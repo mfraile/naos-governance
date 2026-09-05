@@ -7,6 +7,8 @@ Lints fenced Mermaid diagrams in Markdown and standalone ``.mmd`` sources.
 Rules enforced (configurable via .ai/rules/):
   - Disallow emojis and HTML line breaks inside ```mermaid fences.
     Standalone ``.mmd`` sources may use Mermaid's ``<br/>`` label breaks.
+  - Disallow raw semicolons in sequence diagrams. Mermaid treats them as
+    statement separators; use the documented ``#59;`` entity in prose.
   - Enforce direction + layout constraints from .ai/rules/naos-mermaid-governance.yaml
   - Enforce node/edge counts, label lengths, required annotations from
     .ai/rules/naos-mermaid-quality-gates.json
@@ -35,6 +37,7 @@ from pathlib import Path
 
 EMOJI_PATTERN = re.compile(r"[\U0001F300-\U0001F6FF\U0001F900-\U0001FAFF]")
 BR_PATTERN = re.compile(r"<br/?>", re.IGNORECASE)
+MERMAID_ENTITY_CODE_PATTERN = re.compile(r"#[0-9]+;")
 NODE_LABEL_PATTERN = re.compile(r"\[(.*?)\]|\"([^\"]+)\"")
 NODE_PATTERN = re.compile(r"^[ \t]*[A-Za-z0-9_]+[ \t]*\[", re.MULTILINE)
 EDGE_PATTERN = re.compile(r"-->")
@@ -154,6 +157,23 @@ def lint_file(path: Path) -> list[str]:
             if ALLOWED_DIRECTIONS and direction not in ALLOWED_DIRECTIONS:
                 violations.append(
                     f"{path}: line {start + 1}: direction '{direction}' must be one of {sorted(ALLOWED_DIRECTIONS)}"
+                )
+
+        if diagram_type == "sequenceDiagram":
+            for offset, line in enumerate(block_lines):
+                if not line.strip() or line.lstrip().startswith("%%"):
+                    continue
+                without_entity_codes = MERMAID_ENTITY_CODE_PATTERN.sub("", line)
+                if ";" not in without_entity_codes:
+                    continue
+                line_number = (
+                    offset + 1
+                    if path.suffix.lower() == ".mmd"
+                    else start + offset + 2
+                )
+                violations.append(
+                    f"{path}: line {line_number}: raw semicolon in sequenceDiagram; "
+                    "use #59; for prose punctuation"
                 )
 
         if REQUIRE_TITLE and not any(

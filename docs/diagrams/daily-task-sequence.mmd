@@ -15,13 +15,13 @@ sequenceDiagram
         Agent->>CLI: Fill lane handoff input and run handoff report
         CLI->>Review: Route handoff HITL reasons through control-plane review
     else Suggested or deferred lanes
-        Agent->>Review: Keep as planning/scope review; no handoff activation
+        Agent->>Review: Keep as planning/scope review#59; no handoff activation
     end
     alt AI/governance instruction surface changed
         CLI->>Review: Include ai-surface-budget report
     end
     alt Session produced reusable lesson
-        CLI->>Review: Include learning-loop-review; candidate remains proposal-only
+        CLI->>Review: Include learning-loop-review#59; candidate remains proposal-only
     end
     Trace->>Review: Surface uncovered requirements and untraced source
     CLI->>Review: Produce reports and dashboard inputs

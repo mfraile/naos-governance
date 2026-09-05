@@ -879,16 +879,16 @@
       "sha256": "e0ed06f7fccdc09929ca0d0523834093cff2f319a71c90b688bd11441c3d6a9d"
     },
     {
-      "bytes": 4505,
+      "bytes": 4523,
       "mode": "0644",
       "path": "docs/diagrams/brownfield-adoption-sequence.mmd",
-      "sha256": "de6c7fe21f8350d61e8c9f38b62c993f78ede7a047eafa35ea6b986ac1f3ac28"
+      "sha256": "387583226f43052e5ab47d7c77e0de50ccd76392dc05f226c7f4a7446daaba90"
     },
     {
-      "bytes": 1374,
+      "bytes": 1380,
       "mode": "0644",
       "path": "docs/diagrams/daily-task-sequence.mmd",
-      "sha256": "44d5a7346225d2d263194e435ce418f2a69b6cf5adfbfbfe538ee4b1b380e1d9"
+      "sha256": "67ba26ff48fabf8091909f841e0341c6e70846989c268c926b4c37ad53af9e1e"
     },
     {
       "bytes": 882,
@@ -927,10 +927,10 @@
       "sha256": "d9ce1a5d763c93c932d7f1825f502f6e40e10b2cc5ddb5f2d1031cf93336bc83"
     },
     {
-      "bytes": 1293,
+      "bytes": 1296,
       "mode": "0644",
       "path": "docs/diagrams/greenfield-adoption-sequence.mmd",
-      "sha256": "ba8d83d6aac15a99718a4e5ec4bd167082042605e1636859f32a0cd1c1f07d7a"
+      "sha256": "cdfca51ba2bce0d50b38f3f4e1fd5b1846885ba13ba74bbdfcb84e51750927a5"
     },
     {
       "bytes": 1884,
@@ -3129,10 +3129,10 @@
       "sha256": "39bb1757b9eb5b04c4f5cfe5eacaecbfeb58bddf1853c2db54cf77adbddf8e5b"
     },
     {
-      "bytes": 8389,
+      "bytes": 9322,
       "mode": "0644",
       "path": "scripts/validators/lint_mermaid_diagrams.py",
-      "sha256": "a7fe3afd6ef7b0d44819c7fec12afd00fc02d870767229af23342e50ecda5fab"
+      "sha256": "eb98b2ef94c665a6eeb51cd624110f0d2f177716c407d3155d5d4ba4377f25eb"
     },
     {
       "bytes": 10358,
@@ -4883,8 +4883,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 14837056,
+  "source_bytes": 14838016,
   "source_file_count": 812,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "2ca89b60b7d0a1e0c5481ad5f5d9120e13d39259e33f82c11bdc88f0a6f0c379"
+  "tree_sha256": "8d11c6e665d9b3ca240fde13f135c5d4152d6ba3c472e3fcbc99f86da87c59a7"
 }
