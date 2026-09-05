@@ -1,0 +1,101 @@
+
+id: CAP-SECURE-CODING-CONTROLS
+name: Secure-Coding Control Evidence Routing
+description: >
+  Validates the canonical secure/agentic coding register and its detector-to-
+  evidence routes, then reports bounded local evidence availability and freshness
+  without deciding that a control is satisfied or that code is secure.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Structural awareness only; project evidence routing is not required."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns when applicable routed detector evidence is missing or stale."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires the bounded routing report for governed code/evidence review."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured missing or stale routed evidence can block through policy and gates, subject to human review."
+authority:
+  may_read:
+    - naos/secure_coding_control_register.yaml
+    - naos/secure_coding_control_evidence_routes.yaml
+    - naos/reports/claims_validation.json
+    - naos/reports/secret_hygiene.json
+    - naos/reports/dependency_integrity.json
+    - naos/reports/pr_risk_classification.json
+    - naos/reports/external_evidence_ingest.json
+  may_write:
+    - naos/reports/secure_coding_controls.json
+allowed_resources:
+  - "repo-local canonical register and schema"
+  - "repo-local evidence-routing contract"
+  - "repo-local deterministic or explicitly unverified evidence reports"
+prohibited_resources:
+  - "network calls"
+  - "provider or model APIs"
+  - "automatic mutation of the register, policy, gates, waivers, or evidence"
+  - "automatic control-satisfaction or security decisions"
+constraints:
+  - "Must preserve the register-as-requirements and policy/gate/human-as-enforcement authority split."
+  - "Must retain detector coverage boundaries from the canonical register."
+  - "Must classify project-supplied SARIF as unverified external evidence."
+  - "Must expose missing, malformed, or stale evidence without converting availability into control satisfaction."
+required_evidence:
+  - "naos/secure_coding_control_register.yaml"
+  - "naos/secure_coding_control_evidence_routes.yaml"
+  - "naos/reports/secure_coding_controls.json"
+validators:
+  - id: secure_coding_controls
+    script: scripts/naos_secure_coding_controls.py
+    status: available
+gatekeepers:
+  - G4
+  - G6
+dashboard_signals:
+  - "secure_coding_controls.status"
+  - "secure_coding_controls.route_integrity"
+  - "secure_coding_controls.evidence_availability"
+  - "secure_coding_controls.evidence_freshness"
+  - "secure_coding_controls.mapping_verification"
+  - "secure_coding_controls.human_review"
+maturity_path:
+  L0: "Capability, schemas, canonical register, and routing contract exist."
+  L1: "Structural and detector-route validation can run deterministically."
+  L2: "The report is wired into G4/G6, systemic-impact, and control-plane review routes."
+  L3: "Policy-controlled missing/stale evidence findings are reviewed and exception-routed."
+  L4: "Evidence pack and dashboard expose separate bounded dimensions without a composite score."
+  L5: "Mappings and detector routes are periodically independently reviewed with recorded provenance."
+known_limitations:
+  - "Evidence availability is not evidence that a control is satisfied."
+  - "Most controls have no direct deterministic detector and retain human-review requirements."
+  - "File modification time is a freshness signal, not proof of evidence validity."
+  - "External SARIF remains project-supplied unverified evidence unless separately verified."
+not_claimed:
+  - "secure code proof"
+  - "control satisfaction"
+  - "vulnerability-free proof"
+  - "framework conformance"
+  - "compliance proof"
+  - "approval"
+  - "release authorization"
+  - "human review replacement"
+related_docs:
+  - docs/SECURE_CODING_CONTROL_MODEL.md
+  - docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
+  - docs/decisions/ADR-0012-secure-and-agentic-coding-control-register.md
+related_scripts:
+  - scripts/naos_secure_coding_controls.py
+  - scripts/validators/validate_secure_coding_control_register.py
+  - scripts/validators/validate_secure_coding_control_references.py

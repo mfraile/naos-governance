@@ -1,0 +1,117 @@
+id: CAP-UI-EXPERIENCE-QUALITY
+name: UI Experience Quality Review
+description: >
+  Provides deterministic local review evidence for optional UI/UX quality
+  evidence declarations that link screen/object IDs to design stage,
+  FR/NFR/task refs, acceptance criteria, data/API/state dependencies, local
+  token and component evidence, screenshot/state evidence, accessibility and
+  performance evidence, generator provenance, advisory AI critique posture,
+  human design review, user-validation posture, residual risks, and
+  review-required reason codes.
+status: active
+default_maturity: L1
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Optional UI quality evidence hints only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warn when configured UI quality evidence is missing."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Route configured UI quality evidence gaps to human review."
+  assured:
+    target_maturity: L1
+    enforcement: required
+    notes: "First implementation slice remains required review only; blocking requires future validated L3+ maturity and gate wiring."
+authority:
+  may_read:
+    - naos/ui_experience_quality.yaml
+    - declared local UI evidence references
+    - declared design traceability refs
+    - declared model-provider role references for imported advisory AI critique
+  may_write:
+    - naos/reports/ui_experience_quality.json
+  may_block:
+    - "none in this implementation slice; findings are review evidence only"
+allowed_resources:
+  - "repo-local UI experience quality declarations"
+  - "repo-local screen specs, token refs, screenshot refs, test/check refs, accessibility refs, performance refs, review refs, and provenance refs"
+  - "optional external generator or advisory AI critique references as non-authoritative metadata"
+prohibited_resources:
+  - "Figma API calls, MCP calls, Penpot API calls, html.to.design automation, browser automation, screenshot generation, Storybook/Chromatic/Playwright/Lighthouse/axe execution, provider calls, model calls, memory tools, hooks, network access, or IDE/tool configuration mutation"
+  - "design quality, delight, accessibility, privacy, brand, legal, compliance, certification, attestation, approval, merge, release, publication, runtime, or provider/model authority"
+constraints:
+  - "Must remain optional and local-file-first."
+  - "Must not inspect, call, configure, or mutate Figma, MCP, Penpot, html.to.design, IDEs, providers, models, memory tools, browsers, hooks, networks, runtime systems, or design tools."
+  - "Must treat optional generator, screenshot, design-tool, and AI critique refs as review evidence references only, never proof of design quality or successful sync."
+  - "Must not emit a numeric design quality score or automatic pass/fail design approval."
+  - "Must not claim design quality, accessibility compliance, privacy compliance, brand approval, user delight, legal sufficiency, approval, certification, attestation, release authority, publication authority, or proof of compliance."
+required_evidence:
+  - naos/ui_experience_quality.yaml
+  - naos/reports/ui_experience_quality.json
+validators:
+  - id: naos_ui_experience_quality
+    script: scripts/naos_ui_experience_quality.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G4
+  - G5
+  - G6
+dashboard_signals: []
+maturity_path:
+  L0: "Candidate design card and challenge exist."
+  L1: "Disabled-by-default local seed, schema, script, capability contract, setup module, CLI/Make dispatch, generated-adopter packaging, focused tests, and bounded control-plane route exist."
+  L2: "Prompt, instruction, and skill guidance can teach stage-aware evidence capture without implying design authority."
+  L3: "Adopter UI pilots show the report reduces quality-evidence ambiguity without creating false design confidence."
+  L4: "Broader evidence consumers may be considered only after external/team adopter evidence and claim-control review."
+  L5: "Any future design-tool integration remains separately approved, tool-specific, credential-reviewed, and non-authoritative."
+known_limitations:
+  - "The report does not inspect live design-tool state, rendered UI, browser behavior, screenshots, accessibility, privacy, brand quality, user experience, or runtime telemetry."
+  - "The report validates local declaration shape and local evidence references only."
+  - "Evidence references can be stale, incomplete, or insufficient for actual design quality."
+  - "Path existence does not prove semantic correctness, UI quality, or design-code fidelity."
+not_claimed:
+  - "Figma MCP replacement"
+  - "automatic code-to-design synchronization"
+  - "automatic design-to-code synchronization"
+  - "Figma availability"
+  - "Figma API access"
+  - "MCP activation"
+  - "design quality proof"
+  - "user delight proof"
+  - "brand approval"
+  - "accessibility certification"
+  - "privacy compliance determination"
+  - "legal or regulatory sufficiency"
+  - "approval"
+  - "merge approval"
+  - "release authority"
+  - "publication authority"
+  - "certification"
+  - "attestation"
+  - "proof of compliance"
+  - "runtime orchestration"
+  - "provider calls"
+  - "model calls"
+  - "memory activation"
+related_docs:
+  - README.md
+  - NAOS_CATALOG.md
+  - docs/CONTROL_PLANE.md
+  - templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md
+  - docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
+related_scripts:
+  - scripts/naos_ui_experience_quality.py
+  - scripts/naos_control_plane_review.py
+related_schemas:
+  - schemas/naos/ui_experience_quality.schema.json
+  - schemas/naos/control_plane_review.schema.json

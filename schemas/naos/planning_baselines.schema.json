@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:planning_baselines:v1",
+  "title": "NAOS Planning Baselines Ledger",
+  "description": "Versioned project planning baselines. The ledger records deterministic implementation-readiness inputs and human decision references; it does not approve requirements, architecture, implementation, merge, release, or publication.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "current_baseline_id",
+    "baselines",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.planning_baselines.v1"},
+    "current_baseline_id": {
+      "type": ["string", "null"],
+      "pattern": "^PB-[A-Z0-9-]+$"
+    },
+    "baselines": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/baseline"}
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "allOf": [
+        {"contains": {"const": "requirements completeness proof"}},
+        {"contains": {"const": "design approval"}},
+        {"contains": {"const": "implementation approval"}},
+        {"contains": {"const": "task closure"}},
+        {"contains": {"const": "merge or release authority"}}
+      ]
+    },
+    "human_review_required": {"const": true}
+  },
+  "$defs": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^(?:[A-Z0-9]+-)*T-[0-9]{3,}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest_kind", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "digest_kind": {"const": "file_sha256"},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "task_registry_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest_kind", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "digest_kind": {"const": "task_registry_planning_projection_sha256_v1"},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "architecture_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest_kind", "sha256", "applicability"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "digest_kind": {"const": "file_sha256"},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "applicability": {
+          "enum": ["required_by_profile", "not_applicable_by_profile"]
+        }
+      }
+    },
+    "evidence_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "required_by_profile", "digest_kind", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "required_by_profile": {"type": "boolean"},
+        "digest_kind": {"const": "file_sha256"},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "horizontal_foundation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "consuming_vertical_slice_task_id", "changed_result"],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/task_id"},
+        "consuming_vertical_slice_task_id": {"$ref": "#/$defs/task_id"},
+        "changed_result": {"type": "string", "minLength": 1}
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_id",
+        "version",
+        "mode",
+        "state",
+        "supersedes",
+        "owner",
+        "planning_model",
+        "source_bindings",
+        "evidence_refs",
+        "decision_ref",
+        "vertical_slices",
+        "horizontal_foundations"
+      ],
+      "properties": {
+        "baseline_id": {"type": "string", "pattern": "^PB-[A-Z0-9-]+$"},
+        "version": {"type": "integer", "minimum": 1},
+        "mode": {"enum": ["greenfield", "brownfield"]},
+        "state": {
+          "enum": ["draft", "discovery", "implementation_ready", "superseded"]
+        },
+        "supersedes": {
+          "type": ["string", "null"],
+          "pattern": "^PB-[A-Z0-9-]+$"
+        },
+        "owner": {"type": "string", "minLength": 1},
+        "planning_model": {"const": "hybrid_vertical_default"},
+        "source_bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requirements", "architecture", "task_registry", "alignment"],
+          "properties": {
+            "requirements": {"$ref": "#/$defs/source_binding"},
+            "architecture": {"$ref": "#/$defs/architecture_binding"},
+            "task_registry": {"$ref": "#/$defs/task_registry_binding"},
+            "alignment": {"$ref": "#/$defs/source_binding"}
+          }
+        },
+        "evidence_refs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "spec_pack_contract",
+            "pre_implementation_alignment_review"
+          ],
+          "properties": {
+            "spec_pack_contract": {"$ref": "#/$defs/evidence_reference"},
+            "pre_implementation_alignment_review": {"$ref": "#/$defs/evidence_reference"}
+          }
+        },
+        "decision_ref": {"type": ["string", "null"], "minLength": 1},
+        "vertical_slices": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/task_id"},
+          "uniqueItems": true
+        },
+        "horizontal_foundations": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/horizontal_foundation"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"state": {"const": "implementation_ready"}},
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "decision_ref": {"type": "string", "minLength": 1},
+              "vertical_slices": {"minItems": 1},
+              "source_bindings": {
+                "properties": {
+                  "requirements": {"properties": {"sha256": {"$ref": "#/$defs/sha256"}}},
+                  "task_registry": {"properties": {"sha256": {"$ref": "#/$defs/sha256"}}},
+                  "alignment": {"properties": {"sha256": {"$ref": "#/$defs/sha256"}}}
+                }
+              },
+              "evidence_refs": {
+                "properties": {
+                  "spec_pack_contract": {"properties": {"sha256": {"$ref": "#/$defs/sha256"}}},
+                  "pre_implementation_alignment_review": {"properties": {"sha256": {"$ref": "#/$defs/sha256"}}}
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

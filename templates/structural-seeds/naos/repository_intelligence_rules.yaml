@@ -1,0 +1,236 @@
+version: 1
+enabled: true
+capability_id: CAP-LOCAL-CONTEXT-INDEX
+semantics:
+  principle: Repository intelligence returns source-bound navigation candidates; repository source remains authoritative.
+  lifecycle: pre_onboarding_and_ongoing
+  mutation_boundary: operation_owned_dot_naos_upgrade_v1_only
+artifact_families:
+  - id: specifications
+    name: Specifications and requirements
+    artifact_type: spec
+    authority_level: repository_governance
+    include_policy: bounded_sections_and_references
+    chunk_kind: markdown_summary
+    include_patterns:
+      - specs/**/*.md
+      - requirements/**/*.md
+      - docs/requirements/**/*.md
+      - docs/specs/**/*.md
+  - id: documentation
+    name: Project documentation
+    artifact_type: documentation
+    authority_level: repository_documentation
+    include_policy: bounded_sections_and_references
+    chunk_kind: markdown_summary
+    include_patterns:
+      - README.md
+      - README*.md
+      - docs/**/*.md
+      - apps/**/README*.md
+      - packages/**/README*.md
+  - id: tests
+    name: Tests
+    artifact_type: test
+    authority_level: current_git_state
+    include_policy: bounded_source_blocks
+    chunk_kind: bounded_text
+    include_patterns:
+      - tests/**/*.py
+      - tests/**/*.js
+      - tests/**/*.jsx
+      - tests/**/*.ts
+      - tests/**/*.tsx
+      - test/**/*.py
+      - test/**/*.js
+      - test/**/*.ts
+      - "**/*.test.js"
+      - "**/*.test.jsx"
+      - "**/*.test.ts"
+      - "**/*.test.tsx"
+      - "**/*.spec.js"
+      - "**/*.spec.jsx"
+      - "**/*.spec.ts"
+      - "**/*.spec.tsx"
+  - id: migrations
+    name: Database migrations
+    artifact_type: migration
+    authority_level: current_git_state
+    include_policy: bounded_source_blocks
+    chunk_kind: bounded_text
+    include_patterns:
+      - migrations/**/*.sql
+      - db/migrations/**/*.sql
+      - apps/**/migrations/**/*.sql
+      - packages/**/migrations/**/*.sql
+  - id: source
+    name: Source code
+    artifact_type: source
+    authority_level: current_git_state
+    include_policy: bounded_source_blocks
+    chunk_kind: bounded_text
+    include_patterns:
+      - "**/*.py"
+      - "**/*.js"
+      - "**/*.jsx"
+      - "**/*.ts"
+      - "**/*.tsx"
+      - "**/*.mjs"
+      - "**/*.cjs"
+      - "**/*.go"
+      - "**/*.rs"
+      - "**/*.java"
+      - "**/*.kt"
+      - "**/*.kts"
+      - "**/*.cs"
+      - "**/*.rb"
+      - "**/*.php"
+      - "**/*.sh"
+  - id: build_and_configuration
+    name: Build and configuration
+    artifact_type: configuration
+    authority_level: current_git_state
+    include_policy: structured_or_bounded_summary
+    chunk_kind: bounded_text
+    include_patterns:
+      - pyproject.toml
+      - setup.cfg
+      - setup.py
+      - requirements*.txt
+      - package.json
+      - package-lock.json
+      - pnpm-lock.yaml
+      - yarn.lock
+      - Cargo.toml
+      - go.mod
+      - go.work
+      - pom.xml
+      - build.gradle
+      - build.gradle.kts
+      - Makefile
+      - "**/Dockerfile"
+      - .github/workflows/*.yml
+      - .github/workflows/*.yaml
+  - id: ai_surfaces
+    name: AI collaboration surfaces
+    artifact_type: ai_surface
+    authority_level: repository_governance
+    include_policy: bounded_sections_and_references
+    chunk_kind: markdown_summary
+    include_patterns:
+      - AGENTS.md
+      - CLAUDE.md
+      - GEMINI.md
+      - .github/copilot-instructions.md
+      - .github/instructions/**/*.md
+      - .github/prompts/**/*.md
+exclude_patterns: &exclusions
+  - .naos/**
+  - .git/**
+  - "**/.venv/**"
+  - "**/venv/**"
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - build/**
+  - "**/build/**"
+  - "**/coverage/**"
+  - "**/.coverage"
+  - "**/__pycache__/**"
+  - "**/.mypy_cache/**"
+  - "**/.pytest_cache/**"
+  - "**/.ruff_cache/**"
+  - "**/.tox/**"
+  - "**/.nox/**"
+  - .claude/worktrees/**
+  - .naos-g1-repository-intelligence/**
+  - naos/context_index/**
+  - naos/context_queries/**
+  - "**/engram.db"
+  - "**/*.sqlite"
+  - "**/*.db"
+  - "**/*.pem"
+  - "**/*.key"
+  - "**/*.crt"
+  - "**/*.p12"
+  - "**/*.pfx"
+  - .env
+  - .env.*
+default_exclusions: *exclusions
+forbidden_content_categories:
+  - secrets
+  - credentials
+  - tokens
+  - private keys
+  - private memory payloads
+  - customer or tenant data unless explicitly in the approved local scope
+chunking:
+  max_artifacts: 5000
+  max_file_bytes: 2000000
+  max_relationships: 20000
+  max_chunks_per_artifact: 12
+  max_chars_per_chunk: 1600
+  include_full_source: false
+  include_full_reports: false
+fts:
+  enabled: true
+  require_executed_fts5_probe: true
+  fail_if_unavailable_for_activation: true
+  query_sanitization:
+    enabled: true
+    max_query_chars: 120
+    allowed_token_pattern: "[A-Za-z0-9_./:-]+"
+    strip_boolean_operators: true
+    literalize_tokens: true
+graph:
+  runtime: networkx
+  exact_version: 3.6.1
+  format: graphml
+  directed: true
+  multigraph: true
+  activate_only_with_explicit_source_bound_relationships: true
+  read_generated_graphml_only: true
+  max_query_depth: 3
+  max_query_results: 100
+semantic_vector:
+  status: workload_not_defined
+  sqlite_vec_enabled: false
+  embeddings_enabled: false
+  activation_requires:
+    - frozen retrieval workload
+    - deterministic vector producer and model identity
+    - source and data scope
+    - measured incremental effectiveness over exact and FTS retrieval
+profile_review:
+  quickstart: digest_confirmation
+  lite: digest_confirmation
+  standard: digest_confirmation_and_named_review
+  assured: digest_confirmation_and_named_review
+maturity:
+  applicability_independent_of_maturity: true
+  L0: Detect, inventory, and prepare a reviewable plan.
+  L1: Validate and activate the SQLite/FTS generation.
+  L2: Use validated NetworkX/GraphML relationships where explicit edges exist.
+  L3: Operate bounded ongoing refresh and query workflows.
+  L4: Review freshness, exclusions, ranking, and measured effectiveness.
+  L5: Maintain a governed, repeatable learning and effectiveness loop.
+ongoing_use_scope:
+  - brownfield_adoption
+  - requirements_reconstruction
+  - traceability_gap_analysis
+  - task_context
+  - change_impact
+  - source_test_navigation
+  - review_preparation
+limitations:
+  - Results are generated candidates and must be verified against current repository source.
+  - GraphML records observed deterministic relationships; it does not establish semantic truth or complete relationship coverage.
+  - Absence of a relationship is not evidence that no relationship exists.
+  - sqlite-vec remains unavailable until a concrete local workload and deterministic vector producer are approved and validated.
+not_claimed:
+  - source of truth
+  - complete dependency graph
+  - semantic truth
+  - automatic requirements approval
+  - automatic maturity promotion
+  - compliance or readiness approval
+  - sqlite-vec effectiveness

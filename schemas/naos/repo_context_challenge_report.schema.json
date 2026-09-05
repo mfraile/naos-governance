@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repo_context_challenge_report:v1",
+  "title": "NAOS Repo Context Challenge Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "generated_at", "profile", "status", "command", "mode", "naos_root", "project_root", "human_review_required", "not_claimed", "limitations", "findings", "summary", "no_edit_confirmation"],
+  "properties": {
+    "schema": {"const": "naos.repo_context_challenge_report.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
+    "command": {"const": "repo-context-challenge"},
+    "mode": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "session_id": {"type": ["string", "null"]},
+    "generated_by": {"type": "object"},
+    "human_review_required": {"type": "boolean"},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array"},
+    "residual_risks": {"type": "array"},
+    "summary": {"type": "object"},
+    "no_edit_confirmation": {"type": "boolean"}
+  }
+}

@@ -1,0 +1,22 @@
+schema: naos.traceability_gap_register_rules.v1
+profile: quickstart
+updated_at: null
+description: >
+  Rules for recording traceability gaps between candidate requirements,
+  existing docs/specs/source/tests, evidence reports, and human decisions.
+gap_types:
+  - requirement_without_code
+  - code_without_requirement
+  - test_without_requirement
+  - behavior_without_owner
+  - missing_evidence
+  - conflicting_ai_artifact
+  - unresolved_memory_mcp_tool_posture
+  - unresolved_human_decision
+closure_rule: explicit_evidence_or_human_decision_required
+not_claimed:
+  - requirements completeness proof
+  - issue resolution
+  - automatic approval
+  - human review replacement
+human_review_required: true

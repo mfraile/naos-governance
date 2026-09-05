@@ -1,0 +1,80 @@
+name: Threat-model feedback
+description: Add a threat, dispute a residual-risk rating, or report a successful bypass observed in practice.
+title: "[threat-model] "
+labels: [threat-model]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this to suggest a new public security limitation, dispute a public security statement, or report a real bypass observed in practice.
+
+        **For a live, exploitable vulnerability**, do not use this template — file privately via the Security tab. See `SECURITY.md`.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of feedback?
+      options:
+        - New threat to enumerate
+        - Dispute a residual-risk rating
+        - Real-world bypass observed
+        - Missing mitigation
+        - Outdated assumption (AS-1..AS-6)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: asset
+    attributes:
+      label: Which asset is affected?
+      options:
+        - A1 — rules surface
+        - A2 — pre-commit hook
+        - A3 — evidence artefacts
+        - A4 — instinct-promotion gate
+        - Behavioral Governance Readiness — future/project-configured scenario metadata and review posture
+        - A6 — admissibility pack
+        - Unsure / spans multiple
+    validations:
+      required: true
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Concrete scenario
+      description: Describe the threat or observation in operational terms — who does what, when, with what effect. Avoid abstract framing.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: likelihood
+    attributes:
+      label: Your likelihood rating
+      options: [Low, Medium, High, Unsure]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Your impact rating
+      options: [Low, Medium, High, Severe, Unsure]
+    validations:
+      required: true
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested mitigation
+      description: What would close or reduce this threat? Mitigations the kit cannot provide (e.g., adopter CI configuration) are still useful for public security guidance and internal threat notes.
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Optional — incident report, source-file reference, link to a postmortem. Helps the maintainer prioritise.
+    validations:
+      required: false

@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:module_header_traceability:v1",
+  "title": "NAOS Module Header Traceability Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "rules",
+    "summary",
+    "scanned_files",
+    "excluded_files",
+    "findings",
+    "legacy_headers",
+    "missing_headers",
+    "stale_headers",
+    "duplicate_headers",
+    "limitations",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.module_header_traceability.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string"},
+    "status": {
+      "type": "string",
+      "enum": ["pass", "advisory", "warning", "required_missing", "blocked", "disabled", "not_configured", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "rules": {"type": "object"},
+    "summary": {"type": "object"},
+    "scanned_files": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/scanned_file"}
+    },
+    "excluded_files": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "legacy_headers": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "missing_headers": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "stale_headers": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "duplicate_headers": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["id", "severity", "status", "message", "path"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+        "status": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "advisory",
+            "warning",
+            "blocked",
+            "missing",
+            "legacy",
+            "stale",
+            "duplicate",
+            "disabled",
+            "not_configured",
+            "unknown",
+            "missing_required_section",
+            "unknown_reference"
+          ]
+        },
+        "message": {"type": "string"},
+        "path": {"type": "string"},
+        "required_next_actions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "scanned_file": {
+      "type": "object",
+      "required": ["path", "status", "sections_present", "missing_sections"],
+      "properties": {
+        "path": {"type": "string"},
+        "status": {
+          "type": "string",
+          "enum": ["ready", "advisory", "warning", "blocked", "missing", "legacy", "stale", "duplicate", "unknown"]
+        },
+        "module_path": {"type": ["string", "null"]},
+        "sections_present": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "missing_sections": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "requirement_ids": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "task_ids": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "spec_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

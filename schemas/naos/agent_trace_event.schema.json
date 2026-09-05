@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:agent_trace_event:v1",
+  "title": "NAOS Agent Trace Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "generated_at",
+    "session_id",
+    "agent_or_surface",
+    "lifecycle_phase",
+    "action_type",
+    "human_review_required",
+    "limitations",
+    "not_claimed"
+  ],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "session_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": ["string", "null"]},
+    "agent_or_surface": {"type": "string", "minLength": 1},
+    "lifecycle_phase": {
+      "type": "string",
+      "enum": [
+        "session_start",
+        "task_start",
+        "implementation",
+        "review",
+        "checkpoint",
+        "session_end",
+        "task_complete",
+        "unknown"
+      ]
+    },
+    "action_type": {
+      "type": "string",
+      "enum": ["read", "write", "generate", "validate", "query", "review", "route", "summarize", "recommend", "unknown"]
+    },
+    "input_artifacts": {"$ref": "#/$defs/string_list"},
+    "output_artifacts": {"$ref": "#/$defs/string_list"},
+    "referenced_specs": {"$ref": "#/$defs/string_list"},
+    "referenced_tasks": {"$ref": "#/$defs/string_list"},
+    "referenced_capabilities": {"$ref": "#/$defs/string_list"},
+    "commands_run": {"$ref": "#/$defs/string_list"},
+    "files_read": {"$ref": "#/$defs/string_list"},
+    "files_modified": {"$ref": "#/$defs/string_list"},
+    "reports_generated": {"$ref": "#/$defs/string_list"},
+    "evidence_refs": {"$ref": "#/$defs/string_list"},
+    "memory_refs": {"$ref": "#/$defs/string_list"},
+    "advisory_controls_used": {"$ref": "#/$defs/string_list"},
+    "deterministic_controls_used": {"$ref": "#/$defs/string_list"},
+    "source_references": {"$ref": "#/$defs/string_list"},
+    "source_hashes": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "profile": {"type": ["string", "null"], "enum": ["quickstart", "lite", "standard", "assured", null]},
+    "authority_layer": {
+      "type": "string",
+      "enum": ["record_only", "deterministic_primary", "advisory_complementary", "unknown"]
+    },
+    "trace_origin": {
+      "type": "string",
+      "enum": ["manual", "agent_declared", "tool_declared", "generated_report", "unknown"]
+    },
+    "trace_status": {
+      "type": "string",
+      "enum": ["declared", "review_required", "reviewed", "rejected", "superseded", "unknown"]
+    },
+    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "residual_risks": {"$ref": "#/$defs/string_list"},
+    "forbidden_payload_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "performed": {"type": "boolean"},
+        "status": {"type": "string"},
+        "notes": {"$ref": "#/$defs/string_list"}
+      }
+    },
+    "review_status": {
+      "type": "string",
+      "enum": ["not_reviewed", "review_pending", "reviewed", "rejected", "unknown"]
+    },
+    "reviewer": {"type": ["string", "null"]},
+    "reviewed_at": {"type": ["string", "null"], "format": "date-time"},
+    "action_receipt": {"$ref": "#/$defs/action_receipt"},
+    "human_review_required": {"type": "boolean"},
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  },
+  "$defs": {
+    "string_list": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "action_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intended_action",
+        "action_contract",
+        "side_effect_class",
+        "approval_required",
+        "approval_status",
+        "tool_decision"
+      ],
+      "properties": {
+        "intended_action": {"type": "string", "minLength": 1},
+        "action_contract": {
+          "type": "string",
+          "enum": [
+            "read",
+            "draft",
+            "propose",
+            "local_write",
+            "command_execution",
+            "network_call",
+            "external_account_action",
+            "memory_write_candidate",
+            "deploy_release",
+            "unknown"
+          ]
+        },
+        "side_effect_class": {
+          "type": "string",
+          "enum": [
+            "none",
+            "local_read",
+            "local_write",
+            "command_execution",
+            "network_call",
+            "external_account_action",
+            "memory_write",
+            "deploy_release",
+            "unknown"
+          ]
+        },
+        "permission_scope": {"type": ["string", "null"]},
+        "approval_required": {"type": "boolean"},
+        "approval_status": {
+          "type": "string",
+          "enum": ["not_required", "required_pending", "approved", "denied", "expired", "unknown"]
+        },
+        "approval_ref": {"type": ["string", "null"]},
+        "tool_decision": {
+          "type": "string",
+          "enum": ["allowed", "blocked", "modified", "deferred", "failed", "unknown"]
+        },
+        "blocked_or_escalated_reason": {"type": ["string", "null"]},
+        "claim_refs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/action_receipt_claim_ref"}
+        },
+        "memory_operation": {
+          "type": "string",
+          "enum": ["none", "read_candidate", "read_reviewed", "write_candidate", "approved_write", "rejected_write", "unknown"]
+        },
+        "memory_trust_state": {
+          "type": "string",
+          "enum": [
+            "raw_memory_candidate",
+            "review_pending_memory",
+            "rejected_memory",
+            "superseded_memory",
+            "supporting_context_memory",
+            "instruction_grade_memory",
+            "unknown"
+          ]
+        },
+        "memory_use_level": {
+          "type": "string",
+          "enum": ["none", "supporting_context", "instruction", "unknown"]
+        }
+      }
+    },
+    "action_receipt_claim_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim"],
+      "properties": {
+        "claim": {"type": "string", "minLength": 1},
+        "evidence_refs": {"$ref": "#/$defs/string_list"}
+      }
+    }
+  }
+}

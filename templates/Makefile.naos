@@ -1,0 +1,1394 @@
+# Makefile.naos — NAOS Governance Targets
+# Include from your main Makefile: include Makefile.naos
+#
+# Prerequisites: Python scripts under scripts/workflows/ and scripts/
+# NAOS_ROOT: override via environment variable (default: naos)
+# NAOS_PROFILE: quickstart | lite | standard | assured (default: quickstart)
+# NAOS_POLICY: optional explicit policy path
+# NAOS_STRICT: set to 1 to enable strict validator exit behavior where supported
+#
+# Usage:
+#   make -f Makefile.naos gov-refresh       - full governance sync (run after any TASK_REGISTRY change)
+#   make -f Makefile.naos gov-full          - gov-refresh + truth validation
+#   make -f Makefile.naos gov-status        - print counts from PROJECT_STATUS.md
+#   make -f Makefile.naos drift-check       - check for signs of governance drift
+#   make -f Makefile.naos semantic-audit    - optional project-configured AI code quality review
+#   make -f Makefile.naos validate-all      - run all non-AI validators
+#   make -f Makefile.naos naos-readiness    - check lifecycle gates before task/baseline/drift work
+#   make -f Makefile.naos function-index    - regenerate FUNCTION_INDEX.yaml
+#   make -f Makefile.naos naos-claims       - validate project-local claims
+#   make -f Makefile.naos naos-self-check   - run control-plane self-conformance
+#   make -f Makefile.naos naos-capability-maturity - evaluate maturity readiness
+#   make -f Makefile.naos naos-systemic-impact - evaluate systemic impact review obligations
+#   make -f Makefile.naos naos-module-headers - evaluate canonical module-header traceability
+#   make -f Makefile.naos naos-spec-pack-contract - validate spec-pack template contract
+#   make -f Makefile.naos naos-spec-pack-materialize - preview missing profile-required spec files
+#     optional: SPEC_PACK_MATERIALIZE_ARGS="" to copy missing files intentionally
+#   make -f Makefile.naos naos-spec-assembly-worksheet - map adoption evidence to specs for review
+#   make -f Makefile.naos naos-spec-cascade - evaluate spec-cascade coherence
+#   make -f Makefile.naos naos-control-plane-review - evaluate control-plane review/research routing
+#   make -f Makefile.naos naos-secure-coding-controls - validate bounded control/evidence routing
+#   make -f Makefile.naos naos-setup-recommendations - recommend setup modules and next actions
+#   make -f Makefile.naos naos-governance-bypass-posture - report local hook/CI bypass posture
+#   make -f Makefile.naos naos-external-evidence-ingest EXTERNAL_EVIDENCE_SOURCE=scan.sarif - summarize local SARIF evidence
+#   make -f Makefile.naos naos-evidence-attestation - generate local digest/reviewer metadata report
+#   make -f Makefile.naos naos-evidence-sign - emit adopter-signable evidence envelope
+#   make -f Makefile.naos naos-evidence-verify - verify local tamper-evidence and report signature-entry presence
+#   make -f Makefile.naos naos-evidence-conflicts - detect deterministic evidence/review conflicts
+#   make -f Makefile.naos naos-memory-readiness - evaluate memory/context governance readiness
+#   make -f Makefile.naos naos-memory-access - evaluate declared provider/MCP posture and unverified fields
+#   make -f Makefile.naos naos-memory-use-policy - evaluate memory-use policy/review readiness
+#   make -f Makefile.naos naos-learning-loop-review - review governed learning lifecycle records
+#   make -f Makefile.naos naos-adapter-coherence - review Codex/Claude/plugin/adapter coherence
+#   make -f Makefile.naos naos-task-context TASK=T-XXX - generate bounded task context pack
+#   make -f Makefile.naos naos-task-lifecycle TASK=T-XXX - inspect exact active/completed task lifecycle state
+#   make -f Makefile.naos naos-task-complete TASK=T-XXX - record native task completion
+#   make -f Makefile.naos naos-research-record RESEARCH_RECORD=path - validate structured research
+#   make -f Makefile.naos naos-task-claim TASK=T-XXX - claim task coordination metadata
+#   make -f Makefile.naos naos-task-release TASK=T-XXX - release task coordination metadata
+#   make -f Makefile.naos naos-task-claims - summarize task claims
+#   make -f Makefile.naos naos-context-index - build generated local context index
+#   make -f Makefile.naos naos-context-query QUERY="..." - query generated local context candidates
+#   make -f Makefile.naos naos-repository-intelligence-plan - inspect and write a no-target-mutation activation plan
+#   make -f Makefile.naos naos-semantic-candidates - evaluate future semantic candidate readiness
+#   make -f Makefile.naos naos-graph-context - evaluate future graph-context readiness
+#   make -f Makefile.naos naos-graph-query TASK=T-001 - query bounded graph-context candidates
+#   make -f Makefile.naos naos-session-id - create/reuse a session id for namespaced reports
+#   make -f Makefile.naos naos-operator-attribution - resolve local operator attribution
+#   make -f Makefile.naos naos-session-start TASK=T-001 - generate session-start checklist
+#   make -f Makefile.naos naos-session-checkpoint TASK=T-001 - generate checkpoint checklist
+#   make -f Makefile.naos naos-session-end TASK=T-001 - generate session-end checklist
+#   make -f Makefile.naos naos-audit-log - summarize append-only audit log events
+#   make -f Makefile.naos naos-agent-traces - validate declared agent trace events
+#   make -f Makefile.naos naos-harness-trace-import HARNESS_TRACE_SOURCE=naos/harness_traces/example.jsonl - import local harness traces
+#   make -f Makefile.naos naos-ai-surface-budget - evaluate AI-surface context budget and health
+#   make -f Makefile.naos naos-static-grader - run deterministic StaticGrader structural checks
+#   make -f Makefile.naos naos-grader-assessment MODE=audit - build deterministic audit/drift/assess review input
+#   make -f Makefile.naos naos-model-policy - review model-provider declarations without provider calls
+#   make -f Makefile.naos naos-model-telemetry - review local model telemetry evidence
+#   make -f Makefile.naos naos-failure-mode-observations - aggregate local report findings by failure mode
+#   make -f Makefile.naos naos-opencode-config-hygiene - review optional OpenCode config hygiene without runtime activation
+#   make -f Makefile.naos naos-design-traceability - review UI spec-object traceability declarations
+#   make -f Makefile.naos naos-ui-experience-quality - review UI quality evidence declarations
+#   make -f Makefile.naos naos-llm-grader-readiness - report readiness-only LLMGrader posture
+#   make -f Makefile.naos naos-behavioral-readiness - report behavioral baseline readiness and impacters
+#   make -f Makefile.naos naos-plan-coherence - review task claims against task registry/module linkage
+#     optional: PLAN_DIFF_BASE=<ref> to compare changed files with PRE_IMPLEMENTATION_ALIGNMENT path declarations
+#   make -f Makefile.naos naos-package-reality - review package, SBOM, provenance, hash, and opt-in registry evidence
+#   make -f Makefile.naos naos-api-symbol-reality - verify declared Python API symbols without importing targets
+#   make -f Makefile.naos naos-ac-completion-evidence - validate declared AC completion evidence
+#     optional: PACKAGE_REALITY_ARGS="--scan-docs" or "--registry-mode online --allow-network"
+#   make -f Makefile.naos naos-sarif-export - export NAOS findings to SARIF 2.1.0
+#   make -f Makefile.naos naos-policy-overrides - validate static/global/team/operator YAML policy overlays
+#     optional: TEAM_ID=<team-id> OPERATOR_ID=<operator-id> OPERATOR_OVERLAY_ID=<overlay-id>
+#   make -f Makefile.naos naos-dashboard    - refresh DASHBOARD.md + reports/dashboard_summary.json
+#   make -f Makefile.naos naos-pr-governance-summary - summarize PR governance evidence
+#   make -f Makefile.naos naos-agentic-workflow-review - review governed agentic coding workflow controls
+#   make -f Makefile.naos naos-pre-implementation-alignment-review - review Pre-Implementation Alignment
+#   make -f Makefile.naos naos-cross-harness-review-readiness - report future cross-harness/DSSE readiness
+#   make -f Makefile.naos naos-adopt MODE=brownfield - orchestrate professional adoption evidence
+#   make -f Makefile.naos naos-preflight - run adoption preflight checks
+#   make -f Makefile.naos naos-intake ANSWERS=naos/intake_answers.yaml - capture guided intake
+#   make -f Makefile.naos naos-install-plan - build reviewable install plan
+#   make -f Makefile.naos naos-existing-resource-inventory - inventory existing docs/specs/tests/source
+#   make -f Makefile.naos naos-ai-artifact-inventory - inventory AI prompts/rules/hooks
+#   make -f Makefile.naos naos-ai-artifact-reconcile - record AI artifact disposition decisions
+#   make -f Makefile.naos naos-ai-code-provenance - compose review-only AI code provenance evidence
+#   make -f Makefile.naos naos-compliance-posture - compose review-only compliance posture evidence
+#   make -f Makefile.naos naos-memory-resource-inventory - inventory Engram/memory/MCP posture
+#   make -f Makefile.naos naos-memory-resource-reconcile - record memory/MCP decisions
+#   make -f Makefile.naos naos-mcp-resource-inventory - inventory declared MCP configs
+#   make -f Makefile.naos naos-brownfield-baseline - build brownfield baseline evidence
+#   make -f Makefile.naos naos-requirements-reconstruct - emit candidate requirements for review
+#   make -f Makefile.naos naos-traceability-gap-register - emit traceability gaps
+#   make -f Makefile.naos naos-install-decision-record - record adoption decisions
+#   make -f Makefile.naos naos-context-challenge - challenge context before build
+#   make -f Makefile.naos naos-repo-context-challenge - challenge brownfield repo context
+#   make -f Makefile.naos naos-plan-challenge - challenge install/implementation plan
+#   make -f Makefile.naos naos-decision-probe - probe unresolved decisions
+#   make -f Makefile.naos naos-planning-gate-review - review planning gate evidence
+#   make -f Makefile.naos admissibility-pack - bundle review-ready governance evidence
+
+NAOS_ROOT    ?= naos
+NAOS_PROFILE ?= quickstart
+NAOS_POLICY  ?=
+NAOS_STRICT  ?=
+PYTHON       ?= python
+ANSWERS      ?=
+DECISION     ?=
+EXTERNAL_EVIDENCE_SOURCE ?=
+PLAN_DIFF_BASE ?=
+SPEC_PACK_MATERIALIZE_ARGS ?= --dry-run
+SPEC_ASSEMBLY_WORKSHEET_ARGS ?=
+HARNESS_TRACE_SOURCE ?=
+HARNESS_TRACE_IMPORT_ARGS ?=
+RESEARCH_RECORD ?=
+REPOSITORY_INTELLIGENCE_ARGS ?=
+
+NAOS_POLICY_ARG := $(if $(NAOS_POLICY),--policy $(NAOS_POLICY),)
+NAOS_STRICT_ARG := $(if $(NAOS_STRICT),--strict,)
+NAOS_COMMON_ARGS := --profile $(NAOS_PROFILE) --naos-root $(NAOS_ROOT) $(NAOS_POLICY_ARG)
+NAOS_PLAN_DIFF_BASE_ARG := $(if $(PLAN_DIFF_BASE),--diff-base $(PLAN_DIFF_BASE),)
+PACKAGE_REALITY_ARGS ?=
+API_SYMBOL_REALITY_ARGS ?=
+NAOS_ADOPTION_MODE := $(if $(MODE),$(MODE),greenfield)
+NAOS_ADOPTION_ARGS := $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) --mode $(NAOS_ADOPTION_MODE) --no-prompt $(if $(ANSWERS),--answers $(ANSWERS),)
+
+# [ADAPT: Update CONDA_ENV if you use conda; or set PYTHON directly]
+# CONDA_ENV ?= myproject-env
+# PYTHON    = conda run -n $(CONDA_ENV) python
+
+.PHONY: gov-refresh gov-full gov-status drift-check semantic-audit \
+	validate-all function-index naos-audit naos-conformance admissibility-pack \
+	naos-readiness naos-claims naos-self-check naos-roadmap-crosswalk \
+	naos-capability-maturity naos-systemic-impact naos-module-headers \
+	naos-spec-pack-contract naos-spec-pack-materialize naos-spec-assembly-worksheet \
+	naos-spec-cascade naos-control-plane-review naos-secure-coding-controls naos-setup-recommendations naos-governance-bypass-posture naos-external-evidence-ingest naos-evidence-attestation \
+	naos-evidence-sign naos-evidence-verify naos-evidence-conflicts \
+	naos-memory-readiness naos-memory-access naos-memory-use-policy naos-learning-loop-review naos-adapter-coherence naos-task-context naos-task-lifecycle naos-task-complete naos-research-record naos-composed-traceability naos-task-claim naos-task-release naos-task-claims naos-context-index naos-context-query naos-repository-intelligence-plan \
+	naos-semantic-candidates naos-graph-context naos-graph-query \
+	naos-session-id naos-operator-attribution naos-session-start naos-session-checkpoint naos-session-end naos-audit-log \
+	naos-agent-traces naos-harness-trace-import naos-ai-surface-budget naos-static-grader naos-grader-assessment naos-ai-component-inventory naos-agent-sponsor-registry naos-aivss-verify naos-model-policy naos-model-telemetry naos-failure-mode-observations naos-design-traceability naos-ui-experience-quality naos-llm-grader-readiness naos-behavioral-readiness naos-plan-coherence naos-sarif-export naos-policy-overrides \
+	naos-function-index-health naos-test-evidence-map naos-test-evidence \
+	naos-ac-completion-evidence naos-package-reality naos-api-symbol-reality \
+	naos-gate-status naos-gate-evaluate naos-evidence-pack naos-dashboard \
+	naos-pr-risk-classify naos-pr-governance-summary naos-agentic-workflow-review naos-pre-implementation-alignment-review \
+	naos-cross-harness-review-readiness \
+	naos-adopt naos-preflight naos-intake naos-install-plan \
+	naos-existing-resource-inventory naos-ai-artifact-inventory naos-ai-artifact-reconcile naos-ai-code-provenance naos-compliance-posture \
+	naos-memory-resource-inventory naos-memory-resource-reconcile naos-mcp-resource-inventory \
+	naos-brownfield-baseline naos-requirements-reconstruct naos-traceability-gap-register \
+	naos-install-decision-record naos-context-challenge naos-repo-context-challenge \
+	naos-plan-challenge naos-decision-probe naos-planning-gate-review \
+	naos-help
+
+# ─── Core Governance ────────────────────────────────────────────────────────
+
+gov-refresh: ## Sync TASK_REGISTRY → all derived PM files (run after any task change)
+	@echo "🔄 [gov-refresh] Syncing derived PM files..."
+	"$(PYTHON)" scripts/workflows/sync_from_registry.py
+	@echo "🔄 [gov-refresh] Syncing spec statuses..."
+	@if [ -f scripts/workflows/sync_spec_statuses.py ] && [ -f specs/03-requirements.md ]; then \
+		"$(PYTHON)" scripts/workflows/sync_spec_statuses.py; \
+	else \
+		echo "    skip (spec-sync not applicable for this project)"; \
+	fi
+	@echo "🔄 [gov-refresh] Refreshing module headers..."
+	# [ADAPT: uncomment if you use header sync script]
+	# "$(PYTHON)" scripts/naos_sync_headers.py
+	@echo "🔄 [gov-refresh] Emitting AI tool-surface catalogue..."
+	@if [ -f scripts/naos_emit_capabilities.py ]; then \
+		"$(PYTHON)" scripts/naos_emit_capabilities.py --root . --output configs/naos_ai_surface_catalogue.yaml; \
+	else \
+		echo "    skip (surface catalogue emitter not installed for this tier)"; \
+	fi
+	@echo "🔄 [gov-refresh] Refreshing declared AI component inventory..."
+	@if [ -f scripts/naos_ai_component_inventory.py ]; then \
+		"$(PYTHON)" scripts/naos_ai_component_inventory.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (AI component inventory not installed for this tier)"; \
+	fi
+	@echo "🔄 [gov-refresh] Reviewing plan coherence..."
+	@if [ -f scripts/naos_plan_coherence.py ]; then \
+		"$(PYTHON)" scripts/naos_plan_coherence.py $(NAOS_COMMON_ARGS); \
+	else \
+		echo "    skip (plan coherence reviewer not installed for this tier)"; \
+	fi
+	@echo "🔄 [gov-refresh] Regenerating dashboard..."
+	"$(PYTHON)" scripts/workflows/generate_naos_dashboard.py $(NAOS_COMMON_ARGS)
+	@echo "✅ gov-refresh complete"
+
+gov-full: gov-refresh ## gov-refresh + truth validation
+	@echo "🔍 [gov-full] Running truth validation..."
+	"$(PYTHON)" scripts/naos_validate_truth.py
+	@echo "✅ gov-full complete"
+
+gov-status: ## Print quick status from PROJECT_STATUS.md
+	@grep -A 5 "## Current Status" $(NAOS_ROOT)/PROJECT_STATUS.md 2>/dev/null || \
+	 echo "naos/PROJECT_STATUS.md not found. Run: make -f Makefile.naos gov-refresh"
+
+# ─── Validation ─────────────────────────────────────────────────────────────
+
+validate-all: ## Run all non-AI validators (task registry, task coherence, metrics, specs, traceability, configs, architecture, mermaid)
+	@echo "🔍 Running governance validators..."
+	@if [ -f scripts/naos_validate_truth.py ]; then \
+		"$(PYTHON)" scripts/naos_validate_truth.py; \
+	else \
+		echo "    skip (truth validator not installed for this tier)"; \
+	fi
+	@echo "  — task registry semantics"
+	@if [ -f scripts/naos_validate_task_registry.py ]; then \
+		"$(PYTHON)" scripts/naos_validate_task_registry.py; \
+	else \
+		echo "    skip (task registry validator not installed for this tier)"; \
+	fi
+	@echo "  — task coherence"
+	@if [ -f scripts/validators/validate_task_coherence.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_task_coherence.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — metrics coherence"
+	@if [ -f scripts/validators/validate_metrics_coherence.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_metrics_coherence.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — spec files"
+	@if [ -f scripts/validators/validate_specs.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_specs.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — spec-pack contract"
+	@if [ -f scripts/naos_spec_pack_contract.py ]; then \
+		"$(PYTHON)" scripts/naos_spec_pack_contract.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (spec-pack contract validator not installed for this tier)"; \
+	fi
+	@echo "  — spec cascade coherence"
+	@if [ -f scripts/naos_detect_spec_drift.py ] && [ -f specs/03-requirements.md ]; then \
+		"$(PYTHON)" scripts/naos_detect_spec_drift.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (spec cascade not applicable for this project)"; \
+	fi
+	@echo "  — traceability headers"
+	@if [ -f scripts/validators/validate_traceability_headers.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_traceability_headers.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — canonical module-header traceability"
+	@if [ -f scripts/naos_module_header_traceability.py ]; then \
+		"$(PYTHON)" scripts/naos_module_header_traceability.py $(NAOS_COMMON_ARGS); \
+	else \
+		echo "    skip (module-header traceability validator not installed for this tier)"; \
+	fi
+	@echo "  — control-plane review routing"
+	@if [ -f scripts/naos_control_plane_review.py ]; then \
+		"$(PYTHON)" scripts/naos_control_plane_review.py $(NAOS_COMMON_ARGS); \
+	else \
+		echo "    skip (control-plane review evaluator not installed for this tier)"; \
+	fi
+	@echo "  — configs"
+	@if [ -f scripts/validators/validate_configs.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_configs.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — architecture coherence"
+	@if [ -f scripts/validators/validate_architecture_coherence.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_architecture_coherence.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — mermaid diagrams"
+	@if [ -f scripts/validators/lint_mermaid_diagrams.py ]; then \
+		"$(PYTHON)" scripts/validators/lint_mermaid_diagrams.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — test AC/SCEN references"
+	@if [ -f scripts/validators/validate_test_ac_references.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_test_ac_references.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — AC completion evidence"
+	@if [ -f scripts/naos_ac_completion_evidence.py ]; then \
+		"$(PYTHON)" scripts/naos_ac_completion_evidence.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (AC completion evidence validator not installed for this tier)"; \
+	fi
+	@echo "  — agent frontmatter"
+	@if [ -f scripts/validators/validate_agents.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_agents.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — skill frontmatter"
+	@if [ -f scripts/validators/validate_skills.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_skills.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — instruction frontmatter"
+	@if [ -f scripts/validators/validate_instructions.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_instructions.py; \
+	else \
+		echo "    skip (validator not installed for this tier)"; \
+	fi
+	@echo "  — AI tool-surface catalogue"
+	@if [ -f scripts/naos_emit_capabilities.py ]; then \
+		"$(PYTHON)" scripts/naos_emit_capabilities.py --root . --output configs/naos_ai_surface_catalogue.yaml --check; \
+	else \
+		echo "    skip (surface catalogue emitter not installed for this tier)"; \
+	fi
+	@echo "  — memory setup"
+	@if [ -f scripts/validators/validate_memory_setup.py ]; then \
+		"$(PYTHON)" scripts/validators/validate_memory_setup.py --root .; \
+	else \
+		echo "    skip (memory validator not installed for this tier)"; \
+	fi
+	@echo "  — control-plane self-check"
+	@$(MAKE) --no-print-directory -f Makefile.naos naos-self-check
+	# [ADAPT: add project-specific validators here]
+	@echo "NAOS validate-all finished; review findings above before treating the run as clean."
+
+naos-readiness: ## Check lifecycle readiness before Phase 2, baseline, or drift work
+	@echo "🔎 Checking NAOS lifecycle readiness..."
+	"$(PYTHON)" scripts/naos_readiness.py --target baseline
+
+drift-check: ## Check for governance drift indicators
+	@echo "🔍 Checking for governance drift..."
+	@# Check for archive folders
+	@find . -type d -name "archive" -not -path "./.git/*" \
+	  -exec echo "  ⚠️  Archive folder found: {}" \;
+	@# Check for backup files
+	@find . \( -name "*.bak" -o -name "*_backup*" \) -not -path "./.git/*" \
+	  -exec echo "  ⚠️  Backup file found: {}" \;
+	@# Check for session files
+	@find . -name "session_*.md" -not -path "./.git/*" \
+	  -exec echo "  ⚠️  Session file found: {}" \;
+	@echo "✅ drift-check complete (see ⚠️ warnings above)"
+
+# ─── Code Quality ────────────────────────────────────────────────────────────
+
+function-index: ## Regenerate FUNCTION_INDEX.yaml from src/
+	@echo "🔄 Regenerating function index..."
+	"$(PYTHON)" scripts/naos_code_quality_audit.py --generate-index
+	@echo "✅ Function index regenerated: naos/inventory/FUNCTION_INDEX.yaml"
+
+semantic-audit: ## Optional project-configured AI code quality review (uses LLM when enabled)
+	@echo "🔍 Running semantic audit..."
+	"$(PYTHON)" scripts/naos_code_quality_audit.py --semantic-audit
+	@echo "✅ Semantic audit complete"
+
+# ─── Governance Audit ──────────────────────────────────────────────────────────
+
+naos-audit: ## Governance completeness audit — 7 categories, 0-10 scoring (inspired by ECC harness-audit)
+	@echo "🔍 Running governance completeness audit..."
+	"$(PYTHON)" scripts/naos_governance_audit.py
+	@echo "✅ Audit complete"
+
+naos-conformance: ## Static conformance check — writes naos/reports/conformance_latest.json
+	@echo "🔍 Running conformance check..."
+	"$(PYTHON)" .github/autoresearch/runner.py --conformance \
+		--output naos/reports/conformance_latest.json
+	@echo "✅ Conformance check complete — run 'make -f Makefile.naos gov-refresh' to update DASHBOARD.md"
+
+admissibility-pack: ## Bundle governance evidence for reviewer/vendor-cascade handoff
+	@echo "📦 Bundling admissibility evidence pack..."
+	@[ -f scripts/workflows/make_admissibility_pack.py ] || { echo "❌ scripts/workflows/make_admissibility_pack.py not installed for this project tier"; exit 1; }
+	"$(PYTHON)" scripts/workflows/make_admissibility_pack.py --root $(NAOS_ROOT)
+	@echo "✅ Admissibility pack ready under $(NAOS_ROOT)/"
+
+# ─── Control-Plane Validators ───────────────────────────────────────────────
+
+naos-claims: ## Validate public/project claims against local evidence
+	@echo "🔎 [naos-claims] Validating claims for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_validate_claims.py ]; then \
+		"$(PYTHON)" scripts/naos_validate_claims.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (claims validator not installed for this tier)"; \
+	fi
+
+naos-self-check: ## Run control-plane self-conformance summary
+	@echo "🔎 [naos-self-check] Running self-conformance for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_self_check.py ]; then \
+		"$(PYTHON)" scripts/naos_self_check.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (self-check validator not installed for this tier)"; \
+	fi
+
+naos-capability-maturity: ## Evaluate capability maturity readiness without recording promotion
+	@echo "🔎 [naos-capability-maturity] Evaluating maturity readiness for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_capability_maturity.py ]; then \
+		"$(PYTHON)" scripts/naos_capability_maturity.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (capability maturity evaluator not installed for this tier)"; \
+	fi
+
+naos-systemic-impact: ## Evaluate systemic impact and coherence review obligations
+	@echo "🔎 [naos-systemic-impact] Evaluating systemic impact review for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_systemic_impact.py ]; then \
+		"$(PYTHON)" scripts/naos_systemic_impact.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (systemic impact evaluator not installed for this tier)"; \
+	fi
+
+naos-module-headers: ## Evaluate canonical module-header traceability
+	@echo "🔎 [naos-module-headers] Evaluating module-header traceability for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_module_header_traceability.py ]; then \
+		"$(PYTHON)" scripts/naos_module_header_traceability.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (module-header traceability validator not installed for this tier)"; \
+	fi
+
+naos-spec-pack-contract: ## Validate spec-pack template contract conformance
+	@echo "🔎 [naos-spec-pack-contract] Validating spec-pack contract for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_spec_pack_contract.py ]; then \
+		"$(PYTHON)" scripts/naos_spec_pack_contract.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (spec-pack contract validator not installed for this tier)"; \
+	fi
+
+naos-spec-pack-materialize: ## Copy or preview missing profile-required spec-pack files
+	@echo "🔎 [naos-spec-pack-materialize] Materializing spec-pack files for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_spec_pack_materialize.py ]; then \
+		"$(PYTHON)" scripts/naos_spec_pack_materialize.py . $(NAOS_COMMON_ARGS) $(SPEC_PACK_MATERIALIZE_ARGS); \
+	else \
+		echo "    skip (spec-pack materializer not installed for this tier)"; \
+	fi
+
+naos-spec-assembly-worksheet: ## Map adoption evidence to manifest-declared specs for review
+	@echo "🔎 [naos-spec-assembly-worksheet] Building review-only spec assembly worksheet for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_spec_assembly_worksheet.py ]; then \
+		"$(PYTHON)" scripts/naos_spec_assembly_worksheet.py . $(NAOS_COMMON_ARGS) $(SPEC_ASSEMBLY_WORKSHEET_ARGS); \
+	else \
+		echo "    skip (spec assembly worksheet not installed for this tier)"; \
+	fi
+
+naos-spec-cascade: ## Evaluate spec-cascade coherence
+	@echo "🔎 [naos-spec-cascade] Evaluating spec-cascade coherence for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_detect_spec_drift.py ] && [ -f specs/03-requirements.md ]; then \
+		"$(PYTHON)" scripts/naos_detect_spec_drift.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (spec cascade not applicable for this project)"; \
+	fi
+
+naos-control-plane-review: ## Evaluate control-plane review and research-routing items
+	@echo "🔎 [naos-control-plane-review] Evaluating review/routing items for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_control_plane_review.py ]; then \
+		"$(PYTHON)" scripts/naos_control_plane_review.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (control-plane review evaluator not installed for this tier)"; \
+	fi
+
+naos-secure-coding-controls: ## Validate canonical secure-coding control evidence routes
+	@echo "🔎 [naos-secure-coding-controls] Evaluating bounded control/evidence routing for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_secure_coding_controls.py ]; then \
+		"$(PYTHON)" scripts/naos_secure_coding_controls.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (secure-coding control routing not installed for this tier)"; \
+	fi
+
+naos-setup-recommendations: ## Recommend setup modules, consequences, and next actions
+	@echo "🔎 [naos-setup-recommendations] Generating setup recommendations for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_setup_recommendations.py ]; then \
+		"$(PYTHON)" scripts/naos_setup_recommendations.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (setup recommendation reporter not installed for this tier)"; \
+	fi
+
+naos-governance-bypass-posture: ## Report local hook/CI bypass posture without claiming prevention
+	@echo "🔎 [naos-governance-bypass-posture] Reporting governance-bypass posture for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_governance_bypass_posture.py ]; then \
+		"$(PYTHON)" scripts/naos_governance_bypass_posture.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (governance-bypass posture reporter not installed for this tier)"; \
+	fi
+
+naos-external-evidence-ingest: ## Ingest local SARIF as unverified external review evidence
+	@echo "🔎 [naos-external-evidence-ingest] Summarizing external evidence for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_external_evidence_ingest.py ]; then \
+		"$(PYTHON)" scripts/naos_external_evidence_ingest.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(if $(EXTERNAL_EVIDENCE_SOURCE),--source $(EXTERNAL_EVIDENCE_SOURCE),); \
+	else \
+		echo "    skip (external evidence ingest script not installed for this tier)"; \
+	fi
+
+naos-evidence-attestation: ## Generate local evidence digest and reviewer metadata report
+	@echo "🔎 [naos-evidence-attestation] Generating local evidence attestation for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_evidence_attestation.py ]; then \
+		"$(PYTHON)" scripts/naos_evidence_attestation.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (evidence attestation reporter not installed for this tier)"; \
+	fi
+
+naos-evidence-sign: ## Emit adopter-signable evidence envelope over manifest root
+	@echo "🔎 [naos-evidence-sign] Emitting adopter-signable evidence envelope for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_evidence_signing.py ]; then \
+		"$(PYTHON)" scripts/naos_evidence_signing.py --mode emit $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (evidence signing bridge not installed for this tier)"; \
+	fi
+
+naos-evidence-verify: ## Verify local tamper-evidence and report signature-entry presence
+	@echo "🔎 [naos-evidence-verify] Verifying local tamper-evidence for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_evidence_signing.py ]; then \
+		"$(PYTHON)" scripts/naos_evidence_signing.py --mode verify $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (evidence verification bridge not installed for this tier)"; \
+	fi
+
+naos-memory-readiness: ## Evaluate AI context-continuity and memory-governance readiness
+	@echo "🔎 [naos-memory-readiness] Evaluating memory/context readiness for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_memory_context_readiness.py ]; then \
+		"$(PYTHON)" scripts/naos_memory_context_readiness.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (memory context readiness reporter not installed for this tier)"; \
+	fi
+
+naos-memory-access: ## Verify declared memory provider/MCP access posture without memory calls
+	@echo "🔎 [naos-memory-access] Verifying memory provider/MCP access posture for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_memory_provider_access.py ]; then \
+		"$(PYTHON)" scripts/naos_memory_provider_access.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (memory provider access verifier not installed for this tier)"; \
+	fi
+
+naos-memory-use-policy: ## Evaluate memory-use policy, review items, recall trace, and audit-event readiness
+	@echo "🔎 [naos-memory-use-policy] Evaluating memory-use policy for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_memory_use_policy.py ]; then \
+		"$(PYTHON)" scripts/naos_memory_use_policy.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (memory-use policy reporter not installed for this tier)"; \
+	fi
+
+naos-learning-loop-review: ## Review governed learning lifecycle records
+	@echo "🔎 [naos-learning-loop-review] Reviewing governed learning lifecycle for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_learning_loop_review.py ]; then \
+		"$(PYTHON)" scripts/naos_learning_loop_review.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (learning-loop reviewer not installed for this tier)"; \
+	fi
+
+naos-adapter-coherence: ## Review Codex/Claude/plugin/adapter coherence
+	@echo "🔎 [naos-adapter-coherence] Reviewing adapter coherence for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_adapter_coherence.py ]; then \
+		"$(PYTHON)" scripts/naos_adapter_coherence.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (adapter-coherence reviewer not installed for this tier)"; \
+	fi
+
+naos-task-context: ## Generate bounded task context pack for TASK=T-XXX
+	@echo "🔎 [naos-task-context] Generating bounded task context for profile $(NAOS_PROFILE), task $(TASK)..."
+	@if [ -z "$(TASK)" ]; then \
+		echo "    set TASK=T-XXX to generate a task-specific pack"; \
+	fi
+	@if [ -f scripts/naos_task_context_pack.py ]; then \
+		"$(PYTHON)" scripts/naos_task_context_pack.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(if $(TASK),--task $(TASK),); \
+	else \
+		echo "    skip (task context pack generator not installed for this tier)"; \
+	fi
+
+naos-task-lifecycle: ## Inspect exact active/completed task lifecycle state for TASK=T-XXX
+	@echo "🔎 [naos-task-lifecycle] Inspecting lifecycle state for profile $(NAOS_PROFILE), task $(TASK)..."
+	@if [ -z "$(TASK)" ]; then \
+		echo "    set TASK=T-XXX or TASK=NAMESPACE-T-XXX"; \
+	fi
+	@if [ -f scripts/naos_task_lifecycle.py ]; then \
+		"$(PYTHON)" scripts/naos_task_lifecycle.py $(NAOS_COMMON_ARGS) --action inspect $(if $(TASK),--task $(TASK),) --recovery-mode $(if $(RECOVERY_MODE),$(RECOVERY_MODE),auto); \
+	else \
+		echo "    skip (task lifecycle script not installed for this tier)"; \
+	fi
+
+naos-task-complete: ## Record native task completion for TASK=T-XXX
+	@echo "🔎 [naos-task-complete] Recording completion for profile $(NAOS_PROFILE), task $(TASK)..."
+	@if [ -z "$(TASK)" ]; then \
+		echo "    set TASK=T-XXX or TASK=NAMESPACE-T-XXX"; \
+	fi
+	@if [ -f scripts/naos_task_lifecycle.py ]; then \
+		"$(PYTHON)" scripts/naos_task_lifecycle.py $(NAOS_COMMON_ARGS) --action complete $(if $(TASK),--task $(TASK),) $(if $(VERIFICATION_STATE),--verification-state $(VERIFICATION_STATE),) $(TASK_COMPLETE_ARGS); \
+	else \
+		echo "    skip (task lifecycle script not installed for this tier)"; \
+	fi
+
+naos-research-record: ## Validate structured research record at RESEARCH_RECORD=path
+	@echo "🔎 [naos-research-record] Validating structured research record for profile $(NAOS_PROFILE)..."
+	@if [ -z "$(RESEARCH_RECORD)" ]; then \
+		echo "    set RESEARCH_RECORD=naos/research/<record>.yaml"; \
+		exit 2; \
+	fi
+	@if [ -f scripts/naos_research_record.py ]; then \
+		"$(PYTHON)" scripts/naos_research_record.py $(RESEARCH_RECORD) $(NAOS_COMMON_ARGS); \
+	else \
+		echo "    skip (research record validator not installed for this tier; validate against schemas/naos/research_record.schema.json)"; \
+	fi
+
+naos-composed-traceability: ## Compose explicit task/spec/source/test/completion links
+	@echo "🔎 [naos-composed-traceability] Composing explicit traceability links for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_composed_traceability.py ]; then \
+		"$(PYTHON)" scripts/naos_composed_traceability.py $(NAOS_COMMON_ARGS); \
+	else \
+		echo "    skip (composed traceability reporter not installed for this tier)"; \
+	fi
+
+naos-context-index: ## Build generated local context index
+	@echo "🔎 [naos-context-index] Building generated local context index for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_local_context_index.py ]; then \
+		"$(PYTHON)" scripts/naos_local_context_index.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (local context index generator not installed for this tier)"; \
+	fi
+
+naos-context-query: ## Query generated local context candidates with QUERY=...
+	@echo "🔎 [naos-context-query] Querying generated local context candidates for profile $(NAOS_PROFILE)..."
+	@if [ -z "$(QUERY)" ]; then \
+		echo "    set QUERY=\"...\" or run scripts/naos_local_context_query.py with --path/--task/--spec/--capability"; \
+	fi
+	@if [ -f scripts/naos_local_context_query.py ]; then \
+		"$(PYTHON)" scripts/naos_local_context_query.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(if $(QUERY),--query "$(QUERY)",); \
+	else \
+		echo "    skip (local context query reporter not installed for this tier)"; \
+	fi
+
+naos-repository-intelligence-plan: ## Inspect repository and prepare a digest-bound no-target-mutation plan
+	@echo "🔎 [naos-repository-intelligence-plan] Inspecting source-bound repository intelligence for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_repository_intelligence.py ]; then \
+		"$(PYTHON)" scripts/naos_repository_intelligence.py plan . $(NAOS_COMMON_ARGS) $(REPOSITORY_INTELLIGENCE_ARGS); \
+	else \
+		echo "    skip (repository-intelligence script not installed locally; use naos repository-intelligence plan .)"; \
+	fi
+
+naos-semantic-candidates: ## Evaluate readiness for a future semantic candidate layer
+	@echo "🔎 [naos-semantic-candidates] Evaluating semantic candidate readiness for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_semantic_candidate_readiness.py ]; then \
+		"$(PYTHON)" scripts/naos_semantic_candidate_readiness.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (semantic candidate readiness reporter not installed for this tier)"; \
+	fi
+
+naos-graph-context: ## Evaluate readiness for future graph-context traversal
+	@echo "🔎 [naos-graph-context] Evaluating graph-context readiness for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_graph_context_readiness.py ]; then \
+		"$(PYTHON)" scripts/naos_graph_context_readiness.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (graph-context readiness reporter not installed for this tier)"; \
+	fi
+
+naos-graph-query: ## Query bounded explicit graph-context candidates with TASK=... or QUERY_ARGS=...
+	@echo "🔎 [naos-graph-query] Querying graph-context candidates for profile $(NAOS_PROFILE)..."
+	@if [ -z "$(TASK)$(ARTIFACT_ID)$(SPEC)$(CAPABILITY)$(QUERY_ARGS)" ]; then \
+		echo "    set TASK=T-XXX, ARTIFACT_ID=A0001, SPEC=..., CAPABILITY=..., or QUERY_ARGS=\"...\""; \
+	fi
+	@if [ -f scripts/naos_graph_context_query.py ]; then \
+		"$(PYTHON)" scripts/naos_graph_context_query.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(if $(TASK),--task $(TASK),) $(if $(ARTIFACT_ID),--artifact-id $(ARTIFACT_ID),) $(if $(SPEC),--spec "$(SPEC)",) $(if $(CAPABILITY),--capability $(CAPABILITY),) $(QUERY_ARGS); \
+	else \
+		echo "    skip (graph-context query reporter not installed for this tier)"; \
+	fi
+
+naos-session-id: ## Create or reuse a session id and namespaced report root
+	@echo "🔎 [naos-session-id] Creating/reusing session identity for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_session_identity.py ]; then \
+		"$(PYTHON)" scripts/naos_session_identity.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(if $(SESSION_ID),--session-id $(SESSION_ID),) $(if $(NEW_SESSION),--new-session,) $(if $(CLOSE_SESSION),--close-session,) $(if $(TASK),--task $(TASK),); \
+	else \
+		echo "    skip (session identity reporter not installed for this tier)"; \
+	fi
+
+naos-operator-attribution: ## Resolve local operator attribution for a run/session
+	@echo "🔎 [naos-operator-attribution] Resolving local operator attribution for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_operator_attribution.py ]; then \
+		"$(PYTHON)" scripts/naos_operator_attribution.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(if $(SESSION_ID),--session-id $(SESSION_ID),) $(if $(NEW_SESSION),--new-session,) $(if $(CLOSE_SESSION),--close-session,); \
+	else \
+		echo "    skip (operator attribution reporter not installed for this tier)"; \
+	fi
+
+naos-session-start: ## Generate deterministic session-start report for TASK=T-XXX
+	@echo "🔎 [naos-session-start] Generating session-start report for profile $(NAOS_PROFILE), task $(TASK)..."
+	@if [ -z "$(TASK)" ]; then \
+		echo "    set TASK=T-XXX or let the reporter discover a task from active cards/registry"; \
+	fi
+	@if [ -f scripts/naos_session_lifecycle.py ]; then \
+		"$(PYTHON)" scripts/naos_session_lifecycle.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) --mode session_start $(if $(TASK),--task $(TASK),) $(if $(SESSION_ID),--session-id $(SESSION_ID),) $(if $(NEW_SESSION),--new-session,); \
+	else \
+		echo "    skip (session lifecycle reporter not installed for this tier)"; \
+	fi
+
+naos-session-checkpoint: ## Generate deterministic checkpoint report for TASK=T-XXX
+	@echo "🔎 [naos-session-checkpoint] Generating checkpoint report for profile $(NAOS_PROFILE), task $(TASK)..."
+	@if [ -z "$(TASK)" ]; then \
+		echo "    set TASK=T-XXX or let the reporter discover a task from active cards/registry"; \
+	fi
+	@if [ -f scripts/naos_session_lifecycle.py ]; then \
+		"$(PYTHON)" scripts/naos_session_lifecycle.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) --mode session_checkpoint $(if $(TASK),--task $(TASK),) $(if $(SESSION_ID),--session-id $(SESSION_ID),) $(if $(NEW_SESSION),--new-session,); \
+	else \
+		echo "    skip (session lifecycle reporter not installed for this tier)"; \
+	fi
+
+naos-session-end: ## Generate deterministic session-end report for TASK=T-XXX
+	@echo "🔎 [naos-session-end] Generating session-end report for profile $(NAOS_PROFILE), task $(TASK)..."
+	@if [ -z "$(TASK)" ]; then \
+		echo "    set TASK=T-XXX or let the reporter discover a task from active cards/registry"; \
+	fi
+	@if [ -f scripts/naos_session_lifecycle.py ]; then \
+		"$(PYTHON)" scripts/naos_session_lifecycle.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) --mode session_end $(if $(TASK),--task $(TASK),) $(if $(SESSION_ID),--session-id $(SESSION_ID),) $(if $(NEW_SESSION),--new-session,) $(if $(CLOSE_SESSION),--close-session,); \
+	else \
+		echo "    skip (session lifecycle reporter not installed for this tier)"; \
+	fi
+
+naos-audit-log: ## Summarize append-only audit log events
+	@echo "🔎 [naos-audit-log] Summarizing audit log events for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_audit_log.py ]; then \
+		"$(PYTHON)" scripts/naos_audit_log.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(if $(EVENT_TYPE),--event-type $(EVENT_TYPE),) $(if $(SESSION_ID),--session-id $(SESSION_ID),); \
+	else \
+		echo "    skip (audit log reporter not installed for this tier)"; \
+	fi
+
+naos-evidence-conflicts: ## Detect deterministic evidence/review conflicts
+	@echo "🔎 [naos-evidence-conflicts] Detecting evidence conflicts for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_evidence_conflicts.py ]; then \
+		"$(PYTHON)" scripts/naos_evidence_conflicts.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (evidence conflict detector not installed for this tier)"; \
+	fi
+
+naos-task-claim: ## Claim task coordination metadata for TASK=T-XXX
+	@echo "🔎 [naos-task-claim] Claiming task $(TASK) for profile $(NAOS_PROFILE)..."
+	@if [ -z "$(TASK)" ]; then \
+		echo "    set TASK=T-XXX"; \
+	fi
+	@if [ -f scripts/naos_task_claims.py ]; then \
+		"$(PYTHON)" scripts/naos_task_claims.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) --action claim $(if $(TASK),--task $(TASK),) $(if $(SESSION_ID),--session-id $(SESSION_ID),) $(if $(OPERATOR_ID),--operator-id $(OPERATOR_ID),) $(if $(BRANCH),--branch $(BRANCH),); \
+	else \
+		echo "    skip (task claim reporter not installed for this tier)"; \
+	fi
+
+naos-task-release: ## Release task coordination metadata for TASK=T-XXX
+	@echo "🔎 [naos-task-release] Releasing task $(TASK) for profile $(NAOS_PROFILE)..."
+	@if [ -z "$(TASK)" ]; then \
+		echo "    set TASK=T-XXX"; \
+	fi
+	@if [ -f scripts/naos_task_claims.py ]; then \
+		"$(PYTHON)" scripts/naos_task_claims.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) --action release $(if $(TASK),--task $(TASK),) $(if $(SESSION_ID),--session-id $(SESSION_ID),) $(if $(OPERATOR_ID),--operator-id $(OPERATOR_ID),) $(if $(BRANCH),--branch $(BRANCH),); \
+	else \
+		echo "    skip (task claim reporter not installed for this tier)"; \
+	fi
+
+naos-task-claims: ## Summarize task claim coordination metadata
+	@echo "🔎 [naos-task-claims] Summarizing task claims for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_task_claims.py ]; then \
+		"$(PYTHON)" scripts/naos_task_claims.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) --action list; \
+	else \
+		echo "    skip (task claim reporter not installed for this tier)"; \
+	fi
+
+naos-agent-traces: ## Validate declared agent trace events without runtime capture
+	@echo "🔎 [naos-agent-traces] Validating declared agent trace events for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_agent_trace_validate.py ]; then \
+		"$(PYTHON)" scripts/naos_agent_trace_validate.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (agent trace validator not installed for this tier)"; \
+	fi
+
+naos-harness-trace-import: ## Import local harness JSONL/NDJSON as declared trace events
+	@echo "🔎 [naos-harness-trace-import] Importing local harness traces for profile $(NAOS_PROFILE)..."
+	@if [ -z "$(HARNESS_TRACE_SOURCE)" ]; then \
+		echo "    set HARNESS_TRACE_SOURCE=naos/harness_traces/example.jsonl"; \
+	fi
+	@if [ -f scripts/naos_harness_trace_import.py ]; then \
+		"$(PYTHON)" scripts/naos_harness_trace_import.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(if $(HARNESS_TRACE_SOURCE),--source $(HARNESS_TRACE_SOURCE),) $(HARNESS_TRACE_IMPORT_ARGS); \
+	else \
+		echo "    skip (harness trace importer not installed for this tier)"; \
+	fi
+
+naos-ai-surface-budget: ## Evaluate AI-surface context budget and health
+	@echo "🔎 [naos-ai-surface-budget] Evaluating AI-surface context budget and health for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_ai_surface_budget.py ]; then \
+		"$(PYTHON)" scripts/naos_ai_surface_budget.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (AI-surface budget validator not installed for this tier)"; \
+	fi
+
+naos-static-grader: ## Run deterministic StaticGrader structural checks
+	@echo "🔎 [naos-static-grader] Running deterministic StaticGrader for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_static_grader.py ]; then \
+		"$(PYTHON)" scripts/naos_static_grader.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (StaticGrader script not installed for this tier)"; \
+	fi
+
+naos-grader-assessment: ## Build deterministic audit/drift/assess grading review input (MODE=audit|drift|assess)
+	@echo "🔎 [naos-grader-assessment] Building deterministic grader assessment for profile $(NAOS_PROFILE), mode $(if $(MODE),$(MODE),audit)..."
+	@if [ -f scripts/naos_grader_assessment.py ]; then \
+		"$(PYTHON)" scripts/naos_grader_assessment.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) --mode $(if $(MODE),$(MODE),audit) $(if $(BASELINE),--baseline $(BASELINE),); \
+	else \
+		echo "    skip (grader assessment script not installed for this tier)"; \
+	fi
+
+naos-model-policy: ## Review model-provider declarations without provider calls
+	@echo "🔎 [naos-model-policy] Reviewing model-provider declarations for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_model_provider_policy.py ]; then \
+		"$(PYTHON)" scripts/naos_model_provider_policy.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (model-provider policy reviewer not installed for this tier)"; \
+	fi
+
+naos-ai-component-inventory: ## Build deterministic declared AI component inventory evidence
+	@echo "🔎 [naos-ai-component-inventory] Building declared AI component inventory for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_ai_component_inventory.py ]; then \
+		"$(PYTHON)" scripts/naos_ai_component_inventory.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (AI component inventory not installed for this tier)"; \
+	fi
+
+naos-agent-sponsor-registry: ## Validate opt-in build-time agent sponsor declarations
+	@echo "🔎 [naos-agent-sponsor-registry] Validating agent sponsor and credential-posture declarations for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_agent_sponsor_registry.py ] && [ -f naos/agent_sponsor_registry.yaml ]; then \
+		"$(PYTHON)" scripts/naos_agent_sponsor_registry.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (optional agent sponsor registry not installed and configured)"; \
+	fi
+
+naos-aivss-verify: ## Verify opt-in AIVSS-Agentic v0.8 arithmetic for human review
+	@echo "🔎 [naos-aivss-verify] Verifying assessor-supplied AIVSS-Agentic v0.8 arithmetic..."
+	@if [ -f scripts/naos_aivss_arithmetic_verification.py ] && [ -f naos/aivss_assessments.yaml ]; then \
+		"$(PYTHON)" scripts/naos_aivss_arithmetic_verification.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (optional AIVSS arithmetic verification not installed and configured)"; \
+	fi
+
+naos-model-telemetry: ## Review local model telemetry evidence without provider calls
+	@echo "🔎 [naos-model-telemetry] Reviewing local model telemetry evidence for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_model_telemetry_evidence.py ]; then \
+		"$(PYTHON)" scripts/naos_model_telemetry_evidence.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (model telemetry evidence reviewer not installed for this tier)"; \
+	fi
+
+naos-failure-mode-posture: ## Review local failure-mode posture taxonomy
+	@echo "🔎 [naos-failure-mode-posture] Reviewing local failure-mode posture for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_failure_mode_posture.py ]; then \
+		"$(PYTHON)" scripts/naos_failure_mode_posture.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (failure-mode posture reviewer not installed for this tier)"; \
+	fi
+
+naos-failure-mode-observations: ## Aggregate local report findings by failure mode
+	@echo "🔎 [naos-failure-mode-observations] Aggregating local report findings for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_failure_mode_observations.py ]; then \
+		"$(PYTHON)" scripts/naos_failure_mode_observations.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (failure-mode observations reviewer not installed for this tier)"; \
+	fi
+
+naos-opencode-config-hygiene: ## Review optional OpenCode config hygiene without runtime activation
+	@echo "🔎 [naos-opencode-config-hygiene] Reviewing OpenCode config hygiene for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_opencode_config_hygiene.py ]; then \
+		"$(PYTHON)" scripts/naos_opencode_config_hygiene.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (OpenCode config hygiene reviewer not installed for this tier)"; \
+	fi
+
+naos-design-traceability: ## Review UI spec-object traceability declarations
+	@echo "🔎 [naos-design-traceability] Reviewing UI spec-object traceability for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_design_traceability.py ]; then \
+		"$(PYTHON)" scripts/naos_design_traceability.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (design traceability reviewer not installed for this tier)"; \
+	fi
+
+naos-ui-experience-quality: ## Review UI quality evidence declarations
+	@echo "🔎 [naos-ui-experience-quality] Reviewing UI experience quality evidence for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_ui_experience_quality.py ]; then \
+		"$(PYTHON)" scripts/naos_ui_experience_quality.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (UI experience quality reviewer not installed for this tier)"; \
+	fi
+
+naos-llm-grader-readiness: ## Report readiness-only LLMGrader governance posture
+	@echo "🔎 [naos-llm-grader-readiness] Reporting readiness-only LLMGrader posture for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_llm_grader_readiness.py ]; then \
+		"$(PYTHON)" scripts/naos_llm_grader_readiness.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (LLMGrader readiness script not installed for this tier)"; \
+	fi
+
+naos-behavioral-readiness: ## Report behavioral governance baseline readiness and impacters
+	@echo "🔎 [naos-behavioral-readiness] Reporting behavioral governance readiness for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_behavioral_governance_readiness.py ]; then \
+		"$(PYTHON)" scripts/naos_behavioral_governance_readiness.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (behavioral governance readiness script not installed for this tier)"; \
+	fi
+
+naos-plan-coherence: ## Review active task claims against task registry/module linkage
+	@echo "🔎 [naos-plan-coherence] Reviewing plan coherence for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_plan_coherence.py ]; then \
+		"$(PYTHON)" scripts/naos_plan_coherence.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(NAOS_PLAN_DIFF_BASE_ARG); \
+	else \
+		echo "    skip (plan coherence reviewer not installed for this tier)"; \
+	fi
+
+naos-roadmap-crosswalk: ## Validate roadmap/recommendation crosswalk evidence
+	@echo "🔎 [naos-roadmap-crosswalk] Validating roadmap crosswalk..."
+	@if [ -f scripts/naos_validate_roadmap_crosswalk.py ]; then \
+		"$(PYTHON)" scripts/naos_validate_roadmap_crosswalk.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (roadmap crosswalk validator not installed for this tier)"; \
+	fi
+
+naos-function-index-health: ## Report FUNCTION_INDEX presence/freshness/advisory gaps
+	@echo "🔎 [naos-function-index-health] Checking function-index health..."
+	@if [ -f scripts/naos_function_index_health.py ]; then \
+		"$(PYTHON)" scripts/naos_function_index_health.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (function-index health validator not installed for this tier)"; \
+	fi
+
+# ─── Professional Adoption Engine ──────────────────────────────────────────
+
+naos-adopt: ## Orchestrate professional adoption evidence (MODE=greenfield|brownfield|upgrade|repair|evaluation)
+	@echo "🔎 [naos-adopt] Orchestrating professional adoption evidence for profile $(NAOS_PROFILE), mode $(NAOS_ADOPTION_MODE)..."
+	@if [ -f scripts/naos_adopt.py ]; then \
+		"$(PYTHON)" scripts/naos_adopt.py $(NAOS_ADOPTION_ARGS); \
+	else \
+		echo "    skip (professional adoption orchestrator not installed for this tier)"; \
+	fi
+
+naos-preflight: ## Run professional adoption preflight checks
+	@echo "🔎 [naos-preflight] Running adoption preflight checks for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_preflight.py ]; then \
+		"$(PYTHON)" scripts/naos_preflight.py $(NAOS_ADOPTION_ARGS); \
+	else \
+		echo "    skip (preflight reporter not installed for this tier)"; \
+	fi
+
+naos-intake: ## Capture guided adoption intake (set ANSWERS=path for answer-file mode)
+	@echo "🔎 [naos-intake] Capturing adoption intake for profile $(NAOS_PROFILE), mode $(NAOS_ADOPTION_MODE)..."
+	@if [ -f scripts/naos_intake.py ]; then \
+		"$(PYTHON)" scripts/naos_intake.py $(NAOS_ADOPTION_ARGS); \
+	else \
+		echo "    skip (intake reporter not installed for this tier)"; \
+	fi
+
+naos-install-plan: ## Build reviewable install plan
+	@echo "🔎 [naos-install-plan] Building install plan for profile $(NAOS_PROFILE), mode $(NAOS_ADOPTION_MODE)..."
+	@if [ -f scripts/naos_install_plan.py ]; then \
+		"$(PYTHON)" scripts/naos_install_plan.py $(NAOS_ADOPTION_ARGS); \
+	else \
+		echo "    skip (install-plan reporter not installed for this tier)"; \
+	fi
+
+naos-existing-resource-inventory: ## Inventory local docs/specs/tests/source/workflows
+	@echo "🔎 [naos-existing-resource-inventory] Inventorying existing resources..."
+	@if [ -f scripts/naos_existing_resource_inventory.py ]; then \
+		"$(PYTHON)" scripts/naos_existing_resource_inventory.py $(NAOS_ADOPTION_ARGS); \
+	else \
+		echo "    skip (existing-resource inventory reporter not installed for this tier)"; \
+	fi
+
+naos-ai-artifact-inventory: ## Inventory AI instructions/prompts/rules/hooks
+	@echo "🔎 [naos-ai-artifact-inventory] Inventorying AI artifacts..."
+	@if [ -f scripts/naos_ai_artifact_inventory.py ]; then \
+		"$(PYTHON)" scripts/naos_ai_artifact_inventory.py $(NAOS_ADOPTION_ARGS); \
+	else \
+		echo "    skip (AI artifact inventory reporter not installed for this tier)"; \
+	fi
+
+naos-ai-artifact-reconcile: ## Record AI artifact disposition decisions
+	@echo "🔎 [naos-ai-artifact-reconcile] Recording AI artifact decisions..."
+	@if [ -f scripts/naos_ai_artifact_reconcile.py ]; then \
+		"$(PYTHON)" scripts/naos_ai_artifact_reconcile.py $(NAOS_ADOPTION_ARGS) $(if $(DECISION),--decision $(DECISION),); \
+	else \
+		echo "    skip (AI artifact reconciliation reporter not installed for this tier)"; \
+	fi
+
+naos-ai-code-provenance: ## Compose review-only AI code provenance evidence
+	@echo "🔎 [naos-ai-code-provenance] Composing AI code provenance evidence for review..."
+	@if [ -f scripts/naos_ai_code_provenance.py ]; then \
+		"$(PYTHON)" scripts/naos_ai_code_provenance.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (AI code provenance reporter not installed for this tier)"; \
+	fi
+
+naos-compliance-posture: ## Compose review-only compliance posture evidence
+	@echo "🔎 [naos-compliance-posture] Composing compliance posture evidence for review..."
+	@if [ -f scripts/naos_compliance_posture.py ]; then \
+		"$(PYTHON)" scripts/naos_compliance_posture.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (compliance posture reporter not installed for this tier)"; \
+	fi
+
+naos-memory-resource-inventory: ## Inventory Engram/memory/MCP posture
+	@echo "🔎 [naos-memory-resource-inventory] Inventorying memory and MCP posture..."
+	@if [ -f scripts/naos_memory_resource_inventory.py ]; then \
+		"$(PYTHON)" scripts/naos_memory_resource_inventory.py $(NAOS_ADOPTION_ARGS); \
+	else \
+		echo "    skip (memory resource inventory reporter not installed for this tier)"; \
+	fi
+
+naos-memory-resource-reconcile: ## Record memory/MCP disposition decisions
+	@echo "🔎 [naos-memory-resource-reconcile] Recording memory/MCP decisions..."
+	@if [ -f scripts/naos_memory_resource_reconcile.py ]; then \
+		"$(PYTHON)" scripts/naos_memory_resource_reconcile.py $(NAOS_ADOPTION_ARGS) $(if $(DECISION),--decision $(DECISION),); \
+	else \
+		echo "    skip (memory resource reconciliation reporter not installed for this tier)"; \
+	fi
+
+naos-mcp-resource-inventory: ## Inventory declared local MCP configs
+	@echo "🔎 [naos-mcp-resource-inventory] Inventorying MCP configs..."
+	@if [ -f scripts/naos_mcp_resource_inventory.py ]; then \
+		"$(PYTHON)" scripts/naos_mcp_resource_inventory.py $(NAOS_ADOPTION_ARGS); \
+	else \
+		echo "    skip (MCP resource inventory reporter not installed for this tier)"; \
+	fi
+
+naos-brownfield-baseline: ## Build brownfield baseline evidence
+	@echo "🔎 [naos-brownfield-baseline] Building brownfield baseline..."
+	@if [ -f scripts/naos_brownfield_baseline.py ]; then \
+		"$(PYTHON)" scripts/naos_brownfield_baseline.py $(NAOS_ADOPTION_ARGS) --mode brownfield; \
+	else \
+		echo "    skip (brownfield baseline reporter not installed for this tier)"; \
+	fi
+
+naos-requirements-reconstruct: ## Emit candidate requirements for human review
+	@echo "🔎 [naos-requirements-reconstruct] Reconstructing candidate requirements..."
+	@if [ -f scripts/naos_requirements_reconstruct.py ]; then \
+		"$(PYTHON)" scripts/naos_requirements_reconstruct.py $(NAOS_ADOPTION_ARGS) --mode brownfield; \
+	else \
+		echo "    skip (requirements reconstruction reporter not installed for this tier)"; \
+	fi
+
+naos-traceability-gap-register: ## Emit traceability gaps for human review
+	@echo "🔎 [naos-traceability-gap-register] Building traceability gap register..."
+	@if [ -f scripts/naos_traceability_gap_register.py ]; then \
+		"$(PYTHON)" scripts/naos_traceability_gap_register.py $(NAOS_ADOPTION_ARGS) --mode brownfield; \
+	else \
+		echo "    skip (traceability gap register reporter not installed for this tier)"; \
+	fi
+
+naos-install-decision-record: ## Record adoption decisions and authority boundaries
+	@echo "🔎 [naos-install-decision-record] Recording install/adoption decision record..."
+	@if [ -f scripts/naos_install_decision_record.py ]; then \
+		"$(PYTHON)" scripts/naos_install_decision_record.py $(NAOS_ADOPTION_ARGS); \
+	else \
+		echo "    skip (install decision record reporter not installed for this tier)"; \
+	fi
+
+naos-context-challenge: ## Challenge context before build with no edits
+	@echo "🔎 [naos-context-challenge] Challenging context before build..."
+	@if [ -f scripts/naos_context_challenge.py ]; then \
+		"$(PYTHON)" scripts/naos_context_challenge.py $(NAOS_ADOPTION_ARGS) $(if $(CHALLENGE_MODE),--challenge-mode $(CHALLENGE_MODE),); \
+	else \
+		echo "    skip (context challenge reporter not installed for this tier)"; \
+	fi
+
+naos-repo-context-challenge: ## Challenge brownfield repository context with no edits
+	@echo "🔎 [naos-repo-context-challenge] Challenging repository context..."
+	@if [ -f scripts/naos_repo_context_challenge.py ]; then \
+		"$(PYTHON)" scripts/naos_repo_context_challenge.py $(NAOS_ADOPTION_ARGS) --mode brownfield $(if $(CHALLENGE_MODE),--challenge-mode $(CHALLENGE_MODE),); \
+	else \
+		echo "    skip (repo-context challenge reporter not installed for this tier)"; \
+	fi
+
+naos-plan-challenge: ## Challenge install or implementation plan with no edits
+	@echo "🔎 [naos-plan-challenge] Challenging plan..."
+	@if [ -f scripts/naos_plan_challenge.py ]; then \
+		"$(PYTHON)" scripts/naos_plan_challenge.py $(NAOS_ADOPTION_ARGS) $(if $(CHALLENGE_MODE),--challenge-mode $(CHALLENGE_MODE),); \
+	else \
+		echo "    skip (plan challenge reporter not installed for this tier)"; \
+	fi
+
+naos-decision-probe: ## Probe unresolved human decisions
+	@echo "🔎 [naos-decision-probe] Probing decisions..."
+	@if [ -f scripts/naos_decision_probe.py ]; then \
+		"$(PYTHON)" scripts/naos_decision_probe.py $(NAOS_ADOPTION_ARGS) --challenge-mode decision; \
+	else \
+		echo "    skip (decision probe reporter not installed for this tier)"; \
+	fi
+
+naos-planning-gate-review: ## Review planning gate evidence with no edits
+	@echo "🔎 [naos-planning-gate-review] Reviewing planning gate evidence..."
+	@if [ -f scripts/naos_planning_gate_review.py ]; then \
+		"$(PYTHON)" scripts/naos_planning_gate_review.py $(NAOS_ADOPTION_ARGS) --challenge-mode gate; \
+	else \
+		echo "    skip (planning gate review reporter not installed for this tier)"; \
+	fi
+
+naos-test-evidence-map: ## Build source-to-test evidence map where possible
+	@echo "🔎 [naos-test-evidence-map] Mapping source files to test evidence..."
+	@if [ -f scripts/naos_test_evidence_map.py ]; then \
+		"$(PYTHON)" scripts/naos_test_evidence_map.py $(NAOS_COMMON_ARGS); \
+	else \
+		echo "    skip (test-evidence mapper not installed for this tier)"; \
+	fi
+
+naos-test-evidence: ## Validate source-to-test evidence health
+	@echo "🔎 [naos-test-evidence] Validating test evidence..."
+	@if [ -f scripts/naos_validate_test_evidence.py ]; then \
+		"$(PYTHON)" scripts/naos_validate_test_evidence.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (test-evidence validator not installed for this tier)"; \
+	fi
+
+naos-ac-completion-evidence: ## Validate declared AC/SCEN completion evidence
+	@echo "🔎 [naos-ac-completion-evidence] Validating AC completion evidence..."
+	@if [ -f scripts/naos_ac_completion_evidence.py ]; then \
+		"$(PYTHON)" scripts/naos_ac_completion_evidence.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (AC completion evidence validator not installed for this tier)"; \
+	fi
+
+naos-duplicate-function-hygiene: ## Detect normalized duplicate function bodies
+	@echo "🔎 [naos-duplicate-function-hygiene] Checking duplicate-function hygiene..."
+	@if [ -f scripts/naos_duplicate_function_hygiene.py ]; then \
+		"$(PYTHON)" scripts/naos_duplicate_function_hygiene.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (duplicate-function hygiene script not installed for this tier)"; \
+	fi
+
+naos-secret-hygiene: ## Detect obvious secret-like local findings
+	@echo "🔎 [naos-secret-hygiene] Checking secret hygiene..."
+	@if [ -f scripts/naos_secret_hygiene.py ]; then \
+		"$(PYTHON)" scripts/naos_secret_hygiene.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (secret hygiene script not installed for this tier)"; \
+	fi
+
+naos-test-quality-hygiene: ## Detect tests with missing or trivial assertion evidence
+	@echo "🔎 [naos-test-quality-hygiene] Checking test-quality hygiene..."
+	@if [ -f scripts/naos_test_quality_hygiene.py ]; then \
+		"$(PYTHON)" scripts/naos_test_quality_hygiene.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (test-quality hygiene script not installed for this tier)"; \
+	fi
+
+naos-dependency-integrity: ## Detect undeclared or unresolved Python imports
+	@echo "🔎 [naos-dependency-integrity] Checking dependency integrity..."
+	@if [ -f scripts/naos_dependency_integrity.py ]; then \
+		"$(PYTHON)" scripts/naos_dependency_integrity.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (dependency-integrity script not installed for this tier)"; \
+	fi
+
+naos-package-reality: ## Review package, SBOM, provenance, hash, and opt-in registry evidence
+	@echo "🔎 [naos-package-reality] Reviewing package reality..."
+	@if [ -f scripts/naos_package_reality.py ]; then \
+		"$(PYTHON)" scripts/naos_package_reality.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(PACKAGE_REALITY_ARGS); \
+	else \
+		echo "    skip (package-reality script not installed for this tier)"; \
+	fi
+
+naos-api-symbol-reality: ## Verify declared Python API symbols without importing targets
+	@echo "🔎 [naos-api-symbol-reality] Reviewing API symbol reality..."
+	@if [ -f scripts/naos_api_symbol_reality.py ]; then \
+		"$(PYTHON)" scripts/naos_api_symbol_reality.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(API_SYMBOL_REALITY_ARGS); \
+	else \
+		echo "    skip (api-symbol-reality script not installed for this tier)"; \
+	fi
+
+naos-gate-status: ## Report G0-G8 gatekeeper readiness
+	@echo "🔎 [naos-gate-status] Reporting gatekeeper readiness..."
+	@if [ -f scripts/naos_gate_status.py ]; then \
+		OUT=""; \
+		if [ -d "$(NAOS_ROOT)" ]; then OUT="--output $(NAOS_ROOT)/reports/gate_status.json"; fi; \
+		"$(PYTHON)" scripts/naos_gate_status.py --profile $(NAOS_PROFILE) --naos-root $(NAOS_ROOT) $$OUT $(if $(TEAM_ID),--team-id $(TEAM_ID),); \
+	else \
+		echo "    skip (gate status script not installed for this tier)"; \
+	fi
+
+naos-gate-evaluate: ## Evaluate G0-G8 gates using the file-first manifest
+	@echo "🔎 [naos-gate-evaluate] Evaluating gates..."
+	@if [ -f scripts/naos_gate_evaluate.py ]; then \
+		OUT=""; \
+		if [ -d "$(NAOS_ROOT)" ]; then OUT="--output $(NAOS_ROOT)/reports/gate_evaluation.json"; fi; \
+		"$(PYTHON)" scripts/naos_gate_evaluate.py --profile $(NAOS_PROFILE) --naos-root $(NAOS_ROOT) $$OUT $(if $(TEAM_ID),--team-id $(TEAM_ID),); \
+	else \
+		echo "    skip (gate evaluate script not installed for this tier)"; \
+	fi
+
+naos-evidence-pack: ## Export machine-readable evidence pack
+	@echo "📦 [naos-evidence-pack] Exporting evidence pack..."
+	@if [ -f scripts/naos_evidence_export.py ]; then \
+		"$(PYTHON)" scripts/naos_evidence_export.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (evidence exporter not installed for this tier)"; \
+	fi
+
+naos-sarif-export: ## Export structured NAOS findings to SARIF 2.1.0
+	@echo "🔎 [naos-sarif-export] Exporting NAOS findings to SARIF 2.1.0..."
+	@if [ -f scripts/naos_sarif_export.py ]; then \
+		"$(PYTHON)" scripts/naos_sarif_export.py $(NAOS_COMMON_ARGS); \
+	else \
+		echo "    skip (SARIF exporter not installed for this tier)"; \
+	fi
+
+naos-policy-overrides: ## Validate and merge static/global/team/operator YAML policy overlays
+	@echo "🔎 [naos-policy-overrides] Validating static/global/team/operator policy overlays for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_policy_overrides.py ]; then \
+		"$(PYTHON)" scripts/naos_policy_overrides.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) --dry-run $(if $(TEAM_ID),--team-id $(TEAM_ID),) $(if $(OPERATOR_ID),--operator-id $(OPERATOR_ID),) $(if $(OPERATOR_OVERLAY_ID),--operator-overlay-id $(OPERATOR_OVERLAY_ID),); \
+	else \
+		echo "    skip (policy override merger not installed for this tier)"; \
+	fi
+
+naos-dashboard: ## Generate DASHBOARD.md and reports/dashboard_summary.json
+	@echo "📊 [naos-dashboard] Generating dashboard..."
+	@if [ -f scripts/workflows/generate_naos_dashboard.py ]; then \
+		"$(PYTHON)" scripts/workflows/generate_naos_dashboard.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (dashboard generator not installed for this tier)"; \
+	fi
+
+naos-pr-risk-classify: ## Classify deterministic PR risk surfaces
+	@echo "🔎 [naos-pr-risk-classify] Classifying deterministic PR risk surfaces for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_pr_risk_classification.py ]; then \
+		"$(PYTHON)" scripts/naos_pr_risk_classification.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (PR risk classification script not installed for this tier)"; \
+	fi
+
+naos-pr-governance-summary: ## Summarize PR-time governance evidence
+	@echo "🔎 [naos-pr-governance-summary] Summarizing PR governance evidence for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_pr_governance_summary.py ]; then \
+		"$(PYTHON)" scripts/naos_pr_governance_summary.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (PR governance summary script not installed for this tier)"; \
+	fi
+
+naos-agentic-workflow-review: ## Review governed agentic coding workflow controls
+	@echo "🔎 [naos-agentic-workflow-review] Reviewing governed agentic coding workflow for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_agentic_workflow_review.py ]; then \
+		"$(PYTHON)" scripts/naos_agentic_workflow_review.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (agentic workflow review script not installed for this tier)"; \
+	fi
+
+naos-pre-implementation-alignment-review: ## Review Pre-Implementation Alignment artifact
+	@echo "🔎 [naos-pre-implementation-alignment-review] Reviewing Pre-Implementation Alignment for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_pre_implementation_alignment_review.py ]; then \
+		"$(PYTHON)" scripts/naos_pre_implementation_alignment_review.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (Pre-Implementation Alignment review script not installed for this tier)"; \
+	fi
+
+naos-calibration-shadow: ## Run deterministic calibration-shadow drift checks
+	@echo "🔎 [naos-calibration-shadow] Checking deterministic report calibration shadow for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_calibration_shadow.py ]; then \
+		"$(PYTHON)" scripts/naos_calibration_shadow.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (calibration-shadow script not installed for this tier)"; \
+	fi
+
+naos-evidence-classification: ## Classify finding provenance for review
+	@echo "🔎 [naos-evidence-classification] Classifying evidence provenance for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_evidence_classification.py ]; then \
+		"$(PYTHON)" scripts/naos_evidence_classification.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (evidence-classification script not installed for this tier)"; \
+	fi
+
+naos-cross-harness-review-readiness: ## Report future cross-harness/DSSE readiness boundaries
+	@echo "🔎 [naos-cross-harness-review-readiness] Reviewing future cross-harness/DSSE readiness for profile $(NAOS_PROFILE)..."
+	@if [ -f scripts/naos_cross_harness_review_readiness.py ]; then \
+		"$(PYTHON)" scripts/naos_cross_harness_review_readiness.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+	else \
+		echo "    skip (cross-harness review readiness script not installed for this tier)"; \
+	fi
+
+# ─── Portability ─────────────────────────────────────────────────────────────
+
+naos-help: ## Show all NAOS governance targets
+	@echo ""
+	@echo "NAOS Governance Targets:"
+	@echo "  make -f Makefile.naos gov-refresh     — Sync all PM derived files"
+	@echo "  make -f Makefile.naos gov-full        — gov-refresh + truth validation"
+	@echo "  make -f Makefile.naos gov-status      — Print project status"
+	@echo "  make -f Makefile.naos drift-check     — Check for governance drift"
+	@echo "  make -f Makefile.naos validate-all    — Run all validators"
+	@echo "  make -f Makefile.naos naos-readiness  — Check lifecycle readiness gates"
+	@echo "  make -f Makefile.naos function-index  — Regenerate function index"
+	@echo "  make -f Makefile.naos naos-claims     — Validate project-local claims"
+	@echo "  make -f Makefile.naos naos-self-check — Run control-plane self-conformance"
+	@echo "  make -f Makefile.naos naos-capability-maturity — Evaluate maturity readiness"
+	@echo "  make -f Makefile.naos naos-systemic-impact — Evaluate systemic impact review obligations"
+	@echo "  make -f Makefile.naos naos-module-headers — Evaluate canonical module-header traceability"
+	@echo "  make -f Makefile.naos naos-spec-cascade — Evaluate spec-cascade coherence"
+	@echo "  make -f Makefile.naos naos-control-plane-review — Evaluate control-plane review/research routing"
+	@echo "  make -f Makefile.naos naos-ai-component-inventory — Build declared AI component inventory evidence"
+	@echo "  make -f Makefile.naos naos-agent-sponsor-registry — Validate opt-in agent sponsor declarations"
+	@echo "  make -f Makefile.naos naos-aivss-verify — Verify opt-in AIVSS-Agentic v0.8 arithmetic"
+	@echo "  make -f Makefile.naos naos-setup-recommendations — Recommend setup modules and next actions"
+	@echo "  make -f Makefile.naos naos-governance-bypass-posture — Report local hook/CI bypass posture"
+	@echo "  make -f Makefile.naos naos-external-evidence-ingest EXTERNAL_EVIDENCE_SOURCE=scan.sarif — Summarize local SARIF evidence"
+	@echo "  make -f Makefile.naos naos-evidence-attestation — Generate local digest/reviewer metadata report"
+	@echo "  make -f Makefile.naos naos-evidence-sign — Emit adopter-signable evidence envelope"
+	@echo "  make -f Makefile.naos naos-evidence-verify — Verify local tamper-evidence and report signature-entry presence"
+	@echo "  make -f Makefile.naos naos-evidence-conflicts — Detect deterministic evidence/review conflicts"
+	@echo "  make -f Makefile.naos naos-memory-readiness — Evaluate memory/context governance readiness"
+	@echo "  make -f Makefile.naos naos-memory-access — Evaluate declared provider/MCP posture and unverified fields"
+	@echo "  make -f Makefile.naos naos-memory-use-policy — Evaluate memory-use policy/review readiness"
+	@echo "  make -f Makefile.naos naos-learning-loop-review — Review governed learning lifecycle records"
+	@echo "  make -f Makefile.naos naos-adapter-coherence — Review Codex/Claude/plugin/adapter coherence"
+	@echo "  make -f Makefile.naos naos-task-context TASK=T-XXX — Generate bounded task context pack"
+	@echo "  make -f Makefile.naos naos-task-lifecycle TASK=T-XXX — Inspect exact active/completed task lifecycle state"
+	@echo "  make -f Makefile.naos naos-task-complete TASK=T-XXX — Record native task completion"
+	@echo "  make -f Makefile.naos naos-research-record RESEARCH_RECORD=path — Validate structured research"
+	@echo "  make -f Makefile.naos naos-composed-traceability — Compose explicit traceability links"
+	@echo "  make -f Makefile.naos naos-task-claim TASK=T-XXX — Claim task coordination metadata"
+	@echo "  make -f Makefile.naos naos-task-release TASK=T-XXX — Release task coordination metadata"
+	@echo "  make -f Makefile.naos naos-task-claims — Summarize task claims"
+	@echo "  make -f Makefile.naos naos-context-index — Build generated local context index"
+	@echo "  make -f Makefile.naos naos-context-query QUERY=\"...\" — Query bounded local context candidates"
+	@echo "  make -f Makefile.naos naos-semantic-candidates — Evaluate future semantic candidate readiness"
+	@echo "  make -f Makefile.naos naos-graph-context — Evaluate future graph-context readiness"
+	@echo "  make -f Makefile.naos naos-graph-query TASK=T-001 — Query bounded graph-context candidates"
+	@echo "  make -f Makefile.naos naos-session-id — Create/reuse a session namespace"
+	@echo "  make -f Makefile.naos naos-operator-attribution — Resolve local operator attribution"
+	@echo "  make -f Makefile.naos naos-session-start TASK=T-001 — Generate session-start checklist"
+	@echo "  make -f Makefile.naos naos-audit-log — Summarize append-only audit log events"
+	@echo "  make -f Makefile.naos naos-agent-traces — Validate declared agent trace events"
+	@echo "  make -f Makefile.naos naos-harness-trace-import HARNESS_TRACE_SOURCE=naos/harness_traces/example.jsonl — Import local harness traces"
+	@echo "  make -f Makefile.naos naos-ai-surface-budget — Evaluate AI-surface context budget and health"
+	@echo "  make -f Makefile.naos naos-static-grader — Run deterministic StaticGrader structural checks"
+	@echo "  make -f Makefile.naos naos-grader-assessment MODE=audit — Build deterministic grader assessment review input"
+	@echo "  make -f Makefile.naos naos-model-policy — Review model-provider declarations without provider calls"
+	@echo "  make -f Makefile.naos naos-model-telemetry — Review local model telemetry evidence"
+	@echo "  make -f Makefile.naos naos-failure-mode-observations — Aggregate local report findings by failure mode"
+	@echo "  make -f Makefile.naos naos-design-traceability — Review UI spec-object traceability declarations"
+	@echo "  make -f Makefile.naos naos-ui-experience-quality — Review UI experience quality evidence declarations"
+	@echo "  make -f Makefile.naos naos-llm-grader-readiness — Report readiness-only LLMGrader posture"
+	@echo "  make -f Makefile.naos naos-behavioral-readiness — Report behavioral baseline readiness and impacters"
+	@echo "  make -f Makefile.naos naos-plan-coherence — Review task claims against task registry/module linkage"
+	@echo "  make -f Makefile.naos naos-roadmap-crosswalk — Validate roadmap/recommendation crosswalk"
+	@echo "  make -f Makefile.naos naos-function-index-health — Check function-index health"
+	@echo "  make -f Makefile.naos naos-adopt MODE=brownfield — Orchestrate professional adoption evidence"
+	@echo "  make -f Makefile.naos naos-preflight — Run adoption preflight checks"
+	@echo "  make -f Makefile.naos naos-intake ANSWERS=naos/intake_answers.yaml — Capture guided intake"
+	@echo "  make -f Makefile.naos naos-install-plan — Build reviewable install plan"
+	@echo "  make -f Makefile.naos naos-existing-resource-inventory — Inventory local docs/specs/tests/source"
+	@echo "  make -f Makefile.naos naos-ai-artifact-inventory — Inventory AI prompts/rules/hooks"
+	@echo "  make -f Makefile.naos naos-ai-artifact-reconcile — Record AI artifact decisions"
+	@echo "  make -f Makefile.naos naos-memory-resource-inventory — Inventory Engram/memory/MCP posture"
+	@echo "  make -f Makefile.naos naos-memory-resource-reconcile — Record memory/MCP decisions"
+	@echo "  make -f Makefile.naos naos-mcp-resource-inventory — Inventory declared MCP configs"
+	@echo "  make -f Makefile.naos naos-brownfield-baseline — Build brownfield baseline evidence"
+	@echo "  make -f Makefile.naos naos-requirements-reconstruct — Emit candidate requirements for review"
+	@echo "  make -f Makefile.naos naos-traceability-gap-register — Emit traceability gaps"
+	@echo "  make -f Makefile.naos naos-install-decision-record — Record adoption decisions"
+	@echo "  make -f Makefile.naos naos-context-challenge — Challenge context before build"
+	@echo "  make -f Makefile.naos naos-repo-context-challenge — Challenge repository context"
+	@echo "  make -f Makefile.naos naos-plan-challenge — Challenge plan evidence"
+	@echo "  make -f Makefile.naos naos-decision-probe — Probe unresolved decisions"
+	@echo "  make -f Makefile.naos naos-planning-gate-review — Review planning gate evidence"
+	@echo "  make -f Makefile.naos naos-test-evidence-map — Build source-to-test evidence map"
+	@echo "  make -f Makefile.naos naos-test-evidence — Validate test evidence"
+	@echo "  make -f Makefile.naos naos-ac-completion-evidence — Validate declared AC completion evidence"
+	@echo "  make -f Makefile.naos naos-duplicate-function-hygiene — Detect normalized duplicate function bodies"
+	@echo "  make -f Makefile.naos naos-secret-hygiene — Detect obvious secret-like local findings"
+	@echo "  make -f Makefile.naos naos-test-quality-hygiene — Detect weak test assertion evidence"
+	@echo "  make -f Makefile.naos naos-dependency-integrity — Detect undeclared or unresolved imports"
+	@echo "  make -f Makefile.naos naos-package-reality — Review package, SBOM, provenance, hash, and opt-in registry evidence"
+	@echo "  make -f Makefile.naos naos-api-symbol-reality — Verify declared Python API symbols"
+	@echo "  make -f Makefile.naos naos-gate-status — Report G0-G8 gatekeeper readiness"
+	@echo "  make -f Makefile.naos naos-gate-evaluate — Evaluate G0-G8 gates"
+	@echo "  make -f Makefile.naos naos-evidence-pack — Export JSON evidence pack"
+	@echo "  make -f Makefile.naos naos-sarif-export — Export findings to SARIF 2.1.0"
+	@echo "  make -f Makefile.naos naos-policy-overrides — Validate static/global/team/operator YAML policy overlays"
+	@echo "  make -f Makefile.naos naos-dashboard  — Generate dashboard + dashboard_summary.json"
+	@echo "  make -f Makefile.naos naos-pr-governance-summary — Summarize PR governance evidence"
+	@echo "  make -f Makefile.naos naos-agentic-workflow-review — Review governed agentic coding workflow controls"
+	@echo "  make -f Makefile.naos naos-pre-implementation-alignment-review — Review Pre-Implementation Alignment"
+	@echo "  make -f Makefile.naos naos-calibration-shadow — Check deterministic report metadata drift"
+	@echo "  make -f Makefile.naos naos-evidence-classification — Classify finding provenance for review"
+	@echo "  make -f Makefile.naos naos-cross-harness-review-readiness — Report future cross-harness/DSSE readiness"
+	@echo "  make -f Makefile.naos semantic-audit  — Optional project-configured AI code quality review"
+	@echo "  make -f Makefile.naos naos-audit      — Governance completeness audit (7 categories, 0-10)"
+	@echo "  make -f Makefile.naos naos-conformance — Static conformance check → naos/reports/conformance_latest.json"
+	@echo "  make -f Makefile.naos admissibility-pack — Bundle reviewer/vendor-cascade evidence zip"
+	@echo ""
+	@echo "  Make targets are operational wrappers for validators/evidence/dashboard."
+	@echo "  Lifecycle remains prompt/agent driven; these targets do not replace it."
+	@echo ""
+	@echo "  NAOS_ROOT=$(NAOS_ROOT)  NAOS_PROFILE=$(NAOS_PROFILE)  PYTHON=$(PYTHON)"
+	@echo ""

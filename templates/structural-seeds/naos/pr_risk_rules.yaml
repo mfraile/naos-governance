@@ -1,0 +1,71 @@
+schema: naos.pr_risk_rules.v1
+mode: deterministic_metadata_only
+trusted_authors: []
+protected_path_patterns:
+  - .github/**
+  - policies/**
+  - schemas/**
+  - capabilities/**
+  - templates/**
+  - scripts/validators/**
+  - naos/**
+workflow_path_patterns:
+  - .github/workflows/**
+  - templates/workflows/**
+dependency_path_patterns:
+  - pyproject.toml
+  - requirements*.txt
+  - requirements/**
+  - package.json
+  - package-lock.json
+  - pnpm-lock.yaml
+  - yarn.lock
+  - poetry.lock
+  - Pipfile
+  - Pipfile.lock
+ai_surface_path_patterns:
+  - CLAUDE.md
+  - AGENTS.md
+  - .github/copilot-instructions.md
+  - .github/agents/**
+  - .github/prompts/**
+  - .github/skills/**
+  - .github/instructions/**
+  - .cursor/rules/**
+  - templates/agents/**
+  - templates/prompts/**
+  - templates/skills/**
+  - templates/instructions/**
+  - templates/instruction-triple/**
+governance_path_patterns:
+  - capabilities/**
+  - policies/**
+  - schemas/**
+  - templates/structural-seeds/naos/**
+  - docs/decisions/**
+  - docs/CLAIMS_AND_LIMITATIONS.md
+  - docs/NAOS_THREAT_MODEL.md
+prompt_injection_patterns:
+  - "(?i)ignore (all )?(previous|prior) instructions"
+  - "(?i)disregard (all )?(previous|prior) instructions"
+  - "(?i)system prompt"
+  - "(?i)developer message"
+  - "(?i)return status: ?passed"
+  - "(?i)do not tell"
+secret_like_patterns:
+  - "\\bAKIA[0-9A-Z]{16}\\b"
+  - "\\bsk-[A-Za-z0-9_-]{20,}\\b"
+  - "-----BEGIN [A-Z ]*PRIVATE KEY-----"
+  - "(?i)\\b(password|passwd|pwd|secret|token|api[_-]?key|credential)\\b\\s*[:=]\\s*['\\\"][^'\\\"]{8,}['\\\"]"
+max_diff_lines_scanned: 4000
+not_claimed:
+  - PR approval
+  - sandbox execution
+  - malware analysis
+  - security proof
+  - compliance proof
+  - DSSE signing
+  - signature verification
+  - key custody
+  - proof of execution
+human_review_required: true

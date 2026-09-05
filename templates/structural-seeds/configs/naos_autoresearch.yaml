@@ -1,0 +1,143 @@
+# naos_autoresearch.yaml — NAOS Autoresearch Readiness
+# [ADAPT] sections: update only when a project explicitly configures future
+# behavioral governance evaluation outside the default kit.
+#
+# Purpose: Governs deterministic conformance and future autoresearch readiness.
+#   Available now: deterministic --conformance checks and deterministic
+#   --audit/--drift/--assess review-input modes, no LLM, no API key,
+#   no provider setup, and no cost.
+#   Deferred/project-configured: model-backed behavioral governance evaluation,
+#   composite scoring, and provider-backed assessment.
+#
+# Run now in generated adopter projects: make -f Makefile.naos naos-conformance
+# Future behavioral runtime: requires separately approved evaluator design.
+
+version: 1
+
+# ==========================================================================
+# FUTURE BEHAVIORAL EVALUATOR SETTINGS (DISABLED)
+# The default kit does not ship semantic/model-backed behavioral grading, model-backed judging,
+# composite scoring, provider setup, or behavioral compliance results.
+# Keep this disabled unless a project explicitly designs and approves an
+# evaluator outside the deterministic conformance baseline.
+# ==========================================================================
+grading:
+  enabled: false                      # Behavioral governance evaluation is not active by default
+  default_strategy: composite         # future/project-configured: static | provider | composite
+
+  dimension_overrides:
+    1: composite    # Future/project-configured only
+    2: composite    # Future/project-configured only
+    3: composite    # Future/project-configured only
+    4: static       # Future/project-configured only
+    5: static       # Future/project-configured only
+    6: composite    # Future/project-configured only
+    7: composite    # Future/project-configured only
+    8: composite    # Future/project-configured only
+
+  static_grader:
+    case_insensitive: true
+    multiline: true
+    max_evidence_matches: 3
+
+  provider_grader:
+    # [ADAPT: future/project-configured provider only; no key is required by default]
+    model_role: null
+    model: "[ADAPT: future project-approved provider model]"
+    api_key_env: "[ADAPT: future project-configured provider key environment variable]"
+    temperature: 0.0
+    max_tokens: 4096
+    response_format: yaml
+    timeout_seconds: 30
+    retry_attempts: 2
+    retry_delay_seconds: 3
+
+  composite_grader:
+    provider_fallback_on: [skip, partial]
+    recheck_failures_with_provider: false
+    max_provider_criteria_pct: 40     # Cost circuit breaker for future evaluators
+
+# Deterministic grader assessment modes (available now)
+grader_assessment:
+  max_runs_per_day: 5
+  cadence: on_demand
+  max_cost_usd: 0.0
+  cost_usd: 0.0
+  llm_runtime_enabled: false
+  provider_allowed: false
+  manual_approval_required: true
+  data_exposure_level: repo_metadata_only
+  audit_window: current_project_state
+  baseline_reference: naos/reports/grader_assessment_baseline.json
+  not_claimed:
+    - audit approval
+    - certification
+    - compliance determination
+    - semantic drift inference
+    - LLMGrader runtime
+
+llm_grader:
+  runtime_enabled: false
+  provider_allowed: false
+  external_api_allowed: false
+  model_dependency_allowed: false
+  cost_budget_required_if_enabled_later: true
+  human_approval_required_before_cost: true
+  data_exposure_review_required: true
+  advisory_only: true
+  static_grader_remains_primary: true
+  not_claimed:
+    - approval
+    - certification
+    - compliance determination
+    - maturity promotion
+
+# Cost model
+cost_model:
+  # [ADAPT: update only if a future/project-approved evaluator is configured]
+  judge_model: "[ADAPT: see provider_grader.model above]"
+  estimated_tokens_per_scenario: 750
+  # Input price per 1K tokens (USD)
+  input_price_per_1k: 0.003
+  # Output price per 1K tokens (USD)
+  output_price_per_1k: 0.015
+
+# Battery configuration
+battery:
+  default_file: "[ADAPT: .github/autoresearch/task_battery/core_scenarios.yaml]"
+  portable_file: "kit/task_battery/portable_scenarios.yaml"
+  timeout_per_scenario_seconds: 120
+  max_parallel_scenarios: 1          # Serialized to avoid rate limits
+
+# Phase 4 maintenance cadences
+maintenance:
+  monthly_drift:
+    enabled: false                     # Future/project-configured behavioral evaluator cadence
+    max_runs_per_month: 5
+    min_spacing_days: 14
+    # [ADAPT: update costs for your judge model]
+    estimated_cost_usd: 1.30
+    battery_subset: "dim1,dim2"
+
+  quarterly_assessment:
+    enabled: false                     # Future/project-configured behavioral evaluator assessment
+    all_dimensions: true
+    estimated_cost_usd: 3.50
+    # [ADAPT: adjust target scores for your governance maturity]
+    target_scores:
+      dimension_1_rule_compliance: 0.85
+      dimension_2_agents: 0.80
+      dimension_3_scoped_instructions: 0.75
+      dimension_4_prompts: 0.80
+      dimension_5_efficiency: 0.85
+      dimension_6_portability: 0.40
+      dimension_7_session_hygiene: 0.80
+      dimension_8_ai_output_quality: 0.80
+
+  dependency_audit:
+    enabled: true
+    trigger: "after pip/npm major version bump"
+
+  toolchain_upgrade:
+    enabled: true
+    trigger: "after AI assistant major version (Claude, GPT, VS Code)"

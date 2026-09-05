@@ -1,0 +1,3 @@
+# Feature flags and project capability switches.
+# [ADAPT] Add concrete flags as features move from planned to implemented.
+features: {}

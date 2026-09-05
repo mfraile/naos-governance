@@ -1,0 +1,2 @@
+date,total_tasks,implemented,verified,done,absorbed,in_progress,planned,deferred
+# AUTO-APPENDED by `make -f Makefile.naos gov-refresh` → naos/workflows/scripts/generate_naos_dashboard.py

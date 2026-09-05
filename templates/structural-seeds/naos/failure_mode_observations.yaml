@@ -1,0 +1,224 @@
+version: "1.0"
+enabled: false
+failure_mode_observations_declared: false
+
+runtime_enabled: false
+provider_calls_allowed: false
+model_calls_allowed: false
+mcp_allowed: false
+memory_allowed: false
+network_calls_allowed: false
+hook_activation_allowed: false
+tool_mutation_allowed: false
+automatic_learning_allowed: false
+
+profile_posture:
+  quickstart:
+    severity: advisory
+    human_review_required: false
+    notes: "Optional local observation statistics only."
+  lite:
+    severity: warning
+    human_review_required: true
+    notes: "Warn when configured source evidence produces review observations."
+  standard:
+    severity: required
+    human_review_required: true
+    notes: "Route configured observation findings to human review."
+  assured:
+    severity: required
+    human_review_required: true
+    notes: "Required review only in this slice; blocking requires future validated L3+ maturity and explicit gate wiring."
+
+excluded_source_report_paths:
+  - "naos/reports/control_plane_review.json"
+
+source_reports:
+  - source_id: failure_mode_posture
+    source_type: failure_mode_posture_finding
+    path_key: failure_mode_posture_report
+    required: false
+    enabled: true
+  - source_id: model_provider_policy
+    source_type: model_provider_policy_finding
+    path_key: model_provider_policy_report
+    required: false
+    enabled: true
+  - source_id: model_telemetry_evidence
+    source_type: model_telemetry_evidence_finding
+    path_key: model_telemetry_evidence_report
+    required: false
+    enabled: true
+  - source_id: opencode_config_hygiene
+    source_type: opencode_config_hygiene_finding
+    path_key: opencode_config_hygiene_report
+    required: false
+    enabled: true
+  - source_id: design_traceability
+    source_type: design_traceability_finding
+    path_key: design_traceability_report
+    required: false
+    enabled: true
+  - source_id: ui_experience_quality
+    source_type: ui_experience_quality_finding
+    path_key: ui_experience_quality_report
+    required: false
+    enabled: true
+  - source_id: parallel_lane_handoff
+    source_type: parallel_lane_handoff_finding
+    path: "naos/reports/parallel_lane_handoff/*.json"
+    required: false
+    enabled: true
+
+reason_mappings:
+  - source_type: model_provider_policy_finding
+    reason_code: missing_role
+    mode_ids: [S3, D2]
+  - source_type: model_provider_policy_finding
+    reason_code: invalid_provider_kind
+    mode_ids: [F3]
+  - source_type: model_provider_policy_finding
+    reason_code: env_reference_review
+    mode_ids: [F3]
+  - source_type: model_provider_policy_finding
+    reason_code: local_endpoint_exposure_review
+    mode_ids: [F3, M3]
+  - source_type: model_provider_policy_finding
+    reason_code: runtime_escalation
+    mode_ids: [M3]
+  - source_type: model_provider_policy_finding
+    reason_code: literal_secret
+    mode_ids: [F3]
+  - source_type: model_telemetry_evidence_finding
+    reason_code: missing_session_link
+    mode_ids: [D4, M2]
+  - source_type: model_telemetry_evidence_finding
+    reason_code: missing_task_link
+    mode_ids: [D2, M2]
+  - source_type: model_telemetry_evidence_finding
+    reason_code: missing_model_role
+    mode_ids: [S3]
+  - source_type: model_telemetry_evidence_finding
+    reason_code: undeclared_model_role
+    mode_ids: [S3]
+  - source_type: model_telemetry_evidence_finding
+    reason_code: model_provider_policy_link_missing
+    mode_ids: [F3, S3]
+  - source_type: model_telemetry_evidence_finding
+    reason_code: provider_runtime_authority_attempt
+    mode_ids: [M3]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: opencode_project_config_malformed
+    mode_ids: [F3]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: remote_instruction_review
+    mode_ids: [F4]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: absolute_instruction_review
+    mode_ids: [F4]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: broad_permission_review
+    mode_ids: [M3]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: auto_approval_review
+    mode_ids: [M3]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: mcp_enabled_review
+    mode_ids: [M3]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: model_provider_policy_link_missing
+    mode_ids: [F3, S3]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: model_provider_drift
+    mode_ids: [F3]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: literal_secret
+    mode_ids: [F3]
+  - source_type: opencode_config_hygiene_finding
+    reason_code: opencode_runtime_authority_attempt
+    mode_ids: [M3]
+  - source_type: design_traceability_finding
+    reason_code: missing_fr_nfr_task_link
+    mode_ids: [D2, S3]
+  - source_type: design_traceability_finding
+    reason_code: referenced_path_missing
+    mode_ids: [S3]
+  - source_type: design_traceability_finding
+    reason_code: changed_file_evidence_gap
+    mode_ids: [B1, S3]
+  - source_type: design_traceability_finding
+    reason_code: test_evidence_gap
+    mode_ids: [B1, B3]
+  - source_type: design_traceability_finding
+    reason_code: stale_or_conflicting_evidence
+    mode_ids: [D3]
+  - source_type: design_traceability_finding
+    reason_code: human_review_disposition_missing
+    mode_ids: [M3]
+  - source_type: ui_experience_quality_finding
+    reason_code: stage_dependency_gap
+    mode_ids: [D2]
+  - source_type: ui_experience_quality_finding
+    reason_code: data_contract_gap
+    mode_ids: [S3]
+  - source_type: ui_experience_quality_finding
+    reason_code: accessibility_evidence_gap
+    mode_ids: [B1, B3]
+  - source_type: ui_experience_quality_finding
+    reason_code: performance_evidence_gap
+    mode_ids: [B1, B3]
+  - source_type: ui_experience_quality_finding
+    reason_code: human_design_review_missing
+    mode_ids: [M3]
+  - source_type: ui_experience_quality_finding
+    reason_code: mcp_or_tool_mutation_attempt
+    mode_ids: [M3]
+  - source_type: parallel_lane_handoff_finding
+    reason_code: missing_planning_link
+    mode_ids: [D2, M2]
+  - source_type: parallel_lane_handoff_finding
+    reason_code: dependency_or_claim_conflict
+    mode_ids: [M1]
+  - source_type: parallel_lane_handoff_finding
+    reason_code: scope_mismatch
+    mode_ids: [D2, S4]
+  - source_type: parallel_lane_handoff_finding
+    reason_code: changed_file_evidence_gap
+    mode_ids: [B1, S3]
+  - source_type: parallel_lane_handoff_finding
+    reason_code: test_evidence_gap
+    mode_ids: [B1, B3]
+  - source_type: parallel_lane_handoff_finding
+    reason_code: evidence_conflict
+    mode_ids: [D3]
+  - source_type: parallel_lane_handoff_finding
+    reason_code: human_review_disposition_missing
+    mode_ids: [M3]
+
+known_gaps:
+  - "disabled_until_project_declares_failure_mode_observations"
+residual_risks:
+  - "observation_mapping_can_be_incomplete"
+  - "source_report_findings_can_be_stale"
+  - "counts_can_be_misread_as_scores_without_human_review"
+not_claimed:
+  - "self-learning model weights"
+  - "autonomous skill promotion"
+  - "automatic memory write-back"
+  - "automatic context injection"
+  - "automatic prompt mutation"
+  - "automatic learning promotion"
+  - "provider call"
+  - "model call"
+  - "API call"
+  - "network access"
+  - "MCP activation"
+  - "Engram activation"
+  - "memory activation"
+  - "runtime orchestration"
+  - "numeric risk score authority"
+  - "approval"
+  - "automatic blocking"
+  - "certification"
+  - "attestation"
+  - "proof of compliance"

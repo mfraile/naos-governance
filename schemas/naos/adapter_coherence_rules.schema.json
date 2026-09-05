@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:adapter_coherence_rules:v1",
+  "title": "NAOS Adapter Coherence Rules",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "version",
+    "enabled",
+    "canonical_plugin",
+    "adapter_surfaces",
+    "project_local_adapter_paths",
+    "required_non_claims",
+    "forbidden_claim_phrases",
+    "propagation_policy",
+    "mcp_policy",
+    "profile_posture",
+    "limitations",
+    "not_claimed"
+  ],
+  "properties": {
+    "schema": {"const": "naos.adapter_coherence_rules.v1"},
+    "version": {"type": "string"},
+    "enabled": {"type": "boolean"},
+    "canonical_plugin": {"type": "object"},
+    "canonical_plugins": {"type": "array", "items": {"type": "object"}},
+    "adapter_surfaces": {"type": "array", "items": {"type": "object"}},
+    "project_local_adapter_paths": {"type": "array", "items": {"type": "string"}},
+    "propagation_state_path": {"type": "string"},
+    "propagation_links": {"type": "array", "items": {"type": "object"}},
+    "required_boundary_phrases": {"type": "array", "items": {"type": "string"}},
+    "required_non_claims": {"type": "array", "items": {"type": "string"}},
+    "forbidden_claim_phrases": {"type": "array", "items": {"type": "string"}},
+    "propagation_policy": {"type": "object"},
+    "mcp_policy": {"type": "object"},
+    "profile_posture": {"type": "object"},
+    "known_gaps": {"type": "array"},
+    "residual_risks": {"type": "array"},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  }
+}

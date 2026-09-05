@@ -1,0 +1,1471 @@
+version: "1.0"
+semantics:
+  rules: "Project configuration for governance-surface review and research-routing evidence; not proof by itself."
+  items: "Structured adopter declarations of findings or changes that need routing."
+  report: "NAOS evaluates declared routing status and review obligations."
+  governance_decision: "Human/project governance decides disposition, remediation, waiver, residual risk, and next action."
+  flow: "declare -> evaluate -> report -> review -> approve disposition -> update"
+  not_claimed:
+    - "complete research coverage"
+    - "complete governance-surface review"
+    - "automatic remediation"
+    - "governance proof"
+
+enabled: true
+items_file: control_plane_review_items.yaml
+
+source_types:
+  - governance_surface_change
+  - research_finding
+  - autoresearch_finding
+  - trend_review
+  - repo_review
+  - systemic_impact_finding
+  - module_traceability_finding
+  - spec_cascade_finding
+  - maturity_readiness_finding
+  - setup_recommendation_finding
+  - evidence_attestation_finding
+  - evidence_verification_finding
+  - evidence_conflict_finding
+  - plan_coherence_finding
+  - parallel_lane_handoff_finding
+  - external_sarif_result_finding
+  - ai_component_inventory_finding
+  - agent_sponsor_registry_finding
+  - aivss_arithmetic_verification_finding
+  - model_provider_policy_finding
+  - model_telemetry_evidence_finding
+  - failure_mode_posture_finding
+  - failure_mode_observations_finding
+  - opencode_config_hygiene_finding
+  - design_traceability_finding
+  - ui_experience_quality_finding
+  - review_outcome_conflict_finding
+  - stale_attestation_finding
+  - missing_reviewer_metadata_finding
+  - separation_of_duties_warning_finding
+  - unrouted_conflict_finding
+  - memory_context_finding
+  - memory_authorization_finding
+  - mcp_tool_access_finding
+  - memory_provider_access_finding
+  - mcp_access_overclaim_finding
+  - memory_write_authorization_finding
+  - ci_memory_access_finding
+  - private_memory_payload_risk_finding
+  - cloud_memory_confusion_finding
+  - cross_project_memory_scope_finding
+  - memory_use_policy_finding
+  - learning_loop_finding
+  - active_learning_finding
+  - stale_learning_finding
+  - learning_promotion_finding
+  - learning_forgetting_finding
+  - learning_redaction_finding
+  - learning_authority_overclaim_finding
+  - unsafe_instruction_grade_memory_finding
+  - memory_review_gap_finding
+  - stale_memory_finding
+  - superseded_memory_use_finding
+  - recall_trace_overclaim_finding
+  - audit_event_overclaim_finding
+  - memory_source_of_truth_confusion_finding
+  - memory_write_back_risk_finding
+  - context_continuity_finding
+  - task_context_pack_finding
+  - stale_context_pack_finding
+  - missing_task_context_finding
+  - context_bloat_finding
+  - local_context_index_finding
+  - stale_index_finding
+  - sensitive_indexing_finding
+  - index_authority_confusion_finding
+  - context_index_bloat_finding
+  - local_context_query_finding
+  - stale_context_query_finding
+  - sensitive_query_result_finding
+  - query_authority_confusion_finding
+  - context_query_bloat_finding
+  - semantic_candidate_overtrust_finding
+  - stale_embedding_finding
+  - sensitive_embedding_finding
+  - semantic_runtime_enablement_finding
+  - extension_loading_finding
+  - external_embedding_finding
+  - global_semantic_scan_finding
+  - graph_context_finding
+  - graph_overtrust_finding
+  - stale_graph_link_finding
+  - sensitive_graph_link_finding
+  - global_graph_scan_finding
+  - graph_runtime_enablement_finding
+  - graph_bloat_finding
+  - graph_traversal_scope_finding
+  - graph_context_query_finding
+  - stale_graph_query_finding
+  - sensitive_graph_query_result_finding
+  - graph_query_authority_confusion_finding
+  - graph_query_bloat_finding
+  - session_identity_finding
+  - session_index_finding
+  - operator_attribution_finding
+  - operator_identity_overclaim_finding
+  - operator_privacy_risk_finding
+  - namespaced_report_gap_finding
+  - latest_report_compatibility_finding
+  - multi_user_foundation_gap_finding
+  - sqlite_write_coordination_finding
+  - sqlite_lock_timeout_finding
+  - sqlite_atomic_replace_finding
+  - sqlite_stale_lock_finding
+  - sqlite_coordination_gap_finding
+  - audit_log_finding
+  - invalid_audit_event_finding
+  - missing_session_id_event_finding
+  - missing_operator_id_event_finding
+  - audit_log_gap_finding
+  - audit_log_overclaim_finding
+  - task_claim_finding
+  - task_claim_conflict_finding
+  - stale_task_claim_finding
+  - unknown_operator_claim_finding
+  - task_release_gap_finding
+  - task_claim_overclaim_finding
+  - session_lifecycle_finding
+  - stale_session_context_finding
+  - checkpoint_gap_finding
+  - session_end_review_finding
+  - memory_candidate_overclaim_finding
+  - automatic_injection_overclaim_finding
+  - lifecycle_memory_write_risk_finding
+  - policy_override_finding
+  - team_operator_overlay_finding
+  - team_operator_map_finding
+  - operator_overlay_scope_finding
+  - team_operator_overlay_overclaim_finding
+  - team_gatekeeper_override_finding
+  - gatekeeper_team_context_finding
+  - gatekeeper_override_rejected_finding
+  - gatekeeper_severity_downgrade_finding
+  - gatekeeper_authority_boundary_finding
+  - pr_governance_finding
+  - ci_gate_failure_finding
+  - ci_evidence_artifact_finding
+  - ci_overclaim_finding
+  - ci_artifact_sensitivity_finding
+  - pr_time_ci_gap_finding
+  - optional_tool_integration_finding
+  - spec_kit_adapter_finding
+  - claude_code_hook_finding
+  - claude_code_plugin_adapter_finding
+  - codex_plugin_adapter_finding
+  - tool_neutral_usage_finding
+  - integration_activation_boundary_finding
+  - agentic_workflow_finding
+  - pre_implementation_alignment_finding
+  - context_hygiene_finding
+  - alignment_interview_finding
+  - vertical_slice_finding
+  - tdd_feedback_finding
+  - push_pull_context_finding
+  - silent_context_injection_finding
+  - auto_approval_boundary_finding
+  - calibration_shadow_finding
+  - deterministic_calibration_drift_finding
+  - evidence_classification_finding
+  - evidence_provenance_finding
+  - missing_classification_finding
+  - hypothesized_finding_review
+  - cross_harness_review_readiness_finding
+  - dsse_readiness_finding
+  - attestation_boundary_finding
+  - key_custody_boundary_finding
+  - harness_trust_boundary_finding
+  - unsafe_cross_harness_runtime_finding
+  - professional_adoption_finding
+  - preflight_finding
+  - intake_finding
+  - install_plan_finding
+  - existing_resource_inventory_finding
+  - ai_artifact_inventory_finding
+  - ai_artifact_reconciliation_finding
+  - memory_resource_inventory_finding
+  - memory_resource_reconciliation_finding
+  - mcp_resource_inventory_finding
+  - brownfield_baseline_finding
+  - candidate_requirements_finding
+  - traceability_gap_finding
+  - install_decision_record_finding
+  - context_challenge_finding
+  - repo_context_challenge_finding
+  - plan_challenge_finding
+  - decision_probe_finding
+  - planning_gate_review_finding
+  - integration_secret_risk_finding
+  - integration_context_injection_risk_finding
+  - protected_invariant_violation_finding
+  - plugin_runtime_enablement_finding
+  - advisory_authority_override_finding
+  - customization_scope_finding
+  - agent_trace_event_finding
+  - trace_event_overclaim_finding
+  - trace_payload_risk_finding
+  - trace_event_schema_gap_finding
+  - trace_event_review_gap_finding
+  - ai_surface_budget_finding
+  - ai_surface_baseline_drift_finding
+  - static_grader_finding
+  - grader_assessment_finding
+  - audit_mode_overclaim_finding
+  - drift_mode_overclaim_finding
+  - assessment_certification_overclaim_finding
+  - composite_score_blending_finding
+  - llm_grader_readiness_finding
+  - behavioral_governance_readiness_finding
+  - behavioral_baseline_impacter_finding
+  - behavioral_baseline_overclaim_finding
+  - llm_runtime_enablement_finding
+  - llm_cost_budget_finding
+  - llm_data_exposure_finding
+  - llm_bias_risk_finding
+  - llm_advisory_authority_finding
+  - grader_overclaim_finding
+  - unsupported_behavioral_dimension_finding
+  - cost_budget_finding
+  - trace_event_grading_gap_finding
+  - duplicate_function_hygiene_finding
+  - secret_hygiene_finding
+  - test_quality_hygiene_finding
+  - dependency_integrity_finding
+  - package_reality_finding
+  - secure_coding_control_finding
+  - secure_coding_evidence_route_finding
+  - secure_coding_mapping_review_finding
+  - deterministic_hygiene_overclaim_finding
+  - manual_review_item
+
+target_surfaces:
+  - capabilities
+  - policy
+  - gatekeepers
+  - validators
+  - evidence_pack
+  - secure_coding_controls
+  - sarif_export
+  - dashboard
+  - claims
+  - known_gaps
+  - residual_risks
+  - roadmap
+  - task_registry
+  - task_claims
+  - task_claim_report
+  - task_claim_conflict
+  - task_claim_release
+  - traceability
+  - capability_state
+  - systemic_impact
+  - control_plane_review
+  - module_headers
+  - setup_recommendations
+  - evidence_attestation
+  - evidence_verification
+  - evidence_conflict_detection
+  - evidence_conflicts
+  - plan_coherence
+  - review_outcome_conflict
+  - separation_of_duties_warning
+  - stale_attestation
+  - memory_context
+  - memory_authorization
+  - memory_provider_access
+  - mcp_tool_access
+  - platform_memory_access
+  - memory_write_authorization
+  - ci_memory_access
+  - memory_use_policy
+  - memory_review_items
+  - memory_trust_ladder
+  - instruction_grade_memory
+  - learning_loop_review
+  - learning_candidates
+  - learning_state
+  - learning_history
+  - learning_promotion_review
+  - learning_forgetting_policy
+  - learning_redaction_policy
+  - recall_trace_readiness
+  - audit_event_readiness
+  - context_pack_readiness
+  - task_context_pack
+  - context_packs
+  - local_context_index
+  - local_context_query
+  - context_index_artifact
+  - sqlite_write_coordination
+  - local_context_index_db
+  - sqlite_lock_file
+  - atomic_replace
+  - append_only_audit_log
+  - audit_log_events
+  - audit_log_summary
+  - index_source_families
+  - future_semantic_layer
+  - semantic_candidate_layer
+  - semantic_candidate_rules
+  - embedding_artifacts
+  - semantic_query_posture
+  - sensitive_embedding_policy
+  - stale_embedding_policy
+  - future_graph_layer
+  - graph_context_readiness
+  - graph_context_query
+  - graph_context_rules
+  - explicit_artifact_links
+  - graph_traversal_posture
+  - graph_overtrust
+  - stale_graph_links
+  - sensitive_graph_links
+  - session_identity
+  - session_index
+  - operator_attribution
+  - operator_privacy
+  - operator_identity_overclaim
+  - namespaced_reports
+  - latest_report_compatibility
+  - multi_user_foundation
+  - session_lifecycle
+  - session_start
+  - session_checkpoint
+  - session_end
+  - memory_candidate_proposals
+  - policy_overrides
+  - team_operator_policy_overlays
+  - team_operator_map
+  - operator_overlay_scope
+  - multi_team_gatekeepers
+  - team_gatekeeper_overrides
+  - effective_gatekeeper_resolution
+  - gatekeeper_team_context
+  - pr_time_ci
+  - pr_governance_summary
+  - ci_gate_evaluation
+  - ci_evidence_artifacts
+  - optional_tool_integrations
+  - spec_kit_adapter
+  - claude_code_hooks
+  - codex_plugin_adapter
+  - codex_plugin_source
+  - adapter_coherence
+  - adapter_propagation
+  - tool_neutral_usage
+  - calibration_shadow
+  - deterministic_calibration_drift
+  - evidence_classification
+  - evidence_provenance
+  - confirmed_deduced_hypothesized
+  - missing_finding_classification
+  - cross_harness_review_readiness
+  - dsse_readiness
+  - attestation_boundary
+  - key_custody_boundary
+  - harness_trust_boundary
+  - independent_review_readiness
+  - integration_activation_boundary
+  - integration_secret_risk
+  - integration_context_injection_risk
+  - customization_hooks
+  - protected_invariants
+  - plugin_runtime_posture
+  - advisory_authority_boundary
+  - agent_trace_events
+  - agent_trace_validation
+  - ai_surface_context_budget
+  - static_grader
+  - static_grader_report
+  - grader_assessment
+  - grader_assessment_report
+  - autoresearch_audit_mode
+  - autoresearch_drift_mode
+  - autoresearch_assess_mode
+  - grader_drift_baseline
+  - composite_grader_boundary
+  - llm_grader_readiness
+  - llm_grader_readiness_rules
+  - behavioral_governance_readiness
+  - behavioral_governance_readiness_rules
+  - behavioral_baseline_state
+  - behavioral_baseline_impacters
+  - llm_grader_runtime_enablement
+  - llm_cost_budget
+  - llm_data_exposure
+  - llm_bias_variance_risk
+  - advisory_grading_boundary
+  - external_evidence_ingest
+  - external_evidence_ingest_report
+  - model_provider_policy
+  - model_provider_policy_report
+  - ai_component_inventory
+  - ai_component_inventory_report
+  - agent_sponsor_registry
+  - agent_sponsor_registry_report
+  - aivss_assessments
+  - aivss_arithmetic_verification_report
+  - model_telemetry_evidence
+  - model_telemetry_evidence_report
+  - failure_mode_posture
+  - failure_mode_posture_report
+  - failure_mode_observations
+  - failure_mode_observations_report
+  - opencode_config_hygiene
+  - opencode_config_hygiene_report
+  - design_traceability
+  - design_traceability_report
+  - ui_experience_quality
+  - ui_experience_quality_report
+  - autoresearch_model_policy
+  - grader_dimension_results
+  - grader_overclaim
+  - cost_budget_posture
+  - behavioral_grading_foundation
+  - trace_event_overclaim
+  - trace_payload_risk
+  - stale_session_context
+  - checkpoint_gap
+  - lifecycle_hook_overclaim
+  - active_task_cards
+  - compact_recovery_briefs
+  - tests
+  - cli
+  - make
+  - docs
+  - ai_surfaces
+  - next_actions
+
+governed_surface_families:
+  - family_id: capabilities
+    name: Capability Contracts
+    enabled: true
+    file_patterns:
+      - "capabilities/*.yaml"
+      - "naos/capabilities/*.yaml"
+    target_surfaces: [policy, gatekeepers, evidence_pack, dashboard, capability_state, docs]
+    human_review_required: true
+    rationale: "Capability cards define governance semantics and maturity expectations."
+
+  - family_id: secure_coding_controls
+    name: Secure-Coding and Agentic-Coding Controls
+    enabled: true
+    file_patterns:
+      - "configs/secure_coding_control_register.yaml"
+      - "configs/secure_coding_control_render_manifest.yaml"
+      - "capabilities/secure_coding_controls.yaml"
+      - "templates/structural-seeds/naos/secure_coding_control_evidence_routes.yaml"
+      - "scripts/naos_secure_coding_controls.py"
+      - "scripts/validators/validate_secure_coding_control*.py"
+      - "naos/secure_coding_control_register.yaml"
+      - "naos/secure_coding_control_evidence_routes.yaml"
+      - "naos/reports/secure_coding_controls.json"
+    target_surfaces: [capabilities, policy, gatekeepers, validators, evidence_pack, secure_coding_controls, dashboard, systemic_impact, ai_surfaces, docs, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Canonical controls and evidence routes affect operational guidance and review posture but do not acquire policy, gate, exception, approval, or compliance authority."
+
+  - family_id: policy
+    name: Policy
+    enabled: true
+    file_patterns:
+      - "policies/default_policy.yaml"
+      - "naos/policy/default_policy.yaml"
+    target_surfaces: [gatekeepers, validators, evidence_pack, dashboard, docs]
+    human_review_required: true
+    rationale: "Policy changes can alter severity, paths, and evidence semantics."
+
+  - family_id: gatekeepers
+    name: Gatekeepers
+    enabled: true
+    file_patterns:
+      - "naos/gatekeepers.yaml"
+      - "templates/structural-seeds/naos/gatekeepers.yaml"
+    target_surfaces: [evidence_pack, dashboard, capability_state, docs]
+    human_review_required: true
+    rationale: "Gate changes alter convergence points and profile behavior."
+
+  - family_id: design_traceability
+    name: Design Traceability
+    enabled: true
+    file_patterns:
+      - "naos/design_traceability.yaml"
+      - "templates/structural-seeds/naos/design_traceability.yaml"
+      - "naos/reports/design_traceability.json"
+      - "scripts/naos_design_traceability.py"
+      - "schemas/naos/design_traceability.schema.json"
+      - "capabilities/design_traceability.yaml"
+    target_surfaces: [design_traceability, design_traceability_report, control_plane_review, gatekeepers, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Design traceability affects optional UI object identity and local evidence review, but it does not activate design-tool sync, runtime orchestration, MCP, providers, models, memory, approval, certification, or compliance authority."
+
+  - family_id: ui_experience_quality
+    name: UI Experience Quality Review
+    enabled: true
+    file_patterns:
+      - "naos/ui_experience_quality.yaml"
+      - "templates/structural-seeds/naos/ui_experience_quality.yaml"
+      - "naos/reports/ui_experience_quality.json"
+      - "scripts/naos_ui_experience_quality.py"
+      - "schemas/naos/ui_experience_quality.schema.json"
+      - "capabilities/ui_experience_quality.yaml"
+    target_surfaces: [ui_experience_quality, ui_experience_quality_report, design_traceability, model_provider_policy, control_plane_review, gatekeepers, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "UI experience quality review affects optional local UI quality evidence posture, but it does not activate Figma, MCP, browser automation, providers, models, memory, design-tool mutation, approval, certification, or compliance authority."
+
+  - family_id: model_telemetry_evidence
+    name: Model Telemetry Evidence
+    enabled: true
+    file_patterns:
+      - "naos/model_telemetry_evidence.yaml"
+      - "templates/structural-seeds/naos/model_telemetry_evidence.yaml"
+      - "naos/reports/model_telemetry_evidence.json"
+      - "scripts/naos_model_telemetry_evidence.py"
+      - "schemas/naos/model_telemetry_evidence.schema.json"
+      - "capabilities/model_telemetry_evidence.yaml"
+    target_surfaces: [model_telemetry_evidence, model_telemetry_evidence_report, model_provider_policy, agent_trace_validation, session_lifecycle, control_plane_review, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Model telemetry evidence affects optional local model-use review posture, but it does not activate providers, models, APIs, gateways, MCP, memory, route enforcement, cost accounting, approval, certification, or compliance authority."
+
+  - family_id: failure_mode_posture
+    name: Failure-Mode Posture
+    enabled: true
+    file_patterns:
+      - "naos/failure_mode_taxonomy.yaml"
+      - "templates/structural-seeds/naos/failure_mode_taxonomy.yaml"
+      - "naos/reports/failure_mode_posture.json"
+      - "scripts/naos_failure_mode_posture.py"
+      - "schemas/naos/failure_mode_posture.schema.json"
+      - "capabilities/failure_mode_posture.yaml"
+    target_surfaces: [failure_mode_posture, failure_mode_posture_report, behavioral_governance_readiness, control_plane_review, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Failure-mode posture affects optional local review statistics for factual, structural, behavioral, drift, and multi-agent failures, but it does not prevent failures, run behavioral batteries, activate learning, providers, models, MCP, memory, runtime orchestration, approval, certification, or compliance authority."
+
+  - family_id: failure_mode_observations
+    name: Failure-Mode Observations
+    enabled: true
+    file_patterns:
+      - "naos/failure_mode_observations.yaml"
+      - "templates/structural-seeds/naos/failure_mode_observations.yaml"
+      - "naos/reports/failure_mode_observations.json"
+      - "scripts/naos_failure_mode_observations.py"
+      - "schemas/naos/failure_mode_observations.schema.json"
+      - "capabilities/failure_mode_observations.yaml"
+    target_surfaces: [failure_mode_observations, failure_mode_observations_report, failure_mode_posture, learning_loop_review, evidence_pack, dashboard, sarif_export, gatekeepers, systemic_impact, control_plane_review, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Failure-mode observations affect optional local review statistics across reports and downstream review consumers, but they do not create or promote learning, mutate prompts/skills/workflows, call providers/models, activate MCP/Engram/memory, use numeric risk scores as authority, approve, block, certify, or prove compliance."
+
+  - family_id: opencode_config_hygiene
+    name: OpenCode Config Hygiene
+    enabled: true
+    file_patterns:
+      - "naos/opencode_config_hygiene.yaml"
+      - "templates/structural-seeds/naos/opencode_config_hygiene.yaml"
+      - "naos/reports/opencode_config_hygiene.json"
+      - "scripts/naos_opencode_config_hygiene.py"
+      - "schemas/naos/opencode_config_hygiene.schema.json"
+      - "capabilities/opencode_config_hygiene.yaml"
+    target_surfaces: [opencode_config_hygiene, opencode_config_hygiene_report, model_provider_policy, ai_surfaces, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "OpenCode config hygiene affects optional local AI tool config review, but it does not create, run, configure, enable, disable, or mutate OpenCode, MCP, memory, providers, models, hooks, IDE settings, global config, credentials, plugins, or runtime systems."
+
+  - family_id: validators
+    name: Validators and Scripts
+    enabled: true
+    file_patterns:
+      - "scripts/naos_*.py"
+      - "scripts/validators/*.py"
+      - "scripts/workflows/*.py"
+    target_surfaces: [cli, make, tests, evidence_pack, dashboard, docs]
+    human_review_required: true
+    rationale: "Validator behavior must stay aligned with wrappers, evidence, and reporting."
+
+  - family_id: ai_surfaces
+    name: AI Tool Surfaces
+    enabled: true
+    file_patterns:
+      - "templates/agents/*.md"
+      - "templates/skills/*/SKILL.md"
+      - "templates/instructions/*.instructions.md"
+      - "templates/prompts/*.prompt.md"
+      - "templates/cursor-rules/*.mdc"
+      - "templates/rules-chain/.ai/*.yml"
+      - "templates/instruction-triple/*"
+    target_surfaces: [systemic_impact, control_plane_review, claims, docs, next_actions]
+    human_review_required: true
+    rationale: "AI guidance can drift or contradict canonical control-plane rules."
+
+  - family_id: governed_learning_lifecycle
+    name: Governed Learning Lifecycle
+    enabled: true
+    file_patterns:
+      - "naos/learning_loop_rules.yaml"
+      - "naos/learning_candidates.yaml"
+      - "naos/learning_state.yaml"
+      - "naos/learning_history.yaml"
+      - "templates/structural-seeds/naos/learning_*.yaml"
+      - "scripts/naos_learning_loop_review.py"
+    target_surfaces: [memory_context, ai_surfaces, gatekeepers, evidence_pack, dashboard, capability_state, docs, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Learning records can influence future agent behavior and must stay reviewed, scoped, reversible, and non-authoritative until approved."
+
+  - family_id: ai_surface_context_budget
+    name: AI Surface Context Budget
+    enabled: true
+    file_patterns:
+      - "naos/ai_surface_context_budget_rules.yaml"
+      - "naos/reports/ai_surface_context_budget.json"
+      - "naos/baselines/ai_surface_health_baseline.json"
+    target_surfaces: [ai_surfaces, static_grader, grader_assessment, gatekeepers, evidence_pack, dashboard, docs, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "AI-surface context-health and baseline drift must be routed without becoming automatic threshold tuning."
+
+  - family_id: research_findings
+    name: Research and Autoresearch Findings
+    enabled: true
+    file_patterns:
+      - "naos/research/*.md"
+      - ".github/autoresearch/*.json"
+      - ".github/autoresearch/*.md"
+    target_surfaces: [known_gaps, residual_risks, roadmap, capabilities, policy, validators, evidence_pack, dashboard, docs, next_actions]
+    human_review_required: true
+    rationale: "Actionable research should route into the control plane instead of remaining standalone analysis."
+
+  - family_id: known_gaps
+    name: Known Gaps
+    enabled: true
+    file_patterns:
+      - "naos/evidence/known_gaps.yaml"
+      - "docs/KNOWN_GAPS.md"
+    target_surfaces: [evidence_pack, dashboard, roadmap, next_actions]
+    human_review_required: true
+    rationale: "Known gaps must remain visible and route into future action."
+
+  - family_id: residual_risks
+    name: Residual Risks
+    enabled: true
+    file_patterns:
+      - "naos/evidence/residual_risks.yaml"
+      - "docs/RISK_REGISTER.md"
+      - "docs/NAOS_THREAT_MODEL.md"
+    target_surfaces: [evidence_pack, dashboard, gatekeepers, next_actions]
+    human_review_required: true
+    rationale: "Residual risks require visible disposition and governance review."
+
+  - family_id: evidence_attestation
+    name: Evidence Integrity and Reviewer Attestation
+    enabled: true
+    file_patterns:
+      - "naos/evidence_attestation_rules.yaml"
+      - "naos/evidence_review_attestations.yaml"
+      - "naos/reports/evidence_attestation.json"
+    target_surfaces: [evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, next_actions]
+    human_review_required: true
+    rationale: "Evidence attestation changes affect digest coverage, reviewer metadata, gaps, residual risks, waivers, and evidence visibility."
+
+  - family_id: evidence_verification
+    name: Evidence Verification
+    enabled: true
+    file_patterns:
+      - "naos/evidence/evidence_envelope.json"
+      - "naos/reports/evidence_verification.json"
+      - "scripts/naos_evidence_signing.py"
+      - "schemas/naos/evidence_envelope.schema.json"
+      - "schemas/naos/evidence_verification.schema.json"
+    target_surfaces: [evidence_pack, dashboard, sarif_export, docs, quick_reference, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Evidence verification changes affect tamper-evidence, signature-entry presence, and Git HEAD metadata; they must not imply NAOS signing, cryptographic third-party signature validation, or identity authentication."
+
+  - family_id: evidence_conflict_detection
+    name: Evidence Conflict Detection
+    enabled: true
+    file_patterns:
+      - "naos/reports/evidence_conflict_detection.json"
+      - "scripts/naos_evidence_conflicts.py"
+      - "schemas/naos/evidence_conflict_detection.schema.json"
+    target_surfaces: [evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "Evidence conflict detection changes affect review-risk visibility and must remain bounded as finding generation, not adjudication."
+
+  - family_id: plan_coherence
+    name: Plan Coherence Review
+    enabled: true
+    file_patterns:
+      - "naos/TASK_REGISTRY.yaml"
+      - "naos/task_claims.yaml"
+      - "naos/PLANNING_BASELINES.yaml"
+      - "naos/reports/plan_coherence.json"
+      - "scripts/naos_plan_coherence.py"
+      - "schemas/naos/plan_coherence.schema.json"
+      - "schemas/naos/planning_baselines.schema.json"
+      - "schemas/naos/human_decision_record.schema.json"
+      - "templates/structural-seeds/naos/gatekeepers.yaml"
+      - "scripts/naos_gate_status.py"
+    target_surfaces: [task_registry, task_claims, gatekeepers, evidence_pack, dashboard, sarif_export, docs, quick_reference, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Plan coherence findings affect task coordination, implementation-readiness, and live G2 review and must remain structural evidence rather than work authorization, sequencing, task closure, merge, or release authority."
+
+  - family_id: task_claims
+    name: Task Claim / Release Coordination
+    enabled: true
+    file_patterns:
+      - "naos/task_claims.yaml"
+      - "naos/reports/task_claim_report.json"
+      - "naos/sessions/*/reports/task_claim_report.json"
+      - "scripts/naos_task_claims.py"
+      - "schemas/naos/task_claims.schema.json"
+      - "schemas/naos/task_claim_report.schema.json"
+    target_surfaces: [task_claims, task_claim_report, task_registry, append_only_audit_log, evidence_conflict_detection, evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "Task claim changes affect team coordination metadata and must remain bounded as claim/release records, not authorization, approval, ownership proof, task completion, or conflict resolution."
+
+  - family_id: pr_time_ci
+    name: PR-Time CI Governance
+    enabled: true
+    file_patterns:
+      - "templates/workflows/naos-pr-governance.yml.example"
+      - "naos/reports/pr_governance_summary.json"
+      - "scripts/naos_pr_governance_summary.py"
+      - "schemas/naos/pr_governance_summary.schema.json"
+    target_surfaces: [pr_governance_summary, ci_gate_evaluation, ci_evidence_artifacts, evidence_pack, dashboard, gatekeepers, sarif_export, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "PR-time CI changes affect generated pull-request review evidence and must remain bounded as evidence, not approval, deployment authorization, release authorization, or proof of compliance."
+
+  - family_id: optional_tool_integrations
+    name: Optional Tool Integrations
+    enabled: true
+    file_patterns:
+      - "templates/integrations/**/*"
+      - "templates/structural-seeds/naos/setup_module_catalog.yaml"
+      - "docs/TOOL_NEUTRAL_USAGE.md"
+    target_surfaces: [optional_tool_integrations, spec_kit_adapter, claude_code_hooks, claude_code_plugin_adapter, codex_plugin_adapter, adapter_coherence, tool_neutral_usage, setup_recommendations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Optional integrations affect adopter ergonomics and must remain convenience templates, not core dependencies, automatic activation, approval, certification, or proof of compliance."
+
+  - family_id: spec_kit_adapter
+    name: Spec-Kit Adapter Template
+    enabled: true
+    file_patterns:
+      - "templates/integrations/spec-kit/README.md"
+      - "templates/integrations/spec-kit/extension-manifest.json"
+      - "templates/integrations/spec-kit/examples/*.md"
+      - "templates/integrations/spec-kit/speckit_adapter.py"
+    target_surfaces: [optional_tool_integrations, spec_kit_adapter, evidence_pack, task_context_pack, gatekeepers, docs, ai_surfaces, control_plane_review, next_actions]
+    human_review_required: true
+    rationale: "Spec-Kit mapping is optional dry-run evidence/context orientation and must not mutate .specify by default or imply official support."
+
+  - family_id: claude_code_hooks
+    name: Claude Code Hook Templates
+    enabled: true
+    file_patterns:
+      - "templates/integrations/claude-code/README.md"
+      - "templates/integrations/claude-code/settings*.json"
+      - "templates/integrations/claude-code/hooks/*.sh"
+    target_surfaces: [optional_tool_integrations, claude_code_hooks, integration_activation_boundary, integration_secret_risk, integration_context_injection_risk, docs, ai_surfaces, gatekeepers, next_actions]
+    human_review_required: true
+    rationale: "Claude Code hook templates can run local NAOS checks when explicitly activated, but must not overwrite settings, inject context, write memory, call providers, or approve work."
+
+  - family_id: codex_plugin_adapter
+    name: Codex Plugin Adapter
+    enabled: true
+    file_patterns:
+      - "plugins/naos-governance/**/*"
+      - "templates/integrations/codex-plugin/**/*"
+      - "scripts/naos_adapter_coherence.py"
+      - "schemas/naos/adapter_coherence*.json"
+      - "docs/CODEX_PLUGIN_AND_MCP.md"
+    target_surfaces: [optional_tool_integrations, codex_plugin_adapter, codex_plugin_source, adapter_coherence, integration_activation_boundary, integration_secret_risk, integration_context_injection_risk, docs, ai_surfaces, gatekeepers, next_actions]
+    human_review_required: true
+    rationale: "Codex plugin adapter changes affect how Codex operators interact with NAOS and must remain bounded as optional guidance over project-local NAOS artifacts."
+
+  - family_id: claude_code_plugin_adapter
+    name: Claude Code Plugin Adapter
+    enabled: true
+    file_patterns:
+      - "plugins/naos-governance-claude-code/**/*"
+      - "templates/integrations/claude-code-plugin/**/*"
+      - "scripts/naos_adapter_coherence.py"
+      - "schemas/naos/adapter_coherence*.json"
+      - "docs/CODEX_PLUGIN_AND_MCP.md"
+    target_surfaces: [optional_tool_integrations, claude_code_plugin_adapter, claude_code_hooks, adapter_coherence, integration_activation_boundary, integration_secret_risk, integration_context_injection_risk, docs, ai_surfaces, gatekeepers, next_actions]
+    human_review_required: true
+    rationale: "Claude Code plugin adapter changes affect how Claude Code operators interact with NAOS and must remain skills-only, optional, and bounded over project-local artifacts."
+
+  - family_id: adapter_coherence
+    name: Adapter Coherence Review
+    enabled: true
+    file_patterns:
+      - "scripts/naos_adapter_coherence.py"
+      - "templates/structural-seeds/naos/adapter_coherence_rules.yaml"
+      - "templates/structural-seeds/naos/adapter_propagation_state.yaml"
+      - "schemas/naos/adapter_coherence*.json"
+      - "schemas/naos/adapter_propagation_state.schema.json"
+      - "naos/reports/adapter_coherence.json"
+    target_surfaces: [adapter_coherence, adapter_propagation, codex_plugin_adapter, claude_code_plugin_adapter, claude_code_hooks, spec_kit_adapter, tool_neutral_usage, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Adapter coherence changes affect drift detection across tool adapters and must remain deterministic, local, report-only, and non-mutating."
+
+  - family_id: adapter_propagation
+    name: Adapter Propagation
+    enabled: true
+    file_patterns:
+      - "plugins/naos-governance/**/*"
+      - "plugins/naos-governance-claude-code/**/*"
+      - "templates/integrations/**/*"
+      - "templates/skills/**/*"
+      - "templates/instructions/**/*"
+      - "templates/agents/**/*"
+      - "templates/structural-seeds/naos/adapter_propagation_state.yaml"
+      - "templates/structural-seeds/naos/learning_*.yaml"
+    target_surfaces: [adapter_propagation, governed_learning_lifecycle, adapter_coherence, ai_surface_context_budget, optional_tool_integrations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Learning-driven changes to skills, prompts, workflows, instructions, plugins, or adapters must be approved centrally and propagated deliberately."
+
+  - family_id: tool_neutral_usage
+    name: Tool-Neutral Usage Guidance
+    enabled: true
+    file_patterns:
+      - "docs/TOOL_NEUTRAL_USAGE.md"
+      - "README.md"
+      - "docs/ADOPTION_GUIDE.md"
+      - "templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md"
+    target_surfaces: [tool_neutral_usage, optional_tool_integrations, docs, ai_surfaces, setup_recommendations, next_actions]
+    human_review_required: true
+    rationale: "Tool-neutral guidance keeps CLI/Make/files/schemas/reports as the core workflow and frames third-party tools as optional patterns."
+
+  - family_id: calibration_shadow
+    name: Calibration Shadow
+    enabled: true
+    file_patterns:
+      - "naos/calibration_shadow.yaml"
+      - "naos/reports/calibration_shadow_report.json"
+      - "scripts/naos_calibration_shadow.py"
+      - "schemas/naos/calibration_shadow*.json"
+    target_surfaces: [calibration_shadow, deterministic_calibration_drift, evidence_pack, dashboard, gatekeepers, docs, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Calibration shadow changes affect deterministic report drift interpretation and must remain metadata review, not model calibration or release authorization."
+
+  - family_id: evidence_classification
+    name: Evidence Classification
+    enabled: true
+    file_patterns:
+      - "naos/evidence_classification_policy.yaml"
+      - "naos/reports/evidence_classification_report.json"
+      - "scripts/naos_evidence_classification.py"
+      - "schemas/naos/evidence_classification*.json"
+    target_surfaces: [evidence_classification, evidence_provenance, confirmed_deduced_hypothesized, missing_finding_classification, evidence_pack, dashboard, sarif_export, gatekeepers, docs, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Evidence classification changes affect how reviewers distinguish confirmed, deduced, hypothesized, and unknown findings without changing severity or granting approval."
+
+  - family_id: cross_harness_review_readiness
+    name: Cross-Harness Review Readiness
+    enabled: true
+    file_patterns:
+      - "naos/cross_harness_review_readiness.yaml"
+      - "naos/reports/cross_harness_review_readiness.json"
+      - "scripts/naos_cross_harness_review_readiness.py"
+      - "schemas/naos/cross_harness_review_readiness*.json"
+      - "docs/CROSS_HARNESS_REVIEW_READINESS.md"
+    target_surfaces: [cross_harness_review_readiness, dsse_readiness, attestation_boundary, key_custody_boundary, harness_trust_boundary, independent_review_readiness, evidence_pack, dashboard, sarif_export, gatekeepers, docs, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Cross-harness review readiness changes affect future review and DSSE-style planning boundaries, but must remain readiness-only and must not enable harness execution, signing, verification, key custody, approval, or proof of compliance."
+
+  - family_id: deterministic_hygiene_controls
+    name: Deterministic Hygiene Controls
+    enabled: true
+    file_patterns:
+      - "scripts/naos_duplicate_function_hygiene.py"
+      - "scripts/naos_secret_hygiene.py"
+      - "scripts/naos_test_quality_hygiene.py"
+      - "scripts/naos_dependency_integrity.py"
+      - "scripts/naos_package_reality.py"
+      - "scripts/naos_api_symbol_reality.py"
+      - "schemas/naos/*hygiene*.json"
+      - "schemas/naos/dependency_integrity.schema.json"
+      - "schemas/naos/package_reality.schema.json"
+      - "schemas/naos/api_symbol_reality*.schema.json"
+      - "naos/reports/duplicate_function_hygiene.json"
+      - "naos/reports/secret_hygiene.json"
+      - "naos/reports/test_quality_hygiene.json"
+      - "naos/reports/dependency_integrity.json"
+      - "naos/reports/package_reality.json"
+      - "naos/reports/api_symbol_reality.json"
+    target_surfaces: [validators, gatekeepers, evidence_pack, dashboard, sarif_export, docs, quick_reference, claims, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Deterministic hygiene controls close observed duplicate, secret, weak-test, undeclared-import, package-reality, and declared API-symbol gaps while preserving human review and non-claim boundaries."
+
+  - family_id: professional_adoption_engine
+    name: "Professional Adoption Engine"
+    enabled: true
+    file_patterns:
+      - "scripts/naos_adopt.py"
+      - "scripts/naos_preflight.py"
+      - "scripts/naos_intake.py"
+      - "scripts/naos_install_plan.py"
+      - "scripts/naos_*inventory.py"
+      - "scripts/naos_*challenge.py"
+      - "naos/reports/adoption_summary.json"
+      - "naos/reports/preflight_report.json"
+      - "naos/reports/intake_report.json"
+      - "naos/reports/install_plan.json"
+      - "naos/reports/install_decision_record.json"
+    target_surfaces: [professional_adoption_engine, preflight, intake, install_plan, inventories, challenges, decision_records, evidence_pack, dashboard, gatekeepers, docs, tutorials, quick_reference, claims]
+    human_review_required: true
+    rationale: "Adoption capabilities must remain wired across commands, configs, reports, schemas, docs, tests, evidence outputs, and human decision boundaries."
+
+  - family_id: integration_activation_boundary
+    name: Integration Activation Boundary
+    enabled: true
+    file_patterns:
+      - "templates/integrations/**/README.md"
+      - "templates/integrations/claude-code/settings*.json"
+      - "templates/structural-seeds/naos/setup_module_catalog.yaml"
+    target_surfaces: [optional_tool_integrations, claude_code_hooks, spec_kit_adapter, setup_recommendations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Integration activation must require explicit adopter review and must not silently change active IDE or assistant settings."
+
+  - family_id: integration_secret_risk
+    name: Integration Secret Risk
+    enabled: true
+    file_patterns:
+      - "templates/integrations/**/*"
+      - "docs/TOOL_NEUTRAL_USAGE.md"
+      - "SECURITY.md"
+    target_surfaces: [optional_tool_integrations, security, docs, ai_surfaces, setup_recommendations, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Optional integrations must not request, store, upload, or depend on secrets, API keys, or provider credentials."
+
+  - family_id: integration_context_injection_risk
+    name: Integration Context Injection Risk
+    enabled: true
+    file_patterns:
+      - "templates/integrations/claude-code/**/*"
+      - "docs/TOOL_NEUTRAL_USAGE.md"
+      - "templates/instruction-triple/CLAUDE.md"
+    target_surfaces: [optional_tool_integrations, claude_code_hooks, ai_surfaces, memory_context, task_context_pack, docs, known_gaps, residual_risks, next_actions]
+    human_review_required: true
+    rationale: "Assistant integration templates must not silently inject context or write memory; they can only surface local NAOS guidance when explicitly activated."
+
+  - family_id: memory_context
+    name: AI Context Continuity and Memory Governance
+    enabled: true
+    file_patterns:
+      - "naos/memory_context_rules.yaml"
+      - "naos/memory_authorization_matrix.yaml"
+      - "naos/reports/memory_context_readiness.json"
+      - "configs/naos_memory.yaml"
+      - "docs/ENGRAM_SETUP.md"
+    target_surfaces: [setup_recommendations, systemic_impact, evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "Memory/context readiness changes can alter AI recall assumptions, MCP/tool access, fallback behavior, and human-review boundaries."
+
+  - family_id: memory_use_policy
+    name: Memory Use Policy
+    enabled: true
+    file_patterns:
+      - "naos/memory_use_policy_rules.yaml"
+      - "naos/memory_review_items.yaml"
+      - "naos/reports/memory_use_policy.json"
+      - "scripts/naos_memory_use_policy.py"
+      - "schemas/naos/memory_use_policy.schema.json"
+    target_surfaces: [memory_context, memory_provider_access, setup_recommendations, systemic_impact, evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "Memory-use policy changes affect trust ladder, instruction-grade memory, recall/audit readiness, source-authority boundaries, and durable human-review decisions."
+
+  - family_id: task_context_pack
+    name: Task Context Pack
+    enabled: true
+    file_patterns:
+      - "naos/task_context_pack_rules.yaml"
+      - "naos/reports/task_context_pack.json"
+      - "naos/context_packs/*.md"
+      - "scripts/naos_task_context_pack.py"
+    target_surfaces: [memory_context, systemic_impact, evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "Task context pack changes affect bounded AI handoff context, source hierarchy, memory-advisory posture, and stale-context routing."
+
+  - family_id: local_context_index
+    name: Local Context Index
+    enabled: true
+    file_patterns:
+      - "naos/local_context_index_rules.yaml"
+      - "naos/reports/local_context_index.json"
+      - "naos/context_index/local_context_index.sqlite"
+      - "scripts/naos_local_context_index.py"
+      - "scripts/naos_local_context_query.py"
+      - "naos/reports/local_context_query.json"
+      - "naos/semantic_candidate_layer_rules.yaml"
+      - "naos/reports/semantic_candidate_layer.json"
+      - "scripts/naos_semantic_candidate_readiness.py"
+      - "naos/graph_context_rules.yaml"
+      - "naos/reports/graph_context_readiness.json"
+      - "scripts/naos_graph_context_readiness.py"
+      - "naos/context_queries/*.md"
+    target_surfaces: [local_context_query, semantic_candidate_layer, graph_context_readiness, task_context_pack, memory_context, systemic_impact, evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "Local context index changes affect generated candidate retrieval, source-family scope, sensitive indexing risk, and context-bloat posture."
+
+  - family_id: sqlite_write_coordination
+    name: SQLite Write Coordination
+    enabled: true
+    file_patterns:
+      - "naos/reports/sqlite_write_coordination.json"
+      - "naos/context_index/local_context_index.sqlite.lock"
+      - "scripts/naos_local_context_index.py"
+      - "schemas/naos/sqlite_write_coordination.schema.json"
+    target_surfaces: [local_context_index, evidence_pack, dashboard, gatekeepers, capability_state, setup_recommendations, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "SQLite write coordination findings affect local index file integrity posture and must not be confused with distributed locking, task locking, evidence conflict detection, append-only audit logging, or full multi-user completion."
+
+  - family_id: semantic_candidate_layer
+    name: Semantic Candidate Layer Readiness
+    enabled: true
+    file_patterns:
+      - "naos/semantic_candidate_layer_rules.yaml"
+      - "templates/structural-seeds/naos/semantic_candidate_layer_rules.yaml"
+      - "naos/reports/semantic_candidate_layer.json"
+      - "scripts/naos_semantic_candidate_readiness.py"
+      - "schemas/naos/semantic_candidate_layer.schema.json"
+    target_surfaces: [local_context_index, local_context_query, task_context_pack, systemic_impact, evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "Semantic candidate readiness affects future semantic/vector posture, provider/model review, sensitive embedding policy, stale embedding policy, and overtrust risk."
+
+  - family_id: graph_context_readiness
+    name: Graph Context Readiness
+    enabled: true
+    file_patterns:
+      - "naos/graph_context_rules.yaml"
+      - "templates/structural-seeds/naos/graph_context_rules.yaml"
+      - "naos/reports/graph_context_readiness.json"
+      - "scripts/naos_graph_context_readiness.py"
+      - "schemas/naos/graph_context_readiness.schema.json"
+    target_surfaces: [local_context_index, local_context_query, task_context_pack, semantic_candidate_layer, systemic_impact, evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "Graph context readiness affects future relationship traversal, explicit-link posture, stale/sensitive link policy, generated-artifact feedback loops, and overtrust risk."
+
+  - family_id: session_lifecycle
+    name: Session Lifecycle
+    enabled: true
+    file_patterns:
+      - "naos/session_lifecycle_rules.yaml"
+      - "templates/structural-seeds/naos/session_lifecycle_rules.yaml"
+      - "naos/reports/session_lifecycle.json"
+      - "scripts/naos_session_lifecycle.py"
+      - "schemas/naos/session_lifecycle.schema.json"
+      - "templates/prompts/*.prompt.md"
+      - "templates/agents/*.md"
+      - "templates/instructions/*.md"
+      - ".claude/settings.json"
+    target_surfaces: [task_context_pack, local_context_index, local_context_query, graph_context_query, semantic_candidate_layer, memory_context, memory_provider_access, memory_use_policy, evidence_pack, dashboard, gatekeepers, capability_state, known_gaps, residual_risks, docs, ai_surfaces, next_actions]
+    human_review_required: true
+    rationale: "Session lifecycle reports coordinate daily start/checkpoint/end posture and can create stale-context, checkpoint-gap, automatic-injection, or memory-write overclaim risks."
+
+expected_routing_targets:
+  governance_surface_change: [docs, tests, evidence_pack, dashboard, next_actions]
+  research_finding: [known_gaps, residual_risks, roadmap, capabilities, evidence_pack, dashboard, next_actions]
+  autoresearch_finding: [known_gaps, residual_risks, validators, evidence_pack, dashboard, next_actions]
+  trend_review: [roadmap, capabilities, docs, next_actions]
+  repo_review: [known_gaps, residual_risks, task_registry, next_actions]
+  systemic_impact_finding: [systemic_impact, known_gaps, residual_risks, next_actions]
+  module_traceability_finding: [module_headers, function_index, tests, next_actions]
+  spec_cascade_finding: [spec_cascade, specs, tasks, module_headers, tests, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  maturity_readiness_finding: [capability_state, evidence_pack, dashboard, next_actions]
+  setup_recommendation_finding: [docs, capability_state, evidence_pack, dashboard, next_actions]
+  evidence_attestation_finding: [evidence_attestation, evidence_pack, dashboard, gatekeepers, known_gaps, residual_risks, next_actions]
+  evidence_verification_finding: [evidence_verification, evidence_pack, dashboard, sarif_export, known_gaps, residual_risks, next_actions]
+  evidence_conflict_finding: [evidence_conflict_detection, evidence_conflicts, evidence_attestation, evidence_pack, dashboard, gatekeepers, known_gaps, residual_risks, next_actions]
+  plan_coherence_finding: [plan_coherence, task_registry, task_claims, gatekeepers, evidence_pack, dashboard, sarif_export, known_gaps, residual_risks, next_actions]
+  parallel_lane_handoff_finding: [control_plane_review, gatekeepers, known_gaps, residual_risks, next_actions]
+  external_sarif_result_finding: [external_evidence_ingest, external_evidence_ingest_report, control_plane_review, gatekeepers, known_gaps, residual_risks, next_actions]
+  ai_component_inventory_finding: [ai_component_inventory, ai_component_inventory_report, ai_surfaces, model_provider_policy, control_plane_review, gatekeepers, known_gaps, residual_risks, next_actions]
+  aivss_arithmetic_verification_finding: [aivss_assessments, aivss_arithmetic_verification_report, control_plane_review, gatekeepers, known_gaps, residual_risks, next_actions]
+  model_provider_policy_finding: [model_provider_policy, model_provider_policy_report, llm_grader_readiness, autoresearch_model_policy, semantic_candidate_layer, ai_surfaces, known_gaps, residual_risks, next_actions]
+  model_telemetry_evidence_finding: [model_telemetry_evidence, model_telemetry_evidence_report, model_provider_policy, agent_trace_validation, session_lifecycle, control_plane_review, known_gaps, residual_risks, next_actions]
+  failure_mode_posture_finding: [failure_mode_posture, failure_mode_posture_report, behavioral_governance_readiness, control_plane_review, known_gaps, residual_risks, next_actions]
+  failure_mode_observations_finding: [failure_mode_observations, failure_mode_observations_report, failure_mode_posture, learning_loop_review, evidence_pack, dashboard, sarif_export, gatekeepers, systemic_impact, control_plane_review, known_gaps, residual_risks, next_actions]
+  opencode_config_hygiene_finding: [opencode_config_hygiene, opencode_config_hygiene_report, model_provider_policy, ai_surfaces, known_gaps, residual_risks, next_actions]
+  design_traceability_finding: [design_traceability, design_traceability_report, control_plane_review, gatekeepers, known_gaps, residual_risks, next_actions]
+  ui_experience_quality_finding: [ui_experience_quality, ui_experience_quality_report, design_traceability, model_provider_policy, control_plane_review, gatekeepers, known_gaps, residual_risks, next_actions]
+  review_outcome_conflict_finding: [review_outcome_conflict, evidence_conflict_detection, control_plane_review, known_gaps, residual_risks, next_actions]
+  stale_attestation_finding: [stale_attestation, evidence_attestation, evidence_conflict_detection, evidence, known_gaps, residual_risks, next_actions]
+  missing_reviewer_metadata_finding: [evidence_conflict_detection, evidence_attestation, operator_attribution, known_gaps, next_actions]
+  separation_of_duties_warning_finding: [separation_of_duties_warning, operator_attribution, evidence_conflict_detection, control_plane_review, known_gaps, residual_risks, next_actions]
+  unrouted_conflict_finding: [evidence_conflict_detection, control_plane_review, known_gaps, residual_risks, next_actions]
+  memory_context_finding: [memory_context, setup_recommendations, systemic_impact, evidence_pack, dashboard, known_gaps, residual_risks, ai_surfaces, next_actions]
+  memory_authorization_finding: [memory_authorization, memory_context, mcp_tool_access, docs, ai_surfaces, next_actions]
+  mcp_tool_access_finding: [mcp_tool_access, memory_authorization, memory_context, docs, ai_surfaces, next_actions]
+  memory_use_policy_finding: [memory_use_policy, memory_review_items, memory_context, memory_provider_access, setup_recommendations, evidence_pack, dashboard, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  learning_loop_finding: [learning_loop_review, learning_candidates, learning_state, learning_history, memory_context, evidence_pack, dashboard, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  active_learning_finding: [learning_state, learning_promotion_review, evidence_pack, dashboard, gatekeepers, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  stale_learning_finding: [learning_state, learning_history, learning_forgetting_policy, control_plane_review, known_gaps, residual_risks, next_actions]
+  learning_promotion_finding: [learning_promotion_review, ai_surface_context_budget, systemic_impact, control_plane_review, evidence_pack, dashboard, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  learning_forgetting_finding: [learning_history, learning_forgetting_policy, memory_use_policy, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  learning_redaction_finding: [learning_history, learning_redaction_policy, evidence_conflict_detection, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  learning_authority_overclaim_finding: [learning_loop_review, learning_state, ai_surfaces, control_plane_review, known_gaps, residual_risks, next_actions]
+  unsafe_instruction_grade_memory_finding: [instruction_grade_memory, memory_review_items, memory_use_policy, control_plane_review, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  memory_review_gap_finding: [memory_review_items, memory_use_policy, docs, ai_surfaces, next_actions]
+  stale_memory_finding: [memory_review_items, memory_use_policy, known_gaps, residual_risks, next_actions]
+  superseded_memory_use_finding: [memory_review_items, memory_use_policy, known_gaps, residual_risks, next_actions]
+  recall_trace_overclaim_finding: [recall_trace_readiness, memory_use_policy, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  audit_event_overclaim_finding: [audit_event_readiness, memory_use_policy, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  memory_source_of_truth_confusion_finding: [memory_use_policy, memory_context, evidence_pack, dashboard, docs, ai_surfaces, control_plane_review, known_gaps, residual_risks, next_actions]
+  memory_write_back_risk_finding: [memory_use_policy, memory_write_authorization, memory_provider_access, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  context_continuity_finding: [context_pack_readiness, memory_context, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  task_context_pack_finding: [task_context_pack, active_task_cards, evidence_pack, dashboard, systemic_impact, control_plane_review, known_gaps, residual_risks, next_actions]
+  stale_context_pack_finding: [context_packs, task_context_pack, active_task_cards, known_gaps, residual_risks, next_actions]
+  missing_task_context_finding: [active_task_cards, task_registry, task_context_pack, known_gaps, next_actions]
+  context_bloat_finding: [task_context_pack, context_packs, ai_surfaces, docs, next_actions]
+  local_context_index_finding: [local_context_index, task_context_pack, evidence_pack, dashboard, systemic_impact, control_plane_review, known_gaps, residual_risks, next_actions]
+  stale_index_finding: [local_context_index, context_index_artifact, task_context_pack, known_gaps, residual_risks, next_actions]
+  sensitive_indexing_finding: [local_context_index, index_source_families, policy, known_gaps, residual_risks, docs, next_actions]
+  index_authority_confusion_finding: [local_context_index, ai_surfaces, docs, control_plane_review, known_gaps, residual_risks, next_actions]
+  context_index_bloat_finding: [local_context_index, index_source_families, task_context_pack, ai_surfaces, docs, next_actions]
+  sqlite_write_coordination_finding: [sqlite_write_coordination, local_context_index, evidence_pack, dashboard, gatekeepers, known_gaps, residual_risks, next_actions]
+  sqlite_lock_timeout_finding: [sqlite_write_coordination, sqlite_lock_file, local_context_index, control_plane_review, known_gaps, residual_risks, next_actions]
+  sqlite_atomic_replace_finding: [sqlite_write_coordination, atomic_replace, local_context_index, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  sqlite_stale_lock_finding: [sqlite_write_coordination, sqlite_lock_file, local_context_index, control_plane_review, known_gaps, residual_risks, next_actions]
+  sqlite_coordination_gap_finding: [sqlite_write_coordination, local_context_index_db, multi_user_foundation, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  audit_log_finding: [append_only_audit_log, audit_log_events, audit_log_summary, evidence_pack, dashboard, gatekeepers, known_gaps, residual_risks, next_actions]
+  invalid_audit_event_finding: [append_only_audit_log, audit_log_events, control_plane_review, known_gaps, residual_risks, next_actions]
+  missing_session_id_event_finding: [append_only_audit_log, session_identity, audit_log_summary, known_gaps, next_actions]
+  missing_operator_id_event_finding: [append_only_audit_log, operator_attribution, audit_log_summary, known_gaps, next_actions]
+  audit_log_gap_finding: [append_only_audit_log, audit_log_summary, multi_user_foundation, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  audit_log_overclaim_finding: [append_only_audit_log, docs, ai_surfaces, control_plane_review, known_gaps, residual_risks, next_actions]
+  task_claim_finding: [task_claims, task_claim_report, task_registry, evidence_pack, dashboard, gatekeepers, known_gaps, residual_risks, next_actions]
+  task_claim_conflict_finding: [task_claim_conflict, task_claims, task_claim_report, control_plane_review, known_gaps, residual_risks, next_actions]
+  stale_task_claim_finding: [task_claims, task_claim_report, task_registry, known_gaps, residual_risks, next_actions]
+  unknown_operator_claim_finding: [task_claims, operator_attribution, session_identity, known_gaps, next_actions]
+  task_release_gap_finding: [task_claim_release, task_claims, task_claim_report, known_gaps, residual_risks, next_actions]
+  task_claim_overclaim_finding: [task_claims, docs, ai_surfaces, control_plane_review, known_gaps, residual_risks, next_actions]
+  local_context_query_finding: [local_context_query, local_context_index, task_context_pack, evidence_pack, dashboard, systemic_impact, control_plane_review, known_gaps, residual_risks, next_actions]
+  stale_context_query_finding: [local_context_query, local_context_index, task_context_pack, known_gaps, residual_risks, next_actions]
+  sensitive_query_result_finding: [local_context_query, local_context_index, policy, known_gaps, residual_risks, docs, next_actions]
+  query_authority_confusion_finding: [local_context_query, ai_surfaces, docs, control_plane_review, known_gaps, residual_risks, next_actions]
+  context_query_bloat_finding: [local_context_query, task_context_pack, ai_surfaces, docs, next_actions]
+  semantic_candidate_overtrust_finding: [semantic_candidate_layer, future_semantic_layer, local_context_index, local_context_query, ai_surfaces, docs, known_gaps, residual_risks, next_actions]
+  stale_embedding_finding: [semantic_candidate_layer, stale_embedding_policy, local_context_index, known_gaps, residual_risks, next_actions]
+  sensitive_embedding_finding: [semantic_candidate_layer, sensitive_embedding_policy, policy, known_gaps, residual_risks, docs, next_actions]
+  semantic_runtime_enablement_finding: [semantic_candidate_layer, semantic_query_posture, local_context_index, gatekeepers, evidence_pack, dashboard, docs, next_actions]
+  extension_loading_finding: [semantic_candidate_layer, policy, known_gaps, residual_risks, docs, next_actions]
+  external_embedding_finding: [semantic_candidate_layer, policy, docs, known_gaps, residual_risks, next_actions]
+  global_semantic_scan_finding: [semantic_candidate_layer, semantic_query_posture, task_context_pack, ai_surfaces, docs, next_actions]
+  graph_context_finding: [graph_context_readiness, local_context_index, local_context_query, task_context_pack, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  graph_overtrust_finding: [graph_context_readiness, graph_overtrust, ai_surfaces, docs, control_plane_review, known_gaps, residual_risks, next_actions]
+  stale_graph_link_finding: [graph_context_readiness, stale_graph_links, local_context_index, local_context_query, known_gaps, residual_risks, next_actions]
+  sensitive_graph_link_finding: [graph_context_readiness, sensitive_graph_links, policy, known_gaps, residual_risks, docs, next_actions]
+  global_graph_scan_finding: [graph_context_readiness, graph_traversal_posture, task_context_pack, ai_surfaces, docs, next_actions]
+  graph_runtime_enablement_finding: [graph_context_readiness, future_graph_layer, local_context_index, gatekeepers, evidence_pack, dashboard, docs, next_actions]
+  graph_bloat_finding: [graph_context_readiness, graph_traversal_posture, task_context_pack, ai_surfaces, docs, next_actions]
+  graph_traversal_scope_finding: [future_graph_layer, graph_context_readiness, local_context_index, ai_surfaces, docs, known_gaps, residual_risks, next_actions]
+  graph_context_query_finding: [graph_context_query, graph_context_readiness, local_context_index, local_context_query, task_context_pack, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  stale_graph_query_finding: [graph_context_query, stale_graph_links, local_context_index, known_gaps, residual_risks, next_actions]
+  sensitive_graph_query_result_finding: [graph_context_query, sensitive_graph_links, policy, known_gaps, residual_risks, docs, next_actions]
+  graph_query_authority_confusion_finding: [graph_context_query, graph_overtrust, ai_surfaces, docs, control_plane_review, known_gaps, residual_risks, next_actions]
+  graph_query_bloat_finding: [graph_context_query, graph_traversal_posture, task_context_pack, ai_surfaces, docs, next_actions]
+  operator_attribution_finding: [operator_attribution, session_identity, session_index, evidence_pack, dashboard, gatekeepers, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  operator_identity_overclaim_finding: [operator_identity_overclaim, operator_attribution, ai_surfaces, docs, known_gaps, residual_risks, next_actions]
+  operator_privacy_risk_finding: [operator_privacy, operator_attribution, policy, security, docs, known_gaps, residual_risks, next_actions]
+  session_lifecycle_finding: [session_lifecycle, task_context_pack, memory_context, memory_provider_access, memory_use_policy, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  stale_session_context_finding: [session_lifecycle, stale_session_context, active_task_cards, compact_recovery_briefs, task_context_pack, control_plane_review, known_gaps, residual_risks, next_actions]
+  checkpoint_gap_finding: [session_lifecycle, session_checkpoint, checkpoint_gap, compact_recovery_briefs, known_gaps, residual_risks, next_actions]
+  session_end_review_finding: [session_lifecycle, session_end, evidence_pack, dashboard, gatekeepers, known_gaps, residual_risks, next_actions]
+  memory_candidate_overclaim_finding: [session_lifecycle, memory_candidate_proposals, memory_use_policy, memory_provider_access, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  automatic_injection_overclaim_finding: [session_lifecycle, lifecycle_hook_overclaim, ai_surfaces, docs, known_gaps, residual_risks, next_actions]
+  lifecycle_memory_write_risk_finding: [session_lifecycle, lifecycle_hook_overclaim, memory_use_policy, memory_provider_access, memory_write_authorization, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  policy_override_finding: [policy_overrides, customization_hooks, evidence_pack, dashboard, gatekeepers, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  team_operator_overlay_finding: [team_operator_policy_overlays, policy_overrides, team_operator_map, evidence_pack, dashboard, gatekeepers, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  team_operator_map_finding: [team_operator_map, team_operator_policy_overlays, operator_attribution, policy_overrides, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  operator_overlay_scope_finding: [operator_overlay_scope, team_operator_policy_overlays, policy_overrides, operator_attribution, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  team_operator_overlay_overclaim_finding: [team_operator_policy_overlays, advisory_authority_boundary, policy_overrides, gatekeepers, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  team_gatekeeper_override_finding: [multi_team_gatekeepers, team_gatekeeper_overrides, effective_gatekeeper_resolution, gatekeepers, evidence_pack, dashboard, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  gatekeeper_team_context_finding: [gatekeeper_team_context, team_operator_map, operator_attribution, multi_team_gatekeepers, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  gatekeeper_override_rejected_finding: [team_gatekeeper_overrides, protected_invariants, advisory_authority_boundary, multi_team_gatekeepers, control_plane_review, next_actions]
+  gatekeeper_severity_downgrade_finding: [effective_gatekeeper_resolution, team_gatekeeper_overrides, gatekeepers, human_review, known_gaps, residual_risks, next_actions]
+  gatekeeper_authority_boundary_finding: [multi_team_gatekeepers, advisory_authority_boundary, protected_invariants, docs, ai_surfaces, next_actions]
+  pr_governance_finding: [pr_time_ci, pr_governance_summary, evidence_pack, dashboard, gatekeepers, known_gaps, residual_risks, next_actions]
+  ci_gate_failure_finding: [ci_gate_evaluation, gatekeepers, pr_governance_summary, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  ci_evidence_artifact_finding: [ci_evidence_artifacts, evidence_pack, dashboard, sarif_export, known_gaps, residual_risks, next_actions]
+  ci_overclaim_finding: [pr_time_ci, pr_governance_summary, docs, ai_surfaces, control_plane_review, known_gaps, residual_risks, next_actions]
+  ci_artifact_sensitivity_finding: [ci_evidence_artifacts, policy, security, docs, known_gaps, residual_risks, next_actions]
+  pr_time_ci_gap_finding: [pr_time_ci, pr_governance_summary, setup_recommendations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  optional_tool_integration_finding: [optional_tool_integrations, setup_recommendations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  spec_kit_adapter_finding: [spec_kit_adapter, optional_tool_integrations, evidence_pack, task_context_pack, gatekeepers, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  claude_code_hook_finding: [claude_code_hooks, optional_tool_integrations, integration_activation_boundary, integration_secret_risk, integration_context_injection_risk, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  claude_code_plugin_adapter_finding: [claude_code_plugin_adapter, claude_code_hooks, adapter_coherence, optional_tool_integrations, integration_activation_boundary, integration_secret_risk, integration_context_injection_risk, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  codex_plugin_adapter_finding: [codex_plugin_adapter, codex_plugin_source, adapter_coherence, optional_tool_integrations, integration_activation_boundary, integration_secret_risk, integration_context_injection_risk, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  adapter_coherence_finding: [adapter_coherence, adapter_propagation, codex_plugin_adapter, claude_code_plugin_adapter, codex_plugin_source, optional_tool_integrations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  adapter_propagation_finding: [adapter_propagation, governed_learning_lifecycle, ai_surface_context_budget, codex_plugin_adapter, claude_code_plugin_adapter, optional_tool_integrations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  tool_neutral_usage_finding: [tool_neutral_usage, optional_tool_integrations, docs, ai_surfaces, setup_recommendations, next_actions]
+  integration_activation_boundary_finding: [integration_activation_boundary, optional_tool_integrations, claude_code_hooks, spec_kit_adapter, setup_recommendations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  integration_secret_risk_finding: [integration_secret_risk, optional_tool_integrations, security, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  integration_context_injection_risk_finding: [integration_context_injection_risk, claude_code_hooks, memory_context, task_context_pack, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  protected_invariant_violation_finding: [protected_invariants, advisory_authority_boundary, policy_overrides, control_plane_review, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  plugin_runtime_enablement_finding: [plugin_runtime_posture, customization_hooks, policy_overrides, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  advisory_authority_override_finding: [advisory_authority_boundary, policy_overrides, control_plane_review, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  customization_scope_finding: [customization_hooks, policy_overrides, setup_recommendations, docs, ai_surfaces, next_actions]
+  agent_trace_event_finding: [agent_trace_events, agent_trace_validation, behavioral_grading_foundation, evidence_pack, dashboard, gatekeepers, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  trace_event_overclaim_finding: [trace_event_overclaim, agent_trace_events, agent_trace_validation, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  trace_payload_risk_finding: [trace_payload_risk, agent_trace_events, agent_trace_validation, policy, security, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  trace_event_schema_gap_finding: [agent_trace_validation, agent_trace_events, behavioral_grading_foundation, validators, docs, next_actions]
+  trace_event_review_gap_finding: [agent_trace_events, agent_trace_validation, behavioral_grading_foundation, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  ai_surface_budget_finding: [ai_surface_context_budget, ai_surfaces, static_grader, grader_assessment, evidence_pack, dashboard, gatekeepers, docs, known_gaps, residual_risks, next_actions]
+  ai_surface_baseline_drift_finding: [ai_surface_context_budget, ai_surfaces, grader_drift_baseline, evidence_pack, dashboard, docs, known_gaps, residual_risks, next_actions]
+  static_grader_finding: [static_grader, static_grader_report, grader_dimension_results, evidence_pack, dashboard, gatekeepers, sarif_export, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  grader_assessment_finding: [grader_assessment, grader_assessment_report, static_grader_report, evidence_pack, dashboard, gatekeepers, sarif_export, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  audit_mode_overclaim_finding: [autoresearch_audit_mode, grader_assessment, grader_overclaim, docs, ai_surfaces, claims, known_gaps, residual_risks, next_actions]
+  drift_mode_overclaim_finding: [autoresearch_drift_mode, grader_drift_baseline, grader_assessment, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  assessment_certification_overclaim_finding: [autoresearch_assess_mode, grader_assessment, grader_overclaim, docs, ai_surfaces, claims, known_gaps, residual_risks, next_actions]
+  composite_score_blending_finding: [composite_grader_boundary, grader_assessment_report, grader_dimension_results, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  llm_grader_readiness_finding: [llm_grader_readiness, llm_grader_readiness_rules, grader_assessment, evidence_pack, dashboard, gatekeepers, sarif_export, setup_recommendations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  behavioral_governance_readiness_finding: [behavioral_governance_readiness, behavioral_governance_readiness_rules, behavioral_baseline_state, behavioral_baseline_impacters, llm_grader_readiness, static_grader, grader_assessment, evidence_pack, dashboard, gatekeepers, sarif_export, setup_recommendations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  behavioral_baseline_impacter_finding: [behavioral_governance_readiness, behavioral_baseline_impacters, behavioral_baseline_state, ai_surface_context_budget, agent_trace_validation, llm_grader_readiness, policy, docs, evidence_pack, dashboard, gatekeepers, known_gaps, residual_risks, next_actions]
+  behavioral_baseline_overclaim_finding: [behavioral_governance_readiness, behavioral_baseline_state, grader_overclaim, docs, ai_surfaces, claims, known_gaps, residual_risks, next_actions]
+  llm_runtime_enablement_finding: [llm_grader_runtime_enablement, llm_grader_readiness, composite_grader_boundary, cost_budget_posture, behavioral_grading_foundation, setup_recommendations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  llm_cost_budget_finding: [llm_cost_budget, llm_grader_readiness, cost_budget_posture, setup_recommendations, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  llm_data_exposure_finding: [llm_data_exposure, llm_grader_readiness, policy, security, docs, ai_surfaces, known_gaps, residual_risks, next_actions]
+  llm_bias_risk_finding: [llm_bias_variance_risk, llm_grader_readiness, advisory_grading_boundary, docs, ai_surfaces, residual_risks, next_actions]
+  llm_advisory_authority_finding: [advisory_grading_boundary, llm_grader_readiness, static_grader, grader_assessment, docs, ai_surfaces, claims, known_gaps, residual_risks, next_actions]
+  grader_overclaim_finding: [grader_overclaim, static_grader, behavioral_grading_foundation, docs, ai_surfaces, claims, known_gaps, residual_risks, next_actions]
+  unsupported_behavioral_dimension_finding: [grader_dimension_results, static_grader_report, behavioral_grading_foundation, known_gaps, residual_risks, docs, next_actions]
+  cost_budget_finding: [cost_budget_posture, static_grader, setup_recommendations, known_gaps, residual_risks, docs, next_actions]
+  trace_event_grading_gap_finding: [agent_trace_validation, static_grader, static_grader_report, behavioral_grading_foundation, evidence_pack, dashboard, known_gaps, residual_risks, next_actions]
+  manual_review_item: [next_actions]
+
+required_item_fields:
+  - id
+  - source_type
+  - source_ref
+  - summary
+  - target_surfaces
+  - disposition
+  - owner
+
+allowed_dispositions:
+  - proposed
+  - needs_review
+  - routed
+  - accepted_gap
+  - accepted_risk
+  - waived
+  - deferred
+  - rejected
+
+freshness_window_days: 90
+profile_severity_behavior:
+  quickstart: advisory
+  lite: warning
+  standard: required
+  assured: blocking
+
+human_review_required:
+  governance_surface_change: true
+  research_finding: true
+  autoresearch_finding: true
+  trend_review: true
+  repo_review: true
+  systemic_impact_finding: true
+  module_traceability_finding: true
+  spec_cascade_finding: true
+  maturity_readiness_finding: true
+  setup_recommendation_finding: true
+  evidence_attestation_finding: true
+  evidence_verification_finding: true
+  evidence_conflict_finding: true
+  plan_coherence_finding: true
+  parallel_lane_handoff_finding: true
+  external_sarif_result_finding: true
+  ai_component_inventory_finding: true
+  aivss_arithmetic_verification_finding: true
+  model_provider_policy_finding: true
+  model_telemetry_evidence_finding: true
+  failure_mode_posture_finding: true
+  failure_mode_observations_finding: true
+  opencode_config_hygiene_finding: true
+  design_traceability_finding: true
+  ui_experience_quality_finding: true
+  review_outcome_conflict_finding: true
+  stale_attestation_finding: true
+  missing_reviewer_metadata_finding: true
+  separation_of_duties_warning_finding: true
+  unrouted_conflict_finding: true
+  memory_context_finding: true
+  memory_authorization_finding: true
+  mcp_tool_access_finding: true
+  learning_loop_finding: true
+  active_learning_finding: true
+  stale_learning_finding: true
+  learning_promotion_finding: true
+  learning_forgetting_finding: true
+  learning_redaction_finding: true
+  learning_authority_overclaim_finding: true
+  context_continuity_finding: true
+  task_context_pack_finding: true
+  stale_context_pack_finding: true
+  missing_task_context_finding: true
+  context_bloat_finding: true
+  local_context_index_finding: true
+  local_context_query_finding: true
+  query_authority_confusion_finding: true
+  stale_index_finding: true
+  sensitive_indexing_finding: true
+  index_authority_confusion_finding: true
+  context_index_bloat_finding: true
+  semantic_candidate_overtrust_finding: true
+  stale_embedding_finding: true
+  sensitive_embedding_finding: true
+  semantic_runtime_enablement_finding: true
+  extension_loading_finding: true
+  external_embedding_finding: true
+  global_semantic_scan_finding: true
+  graph_context_finding: true
+  graph_overtrust_finding: true
+  stale_graph_link_finding: true
+  sensitive_graph_link_finding: true
+  global_graph_scan_finding: true
+  graph_runtime_enablement_finding: true
+  graph_bloat_finding: true
+  graph_traversal_scope_finding: true
+  graph_context_query_finding: true
+  stale_graph_query_finding: true
+  sensitive_graph_query_result_finding: true
+  graph_query_authority_confusion_finding: true
+  graph_query_bloat_finding: true
+  operator_attribution_finding: true
+  operator_identity_overclaim_finding: true
+  operator_privacy_risk_finding: true
+  sqlite_write_coordination_finding: true
+  sqlite_lock_timeout_finding: true
+  sqlite_atomic_replace_finding: true
+  sqlite_stale_lock_finding: true
+  sqlite_coordination_gap_finding: true
+  audit_log_finding: true
+  invalid_audit_event_finding: true
+  missing_session_id_event_finding: true
+  missing_operator_id_event_finding: true
+  audit_log_gap_finding: true
+  audit_log_overclaim_finding: true
+  task_claim_finding: true
+  task_claim_conflict_finding: true
+  stale_task_claim_finding: true
+  unknown_operator_claim_finding: true
+  task_release_gap_finding: true
+  task_claim_overclaim_finding: true
+  session_lifecycle_finding: true
+  stale_session_context_finding: true
+  checkpoint_gap_finding: true
+  session_end_review_finding: true
+  memory_candidate_overclaim_finding: true
+  automatic_injection_overclaim_finding: true
+  lifecycle_memory_write_risk_finding: true
+  policy_override_finding: true
+  team_operator_overlay_finding: true
+  team_operator_map_finding: true
+  operator_overlay_scope_finding: true
+  team_operator_overlay_overclaim_finding: true
+  team_gatekeeper_override_finding: true
+  gatekeeper_team_context_finding: true
+  gatekeeper_override_rejected_finding: true
+  gatekeeper_severity_downgrade_finding: true
+  gatekeeper_authority_boundary_finding: true
+  pr_governance_finding: true
+  ci_gate_failure_finding: true
+  ci_evidence_artifact_finding: true
+  ci_overclaim_finding: true
+  ci_artifact_sensitivity_finding: true
+  pr_time_ci_gap_finding: true
+  optional_tool_integration_finding: true
+  spec_kit_adapter_finding: true
+  claude_code_hook_finding: true
+  claude_code_plugin_adapter_finding: true
+  codex_plugin_adapter_finding: true
+  adapter_coherence_finding: true
+  adapter_propagation_finding: true
+  tool_neutral_usage_finding: true
+  integration_activation_boundary_finding: true
+  agentic_workflow_finding: true
+  pre_implementation_alignment_finding: true
+  context_hygiene_finding: true
+  alignment_interview_finding: true
+  vertical_slice_finding: true
+  tdd_feedback_finding: true
+  push_pull_context_finding: true
+  silent_context_injection_finding: true
+  auto_approval_boundary_finding: true
+  calibration_shadow_finding: true
+  deterministic_calibration_drift_finding: true
+  evidence_classification_finding: true
+  evidence_provenance_finding: true
+  missing_classification_finding: true
+  hypothesized_finding_review: true
+  cross_harness_review_readiness_finding: true
+  dsse_readiness_finding: true
+  attestation_boundary_finding: true
+  key_custody_boundary_finding: true
+  harness_trust_boundary_finding: true
+  unsafe_cross_harness_runtime_finding: true
+  integration_secret_risk_finding: true
+  integration_context_injection_risk_finding: true
+  protected_invariant_violation_finding: true
+  plugin_runtime_enablement_finding: true
+  advisory_authority_override_finding: true
+  customization_scope_finding: true
+  agent_trace_event_finding: true
+  trace_event_overclaim_finding: true
+  trace_payload_risk_finding: true
+  trace_event_schema_gap_finding: true
+  trace_event_review_gap_finding: true
+  ai_surface_budget_finding: true
+  ai_surface_baseline_drift_finding: true
+  static_grader_finding: true
+  grader_assessment_finding: true
+  audit_mode_overclaim_finding: true
+  drift_mode_overclaim_finding: true
+  assessment_certification_overclaim_finding: true
+  composite_score_blending_finding: true
+  llm_grader_readiness_finding: true
+  behavioral_governance_readiness_finding: true
+  behavioral_baseline_impacter_finding: true
+  behavioral_baseline_overclaim_finding: true
+  llm_runtime_enablement_finding: true
+  llm_cost_budget_finding: true
+  llm_data_exposure_finding: true
+  llm_bias_risk_finding: true
+  llm_advisory_authority_finding: true
+  grader_overclaim_finding: true
+  unsupported_behavioral_dimension_finding: true
+  cost_budget_finding: true
+  trace_event_grading_gap_finding: true
+  duplicate_function_hygiene_finding: true
+  secret_hygiene_finding: true
+  test_quality_hygiene_finding: true
+  dependency_integrity_finding: true
+  package_reality_finding: true
+  deterministic_hygiene_overclaim_finding: true
+  manual_review_item: true
+
+waiver_handling:
+  visible: true
+  converts_to_pass: false
+  requires_reference: true
+
+ignored_source_patterns:
+  - "dev/**"
+  - ".git/**"
+  - ".venv/**"
+  - "venv/**"
+  - "node_modules/**"
+  - "dist/**"
+  - "build/**"
+  - "__pycache__/**"
+
+limitations:
+  - "This report evaluates structured declarations; it does not perform broad NLP or web research."
+  - "It does not scan private/internal dev content by default for adopter-facing behavior."
+  - "It does not prove complete research coverage or complete governance-surface review."
+  - "It does not auto-route, auto-fix, or approve remediation."

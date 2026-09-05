@@ -1,0 +1,147 @@
+name: Public candidate CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-candidate-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable:
+    name: Linux build, clean install, and portable preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the history-free candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Validate the exported receipt and public contract
+        run: python -B -m unittest discover -s public_tests -p 'test_*.py'
+
+      - name: Build wheel and source distribution
+        run: |
+          python -m pip install --disable-pip-version-check "build==1.5.0"
+          python -m build --sdist --wheel
+
+      - name: Clean-install and exercise portable public previews
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_root="$(mktemp -d)"
+          trap 'rm -rf "$smoke_root"' EXIT
+
+          python -m venv "$smoke_root/venv"
+          "$smoke_root/venv/bin/python" -m pip install --disable-pip-version-check dist/*.whl
+          "$smoke_root/venv/bin/python" -m pip check
+
+          (
+            cd "$smoke_root"
+            "$smoke_root/venv/bin/python" -m naos_governance.scripts.validators.validate_regulatory_claim_source_matrix --require-independent-pass
+            "$smoke_root/venv/bin/naos-governance" init "$smoke_root/quickstart-target" --new --tier quickstart --preview-dir "$smoke_root/quickstart"
+            "$smoke_root/venv/bin/naos-governance" init "$smoke_root/lite-target" --new --tier lite --archetype custom --backend static_only --preview-dir "$smoke_root/lite"
+            "$smoke_root/venv/bin/naos-governance" init "$smoke_root/standard-target" --new --tier standard --archetype custom --backend static_only --preview-dir "$smoke_root/standard"
+          )
+
+          test ! -e "$smoke_root/quickstart-target"
+          test ! -e "$smoke_root/lite-target"
+          test ! -e "$smoke_root/standard-target"
+          test -f "$smoke_root/quickstart/NAOS_QUICKSTART.md"
+          test -f "$smoke_root/quickstart/naos/profile_generated_surface_contract.json"
+          grep -Fq "https://github.com/mfraile/naos-governance" "$smoke_root/quickstart/NAOS_QUICKSTART.md"
+          test -f "$smoke_root/lite/Makefile.naos"
+          test -f "$smoke_root/lite/specs/03-requirements.md"
+          test -f "$smoke_root/lite/naos/PLANNING_BASELINES.yaml"
+          test -f "$smoke_root/standard/Makefile.naos"
+          test -f "$smoke_root/standard/specs/04-architecture.md"
+          test -f "$smoke_root/standard/naos/NAOS_QUICK_REFERENCE.md"
+
+          "$smoke_root/venv/bin/python" -B scripts/validators/validate_docs_consistency.py
+          "$smoke_root/venv/bin/python" -B scripts/validators/validate_tutorial_consistency.py
+          "$smoke_root/venv/bin/python" -B scripts/validators/lint_mermaid_diagrams.py docs/diagrams
+
+  activate:
+    name: macOS ARM64 create-only activation
+    needs: portable
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the history-free candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Verify the supported mutation tuple
+        run: |
+          python - <<'PY'
+          import platform
+          import sys
+
+          machine = platform.machine().lower()
+          supported = (
+              platform.system() == "Darwin"
+              and machine in {"arm64", "aarch64"}
+              and sys.version_info[:2] == (3, 11)
+          )
+          if not supported:
+              raise SystemExit(
+                  "Expected Darwin ARM64 CPython 3.11, observed "
+                  f"{platform.system()} {machine} "
+                  f"{sys.version_info.major}.{sys.version_info.minor}"
+              )
+          PY
+
+      - name: Build and clean-install the wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "build==1.5.0"
+          python -m build --wheel
+          python -m venv /tmp/naos-public-activation-venv
+          /tmp/naos-public-activation-venv/bin/python -m pip install --disable-pip-version-check dist/*.whl
+          /tmp/naos-public-activation-venv/bin/python -m pip check
+
+      - name: Exercise supported create-only activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_root="$(mktemp -d)"
+          trap 'rm -rf "$smoke_root" /tmp/naos-public-activation-venv' EXIT
+          python_bin=/tmp/naos-public-activation-venv/bin/python
+          cli_bin=/tmp/naos-public-activation-venv/bin/naos-governance
+
+          "$python_bin" -m naos_governance.scripts.validators.validate_regulatory_claim_source_matrix --require-independent-pass
+          "$cli_bin" init "$smoke_root/quickstart" --new --tier quickstart --activate
+          "$cli_bin" init "$smoke_root/lite" --new --tier lite --archetype custom --backend static_only --activate
+          "$cli_bin" init "$smoke_root/standard" --new --tier standard --archetype custom --backend static_only --activate
+
+          test -f "$smoke_root/quickstart/NAOS_QUICKSTART.md"
+          test -f "$smoke_root/quickstart/naos/profile_generated_surface_contract.json"
+          test -f "$smoke_root/lite/Makefile.naos"
+          test -f "$smoke_root/lite/specs/03-requirements.md"
+          test -f "$smoke_root/standard/Makefile.naos"
+          test -f "$smoke_root/standard/specs/04-architecture.md"

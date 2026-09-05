@@ -1,0 +1,34 @@
+schema: naos.existing_resource_inventory_rules.v1
+profile: quickstart
+updated_at: null
+description: >
+  Rules for deterministic discovery of local docs, specs, tests, source,
+  workflows, and existing NAOS artifacts before adoption.
+scan_categories:
+  - docs
+  - specs
+  - tests
+  - source
+  - workflows
+  - naos_artifacts
+ignored_parts:
+  - .git
+  - .venv
+  - venv
+  - node_modules
+  - dist
+  - build
+  - __pycache__
+decision_states:
+  - keep
+  - merge
+  - replace
+  - quarantine
+  - create
+  - review_required
+not_claimed:
+  - source truth proof
+  - requirements completeness proof
+  - automatic approval
+  - human review replacement
+human_review_required: true

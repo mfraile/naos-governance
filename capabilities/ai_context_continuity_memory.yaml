@@ -1,0 +1,150 @@
+id: CAP-AI-CONTEXT-CONTINUITY-MEMORY
+name: AI Context Continuity & Memory Governance Readiness
+description: >
+  Produces deterministic, local-first readiness evidence for AI context
+  continuity, memory authorization, MCP/tool-access posture, platform fallback
+  behavior, memory provider/MCP access verification posture, and context-pack
+  readiness. Memory is treated as advisory recall and continuity support only;
+  repository governance files, deterministic NAOS reports, current user
+  instructions, and human decisions remain authoritative.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Reports memory/context posture without requiring memory or MCP access."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Surfaces memory authorization and fallback readiness for CI-friendly projects."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Expects declared memory rules, authorization matrix, fallback behavior, and human-review boundaries."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "May block when memory write access, MCP access, or source-of-truth posture creates unmanaged governance risk."
+authority:
+  may_read:
+    - "naos/memory_context_rules.yaml"
+    - "naos/memory_authorization_matrix.yaml"
+    - "naos/memory_provider_access_rules.yaml"
+    - "configs/naos_memory.yaml"
+    - "safe project-local MCP config declarations"
+    - "registered user-scope MCP client metadata limited to descriptor, server, project-candidate, and secret-like key names"
+    - "naos/memory_use_policy_rules.yaml and naos/memory_review_items.yaml metadata"
+    - "AI surface templates and generated AI guidance"
+  may_write:
+    - "naos/reports/memory_context_readiness.json"
+    - "naos/reports/memory_provider_access.json"
+    - "naos/reports/memory_use_policy.json"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "repo-local memory governance rules"
+  - "repo-local memory authorization matrix"
+  - "safe project-local MCP config declaration checks"
+  - "sanitized registered user-scope MCP declaration metadata without command arguments, environment values, or secret values"
+  - "safe provider binary/data-directory/derived-database metadata checks"
+  - "schema-validated memory-readiness/provider-report joins for memory-use posture"
+  - "degraded recovery and context-pack readiness metadata"
+prohibited_resources:
+  - "automatic Engram installation"
+  - "automatic memory writes"
+  - "Engram cloud enablement"
+  - "cloud memory sync"
+  - "MCP tool calls"
+  - "private memory payload reads"
+  - "automatic context injection"
+  - "semantic scoring"
+  - "provider, model, vector database, database, daemon, scheduler, API, or network dependency installation"
+constraints:
+  - "Must remain deterministic, local, and file-first."
+  - "Must not call Engram, MCP, memory tools, or external services."
+  - "Must not read private memory payloads or write durable memory."
+  - "User-scope config inspection must remain registry-bounded and emit names/key names only; command arguments, environment values, credentials, and secret values are prohibited."
+  - "Must not treat memory as evidence, approval, compliance proof, architecture authority, security exception, or source of truth."
+  - "Must keep stale, conflicting, missing, not_configured, disabled, and human-review states visible."
+  - "Must not assume every AI platform has MCP access."
+  - "Must not treat configured provider or MCP config presence as proof of usable access."
+required_evidence:
+  - "naos/memory_context_rules.yaml"
+  - "naos/memory_authorization_matrix.yaml"
+  - "naos/memory_provider_access_rules.yaml"
+  - "naos/reports/memory_context_readiness.json"
+  - "naos/reports/memory_provider_access.json"
+  - "naos/reports/memory_use_policy.json"
+validators:
+  - id: memory_context_readiness
+    script: scripts/naos_memory_context_readiness.py
+    status: available
+  - id: memory_provider_access
+    script: scripts/naos_memory_provider_access.py
+    status: available
+  - id: memory_use_policy
+    script: scripts/naos_memory_use_policy.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+dashboard_signals:
+  - "memory_context_readiness.status"
+  - "memory_context_readiness.provider_posture"
+  - "memory_context_readiness.platform_access_matrix"
+  - "memory_context_readiness.memory_authorization"
+  - "memory_context_readiness.fallback_readiness"
+  - "memory_context_readiness.context_pack_readiness"
+  - "memory_context_readiness.project_identity.status"
+  - "memory_context_readiness.project_identity.project_identity_verified"
+  - "memory_context_readiness.human_review_required"
+  - "memory_provider_access.status"
+  - "memory_provider_access.provider_access_verified"
+  - "memory_provider_access.mcp_access_verified"
+  - "memory_provider_access.project_identity.status"
+  - "memory_provider_access.project_identity.project_identity_verified"
+  - "memory_provider_access.ci_memory_access"
+  - "memory_use_policy.memory_access_prerequisites.joined_status"
+  - "memory_use_policy.summary.policy_items_valid_but_access_unverified"
+maturity_path:
+  L0: "Capability contract, rules schema, report schema, seed rules, and authorization matrix exist."
+  L1: "Project declares memory provider posture, source-of-truth hierarchy, forbidden categories, access-verification posture, and fallback behavior."
+  L2: "Project declares platform/tool authorization for read, draft write, approved write, and admin access, and keeps configured provider/MCP access separate from verified access."
+  L3: "Evidence pack, dashboard, gates, setup recommendations, systemic impact, and control-plane review expose memory-readiness and memory-access findings."
+  L4: "Memory conflicts, stale recall, access changes, write authorization, and context-pack readiness are routed through human review and control-plane decisions."
+  L5: "Projects combine local memory governance with independently approved platform controls where needed; memory remains advisory."
+known_limitations:
+  - "The report evaluates declared readiness and safe local config presence; it does not prove memory correctness."
+  - "Memory-access verification is config-only in v1; configured providers and MCP config files do not prove live tool access."
+  - "The report does not call memory tools or verify private memory payload contents."
+  - "The report does not prevent hallucinations, context drift, or stale recall."
+  - "MCP availability differs by platform and may require manual configuration outside the repository."
+  - "Human review remains required for memory writes, conflict disposition, privacy boundaries, and governance decisions."
+not_claimed:
+  - "hallucination prevention"
+  - "memory as evidence"
+  - "memory as approval"
+  - "cloud memory by default"
+  - "automatic context injection"
+  - "automatic memory writes"
+  - "universal MCP access"
+  - "configured provider as usable access"
+  - "secret or customer data storage"
+  - "complete continuity"
+  - "governance correctness"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/ENGRAM_SETUP.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+  - NAOS_CATALOG.md
+related_scripts:
+  - scripts/naos_mcp_config_registry.py
+  - scripts/naos_memory_context_readiness.py
+  - scripts/naos_memory_provider_access.py
+  - scripts/naos_memory_use_policy.py

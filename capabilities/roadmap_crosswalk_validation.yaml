@@ -1,0 +1,72 @@
+id: CAP-ROADMAP-CROSSWALK-VALIDATION
+name: Roadmap Crosswalk Validation
+description: >
+  Checks that roadmap and recommendation identifiers referenced by docs,
+  assessments, and configs are mapped to an honest state such as implemented,
+  planned, gated, rejected, or deferred.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "No blocking expectation."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Crosswalk can warn on unmapped recommendations."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Roadmap references produce validation evidence."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Shipped claims without roadmap evidence can block."
+authority:
+  may_read:
+    - ROADMAP.md
+    - docs/
+    - naos/
+  may_write:
+    - naos/reports/roadmap_crosswalk_validation.json
+allowed_resources:
+  - "repo-local roadmap, decision, and assessment files"
+prohibited_resources:
+  - "unstated roadmap status inference"
+constraints:
+  - "Must flag items marked shipped without evidence."
+  - "Must allow rejected and deferred states when explicitly documented."
+required_evidence:
+  - "Crosswalk mapping file or configured roadmap source."
+  - "Evidence references for implemented or shipped items."
+validators:
+  - id: roadmap_crosswalk_validation
+    script: scripts/naos_validate_roadmap_crosswalk.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - "roadmap_crosswalk.status"
+  - "roadmap_crosswalk.unmapped_ids"
+  - "roadmap_crosswalk.shipped_without_evidence"
+maturity_path:
+  L0: "Crosswalk schema and expected states exist."
+  L1: "Project configures roadmap and recommendation sources."
+  L2: "Validator emits crosswalk evidence."
+  L3: "Gatekeeper applies profile severity."
+  L4: "Dashboard tracks roadmap drift."
+  L5: "Crosswalk evidence supports review of initiative lineage."
+known_limitations:
+  - "Cannot validate IDs that are intentionally outside configured scope."
+not_claimed:
+  - "Strategic correctness of roadmap choices."
+related_docs:
+  - ROADMAP.md
+  - docs/CONTROL_PLANE.md
+related_scripts:
+  - scripts/naos_validate_roadmap_crosswalk.py

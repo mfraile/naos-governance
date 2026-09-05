@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_enrollment_result:v1",
+  "title": "NAOS Repository Intelligence Enrollment Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "project_root", "project_id", "owner_path", "owner_integrity_sha3_512", "scope_path", "scope_integrity_sha3_512", "governed_root", "authorization_plan_sha256", "reviewer", "next_action", "ownership_inference_used", "source_artifacts_modified"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.enrollment_result.v1"},
+    "status": {"const": "enrolled"},
+    "project_root": {"type": "string"},
+    "project_id": {"type": "string"},
+    "owner_path": {"const": ".naos/upgrade-v1/OWNER.json"},
+    "owner_integrity_sha3_512": {"$ref": "#/$defs/sha3_512"},
+    "scope_path": {"const": ".naos/upgrade-v1/provenance/scopes/repository-intelligence.json"},
+    "scope_integrity_sha3_512": {"$ref": "#/$defs/sha3_512"},
+    "governed_root": {"type": "string"},
+    "authorization_plan_sha256": {"$ref": "#/$defs/sha256"},
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "reviewer_id", "identity_status", "authentication_status"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "reviewer_id": {"type": ["string", "null"]},
+        "identity_status": {"enum": ["declared_attribution", "not_required"]},
+        "authentication_status": {"const": "not_claimed"}
+      }
+    },
+    "next_action": {"type": "string"},
+    "ownership_inference_used": {"const": false},
+    "source_artifacts_modified": {"type": "array", "maxItems": 0}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sha3_512": {"type": "string", "pattern": "^[0-9a-f]{128}$"}
+  }
+}

@@ -1,0 +1,47 @@
+# NAOS Instinct Seed — INS-008
+# Tier 1 seed — stripped of source-project evidence for kit distribution.
+# Set evidence_count ≥ 1 and add your source_sessions as you observe this pattern.
+---
+
+id: INS-008
+title: "Proxy audit DEGRADED masks structural skip-inflation — not a governance regression"
+status: hypothesis
+tier: 1
+
+observed_pattern: >
+  A future behavioral conformance audit produces Status=DEGRADED consistently.
+  Investigation shows the DEGRADED status is driven by two structural factors,
+  not by real governance regressions:
+  (1) ide_only scenarios are counted as SKIP in proxy mode, which inflates the
+  denominator and deflates the pass-rate for multiple dimensions significantly.
+  (2) The LLM grader judges governance file text against behavioral output
+  patterns — a structural mismatch for skill/prompt template scenarios that only
+  produce matching text when executed by a live agent.
+  When ide_only SKIPs are excluded, the affected dimensions score above threshold.
+
+context: >
+  Applies whenever: (a) a behavioral conformance audit reports DEGRADED with multiple drift alerts, AND
+  (b) a large fraction of scenarios are SKIP, AND
+  (c) the drifted dimensions contain ide_only scenarios.
+  Before treating a DEGRADED behavioral audit as a governance emergency, check:
+    - How many SKIPs are ide_only vs quota failures?
+    - What is the score excluding SKIPs?
+    - Does the behavioral drift check agree with the proxy signal?
+  The authoritative health metric is the behavioral drift check, not a proxy.
+
+mitigation: >
+  When evaluating behavioral Status=DEGRADED:
+  1. Check SKIP count and ide_only breakdown before concluding regression
+  2. Recompute compliance excluding SKIPs — if above threshold, it's structural
+  3. Run the behavioral drift check to get the authoritative health signal
+  4. Only open a remediation sprint if behavioral drift also shows regression
+
+evidence_count: 0
+first_observed: null
+last_confirmed: null
+source_sessions: []
+
+confidence: 0.0   # evidence_count = 0 → seed only
+tags: [audit, degraded, proxy, skip-inflation, ide_only, memory-recovery]
+promoted_to_rule: null
+dismissed: false

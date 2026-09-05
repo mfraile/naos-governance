@@ -1,0 +1,110 @@
+version: 1
+enabled: false
+telemetry_declared: false
+runtime_enabled: false
+provider_calls_allowed: false
+gateway_calls_allowed: false
+mcp_allowed: false
+memory_allowed: false
+payload_capture_allowed: false
+credential_capture_allowed: false
+tool_mutation_allowed: false
+route_enforcement_enabled: false
+capability_maturity: L1
+
+profile_posture:
+  quickstart:
+    state: optional
+    severity: advisory
+    human_review_required: false
+    notes: "Optional local telemetry evidence hints only."
+  lite:
+    state: optional
+    severity: warning
+    human_review_required: false
+    notes: "Warn when configured telemetry evidence is missing or risky."
+  standard:
+    state: optional
+    severity: required
+    human_review_required: true
+    notes: "Route configured telemetry evidence gaps and policy exceptions to human review."
+  assured:
+    state: optional
+    severity: required
+    human_review_required: true
+    notes: "First implementation slice remains required review only; blocking requires future validated L3+ maturity and gate wiring."
+
+policy_linkage:
+  require_policy_ref: true
+  model_provider_policy_ref: "naos/model_provider_policy.yaml"
+
+thresholds:
+  cost_usd_review_threshold: null
+  latency_ms_review_threshold: null
+  stale_after_days: null
+
+# Enable only when the project has local model-use telemetry summaries to review.
+# This file is an evidence index, not a provider gateway or runtime router.
+telemetry_sources: []
+records: []
+
+# Example local-source shape. Keep commented until adapted.
+# telemetry_sources:
+#   - path: "naos/evidence/model_telemetry/model-usage.jsonl"
+#     format: jsonl
+#     source_kind: "tool_summary"
+#     reviewed: false
+#
+# Example record shape. Keep commented until adapted.
+# records:
+#   - record_id: "MT-001"
+#     timestamp: "2026-07-08T12:00:00Z"
+#     session_id: "session-001"
+#     task_id: "T-001"
+#     tool: "codex"
+#     model_role: "planning"
+#     provider_kind: "managed_platform"
+#     provider: "host_tool"
+#     model: "[ADAPT: host tool model string if reviewable]"
+#     route_class: "planning"
+#     data_class: "repo_metadata_only"
+#     input_tokens: 1000
+#     output_tokens: 300
+#     total_tokens: 1300
+#     cost_usd: null
+#     latency_ms: null
+#     policy_ref: "naos/model_provider_policy.yaml#roles.planning"
+#     action_receipt_ref: "naos/agent_trace_events.yaml"
+#     evidence_refs:
+#       - "naos/reports/model_provider_policy.json"
+#     policy_exception: false
+#     policy_exceptions: []
+
+known_gaps:
+  - "disabled_until_project_declares_local_model_telemetry"
+residual_risks: []
+not_claimed:
+  - "LiteLLM integration"
+  - "provider gateway availability"
+  - "provider call"
+  - "model call"
+  - "API call"
+  - "network access"
+  - "MCP activation"
+  - "memory activation"
+  - "credential validation"
+  - "runtime model routing"
+  - "route enforcement"
+  - "model recommendation"
+  - "provider catalog"
+  - "complete cost accounting"
+  - "billing proof"
+  - "payload safety proof"
+  - "route correctness proof"
+  - "policy compliance proof"
+  - "legal or regulatory assurance"
+  - "approval"
+  - "certification"
+  - "attestation"
+  - "release authority"
+  - "publication authority"

@@ -1,0 +1,90 @@
+id: CAP-EXTERNAL-EVIDENCE-INGEST
+name: External Evidence Ingest
+description: >
+  Ingests local SARIF 2.1.0 files as bounded, unverified external review
+  evidence, preserves one deterministic opaque record per result, and lets
+  control-plane review create repeatable advisory human-review prompts.
+status: active
+default_maturity: L0
+minimum_profile: standard
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "External evidence ingest is optional orientation only."
+  lite:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "External evidence ingest remains optional."
+  standard:
+    target_maturity: L1
+    enforcement: warning
+    notes: "External SARIF can be preserved per result and routed to advisory G2/G6 human review when configured."
+  assured:
+    target_maturity: L2
+    enforcement: required
+    notes: "Configured external SARIF evidence is expected for high-assurance review when adopter policy requires external scanners."
+authority:
+  may_read:
+    - local SARIF files
+  may_write:
+    - naos/reports/external_evidence_ingest.json
+allowed_resources:
+  - "local SARIF 2.1.0 files"
+prohibited_resources:
+  - "network calls"
+  - "scanner execution"
+  - "provider/model/API calls"
+  - "automatic finding verification"
+  - "approval or attestation"
+constraints:
+  - "Must keep imported findings external and unverified by default."
+  - "Must not promote external findings to source-of-truth authority."
+  - "Must not retain arbitrary SARIF result-message text in the bounded result record."
+  - "G2/G6 labels on generated routes are human-review destinations only and do not change gate decisions."
+  - "Must not approve, waive, remediate, or release based on ingest alone."
+required_evidence:
+  - "naos/reports/external_evidence_ingest.json"
+validators:
+  - id: external_evidence_ingest
+    script: scripts/naos_external_evidence_ingest.py
+    status: available
+gatekeepers:
+  - G2
+  - G4
+  - G6
+  - G8
+dashboard_signals:
+  - "external_evidence_ingest.status"
+  - "external_evidence_ingest.summary.results"
+  - "external_evidence_ingest.summary.verification_status"
+  - "external_evidence_ingest.summary.result_posture"
+  - "control_plane_review.summary.external_sarif_result_routes"
+maturity_path:
+  L0: "Capability contract, schema, and command exist."
+  L1: "Local SARIF can be summarized and preserved per result without network calls or raw-message retention."
+  L2: "Report is visible in gates, evidence pack, dashboard, and self-check."
+  L3: "Adopter policy defines required scanners and freshness expectations."
+  L4: "External evidence trends are reviewed over release cadence."
+  L5: "External evidence is independently verified before release decisions."
+known_limitations:
+  - "SARIF ingest does not prove finding validity."
+  - "Native levels and source-declared taxonomy references are not mapped to NAOS risk, severity, controls, or requirements authority."
+  - "Generated review prompts do not persist human dispositions or create tasks/writeback."
+not_claimed:
+  - "external finding verification"
+  - "security proof"
+  - "vulnerability absence"
+  - "PR approval"
+  - "attestation"
+  - "certification"
+  - "proof of compliance"
+  - "source-of-truth authority"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_external_evidence_ingest.py
+  - scripts/naos_control_plane_review.py

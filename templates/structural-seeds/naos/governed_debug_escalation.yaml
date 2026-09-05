@@ -1,0 +1,35 @@
+version: "1.0"
+semantics:
+  authority_rule: "Profile and maturity constrain eligibility; only explicit project configuration and human approval activate the optional agent."
+  evidence_rule: "Configuration and validator output are activation evidence, not proof that a child agent ran or returned a correct diagnosis."
+  fallback_rule: "If the host tool, configuration, or validation is unavailable, use the human-mediated handoff."
+
+enabled: false
+profile: not_configured
+
+host:
+  id: vscode-copilot
+  capability_acknowledged: false
+  contract_reviewed_at: null
+
+transition:
+  from: naos-implement-with-debug
+  to: naos-debug
+
+trigger:
+  failed_attempt_threshold: 2
+  same_focused_reproducer_required: true
+  materially_different_attempts_required: true
+
+limits:
+  max_debug_dispatches_per_task: 1
+  recursive_invocation_allowed: false
+  child_write_allowed: false
+  child_approval_allowed: false
+
+human_approval:
+  approved: false
+  approved_by: "@unassigned"
+  approved_at: null
+
+manual_fallback_required: true

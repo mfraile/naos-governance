@@ -1,0 +1,65 @@
+# Agent Handoff Template
+
+# Use this when a session ends mid-task to preserve context for the next session.
+# Save as: .github/agents/_HANDOFF_<TASK_ID>_<DATE>.yaml
+
+task_id: "T-XXX"  # ADAPT: task being handed off
+task_title: "[ADAPT: short task title]"
+handoff_from: "@naos-implement"   # ADAPT: which agent is handing off
+handoff_to: "@naos-review"        # ADAPT: which agent receives
+date: "YYYY-MM-DD"                # ADAPT: today's date
+
+# Advisory per-task risk routing (QW1/AP5). From `naos pr-risk-classify` summary.
+# Escalate-up-only and human-reviewed: a higher effective_profile signals that the
+# next session should review under stricter expectations. This is review guidance,
+# NOT an enforced gate and NOT an instruction to trigger another agent.
+risk_tier: "low"                  # ADAPT: low | medium | high (from pr-risk summary)
+effective_profile: "standard"     # ADAPT: max(repo profile, risk-implied profile)
+
+# What was accomplished in this session
+completed:
+  - "[ADAPT: describe what was done]"
+  - "[ADAPT: list completed sub-tasks or files modified]"
+
+# What still needs to be done
+remaining:
+  - "[ADAPT: what's left to complete this task]"
+
+# Advisory next step for the human operator or next session.
+# This is not an executable instruction and must not trigger another agent.
+next_action:
+  label: "[ADAPT: short human-readable next step]"
+  preferred_command: "[ADAPT: /naos-task-complete | /naos-d-commit | /naos-d-end]"
+  preferred_agent: "[ADAPT: @naos-review | @naos-implement | @naos-plan]"
+  reason: "[ADAPT: why this is the right next step]"
+  constraints:
+    - "[ADAPT: constraints the next step must respect]"
+
+# Files modified (list all modified files, even tests and configs)
+files_modified:
+  - path: "src/services/example.py"
+    change: "[ADAPT: what changed and why]"
+  - path: "tests/unit/test_example.py"
+    change: "[ADAPT]"
+
+# Key decisions made during this session
+decisions:
+  - "[ADAPT: e.g. Used X instead of Y because Z]"
+  - "[ADAPT: any architectural choices the next agent should know]"
+
+# Current state of tests
+tests:
+  last_run: "YYYY-MM-DD HH:MM"
+  command: "pytest -q tests/unit tests/acceptance"   # ADAPT if different
+  result: "PASS | FAIL | NOT_RUN"
+  failures: []  # ADAPT: list any failing tests with why they're failing
+
+# Constraints the next agent must respect
+constraints:
+  - "[ADAPT: e.g. Do not modify src/api/auth.py — unrelated to this task]"
+  - "[ADAPT: e.g. Fix must not change the public API signature]"
+
+# Context that would be hard to recover without this file
+context_notes:
+  - "[ADAPT: e.g. The validation happens in service layer, not API layer — see comment in foo.py:L42]"
+  - "[ADAPT: any non-obvious discoveries or gotchas]"

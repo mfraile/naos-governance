@@ -1,0 +1,57 @@
+name: Roadmap decision feedback
+description: Comment on public roadmap direction, non-goals, or release priorities.
+title: "[roadmap-decision] "
+labels: [roadmap-decision]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when you want to comment on public roadmap direction, explicit non-goals, release priorities, or adoption needs. Detailed maintainer planning is private until a public-safe summary is ready.
+
+  - type: dropdown
+    id: target
+    attributes:
+      label: Which roadmap area is this about?
+      options:
+        - Compliance evidence
+        - Capability catalogue
+        - Conformance and anti-hallucination
+        - Adoption ergonomics
+        - Longer-term architecture direction
+        - Kit-enabled per-project capability
+        - Explicit non-goal
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: item_id
+    attributes:
+      label: Specific topic
+      description: e.g. "capability contracts", "AI surface catalogue", "runtime governance non-goal"
+    validations:
+      required: true
+
+  - type: textarea
+    id: position
+    attributes:
+      label: Your position
+      description: What you think the kit should do, and why. Cite concrete reasons; "we use this in production" carries more weight than "it would be nice."
+    validations:
+      required: true
+
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Tradeoffs you see
+      description: What is given up under your proposal? Honest negatives are valued.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Adoption context
+      description: Optional — your project size, industry, regulatory exposure. Helps the maintainer calibrate.
+    validations:
+      required: false

@@ -1,0 +1,66 @@
+# naos_ai_precommit.yaml — NAOS AI Pre-Commit Semantic Review
+# [ADAPT] sections: update model names, paths, and thresholds for your stack
+#
+# Purpose: Central AI review policy for NAOS-generated projects.
+#   v0.9.2 guarantees static governance checks.
+#   Provider-backed semantic review is scaffolded only until the user configures
+#   local/API/IDE-agent runtime outside this public kit.
+#
+# Install hook: chmod +x .githooks/pre-commit && git config core.hooksPath .githooks
+#               python scripts/naos_ai_precommit.py --check-config
+
+ai_review:
+  enabled: true  # NAOS_INIT_PATCH
+  mode: static_only  # NAOS_INIT_PATCH
+                 # disabled | static_only | local_ollama | api_provider | ide_agent
+  provider: null # ollama | anthropic | openai | azure_openai | ide_agent
+  api_key_env: null # e.g. FUTURE_PROJECT_CONFIGURED_PROVIDER_KEY; never store keys here
+
+# Optional Stage 1: project-configured similarity filtering (disabled by default)
+# Core NAOS is deterministic, file-first, and portable. It does not install or
+# require MPNet, MiniLM, sentence-transformers, embeddings, GPU, or any semantic
+# model by default. Similarity evidence is optional, provider-neutral, and
+# project-owned.
+optional_similarity_filter:
+  enabled: false
+  provider: null
+  model: null
+  device: null
+  index_path: null
+  evidence_required: true
+  profile_behavior:
+    quickstart: disabled
+    lite: disabled
+    standard: advisory_when_configured
+    assured: advisory_or_required_when_configured
+
+# Optional project-configured local example (not a baseline dependency):
+# optional_similarity_filter:
+#   enabled: true
+#   provider: local_sentence_transformers
+#   model: sentence-transformers/all-mpnet-base-v2
+#   device: cpu
+#   index_path: naos/semantic/rule_embeddings.json
+#   evidence_required: true
+
+# Optional local semantic review scaffold
+ollama:
+  host: http://localhost:11434        # localhost ONLY — never point at remote without TLS
+  model: "[ADAPT: mistral:7b | llama3.2:3b | gemma2:2b]"
+  timeout_seconds: 45
+  max_diff_length: 8000
+  temperature: 0.05
+
+# Optional Stage 2 fallback chain (metadata only in v0.9.2 safe mode)
+stage2_fallback:
+  preferred_backend: static_only      # disabled | static_only | local_ollama | api_provider | ide_agent
+  self_heal_enabled: true
+  self_heal_timeout_seconds: 30
+  ide_delegation_enabled: true
+  output_dir: .ai-review              # Ephemeral review files (add to .gitignore)
+
+# Behavior
+mode: advisory                        # advisory (exit 0) | blocking (exit 1 on CRITICAL)
+skip_if_no_staged_python: true
+max_rules_to_review: 5
+min_diff_length: 50

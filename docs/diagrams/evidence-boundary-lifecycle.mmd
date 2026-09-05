@@ -1,0 +1,28 @@
+flowchart TD
+    INPUTS["Specs, tasks, code, tests, policies, configs, reports,<br/>prompts, agents, skills, instructions, workflows"] --> TRACE["Traceability checks<br/>spec-pack, spec-cascade, module-headers,<br/>test evidence, AC-completion evidence"]
+    TRACE --> VALIDATORS["Deterministic validators and report generators"]
+    INPUTS --> SURFACE["AI-surface budget<br/>context health, anchors, combined loadouts"]
+    SURFACE --> REPORTS
+    VALIDATORS --> REPORTS["Local JSON reports"]
+    REPORTS --> STATUS["naos gate-status"]
+    REPORTS --> EVAL["naos gate-evaluate"]
+    REPORTS --> PACK["naos evidence-pack"]
+    REPORTS --> DASH["naos dashboard"]
+    REPORTS --> SARIF["naos sarif-export"]
+
+    STATUS --> REVIEW["Human reviewer"]
+    EVAL --> REVIEW
+    PACK --> REVIEW
+    DASH --> REVIEW
+    SARIF --> REVIEW
+
+    REVIEW --> DECISION{"Human decision"}
+    DECISION --> ACCEPT["Accept evidence as sufficient for this project decision"]
+    DECISION --> REMEDIATE["Remediate gaps"]
+    DECISION --> WAIVE["Record waiver / residual risk"]
+    DECISION --> DEFER["Defer capability or module"]
+
+    LIMITS["NAOS evidence does not prove legal compliance, certification,<br/>secure code, runtime safety, complete traceability,<br/>requirements completeness, hallucination prevention, threshold approval,<br/>or release approval."]:::boundary
+    REVIEW --> LIMITS
+
+    classDef boundary fill:#fde2e2,stroke:#b91c1c,color:#5a0d0d,stroke-dasharray:4 3

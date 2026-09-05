@@ -1,0 +1,38 @@
+# NAOS Instinct Seed — INS-002
+# Tier 1 seed — stripped of source-project evidence for kit distribution.
+# Set evidence_count ≥ 1 and add your source_sessions as you observe this pattern.
+---
+
+id: INS-002
+title: "Drift alerts trigger false positives on N=1 baseline runs"
+status: hypothesis
+tier: 1
+
+observed_pattern: >
+  When baseline_compliance is measured from a single behavioral run (N=1), natural
+  stochastic variance of ±3-5 pp between consecutive runs causes the drift check
+  to fire ALERT for alert_threshold_pp=5 even when model behaviour is stable.
+  This is not a true regression — it is measurement noise masquerading as drift.
+
+context: >
+  Applies to: any future behavioral drift invocation where baseline was established from N<3 runs.
+  The 5-pp alert threshold is too tight for N=1 baselines; N≥5 runs produce
+  a stable mean that tolerates the threshold correctly.
+
+mitigation: >
+  Always establish baseline with --runs 5 (or the runs value from monthly_drift_check
+  in autoresearch.yaml). Update baseline_compliance in autoresearch.yaml after each
+  scheduled drift check by taking the MEAN of that run's report, not a single value.
+  If N=1 drift check fires ALERT, rerun with --runs 5 before escalating.
+  The drift handler should log when it detects an N=1 baseline condition —
+  ensure this warning is not ignored.
+
+evidence_count: 0
+first_observed: null
+last_confirmed: null
+source_sessions: []
+
+confidence: 0.0   # evidence_count = 0 → seed only
+tags: [behavioral, drift-check, statistics, false-positive]
+promoted_to_rule: null
+dismissed: false

@@ -1,0 +1,105 @@
+id: CAP-ADAPTER-COHERENCE
+name: Adapter Coherence Review
+description: >
+  Provides deterministic, file-first review of NAOS optional adapter surfaces
+  such as the Codex plugin source, Claude Code hooks, Spec-Kit adapter, and
+  adopter-local integration copies. The capability helps keep tool adapters
+  thin, explicit, reversible, scoped, and aligned with canonical NAOS guidance.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Advisory visibility for plugin and adapter structure."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns on missing adapter docs, overclaims, or stale plugin references."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires adapter coherence review before relying on plugin-guided governance operations."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Can block on unsafe adapter claims, missing canonical plugin surfaces, or hidden runtime enablement language."
+authority:
+  may_read:
+    - "plugins/naos-governance/**/*"
+    - "templates/integrations/**/*"
+    - "templates/skills/**/*"
+    - "templates/instructions/**/*"
+    - "templates/agents/**/*"
+    - "naos/integrations/**/* when present"
+  may_write:
+    - "naos/reports/adapter_coherence.json"
+  may_block:
+    - "only through configured profile policy, strict mode, or assured gates"
+allowed_resources:
+  - "repo-local plugin source"
+  - "repo-local optional integration templates"
+  - "project-local copied adapter guidance"
+prohibited_resources:
+  - "live Codex plugin cache mutation"
+  - "Codex marketplace writes"
+  - "MCP calls"
+  - "Engram or memory tool calls"
+  - "IDE settings mutation"
+  - "hook activation"
+  - "provider/model/API calls"
+  - "Git push, merge, deployment, or release actions"
+constraints:
+  - "Must remain deterministic, local, and file-first."
+  - "Must treat the NAOS kit and project-local NAOS artifacts as canonical."
+  - "Must not treat an installed plugin copy or external IDE cache as source authority."
+  - "Advisory output requires human review before durable decisions, adapter propagation, waivers, maturity changes, approvals, or blocking escalation."
+  - "Must not claim live plugin installation, MCP access, memory access, approval, certification, or proof of compliance."
+required_evidence:
+  - "scripts/naos_adapter_coherence.py"
+  - "templates/structural-seeds/naos/adapter_coherence_rules.yaml"
+  - "plugins/naos-governance/.codex-plugin/plugin.json"
+  - "naos/reports/adapter_coherence.json when generated"
+validators:
+  - id: adapter_coherence
+    script: scripts/naos_adapter_coherence.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+dashboard_signals:
+  - adapter_coherence.status
+  - adapter_coherence.summary.plugin_skills_present
+  - adapter_coherence.summary.adapter_surfaces_present
+  - adapter_coherence.summary.project_local_adapters_present
+maturity_path:
+  L0: "Capability contract, rules seed, schema, plugin package, and validator exist."
+  L1: "Projects can review optional adapter presence and non-claim boundaries."
+  L2: "Adapter coherence reports are generated before plugin-guided adoption or governance changes."
+  L3: "Unsafe adapter claims and hidden runtime enablement are routed through gates and control-plane review."
+  L4: "Adapter propagation is routinely checked after governed learning, prompt, skill, workflow, or instruction changes."
+  L5: "Projects combine adapter coherence with independently approved release and tool-administration controls."
+known_limitations:
+  - "The report validates static files and wording; it does not prove live Codex plugin installation or IDE runtime behavior."
+  - "The report does not mutate Codex plugin caches, marketplaces, MCP servers, memory stores, or IDE settings."
+not_claimed:
+  - "live Codex plugin installation proof"
+  - "MCP access proof"
+  - "memory access proof"
+  - "automatic adapter propagation"
+  - "automatic memory write-back"
+  - "hidden context injection"
+  - "approval"
+  - "certification"
+  - "proof of compliance"
+related_docs:
+  - docs/CODEX_PLUGIN_AND_MCP.md
+  - docs/TOOL_NEUTRAL_USAGE.md
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+related_scripts:
+  - scripts/naos_adapter_coherence.py

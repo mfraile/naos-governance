@@ -1,0 +1,5 @@
+version: "1.0"
+semantics:
+  state: "Candidate learnings are proposal-only."
+  governance_boundary: "Candidates may be reviewed, rejected, or promoted later; they are not current instruction."
+learning_candidates: []

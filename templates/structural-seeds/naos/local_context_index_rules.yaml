@@ -1,0 +1,320 @@
+version: 1
+enabled: true
+semantics:
+  principle: Local context index retrieves bounded candidates; it does not decide truth.
+  posture: generated_derived_cache_like_non_authoritative
+include_patterns:
+  - specs/**/*.md
+  - naos/TASK_REGISTRY.yaml
+  - naos/active/**/*.md
+  - naos/capabilities/**/*.yaml
+  - capabilities/**/*.yaml
+  - naos/policy/**/*.yaml
+  - policies/**/*.yaml
+  - naos/*.yaml
+  - schemas/naos/**/*.json
+  - naos/reports/**/*.json
+  - naos/evidence/**/*.yaml
+  - naos/evidence/**/*.json
+  - naos/test_evidence/**/*.json
+  - naos/inventory/FUNCTION_INDEX.yaml
+  - src/**/*.py
+  - tests/**/*.py
+exclude_patterns:
+  - .git/**
+  - "**/.venv/**"
+  - "**/venv/**"
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - build/**
+  - "**/build/**"
+  - "**/__pycache__/**"
+  - "**/.mypy_cache/**"
+  - "**/.pytest_cache/**"
+  - "**/.ruff_cache/**"
+  - .claude/worktrees/**
+  - dev/**
+  - naos/audit_log/**
+  - naos/context_index/**
+  - naos/context_packs/**
+  - naos/reports/local_context_index.json
+  - naos/reports/sqlite_write_coordination.json
+  - naos/reports/audit_log_summary.json
+  - "**/engram.db"
+  - "**/*.sqlite"
+  - "**/*.db"
+  - "**/*.pem"
+  - "**/*.key"
+  - "**/*.crt"
+  - "**/*.p12"
+  - "**/*.pfx"
+  - .env
+  - .env.*
+default_exclusions:
+  - .git/**
+  - "**/.venv/**"
+  - "**/venv/**"
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - build/**
+  - "**/build/**"
+  - "**/__pycache__/**"
+  - "**/.mypy_cache/**"
+  - "**/.pytest_cache/**"
+  - "**/.ruff_cache/**"
+  - .claude/worktrees/**
+  - dev/**
+  - naos/audit_log/**
+  - naos/context_index/**
+  - naos/context_packs/**
+  - naos/reports/local_context_index.json
+  - naos/reports/sqlite_write_coordination.json
+  - naos/reports/audit_log_summary.json
+  - "**/engram.db"
+  - "**/*.sqlite"
+  - "**/*.db"
+  - "**/*.pem"
+  - "**/*.key"
+  - .env
+  - .env.*
+forbidden_content_categories:
+  - secrets
+  - credentials
+  - tokens
+  - API keys
+  - passwords
+  - private keys
+  - certificates
+  - connection strings
+  - private memory payloads
+  - customer data
+  - tenant data
+  - regulated data
+  - tool worktrees
+  - generated feedback-loop artifacts
+artifact_families:
+  - id: specs
+    name: Specs
+    artifact_type: spec
+    include_patterns:
+      - specs/**/*.md
+    authority_level: repository_governance
+    include_policy: bounded_sections_and_references
+    chunk_kind: markdown_summary
+  - id: task_registry
+    name: Task Registry
+    artifact_type: task_registry
+    include_patterns:
+      - naos/TASK_REGISTRY.yaml
+    authority_level: repository_governance
+    include_policy: structured_summary
+    chunk_kind: yaml_summary
+  - id: active_task_cards
+    name: Active Task Cards
+    artifact_type: active_task_card
+    include_patterns:
+      - naos/active/**/*.md
+    authority_level: repository_governance
+    include_policy: bounded_sections_and_references
+    chunk_kind: markdown_summary
+  - id: capability_cards
+    name: Capability Cards
+    artifact_type: capability_card
+    include_patterns:
+      - naos/capabilities/**/*.yaml
+      - capabilities/**/*.yaml
+    authority_level: repository_governance
+    include_policy: structured_summary
+    chunk_kind: yaml_summary
+  - id: policies
+    name: Policy Files
+    artifact_type: policy
+    include_patterns:
+      - naos/policy/**/*.yaml
+      - policies/**/*.yaml
+    authority_level: repository_governance
+    include_policy: structured_summary
+    chunk_kind: yaml_summary
+  - id: schemas
+    name: Schemas
+    artifact_type: schema
+    include_patterns:
+      - schemas/naos/**/*.json
+    authority_level: repository_governance
+    include_policy: structured_summary
+    chunk_kind: json_summary
+  - id: rules_seeds
+    name: Rules Seeds
+    artifact_type: rules_seed
+    include_patterns:
+      - naos/*.yaml
+    authority_level: repository_governance
+    include_policy: structured_summary
+    chunk_kind: yaml_summary
+  - id: function_index_metadata
+    name: Function Index Metadata
+    artifact_type: function_index
+    include_patterns:
+      - naos/inventory/FUNCTION_INDEX.yaml
+    authority_level: deterministic_report
+    include_policy: symbol_summary_only
+    chunk_kind: yaml_summary
+  - id: source_metadata
+    name: Source Metadata
+    artifact_type: source_file
+    include_patterns:
+      - src/**/*.py
+    authority_level: current_git_state
+    include_policy: module_header_and_symbol_summary_only
+    chunk_kind: python_symbol_summary
+  - id: test_metadata
+    name: Test Metadata
+    artifact_type: test_file
+    include_patterns:
+      - tests/**/*.py
+    authority_level: current_git_state
+    include_policy: module_header_and_symbol_summary_only
+    chunk_kind: python_symbol_summary
+  - id: deterministic_reports
+    name: Deterministic NAOS Reports
+    artifact_type: deterministic_report
+    include_patterns:
+      - naos/reports/*.json
+      - naos/test_evidence/*.json
+      - naos/evidence/*.json
+    authority_level: deterministic_report
+    include_policy: status_summary_only
+    chunk_kind: json_summary
+  - id: evidence_records
+    name: Evidence Records
+    artifact_type: evidence_record
+    include_patterns:
+      - naos/evidence/**/*.yaml
+    authority_level: deterministic_report
+    include_policy: structured_summary
+    chunk_kind: yaml_summary
+authority_levels:
+  - id: current_task_or_user_constraint
+    rank: 1
+    description: Current user instruction and active task constraints outrank all generated context.
+  - id: repository_governance
+    rank: 2
+    description: Repository governance files, specs, policies, schemas, rules, task cards, and capability cards.
+  - id: current_git_state
+    rank: 3
+    description: Current working tree and source/test files as deterministic local files.
+  - id: deterministic_report
+    rank: 4
+    description: Deterministic NAOS reports and evidence summaries generated from repository artifacts.
+  - id: advisory_memory_metadata
+    rank: 5
+    description: Memory readiness or memory-reference metadata only; private payloads are never indexed by default.
+  - id: external_reference
+    rank: 6
+    description: External references with provenance remain subordinate to repository evidence.
+chunking:
+  max_artifacts: 500
+  max_chunks_per_artifact: 8
+  max_chars_per_chunk: 1200
+  include_full_source: false
+  include_full_reports: false
+  summarize_reports: true
+  summarize_source_symbols_only: true
+fts:
+  enabled: true
+  use_fts5_if_available: true
+  fail_if_unavailable: false
+  table: artifact_chunks_fts
+  query_sanitization:
+    enabled: true
+    max_query_chars: 120
+    allowed_token_pattern: "[A-Za-z0-9_./:-]+"
+    strip_boolean_operators: true
+    literalize_tokens: true
+    no_raw_llm_match_queries: true
+sqlite_artifact:
+  enabled: true
+  path: context_index/local_context_index.sqlite
+  rebuild_mode: full_deterministic_rebuild
+  extension_loading_allowed: false
+freshness_policy:
+  default_freshness_window_days: 30
+  stale_status: stale
+  unknown_status: unknown
+source_hash_policy:
+  algorithm: sha256
+  hash_files: true
+  hash_directories_as_blobs: false
+memory_indexing_policy:
+  index_private_memory_payloads: false
+  read_engram_db: false
+  call_engram: false
+  call_mcp: false
+  call_memory_tools: false
+  allowed_memory_artifacts:
+    - naos/reports/memory_context_readiness.json
+  memory_role: advisory_metadata_only
+generated_artifact_feedback_loop_policy:
+  exclude_context_index_by_default: true
+  exclude_context_packs_by_default: true
+  exclude_generated_feedback_loop_artifacts_by_default: true
+  rationale: Generated artifacts should not recursively become their own retrieval source unless explicitly configured and reviewed.
+future_semantic_vector_layer:
+  status: readiness_only_deferred_runtime
+  readiness_report: naos/reports/semantic_candidate_layer.json
+  rules_seed: naos/semantic_candidate_layer_rules.yaml
+  sqlite_vec: deferred
+  vec0_tables: deferred
+  embeddings: deferred
+  extension_loading_allowed: false
+  candidate_only_if_future_enabled: true
+  not_authority: true
+future_graph_layer:
+  status: readiness_only_deferred_runtime
+  readiness_rules: naos/graph_context_rules.yaml
+  readiness_report: naos/reports/graph_context_readiness.json
+  networkx: deferred
+  graphml: deferred
+  graph_database: deferred
+  graph_algorithms: deferred
+  global_graph_scans: prohibited
+  future_traversal_policy: bounded_from_vetted_seed_nodes_only
+  explicit_link_traversal_only: true
+profile_severity_behavior:
+  quickstart: advisory
+  lite: advisory
+  standard: review_required
+  assured: review_required
+human_review_required:
+  required_for_sensitive_indexing_findings: true
+  required_for_authority_confusion_findings: true
+  required_for_future_semantic_or_graph_enablement: true
+known_gaps:
+  - id: LCI-KG-001
+    summary: Semantic/vector retrieval and graph traversal are intentionally deferred.
+residual_risks:
+  - id: LCI-RR-001
+    summary: Exact keyword retrieval can miss relevant artifacts or surface stale candidates.
+limitations:
+  - The local context index is generated, derived, and cache-like.
+  - The SQLite artifact is not the source of truth; repository evidence remains authoritative.
+  - FTS is exact/keyword candidate retrieval only and may be unavailable on some SQLite builds.
+  - Source files are indexed as references and symbol/header summaries, not full source dumps by default.
+  - Reports are indexed as statuses and summaries, not full recursive dumps by default.
+  - Private memory payloads, Engram databases, dev files, caches, and generated context packs are excluded by default.
+not_claimed:
+  - source of truth
+  - authoritative truth
+  - hallucination prevention
+  - semantic retrieval
+  - semantic relevance scoring
+  - sqlite-vec
+  - embeddings
+  - vector database
+  - graph database
+  - NetworkX
+  - GraphML
+  - MCP access
+  - Engram access
+  - memory as evidence
+  - automatic context injection

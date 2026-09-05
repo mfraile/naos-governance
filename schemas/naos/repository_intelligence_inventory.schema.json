@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_inventory:v1",
+  "title": "NAOS Repository Intelligence Inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "project_root", "generation_id", "effective_source_sha256", "source_inventory", "artifacts", "relationships", "sqlite_content_binding", "excluded_artifacts", "components", "ongoing_use_scope", "candidate_only", "limitations", "not_claimed"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.inventory.v1"},
+    "status": {"const": "staged"},
+    "project_root": {"type": "string"},
+    "generation_id": {"type": "string", "pattern": "^RI-[0-9a-f]{24}$"},
+    "effective_source_sha256": {"$ref": "#/$defs/sha256"},
+    "source_inventory": {"type": "array", "items": {"type": "object"}},
+    "artifacts": {"type": "array", "items": {"type": "object"}},
+    "relationships": {"type": "array", "items": {"type": "object"}},
+    "sqlite_content_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifacts", "artifact_chunks", "artifact_links", "repository_relationships"],
+      "properties": {
+        "artifacts": {"$ref": "#/$defs/record_identity_binding"},
+        "artifact_chunks": {"$ref": "#/$defs/record_identity_binding"},
+        "artifact_links": {"$ref": "#/$defs/record_identity_binding"},
+        "repository_relationships": {"$ref": "#/$defs/record_identity_binding"}
+      }
+    },
+    "excluded_artifacts": {"type": "array", "items": {"type": "object"}},
+    "components": {"type": "object"},
+    "ongoing_use_scope": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "candidate_only": {"const": true},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "record_identity_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "ids_sha256", "rows_sha256"],
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "ids_sha256": {"$ref": "#/$defs/sha256"},
+        "rows_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

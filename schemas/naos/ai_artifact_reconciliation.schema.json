@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:ai_artifact_reconciliation:v1",
+  "title": "NAOS AI Artifact Reconciliation Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "generated_at", "profile", "status", "command", "mode", "naos_root", "project_root", "human_review_required", "not_claimed", "limitations", "findings", "summary", "decisions", "write_mode", "decision_states"],
+  "properties": {
+    "schema": {"const": "naos.ai_artifact_reconciliation.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
+    "command": {"const": "ai-artifact-reconcile"},
+    "mode": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "session_id": {"type": ["string", "null"]},
+    "generated_by": {"type": "object"},
+    "human_review_required": {"type": "boolean"},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array"},
+    "residual_risks": {"type": "array"},
+    "summary": {"type": "object"},
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["artifact_id", "artifact_path", "detected_owner", "detected_source", "conflict_category", "conflict_reason", "compared_surface", "profile_impact", "recommended_decision", "selected_option", "available_options", "write_required", "write_performed", "status", "human_review_required", "human_review_boundary", "non_claims"],
+        "properties": {
+          "artifact_id": {"type": "string"},
+          "path": {"type": "string"},
+          "artifact_path": {"type": "string"},
+          "detected_owner": {"enum": ["NAOS-owned", "user-owned", "third-party", "unknown"]},
+          "detected_source": {"type": "string"},
+          "conflict_category": {"type": "string"},
+          "conflict_reason": {"type": "string"},
+          "compared_surface": {"type": "string"},
+          "profile_impact": {"type": "string"},
+          "recommended_decision": {"enum": ["keep", "merge", "replace", "quarantine", "create", "review_required"]},
+          "selected_option": {"enum": ["keep", "merge", "replace", "quarantine", "create", "review_required"]},
+          "available_options": {"type": "array", "items": {"type": "string"}},
+          "write_required": {"type": "boolean"},
+          "write_performed": {"type": "boolean"},
+          "status": {"enum": ["recorded", "review_required"]},
+          "human_review_required": {"type": "boolean"},
+          "human_review_boundary": {"type": "string"},
+          "non_claims": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "write_mode": {"enum": ["dry_run", "explicit_write"]},
+    "write_boundary": {"type": "string"},
+    "decision_states": {"type": "array", "items": {"type": "string"}}
+  }
+}

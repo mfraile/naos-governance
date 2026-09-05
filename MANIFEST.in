@@ -1,0 +1,37 @@
+# Include all data directories needed by the NAOS scaffolder
+recursive-include templates *
+recursive-include plugins *
+recursive-include profiles *
+recursive-include archetypes *
+recursive-include scripts *
+recursive-include autoresearch *
+recursive-include task_battery *
+recursive-include schemas *
+recursive-include baselines *
+include configs/features.yaml
+include configs/profile_generated_surface_contract.json
+include configs/profile_rules_source.yaml
+include docs/COMPLIANCE_MAPPING.md
+include docs/OSFI_E23_MAPPING.md
+include docs/DORA_MAPPING.md
+include docs/REGULATORY_CLAIM_SOURCE_MATRIX.yaml
+include docs/ADMISSIBILITY.md
+include docs/CODEX_PLUGIN_AND_MCP.md
+recursive-include docs/diagrams *.mmd
+
+# Exclude build artifacts and docs
+recursive-exclude * __pycache__
+recursive-exclude * *.pyc
+recursive-exclude docs *
+include docs/COMPLIANCE_MAPPING.md
+include docs/OSFI_E23_MAPPING.md
+include docs/DORA_MAPPING.md
+include docs/REGULATORY_CLAIM_SOURCE_MATRIX.yaml
+include docs/ADMISSIBILITY.md
+include docs/CODEX_PLUGIN_AND_MCP.md
+recursive-include docs/diagrams *.mmd
+exclude .release_cache.json
+exclude configs/naos_private_project_coherence_overrides.json
+exclude configs/naos_public_export_manifest.yaml
+exclude schemas/naos/public_export_manifest.schema.json
+exclude scripts/naos_public_export.py

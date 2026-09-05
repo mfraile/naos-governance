@@ -1,0 +1,84 @@
+schema: naos.cross_harness_review_readiness.v1
+profile: quickstart
+updated_at: null
+enabled: true
+mode: readiness_only
+cross_harness_review:
+  runtime_execution_enabled: false
+  harness_execution_allowed: false
+  provider_api_allowed: false
+  external_network_allowed: false
+  advisory_only: true
+  deterministic_controls_remain_primary: true
+  human_review_required: true
+declared_harnesses:
+  - harness_id: primary_local_cli
+    harness_type: local_cli
+    status: planned
+    execution_enabled: false
+    trust_boundary: local_repository
+    notes: "Placeholder only. No harness is executed by the core kit."
+review_model:
+  minimum_independent_reviews: 2
+  reviewer_independence_required: true
+  same_operator_review_warning: true
+  evidence_required:
+    - source_diff
+    - generated_reports
+    - gate_evaluation
+    - evidence_pack
+    - human_review_record
+  limitations:
+    - Readiness metadata does not prove independent review occurred.
+dsse_readiness:
+  signing_enabled: false
+  signature_verification_enabled: false
+  key_custody_configured: false
+  key_custody_owner: adopter_owned
+  signing_authority: adopter_owned
+  canonicalization_defined: false
+  artifact_hashing_required: true
+  replay_protection_required: true
+  signer_identity_required: true
+  verification_policy_required: true
+  limitations:
+    - The core kit does not sign or verify artifacts.
+    - SHA-256 digests are not signatures.
+    - Adopters own key custody and attestation authority.
+readiness_requirements:
+  - requirement_id: declared_harness_inventory
+    required: true
+    status: missing
+  - requirement_id: trust_boundary_documented
+    required: true
+    status: missing
+  - requirement_id: data_exposure_review
+    required: true
+    status: missing
+  - requirement_id: human_review_boundary
+    required: true
+    status: missing
+  - requirement_id: artifact_hashing_policy
+    required: true
+    status: missing
+  - requirement_id: key_custody_plan
+    required: false
+    status: deferred
+  - requirement_id: signing_policy
+    required: false
+    status: deferred
+  - requirement_id: verification_policy
+    required: false
+    status: deferred
+not_claimed:
+  - cross-harness execution
+  - DSSE signing
+  - signature verification
+  - key custody
+  - signed attestation
+  - compliance proof
+  - approval
+  - certification
+  - behavioral correctness proof
+  - human review replacement
+human_review_required: true

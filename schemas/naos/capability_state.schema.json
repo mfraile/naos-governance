@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:capability_state:v1",
+  "title": "NAOS Adopter Capability State",
+  "description": "Adopter-local declaration of capability maturity state. This file is input evidence, not proof or approval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "semantics", "capabilities"],
+  "properties": {
+    "version": {"type": "string"},
+    "semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state_rule", "report_rule", "promotion_rule"],
+      "properties": {
+        "state_rule": {"type": "string"},
+        "report_rule": {"type": "string"},
+        "promotion_rule": {"type": "string"}
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/capability_state"}
+    }
+  },
+  "$defs": {
+    "maturity_level": {
+      "type": "string",
+      "enum": ["L0", "L1", "L2", "L3", "L4", "L5"]
+    },
+    "capability_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "enabled",
+        "current_maturity",
+        "target_maturity",
+        "owner_1lod",
+        "owner_2lod",
+        "accountable_reviewer",
+        "parameters",
+        "evidence_roots",
+        "evidence_refs",
+        "freshness_window_days",
+        "waiver_policy",
+        "notes",
+        "criteria"
+      ],
+      "properties": {
+        "capability_id": {
+          "type": "string",
+          "pattern": "^CAP-[A-Z0-9-]+$"
+        },
+        "enabled": {"type": "boolean"},
+        "current_maturity": {"$ref": "#/$defs/maturity_level"},
+        "target_maturity": {"$ref": "#/$defs/maturity_level"},
+        "owner_1lod": {"type": "string"},
+        "owner_2lod": {"type": "string"},
+        "accountable_reviewer": {"type": "string"},
+        "parameters": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "evidence_roots": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "freshness_window_days": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "waiver_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allow_waiver", "requires_approval"],
+          "properties": {
+            "allow_waiver": {"type": "boolean"},
+            "requires_approval": {"type": "boolean"},
+            "approval_owner": {"type": ["string", "null"]}
+          }
+        },
+        "waivers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["id", "reason"],
+            "properties": {
+              "id": {"type": "string"},
+              "reason": {"type": "string"},
+              "expires": {"type": ["string", "null"]},
+              "approved_by": {"type": ["string", "null"]}
+            }
+          }
+        },
+        "notes": {"type": "string"},
+        "criteria": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:agent_orchestration_plan:v1",
+  "title": "NAOS deterministic agent orchestration proposal report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "project_root",
+    "naos_root",
+    "configured",
+    "active",
+    "proposal_only",
+    "repository",
+    "client_contracts",
+    "client_projections",
+    "waves",
+    "subject",
+    "decision",
+    "findings",
+    "authority",
+    "limitations",
+    "not_claimed",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.agent_orchestration_plan.v1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "enum": [
+        "not_applicable",
+        "not_configured",
+        "inactive",
+        "invalid_contract",
+        "precondition_failed",
+        "decision_required",
+        "decision_rejected",
+        "decision_deferred",
+        "human_dispatch_required"
+      ]
+    },
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "configured": {"type": "boolean"},
+    "active": {"type": "boolean"},
+    "proposal_only": {"const": true},
+    "repository": {
+      "oneOf": [
+        {"type": "object", "maxProperties": 0},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["root", "branch", "head_observed_not_digest_bound", "object_format", "clean", "snapshot_raced"],
+          "properties": {
+            "root": {"type": "string", "minLength": 1},
+            "branch": {"type": "string", "minLength": 1},
+            "head_observed_not_digest_bound": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
+            "object_format": {"enum": ["sha1", "sha256"]},
+            "clean": {"type": "boolean"},
+            "snapshot_raced": {"type": "boolean"}
+          }
+        }
+      ]
+    },
+    "client_contracts": {"type": "object"},
+    "client_projections": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/client_projection"}
+    },
+    "waves": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/wave"}
+    },
+    "subject": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": [
+            "digest_kind",
+            "sha256",
+            "subject_refs",
+            "affected_files",
+            "affected_bytes",
+            "affected_files_by_lane",
+            "affected_index_entries",
+            "head_excluded_to_avoid_self_referential_decision_commit",
+            "decision_ref_excluded_from_affected_projection"
+          ],
+          "properties": {
+            "digest_kind": {"const": "agent_orchestration_plan_sha256_v1"},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "subject_refs": {"type": "array", "items": {"type": "string"}},
+            "affected_files": {"type": "integer", "minimum": 1},
+            "affected_bytes": {"type": "integer", "minimum": 0},
+            "affected_files_by_lane": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {"type": "integer", "minimum": 1}
+            },
+            "affected_index_entries": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/affected_index_entry"},
+              "minItems": 1
+            },
+            "head_excluded_to_avoid_self_referential_decision_commit": {"const": true},
+            "decision_ref_excluded_from_affected_projection": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "decision": {
+      "type": "object",
+      "required": ["present", "validated", "outcome", "automatic_dispatch_authorized"],
+      "properties": {
+        "present": {"type": "boolean"},
+        "validated": {"type": "boolean"},
+        "outcome": {"type": ["string", "null"]},
+        "automatic_dispatch_authorized": {"const": false}
+      },
+      "additionalProperties": true
+    },
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "authority": {"$ref": "#/$defs/authority"},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "summary": {"$ref": "#/$defs/summary"}
+  },
+  "$defs": {
+    "safe_path_pattern": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000-\\u001f]+$"
+    },
+    "finding": {
+      "type": "object",
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "severity": {"enum": ["advisory", "blocking"]},
+        "status": {"enum": ["review_required", "blocked"]},
+        "message": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "client_launch",
+        "client_configuration_write",
+        "provider_or_model_call",
+        "task_state_write",
+        "task_completion",
+        "claim_write",
+        "automatic_approval",
+        "merge",
+        "push",
+        "release",
+        "publication",
+        "worktree_creation",
+        "hook_installation",
+        "memory_write"
+      ],
+      "properties": {
+        "client_launch": {"const": false},
+        "client_configuration_write": {"const": false},
+        "provider_or_model_call": {"const": false},
+        "task_state_write": {"const": false},
+        "task_completion": {"const": false},
+        "claim_write": {"const": false},
+        "automatic_approval": {"const": false},
+        "merge": {"const": false},
+        "push": {"const": false},
+        "release": {"const": false},
+        "publication": {"const": false},
+        "worktree_creation": {"const": false},
+        "hook_installation": {"const": false},
+        "memory_write": {"const": false}
+      }
+    },
+    "client_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane_id",
+        "task_id",
+        "client",
+        "role",
+        "agent_name",
+        "configuration_path",
+        "model_field",
+        "reasoning_effort_field",
+        "model",
+        "reasoning_effort",
+        "configuration_written",
+        "effective_runtime_verified",
+        "provider_or_model_called",
+        "limitations"
+      ],
+      "properties": {
+        "lane_id": {"type": "string", "minLength": 1},
+        "task_id": {"type": "string", "minLength": 1},
+        "client": {"enum": ["codex", "claude_code", "github_copilot_cli", "opencode"]},
+        "role": {"type": "string", "minLength": 1},
+        "agent_name": {"type": "string", "minLength": 1},
+        "configuration_path": {"type": "string", "minLength": 1},
+        "model_field": {"type": "string", "minLength": 1},
+        "reasoning_effort_field": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "reasoning_effort": {"type": "string", "minLength": 1},
+        "configuration_written": {"const": false},
+        "effective_runtime_verified": {"const": false},
+        "provider_or_model_called": {"const": false},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "wave_lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane_id",
+        "task_id",
+        "objective",
+        "read_only",
+        "client",
+        "role",
+        "agent_name",
+        "priority",
+        "phase",
+        "parallelizable",
+        "depends_on_selected",
+        "permitted_paths",
+        "excluded_paths",
+        "required_outputs"
+      ],
+      "properties": {
+        "lane_id": {"type": "string", "minLength": 1},
+        "task_id": {"type": "string", "minLength": 1},
+        "objective": {"type": "string", "minLength": 10},
+        "read_only": {"type": "boolean"},
+        "client": {"enum": ["codex", "claude_code", "cursor", "github_copilot_cli", "opencode"]},
+        "role": {"type": "string", "minLength": 1},
+        "agent_name": {"type": "string", "minLength": 1},
+        "priority": {"enum": ["P0", "P1", "P2", "P3"]},
+        "phase": {"type": "integer", "minimum": 0},
+        "parallelizable": {"type": "boolean"},
+        "depends_on_selected": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "permitted_paths": {"type": "array", "items": {"$ref": "#/$defs/safe_path_pattern"}, "minItems": 1, "uniqueItems": true},
+        "excluded_paths": {"type": "array", "items": {"$ref": "#/$defs/safe_path_pattern"}, "uniqueItems": true},
+        "required_outputs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true}
+      }
+    },
+    "wave": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wave", "conditional", "must_recompute_before_dispatch", "lanes"],
+      "properties": {
+        "wave": {"type": "integer", "minimum": 1},
+        "conditional": {"type": "boolean"},
+        "must_recompute_before_dispatch": {"const": true},
+        "lanes": {"type": "array", "items": {"$ref": "#/$defs/wave_lane"}, "minItems": 1}
+      }
+    },
+    "affected_index_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "path", "blob_sha256", "bytes"],
+      "properties": {
+        "mode": {"enum": ["100644", "100755"]},
+        "path": {"type": "string", "minLength": 1},
+        "blob_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lanes", "waves", "affected_files", "affected_bytes", "human_review_required", "automatic_dispatch_authorized"],
+      "properties": {
+        "lanes": {"type": "integer", "minimum": 0},
+        "waves": {"type": "integer", "minimum": 0},
+        "affected_files": {"type": "integer", "minimum": 0},
+        "affected_bytes": {"type": "integer", "minimum": 0},
+        "human_review_required": {"const": true},
+        "automatic_dispatch_authorized": {"const": false}
+      }
+    }
+  }
+}

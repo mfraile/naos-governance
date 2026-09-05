@@ -1,0 +1,42 @@
+# NAOS Instinct Seed — INS-006
+# Tier 1 seed — stripped of source-project evidence for kit distribution.
+# Set evidence_count ≥ 1 and add your source_sessions as you observe this pattern.
+---
+
+id: INS-006
+title: "Agent lacks cost ceiling enforcement before API-spending commands"
+status: hypothesis
+tier: 1
+
+observed_pattern: >
+  A task card quotes a budget estimate for behavioral runner API runs.
+  The actual cost significantly exceeds the estimate. Contributing factors:
+  (a) Cost per run was estimated without profiling actual context file sizes
+  (large files inflate token counts dramatically beyond naive estimates).
+  (b) The safety cap in autoresearch.yaml is per-run, not per-session —
+  it does not prevent multiple runs from accumulating toward a higher total.
+  The agent has no mechanism to halt at the budgeted session amount.
+
+context: >
+  Applies whenever: (a) a task card quotes a budget estimate for API runs,
+  AND (b) cost per run was computed without profiling actual context file sizes,
+  AND (c) the agent can invoke the CLI multiple times within a session.
+  Estimates that ignore context file sizes are systematically too low.
+
+mitigation: >
+  Before each behavioral runner invocation, state the incremental cost explicitly:
+  "This --runs N invocation will cost approximately $X (N × $rate/run).
+  Running total for this session: $Y. Plan budget was $Z."
+  If running total would exceed the plan estimate by >20%, stop and ask for approval.
+  When estimating cost for a new task card, ALWAYS profile context file sizes
+  first before quoting a number.
+
+evidence_count: 0
+first_observed: null
+last_confirmed: null
+source_sessions: []
+
+confidence: 0.0   # evidence_count = 0 → seed only
+tags: [api-cost, budget, cost-ceiling, context-files, behavioral-runner]
+promoted_to_rule: null
+dismissed: false

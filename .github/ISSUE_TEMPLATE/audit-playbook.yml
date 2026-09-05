@@ -1,0 +1,56 @@
+name: Audit-playbook feedback
+description: Report public assurance, audit, or compliance-mapping feedback.
+title: "[audit-playbook] "
+labels: [audit-playbook]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this after evaluating a NAOS-governed project or reviewing the public compliance mapping. The maintainer uses this feedback to improve public assurance guidance and internal audit notes.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of feedback?
+      options:
+        - Common finding to add to §4
+        - Per-framework section missing or incorrect (§2)
+        - Reproducibility command R1–R12 did not work as documented
+        - '"What NAOS evidence does NOT prove" section incomplete (§3)'
+        - Audit-report template improvement (§7)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: framework
+    attributes:
+      label: Which framework?
+      options:
+        - EU AI Act
+        - NIST AI RMF
+        - ISO 42001
+        - AIUC-1
+        - OSFI E-23
+        - DORA
+        - SOC 2
+        - Internal audit
+        - Cross-framework / general
+    validations:
+      required: true
+
+  - type: textarea
+    id: detail
+    attributes:
+      label: Detail
+      description: What you observed, what the playbook said vs. what you needed, and any suggested phrasing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Audit context
+      description: Optional — type of audit (internal / external / regulator / second-line model risk), project size, regulatory exposure. Anonymised is fine.
+    validations:
+      required: false

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:pre_implementation_alignment:v1",
+  "title": "NAOS Pre-Implementation Alignment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "mode", "status", "questions", "not_claimed", "human_review_required"],
+  "properties": {
+    "schema": {"const": "naos.pre_implementation_alignment.v1"},
+    "mode": {"enum": ["greenfield", "brownfield", "feature"]},
+    "task_id": {"type": ["string", "null"]},
+    "feature_name": {"type": ["string", "null"]},
+    "status": {"type": "string"},
+    "parallel_lane_opportunity": {
+      "enum": ["not_applicable", "sequential_recommended", "parallel_possible", "parallel_recommended"]
+    },
+    "parallel_lane_decision": {
+      "enum": ["sequential", "declared", "deferred"]
+    },
+    "parallel_lane_reasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "independent_acceptance_criteria",
+          "distinct_path_scopes",
+          "dependency_unlocked",
+          "frontend_backend_test_docs_split",
+          "high_context_load",
+          "solo_checkpoint_value",
+          "unresolved_dependency",
+          "high_scope_overlap",
+          "schema_or_api_decision_first",
+          "high_risk_tightly_controlled_work",
+          "missing_task_or_requirement_link",
+          "missing_test_strategy"
+        ]
+      }
+    },
+    "parallel_lane_candidate_lanes": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "questions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intended_user",
+        "problem_statement",
+        "first_vertical_slice",
+        "input_output_contract",
+        "edge_cases",
+        "failure_modes",
+        "security_privacy_assumptions",
+        "existing_interfaces_touched",
+        "backward_compatibility_constraints",
+        "architecture_assumptions",
+        "known_fragile_modules_or_risk_areas",
+        "test_strategy",
+        "evidence_required",
+        "explicit_out_of_scope",
+        "human_review_boundary"
+      ],
+      "properties": {
+        "intended_user": {"type": ["string", "null"]},
+        "problem_statement": {"type": ["string", "null"]},
+        "first_vertical_slice": {"type": ["string", "null"]},
+        "input_output_contract": {"type": ["string", "null"]},
+        "edge_cases": {"type": "array", "items": {"type": "string"}},
+        "failure_modes": {"type": "array", "items": {"type": "string"}},
+        "security_privacy_assumptions": {"type": "array", "items": {"type": "string"}},
+        "existing_interfaces_touched": {"type": "array", "items": {"type": "string"}},
+        "backward_compatibility_constraints": {"type": "array", "items": {"type": "string"}},
+        "architecture_assumptions": {"type": "array", "items": {"type": "string"}},
+        "known_fragile_modules_or_risk_areas": {"type": "array", "items": {"type": "string"}},
+        "test_strategy": {"type": "array", "items": {"type": "string"}},
+        "evidence_required": {"type": "array", "items": {"type": "string"}},
+        "explicit_out_of_scope": {"type": "array", "items": {"type": "string"}},
+        "planned_change_paths": {"type": "array", "items": {"type": "string"}},
+        "out_of_scope_paths": {"type": "array", "items": {"type": "string"}},
+        "human_review_boundary": {"type": ["string", "null"]}
+      }
+    },
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "extensions": {"type": "object"}
+  }
+}

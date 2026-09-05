@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:gatekeeper:v1",
+  "title": "NAOS Gatekeeper Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "profile_order", "gates"],
+  "properties": {
+    "version": {"type": "string"},
+    "profile_order": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["quickstart", "lite", "standard", "assured"]
+      }
+    },
+    "gates": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/gate"}
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "purpose",
+        "profile_behavior",
+        "required_inputs",
+        "required_evidence",
+        "validators",
+        "outputs",
+        "severity_by_profile",
+        "maturity_dependency",
+        "known_limitations"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^G[0-9]+$"},
+        "name": {"type": "string"},
+        "enabled": {"type": "boolean"},
+        "purpose": {"type": "string"},
+        "profile_behavior": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
+        "required_inputs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "required_evidence": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "semantic_requirements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "source", "field", "allowed_values", "profiles"],
+            "properties": {
+              "id": {"type": "string", "minLength": 1},
+              "source": {"enum": ["plan_coherence_live"]},
+              "field": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+              "allowed_values": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "profiles": {
+                "type": "array",
+                "items": {"enum": ["quickstart", "lite", "standard", "assured"]},
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        "validators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "status"],
+            "properties": {
+              "id": {"type": "string"},
+              "script": {"type": "string"},
+              "status": {
+                "type": "string",
+                "enum": ["available", "planned", "manual", "external"]
+              },
+              "notes": {"type": "string"}
+            }
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "severity_by_profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["quickstart", "lite", "standard", "assured"],
+          "properties": {
+            "quickstart": {"$ref": "#/$defs/severity"},
+            "lite": {"$ref": "#/$defs/severity"},
+            "standard": {"$ref": "#/$defs/severity"},
+            "assured": {"$ref": "#/$defs/severity"}
+          }
+        },
+        "maturity_dependency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["capability", "minimum_maturity"],
+          "properties": {
+            "capability": {"type": "string"},
+            "minimum_maturity": {
+              "type": "string",
+              "enum": ["L0", "L1", "L2", "L3", "L4", "L5"]
+            }
+          }
+        },
+        "known_limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "team_overrides": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/team_override"},
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+          }
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["none", "advisory", "warning", "required", "blocking"]
+    },
+    "team_override": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "severity": {"$ref": "#/$defs/severity"},
+        "rationale": {"type": "string"},
+        "profile_scope": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["quickstart", "lite", "standard", "assured"]
+          }
+        },
+        "review_required": {"type": "boolean"},
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

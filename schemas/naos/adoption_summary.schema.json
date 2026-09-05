@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:adoption_summary:v1",
+  "title": "NAOS Professional Adoption Summary Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "generated_at", "profile", "status", "command", "mode", "naos_root", "project_root", "repository_intelligence_prestart", "repository_intelligence_consumption", "continuation_allowed", "persistence_allowed", "human_review_required", "not_claimed", "limitations", "findings", "summary"],
+  "properties": {
+    "schema": {"const": "naos.adoption_summary.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string", "enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
+    "command": {"const": "adopt"},
+    "mode": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "repository_intelligence_prestart": {
+      "type": "object",
+      "required": ["applicable", "applicability_status", "lifecycle_status", "continuation_allowed", "recommendation", "selected_profile", "engine_execution", "plan_status", "required_usage_scopes", "usage_scope_satisfied", "installation", "not_claimed"],
+      "properties": {
+        "applicable": {"type": "boolean"},
+        "applicability_status": {"enum": ["applicable", "not_applicable", "undetermined"]},
+        "lifecycle_status": {"enum": ["not_applicable", "activation_required", "validated_current", "refresh_required", "recovery_required", "blocked"]},
+        "continuation_allowed": {"type": "boolean"},
+        "recommendation": {
+          "type": "string",
+          "enum": ["capability_enrollment_then_activation", "digest_review_and_activation", "no_install_recommended", "blocked_prerequisite", "not_applicable_for_mode", "use_validated_current_generation", "refresh_and_revalidate", "recover_then_revalidate"]
+        },
+        "selected_profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+        "engine_execution": {"enum": ["completed", "refused", "not_run"]},
+        "plan_status": {"enum": ["confirmation_required", "enrollment_required", "not_applicable", "blocked_prerequisite", "active", "refresh_required", "recovery_required"]},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "required_usage_scopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "authorized_usage_scopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "usage_scope_satisfied": {"type": "boolean"},
+        "active_context": {"type": ["object", "null"]},
+        "effective_source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "coverage": {"type": "object"},
+        "profile_gate": {"type": "object"},
+        "maturity": {"type": "object"},
+        "maturity_authorization_effect": {"const": "none"},
+        "provenance_status": {"enum": ["valid", "enrollment_required", "scope_enrollment_required", "refused"]},
+        "components": {"type": "object"},
+        "graph_eligibility": {"type": "object"},
+        "effectiveness_hypothesis": {"type": "object"},
+        "finding_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "error": {"type": "string"},
+        "not_claimed": {"type": "array", "items": {"type": "string"}},
+        "installation": {
+          "type": "object",
+          "required": ["automatic", "explicit_digest_confirmation_required", "capability_enrollment_required", "transaction_and_recovery_required", "source_artifacts_remain_authoritative", "next_action"],
+          "properties": {
+            "automatic": {"const": false},
+            "explicit_digest_confirmation_required": {"type": "boolean"},
+            "capability_enrollment_required": {"type": "boolean"},
+            "transaction_and_recovery_required": {"type": "boolean"},
+            "source_artifacts_remain_authoritative": {"const": true},
+            "next_action": {"type": "string"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "engine_execution": {"const": "completed"},
+              "plan_status": {"enum": ["confirmation_required", "enrollment_required", "not_applicable", "active"]}
+            },
+            "required": ["engine_execution", "plan_status"]
+          },
+          "then": {
+            "required": ["effective_source_sha256", "coverage", "profile_gate", "maturity", "maturity_authorization_effect", "provenance_status", "components", "graph_eligibility", "effectiveness_hypothesis", "finding_ids"]
+          }
+        },
+        {
+          "if": {"properties": {"engine_execution": {"const": "refused"}}, "required": ["engine_execution"]},
+          "then": {
+            "required": ["error"],
+            "properties": {
+              "applicable": {"const": false},
+              "applicability_status": {"const": "undetermined"},
+              "plan_status": {"const": "blocked_prerequisite"},
+              "recommendation": {"const": "blocked_prerequisite"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"engine_execution": {"const": "not_run"}}, "required": ["engine_execution"]},
+          "then": {"required": ["reason_codes"]}
+        },
+        {
+          "if": {"properties": {"lifecycle_status": {"const": "validated_current"}}, "required": ["lifecycle_status"]},
+          "then": {
+            "properties": {
+              "continuation_allowed": {"const": true},
+              "plan_status": {"const": "active"},
+              "recommendation": {"const": "use_validated_current_generation"},
+              "usage_scope_satisfied": {"const": true}
+            },
+            "required": ["active_context", "authorized_usage_scopes"]
+          }
+        }
+      ]
+    },
+    "repository_intelligence_consumption": {
+      "type": "object",
+      "required": ["status", "candidate_only", "source_artifacts_remain_authoritative"],
+      "properties": {
+        "status": {"enum": ["consumed", "not_applicable", "activation_required", "refresh_required", "recovery_required", "blocked"]},
+        "consumed": {"type": "boolean"},
+        "opening_generation": {"type": "object"},
+        "closing_generation": {"type": "object"},
+        "binding_unchanged": {"type": "boolean"},
+        "usage_scopes_authorized": {"type": "boolean"},
+        "required_usage_scopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "components_used": {"type": "object"},
+        "candidate_count": {"type": "integer", "minimum": 0},
+        "retrieval_candidate_count": {"type": "integer", "minimum": 0},
+        "fts_candidate_count": {"type": "integer", "minimum": 0},
+        "graph_candidate_count": {"type": "integer", "minimum": 0},
+        "graph_results_consumed": {"type": "boolean"},
+        "relationship_count": {"type": "integer", "minimum": 0},
+        "candidate_only": {"const": true},
+        "source_artifacts_remain_authoritative": {"const": true},
+        "consumer_reports": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "error": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "continuation_allowed": {"type": "boolean"},
+    "persistence_allowed": {"type": "boolean"},
+    "session_id": {"type": ["string", "null"]},
+    "generated_by": {"type": "object"},
+    "human_review_required": {"type": "boolean"},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array"},
+    "residual_risks": {"type": "array"},
+    "summary": {"type": "object"}
+  }
+}

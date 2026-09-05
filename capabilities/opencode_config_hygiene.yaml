@@ -1,0 +1,122 @@
+id: CAP-OPENCODE-CONFIG-HYGIENE
+name: OpenCode Config Hygiene
+description: >
+  Provides deterministic local review evidence for optional repo-local OpenCode
+  configuration surfaces, including project AGENTS.md, opencode.json/jsonc,
+  .opencode subdirectories, MCP declarations, plugin references, permission
+  posture, literal secret-like values, and model/provider drift against the
+  local model-provider policy report.
+status: active
+default_maturity: L1
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Optional OpenCode hygiene hints only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warn when configured OpenCode hygiene evidence needs review."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Route OpenCode hygiene findings to human review."
+  assured:
+    target_maturity: L1
+    enforcement: required
+    notes: "Required review only in this slice; blocking is limited to obvious unsafe declarations such as literal secrets or runtime-authority attempts."
+authority:
+  may_read:
+    - AGENTS.md
+    - opencode.json
+    - opencode.jsonc
+    - .opencode/agents
+    - .opencode/commands
+    - .opencode/modes
+    - .opencode/plugins
+    - .opencode/skills
+    - .opencode/tools
+    - .opencode/themes
+    - naos/opencode_config_hygiene.yaml
+    - naos/reports/model_provider_policy.json
+  may_write:
+    - naos/reports/opencode_config_hygiene.json
+  may_block:
+    - "only through configured deterministic policy when declarations contain obvious literal secret-like values or attempt runtime/MCP/memory/provider/model/hook/tool-mutation authority"
+allowed_resources:
+  - "repo-local OpenCode project configuration and .opencode subdirectory files"
+  - "repo-local NAOS OpenCode hygiene declaration"
+  - "repo-local model-provider policy report for declaration drift comparison"
+prohibited_resources:
+  - "global OpenCode user configuration, personal IDE settings, private MCP setup, credentials, memory payloads, external URLs, provider/model/API calls, network access, OpenCode execution, OpenCode plugin creation, hook activation, or tool mutation"
+constraints:
+  - "Must remain optional and local-file-first."
+  - "Must not create OpenCode configuration files or .opencode directories."
+  - "Must not run OpenCode, call providers/models/APIs, activate MCP, activate memory, inspect private/global user config, validate credentials, mutate IDE/tool settings, approve work, certify, attest, release, publish, or prove compliance."
+  - "Must treat findings as review evidence only."
+  - "Must keep missing OpenCode files non-failing by default."
+required_evidence:
+  - naos/opencode_config_hygiene.yaml
+  - naos/reports/opencode_config_hygiene.json
+validators:
+  - id: naos_opencode_config_hygiene
+    script: scripts/naos_opencode_config_hygiene.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+dashboard_signals: []
+maturity_path:
+  L0: "Candidate design card and challenge exist."
+  L1: "Disabled-by-default seed, schema, script, capability contract, setup module, CLI/Make dispatch, generated-adopter packaging, focused tests, and bounded control-plane route exist."
+  L2: "Prompt/instruction/skill guidance may teach optional review use without implying OpenCode activation."
+  L3: "Adopter pilots show reduced OpenCode config ambiguity without false runtime or security confidence."
+  L4: "Broader evidence consumers may be considered only after external/team adopter evidence and claim-control review."
+  L5: "Any future OpenCode adapter remains separately approved, tool-specific, credential-reviewed, and non-authoritative."
+known_limitations:
+  - "The report does not execute OpenCode or inspect runtime behavior."
+  - "The report does not inspect global user OpenCode configuration or personal IDE settings."
+  - "The report detects only obvious literal secret-like strings."
+  - "Model/provider drift comparison is limited to local declarations and local model-provider policy report contents."
+not_claimed:
+  - "OpenCode installation"
+  - "OpenCode execution"
+  - "OpenCode plugin creation"
+  - "global OpenCode config inspection"
+  - "MCP activation"
+  - "memory activation"
+  - "provider call"
+  - "model call"
+  - "API call"
+  - "network access"
+  - "credential validation"
+  - "secret scanner completeness"
+  - "malware absence"
+  - "supply-chain safety proof"
+  - "prompt-injection prevention"
+  - "runtime sandboxing"
+  - "runtime orchestration"
+  - "provider route correctness"
+  - "model recommendation"
+  - "IDE/tool configuration mutation"
+  - "approval"
+  - "merge approval"
+  - "release authority"
+  - "publication authority"
+  - "certification"
+  - "attestation"
+  - "proof of compliance"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
+  - docs/decisions/ADR-0013-opencode-governed-activation-surface.md
+related_scripts:
+  - scripts/naos_opencode_config_hygiene.py
+  - scripts/naos_control_plane_review.py
+related_schemas:
+  - schemas/naos/opencode_config_hygiene.schema.json
+  - schemas/naos/control_plane_review.schema.json

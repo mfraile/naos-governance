@@ -1,0 +1,97 @@
+id: CAP-SYSTEMIC-IMPACT-REVIEW
+name: Systemic Impact Review
+description: >
+  Declares project-configurable artifact-family relationships and evaluates
+  current review obligations plus caller-supplied changed-path review across
+  specs, requirements, policies, gates, validators, AI surfaces, docs,
+  evidence, generated adopter files, and dashboard semantics.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Shows configured families and missing review obligations without blocking."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns when configured artifact-family relationships are incomplete."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires systemic impact review evidence where configured."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Can block when configured high-impact review evidence is missing."
+authority:
+  may_read:
+    - "naos/systemic_impact_rules.yaml"
+    - "an explicitly supplied changed-path review record"
+    - "project governance artifacts and configured file patterns"
+  may_write:
+    - "naos/reports/systemic_impact_review.json"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "file-first YAML, JSON, Markdown, and script outputs"
+prohibited_resources:
+  - "mandatory database"
+  - "mandatory daemon"
+  - "mandatory scheduler"
+  - "mandatory runtime gateway"
+  - "mandatory external service"
+constraints:
+  - "Must treat rules as configuration, not proof."
+  - "Must identify missing/not_configured/disabled review obligations honestly."
+  - "Must keep NAOS-governance kit-source routes separate from portable adopter-generated routes."
+  - "Must not infer a Git base or changed paths; the caller supplies the exact stable change set."
+  - "Must preserve unresolved and update-required human dispositions."
+  - "Must not claim automatic consistency proof, guaranteed coherence, complete impact analysis, or certification."
+required_evidence:
+  - "naos/systemic_impact_rules.yaml"
+  - "naos/reports/systemic_impact_review.json"
+validators:
+  - id: systemic_impact_review
+    script: scripts/naos_systemic_impact.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - "systemic_impact_review.status"
+  - "systemic_impact_review.review_required"
+  - "systemic_impact_review.not_configured"
+  - "systemic_impact_review.human_review_required"
+maturity_path:
+  L0: "Capability contract, rules schema, and seed rules exist in the kit."
+  L1: "Project configures artifact families and review relationships."
+  L2: "Systemic impact review report is generated and exact changed-path obligations can be dispositioned as evidence."
+  L3: "Gatekeepers apply profile severity to missing review obligations."
+  L4: "Dashboard tracks configured families, obligations, and stale/missing links."
+  L5: "Evidence is complete enough to support review of systemic coherence decisions."
+known_limitations:
+  - "Does not prove perfect coherence or complete impact analysis."
+  - "Does not automatically update related artifacts."
+  - "Does not replace human/project governance judgement."
+  - "Changed-path review classifies caller-supplied paths and declared links; it does not infer or execute a Git diff."
+  - "Path and relationship classification does not prove semantic completeness."
+not_claimed:
+  - "automatic consistency proof"
+  - "guaranteed coherence"
+  - "complete impact analysis"
+  - "certification"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/INDEX.md
+  - schemas/README.md
+related_scripts:
+  - scripts/naos_systemic_impact.py
+related_schemas:
+  - schemas/naos/systemic_impact_rules.schema.json
+  - schemas/naos/systemic_impact_review.schema.json
+  - schemas/naos/systemic_impact_changed_path_review.schema.json

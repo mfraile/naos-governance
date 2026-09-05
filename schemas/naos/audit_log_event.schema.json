@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:audit_log_event:v1",
+  "title": "NAOS Audit Log Event",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "event_id",
+    "event_type",
+    "generated_at",
+    "session_id",
+    "operator_id",
+    "operator_source",
+    "generated_by",
+    "profile",
+    "project_root",
+    "naos_root",
+    "source_report",
+    "source_report_hash",
+    "source_report_path",
+    "related_task_id",
+    "related_capability_id",
+    "related_gate_id",
+    "related_artifacts",
+    "event_payload_summary",
+    "event_payload_hash",
+    "authority_layer",
+    "human_review_required",
+    "limitations",
+    "not_claimed",
+    "residual_risks"
+  ],
+  "properties": {
+    "schema": { "const": "naos.audit_log_event.v1" },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@+-]{7,160}$"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "report_generated",
+        "session_started",
+        "session_checkpoint",
+        "session_ended",
+        "operator_attributed",
+        "context_index_generated",
+        "sqlite_coordination_completed",
+        "gate_evaluated",
+        "evidence_pack_generated",
+        "dashboard_generated",
+        "sarif_export_generated",
+        "grader_assessment_generated",
+        "policy_override_merged",
+        "memory_readiness_checked",
+        "control_plane_review_generated",
+        "task_claimed",
+        "task_released",
+        "task_claim_conflict_detected",
+        "unknown"
+      ]
+    },
+    "generated_at": { "type": "string" },
+    "session_id": { "type": ["string", "null"] },
+    "operator_id": { "type": ["string", "null"] },
+    "operator_source": { "type": "string" },
+    "generated_by": { "type": "object" },
+    "profile": {
+      "type": "string",
+      "enum": ["quickstart", "lite", "standard", "assured"]
+    },
+    "project_root": { "type": "string" },
+    "naos_root": { "type": "string" },
+    "source_report": { "type": ["string", "null"] },
+    "source_report_hash": { "type": ["string", "null"] },
+    "source_report_path": { "type": ["string", "null"] },
+    "related_task_id": { "type": ["string", "null"] },
+    "related_capability_id": { "type": ["string", "null"] },
+    "related_gate_id": { "type": ["string", "null"] },
+    "related_artifacts": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "event_payload_summary": { "type": "object" },
+    "event_payload_hash": { "type": "string" },
+    "authority_layer": { "type": "string" },
+    "human_review_required": { "type": "boolean" },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

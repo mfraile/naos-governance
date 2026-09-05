@@ -1,0 +1,64 @@
+name: Optional Project Licence-Policy Metadata Check
+
+on:
+  pull_request:
+    paths:
+      - requirements.txt
+      - requirements-dev.txt
+  push:
+    branches: [main, updates]
+    paths:
+      - requirements.txt
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pip-licenses
+          pip install -r requirements.txt
+
+      - name: Check configured GPL/AGPL metadata patterns
+        run: |
+          echo "Scanning for GPL/AGPL licenses (LGPL permitted)..."
+          pip-licenses --format=json > licenses.json
+
+          # Block GPL and AGPL; allow LGPL (LGPL-2.1-only, LGPL-3.0-only, LGPLv2+, LGPLv3).
+          # Both AGPL and GPL contain "GPL" without "LGPL".
+          COPYLEFT=$(jq -r '.[] | select(
+            (.License | contains("GPL")) and (.License | contains("LGPL") | not)
+          ) | "\(.Name) - \(.License)"' licenses.json || true)
+
+          if [ -n "$COPYLEFT" ]; then
+            echo "ERROR: Configured GPL/AGPL licence-name patterns detected:"
+            echo "$COPYLEFT"
+            echo ""
+            echo "Project policy rejects these licences; obtain qualified review for your use case."
+            exit 1
+          fi
+
+          echo "No configured GPL/AGPL licence-name pattern detected."
+          echo "Metadata string matching is incomplete review evidence, not licence clearance or legal compliance."
+
+      - name: Generate license report
+        if: always()
+        run: |
+          pip-licenses --format=markdown --output-file=licenses_report.md
+
+      - name: Upload license report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: licenses_report.md

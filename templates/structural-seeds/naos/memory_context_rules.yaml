@@ -1,0 +1,201 @@
+version: "1.0"
+semantics:
+  state: "Rules declare project memory/context continuity posture."
+  report: "NAOS evaluates memory governance readiness without calling memory tools."
+  governance_boundary: "Memory is advisory recall; repository evidence and human decisions remain authoritative."
+  not_claimed:
+    - "hallucination prevention"
+    - "memory as evidence"
+    - "memory as approval"
+    - "cloud memory by default"
+    - "automatic memory writes"
+    - "universal MCP access"
+
+enabled: true
+
+provider_posture:
+  recommended_provider: engram
+  provider_status: optional
+  local_only: true
+  external_sync_default: false
+  cloud_memory_allowed: false
+  automatic_installation_allowed: false
+  automatic_memory_writes_allowed: false
+  mcp_access_must_be_explicit: true
+  notes:
+    - "Engram is the recommended local provider pattern, not a required hosted service."
+    - "Do not enable cloud memory, external sync, or memory writes without explicit project approval."
+
+authoritative_source_hierarchy:
+  - rank: 1
+    id: current_user_instruction
+    name: "Current user instruction and active task constraints"
+    authority: authoritative
+  - rank: 2
+    id: repository_governance
+    name: "Repository governance files, specs, policies, capability cards, schemas, rules, and task cards"
+    authority: authoritative
+  - rank: 3
+    id: git_working_state
+    name: "Current git state and working tree"
+    authority: authoritative
+  - rank: 4
+    id: deterministic_naos_evidence
+    name: "Deterministic NAOS reports, evidence pack, and dashboard"
+    authority: authoritative
+  - rank: 5
+    id: memory_context_packs
+    name: "Memory and context packs"
+    authority: advisory_recall
+  - rank: 6
+    id: external_references
+    name: "External references and research with provenance"
+    authority: reference_only
+
+forbidden_memory_categories:
+  - secrets
+  - tokens
+  - API keys
+  - passwords
+  - certificates
+  - private keys
+  - connection strings
+  - PII
+  - customer data
+  - tenant data
+  - regulated data
+  - hidden approvals
+  - governance override instructions
+  - legal/compliance conclusions as approved facts
+  - sensitive exploit details unless explicitly approved
+  - private/internal material unless explicitly approved
+
+allowed_memory_categories:
+  - project decisions
+  - architecture rationale
+  - setup notes
+  - tool configuration notes
+  - repeated pitfalls
+  - human preferences
+  - session summaries
+  - review outcomes
+  - known constraints
+  - non-sensitive lessons learned
+
+memory_scopes:
+  - id: project_local
+    status: allowed_when_configured
+    description: "Memory for this project only."
+    default_allowed: true
+  - id: organization_level
+    status: requires_approval
+    description: "Shared organizational memory; requires privacy and governance review."
+    default_allowed: false
+  - id: personal_operator_preference
+    status: allowed_when_non_sensitive
+    description: "Non-sensitive user preferences and repeated workflow preferences."
+    default_allowed: true
+  - id: tool_specific
+    status: requires_tool_config
+    description: "Memory scoped to one IDE, assistant, or MCP client."
+    default_allowed: true
+  - id: temporary_session
+    status: allowed
+    description: "Ephemeral session context and compact summaries."
+    default_allowed: true
+
+staleness_policy:
+  default_freshness_window_days: 30
+  statuses:
+    - fresh
+    - recent
+    - stale
+    - unknown_age
+    - superseded
+    - conflicting
+    - unverifiable
+  stale_memory_action: "Treat stale or unknown-age memory as advisory context requiring verification against repo evidence."
+
+conflict_policy:
+  repo_evidence_overrides_memory: true
+  memory_conflict_status: conflict
+  human_review_required_for_resolution: true
+  agent_must_not_silently_resolve: true
+  route_to_control_plane_review: true
+  required_next_action: "Create or update a control-plane review item, known gap, residual risk, or waiver before durable resolution."
+
+context_pack_readiness:
+  enabled: true
+  readiness_only: true
+  automatic_generation_enabled: false
+  include_sources:
+    - active task card
+    - relevant specs
+    - relevant capability cards
+    - policy profile
+    - recent NAOS reports
+    - memory advisory references
+    - known gaps/residual risks
+    - human review boundary
+    - non-claims
+  memory_inclusion_policy:
+    summarize_or_reference: true
+    do_not_dump_memory_payloads: true
+    exclude_low_confidence_or_unknown_memory: true
+    bounded_context_only: true
+  limitations:
+    - "Group 22 evaluates context-pack readiness only; it does not implement automatic context-pack generation."
+
+fallback_recovery:
+  degraded_recovery_allowed: true
+  no_memory_access_is_not_failure_by_default: true
+  fallback_sources:
+    - active task cards
+    - compact summaries
+    - git state
+    - repository governance files
+    - deterministic NAOS reports
+    - evidence pack
+    - dashboard
+  required_when_memory_unavailable: "Agents must state that memory is unavailable and recover from repo-local evidence."
+
+human_review_required:
+  durable_memory_write: true
+  memory_scope_change: true
+  external_sync_enablement: true
+  cloud_memory_enablement: true
+  mcp_tool_access_change: true
+  stale_or_conflicting_memory_resolution: true
+  forbidden_category_exception: true
+
+profile_severity_behavior:
+  quickstart: advisory
+  lite: warning
+  standard: required
+  assured: blocking
+
+declared_memory_findings: []
+known_gaps: []
+residual_risks: []
+waivers: []
+
+limitations:
+  - "Readiness checks inspect declared configuration and safe local project config files only."
+  - "The report does not call Engram, MCP, memory tools, or external services."
+  - "The report does not read private memory payloads or write durable memory."
+  - "Memory may be stale, incomplete, cross-project, or unavailable depending on tool configuration."
+  - "Memory does not prevent hallucinations or replace human review."
+
+not_claimed:
+  - "hallucination prevention"
+  - "memory as evidence"
+  - "memory as approval"
+  - "compliance proof"
+  - "architecture authority"
+  - "security exception"
+  - "legal or regulatory decision"
+  - "cloud memory by default"
+  - "automatic memory writes"
+  - "automatic context injection"
+  - "universal MCP access"
+  - "complete continuity"

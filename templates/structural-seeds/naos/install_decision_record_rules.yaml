@@ -1,0 +1,48 @@
+schema: naos.install_decision_record_rules.v1
+profile: quickstart
+updated_at: null
+description: >
+  Rules for install/adoption decision records. Decisions must connect intake,
+  discovery, inventories, challenges, installation plan, activation boundary,
+  and residual risk.
+required_evidence:
+  - intake_report
+  - install_plan
+  - existing_resource_inventory
+  - ai_artifact_inventory
+  - memory_resource_inventory
+  - memory_resource_reconciliation
+  - mcp_resource_inventory
+  - challenge_reports
+decision_states:
+  - keep
+  - merge
+  - replace
+  - quarantine
+  - create
+  - review_required
+memory_reconciliation_options:
+  - connect
+  - reuse
+  - repair
+  - new
+  - disabled
+  - deferred
+  - review_required
+memory_decision_boundary:
+  memory_remains_advisory: true
+  provider_or_client_mutation_allowed: false
+  provider_or_client_mutation_performed: false
+  write_requests_must_be_disclosed: true
+activation_boundary:
+  explicit_human_activation_required: true
+  silent_overwrite_allowed: false
+  hooks_auto_enabled: false
+  provider_api_enabled: false
+not_claimed:
+  - automatic approval
+  - legal or regulatory compliance conclusion
+  - certification
+  - runtime safety proof
+  - human review replacement
+human_review_required: true

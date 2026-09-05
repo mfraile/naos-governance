@@ -1,0 +1,164 @@
+version: 1
+enabled: false
+runtime_enabled: false
+state: readiness_only
+provider_allowed: false
+external_api_allowed: false
+model_dependency_allowed: false
+api_keys_allowed: false
+cost_incurred_by_default: false
+cost_budget_required_if_enabled_later: true
+human_approval_required_before_cost: true
+data_exposure_review_required: true
+prompt_rubric_version_required: true
+model_version_required: true
+bias_variance_limitations_required: true
+residual_risk_required: true
+advisory_only: true
+can_promote_without_human: false
+can_approve: false
+can_certify: false
+can_prove_compliance: false
+deterministic_baseline_required: true
+static_grader_remains_primary: true
+
+profile_posture:
+  quickstart:
+    state: disabled
+    severity: advisory
+    human_review_required: false
+    notes: "LLMGrader readiness stays quiet and disabled; StaticGrader remains the deterministic baseline."
+  lite:
+    state: readiness_only
+    severity: advisory
+    human_review_required: false
+    notes: "Readiness posture is visible but no model, provider, network, cost, or judging runtime is enabled."
+  standard:
+    state: readiness_only
+    severity: review_required
+    human_review_required: true
+    notes: "Human review is expected before any future LLM-as-judge enablement request is considered."
+  assured:
+    state: readiness_only
+    severity: review_required
+    human_review_required: true
+    notes: "Human review is required before any future model/provider/cost/data-exposure posture is considered."
+
+future_enablement_requested: false
+future_enablement:
+  model_role: null
+  provider: null
+  model: null
+  model_version: null
+  prompt_version: null
+  rubric_version: null
+  max_cost_usd: null
+  max_runs_per_day: null
+  data_exposure_level: null
+  allowed_data_classes: []
+  prohibited_data_classes:
+    - secrets
+    - credentials
+    - tokens
+    - passwords
+    - private keys
+    - certificates
+    - connection strings
+    - customer data
+    - tenant data
+    - regulated data
+    - private memory payloads
+  approval_owner: null
+  human_review_boundary: null
+  residual_risks: []
+  not_claimed:
+    - approval
+    - certification
+    - compliance determination
+    - maturity promotion
+    - source authority
+
+cost_policy:
+  cost_usd: 0.0
+  max_cost_usd: null
+  max_runs_per_day: null
+  cost_budget_required_if_enabled_later: true
+  human_approval_required_before_cost: true
+
+data_exposure_policy:
+  review_required: true
+  default_data_exposure_level: none
+  allowed_data_classes: []
+  prohibited_data_classes:
+    - secrets
+    - credentials
+    - tokens
+    - passwords
+    - private keys
+    - certificates
+    - connection strings
+    - customer data
+    - tenant data
+    - regulated data
+    - private memory payloads
+
+model_policy:
+  model_role: null
+  provider_required_if_enabled_later: true
+  model_required_if_enabled_later: true
+  model_version_required_if_enabled_later: true
+  provider_dependency_allowed_by_default: false
+  model_dependency_allowed_by_default: false
+
+prompt_rubric_policy:
+  prompt_version_required_if_enabled_later: true
+  rubric_version_required_if_enabled_later: true
+  prompt_and_rubric_review_required: true
+
+bias_variance_policy:
+  limitations_required: true
+  expected_limitations:
+    - model_drift
+    - prompt_rubric_drift
+    - position_bias
+    - style_bias
+    - self_preference_bias
+    - false_positive
+    - false_negative
+    - automation_bias
+
+residual_risk_policy:
+  required: true
+  required_risks:
+    - model_drift
+    - prompt_rubric_drift
+    - position_bias
+    - style_bias
+    - self_preference_bias
+    - provider_dependency
+    - data_exposure
+    - cost_overrun
+    - false_positive
+    - false_negative
+    - automation_bias
+    - advisory_to_authority_confusion
+    - human_review_required
+
+deterministic_baseline:
+  required: true
+  primary_controls:
+    - StaticGrader
+    - agent trace validation
+    - deterministic conformance
+    - source-linked evidence
+  static_grader_remains_primary: true
+
+advisory_boundary:
+  advisory_only: true
+  can_promote_without_human: false
+  can_approve: false
+  can_certify: false
+  can_prove_compliance: false
+  can_replace_deterministic_controls: false
+  can_replace_human_review: false
+  may_challenge_deterministic_controls: true

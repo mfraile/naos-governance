@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:systemic_impact_changed_path_review:v1",
+  "title": "NAOS Systemic Impact Changed-Path Review Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "changed_paths", "reviews"],
+  "properties": {
+    "schema": {"const": "naos.systemic_impact_changed_path_review.v1"},
+    "changed_paths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "reviews": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/review"}
+    }
+  },
+  "$defs": {
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_kind",
+        "target_id",
+        "disposition"
+      ],
+      "properties": {
+        "target_kind": {
+          "type": "string",
+          "enum": ["artifact_family", "review_surface", "declared_artifact"]
+        },
+        "target_id": {"type": "string", "minLength": 1},
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "updated",
+            "reviewed_no_change",
+            "not_applicable",
+            "update_required",
+            "unresolved"
+          ]
+        },
+        "rationale": {"type": "string"},
+        "evidence_refs": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": ["updated", "reviewed_no_change", "not_applicable"]
+              }
+            },
+            "required": ["disposition"]
+          },
+          "then": {
+            "required": ["rationale", "evidence_refs"],
+            "properties": {
+              "rationale": {"minLength": 1},
+              "evidence_refs": {"minItems": 1}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,100 @@
+id: CAP-AGENT-SPONSOR-REGISTRY
+name: "Agent Sponsor Registry"
+description: >-
+  Validates an opt-in build-time declaration mapping every current repository
+  agent to an opaque project-owned sponsor reference, ownership scope, review
+  expiry, and categorical credential posture, then supplies deterministic
+  G2/G6 human-review evidence to the control plane.
+status: active
+default_maturity: L1
+minimum_profile: standard
+enforcement_default: required
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Not installed by default and not recommended for Quickstart."
+  lite:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Not installed by default and not recommended for Lite."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Optional; once explicitly installed, incomplete or expired declarations route to G2/G6 human review."
+  assured:
+    target_maturity: L1
+    enforcement: required
+    notes: "Optional; once explicitly installed, incomplete or expired declarations route to G2/G6 human review."
+authority:
+  may_read:
+    - naos/agent_sponsor_registry.yaml
+    - .github/agents/*.agent.md
+  may_write:
+    - naos/reports/agent_sponsor_registry.json
+  may_block: []
+allowed_resources:
+  - repo-local agent declarations
+  - opaque project-local sponsor, owner, and external-control references
+  - categorical credential posture and review timestamps
+prohibited_resources:
+  - credentials, tokens, keys, certificates, personal identity data, external directories, providers, networks, MCP, memory, runtime identity, authentication, authorization, signing, release, or publication actions
+constraints:
+  - "Must remain opt-in and must not be generated into default profiles."
+  - "Must derive current agent identity from normalized .agent.md declarations, not AGENTS.md prose."
+  - "Must store no credential values and must emit only digests of sponsor references."
+  - "Must distinguish registry review expiry from credential lifetime and must not claim credential validation."
+  - "Must route missing, malformed, stale, expired, orphaned, or exception declarations to G2/G6 human review."
+required_evidence:
+  - naos/agent_sponsor_registry.yaml
+  - naos/reports/agent_sponsor_registry.json
+validators:
+  - id: naos_agent_sponsor_registry
+    script: scripts/naos_agent_sponsor_registry.py
+    status: available
+gatekeepers: [G2, G6]
+dashboard_signals:
+  - agent_sponsor_registry.status
+  - agent_sponsor_registry.human_review_required
+maturity_path:
+  L0: "No project registry is installed; the capability is not applicable."
+  L1: "A schema-valid declaration and current report cover every normalized agent and feed control-plane review."
+  L2: "Adopter evidence shows sponsor declarations are reviewed before their declared review expiry."
+  L3: "External identity or credential controls remain separately designed and independently assured."
+  L4: "Multiple adopters preserve current sponsor posture without treating it as runtime identity."
+  L5: "Any stronger identity or credential assurance remains external and does not expand this declaration's claims."
+known_limitations:
+  - "Opaque references prove only declaration completeness, not who a sponsor is."
+  - "Review timestamps are evaluated against the controlled NAOS clock; they do not prove credential TTL, rotation, or revocation."
+  - "Content hashes detect drift but do not authenticate authors or attest provenance."
+not_claimed:
+  - sponsor identity verification
+  - sponsor approval
+  - authentication
+  - authorization
+  - delegation authority
+  - separation of duties
+  - credential existence or validation
+  - credential lifetime verification
+  - credential issuance, rotation, or revocation
+  - runtime identity or enforcement
+  - SPIFFE or SPIRE integration
+  - OAuth or on-behalf-of integration
+  - mTLS integration
+  - signing or attestation
+  - compliance approval
+  - release authority
+  - publication authority
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ASI_AICM_MAPPING.md
+  - templates/agents/AGENTS.md
+related_scripts:
+  - scripts/naos_agent_sponsor_registry.py
+  - scripts/naos_emit_capabilities.py
+  - scripts/naos_control_plane_review.py
+related_schemas:
+  - schemas/naos/agent_sponsor_registry.schema.json
+  - schemas/naos/agent_sponsor_registry_report.schema.json
+  - schemas/naos/control_plane_review.schema.json

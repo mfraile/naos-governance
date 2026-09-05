@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:cross_harness_review_readiness:v1",
+  "title": "NAOS Cross-Harness Review Readiness Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "profile",
+    "updated_at",
+    "enabled",
+    "mode",
+    "cross_harness_review",
+    "declared_harnesses",
+    "review_model",
+    "dsse_readiness",
+    "readiness_requirements",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.cross_harness_review_readiness.v1"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "updated_at": {"type": ["string", "null"]},
+    "enabled": {"type": "boolean"},
+    "mode": {"const": "readiness_only"},
+    "cross_harness_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime_execution_enabled",
+        "harness_execution_allowed",
+        "provider_api_allowed",
+        "external_network_allowed",
+        "advisory_only",
+        "deterministic_controls_remain_primary",
+        "human_review_required"
+      ],
+      "properties": {
+        "runtime_execution_enabled": {"type": "boolean"},
+        "harness_execution_allowed": {"type": "boolean"},
+        "provider_api_allowed": {"type": "boolean"},
+        "external_network_allowed": {"type": "boolean"},
+        "advisory_only": {"type": "boolean"},
+        "deterministic_controls_remain_primary": {"type": "boolean"},
+        "human_review_required": {"type": "boolean"}
+      }
+    },
+    "declared_harnesses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["harness_id", "harness_type", "status", "execution_enabled", "trust_boundary"],
+        "properties": {
+          "harness_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"},
+          "harness_type": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"},
+          "status": {"enum": ["planned", "documented", "review_required", "disabled", "unknown"]},
+          "execution_enabled": {"type": "boolean"},
+          "trust_boundary": {"type": "string"},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "review_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_independent_reviews",
+        "reviewer_independence_required",
+        "same_operator_review_warning",
+        "evidence_required",
+        "limitations"
+      ],
+      "properties": {
+        "minimum_independent_reviews": {"type": "integer", "minimum": 0},
+        "reviewer_independence_required": {"type": "boolean"},
+        "same_operator_review_warning": {"type": "boolean"},
+        "evidence_required": {"type": "array", "items": {"type": "string"}},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "dsse_readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signing_enabled",
+        "signature_verification_enabled",
+        "key_custody_configured",
+        "key_custody_owner",
+        "signing_authority",
+        "canonicalization_defined",
+        "artifact_hashing_required",
+        "replay_protection_required",
+        "signer_identity_required",
+        "verification_policy_required",
+        "limitations"
+      ],
+      "properties": {
+        "signing_enabled": {"type": "boolean"},
+        "signature_verification_enabled": {"type": "boolean"},
+        "key_custody_configured": {"type": "boolean"},
+        "key_custody_owner": {"type": "string"},
+        "signing_authority": {"type": "string"},
+        "canonicalization_defined": {"type": "boolean"},
+        "artifact_hashing_required": {"type": "boolean"},
+        "replay_protection_required": {"type": "boolean"},
+        "signer_identity_required": {"type": "boolean"},
+        "verification_policy_required": {"type": "boolean"},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "readiness_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requirement_id", "required", "status"],
+        "properties": {
+          "requirement_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"},
+          "required": {"type": "boolean"},
+          "status": {"enum": ["missing", "deferred", "planned", "documented", "ready", "complete", "review_required", "unknown"]},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  }
+}

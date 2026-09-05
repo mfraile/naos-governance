@@ -1,0 +1,47 @@
+flowchart TB
+    KIT["NAOS Kit Repository"]
+    CODEXPLUGIN["plugins/naos-governance<br/>Canonical Codex plugin source"]
+    CLAUDEPLUGIN["plugins/naos-governance-claude-code<br/>Canonical Claude Code plugin source"]
+    TEMPLATES["templates/integrations<br/>Review-first adapter templates"]
+    CORE["schemas + scripts + policies + templates<br/>Canonical governance substrate"]
+
+    PROJECT["Adopter Project"]
+    STATE["naos/<br/>Project-local state, reports, evidence, learning"]
+    LOCALADAPTER["naos/integrations/*<br/>Optional copied adapter guidance"]
+
+    TOOLS["Tool Adapters"]
+    CODEX["Codex installed plugin copy/cache<br/>Operator interface only"]
+    CLAUDE["Claude Code installed plugin copy/cache<br/>Skills-only operator interface"]
+    CLAUDEHOOKS["Claude Code hooks/settings<br/>Manual activation"]
+    CURSOR["Cursor / VS Code / Gemini guidance<br/>Tool-specific adapters"]
+
+    COMMANDS["Explicit NAOS commands<br/>self-check, adapter-coherence, learning-loop-review,<br/>ai-surface-budget, systemic-impact, control-plane-review"]
+    REPORTS["Deterministic reports<br/>naos/reports/*.json"]
+    LEARNING["Governed learning lifecycle<br/>candidate -> active -> history"]
+    PROP["Propagation rule<br/>Learn anywhere, approve centrally,<br/>propagate deliberately"]
+
+    KIT --> CODEXPLUGIN
+    KIT --> CLAUDEPLUGIN
+    KIT --> TEMPLATES
+    KIT --> CORE
+    CORE --> PROJECT
+    PROJECT --> STATE
+    TEMPLATES --> LOCALADAPTER
+
+    CODEXPLUGIN --> CODEX
+    CLAUDEPLUGIN --> CLAUDE
+    LOCALADAPTER --> CODEX
+    LOCALADAPTER --> CLAUDE
+    TEMPLATES --> CLAUDEHOOKS
+    TEMPLATES --> CURSOR
+    CODEX --> COMMANDS
+    CLAUDE --> COMMANDS
+    CLAUDEHOOKS --> COMMANDS
+    CURSOR --> COMMANDS
+    COMMANDS --> REPORTS
+    REPORTS --> STATE
+    LEARNING --> PROP
+    PROP --> CODEXPLUGIN
+    PROP --> CLAUDEPLUGIN
+    PROP --> TEMPLATES
+    STATE --> LEARNING

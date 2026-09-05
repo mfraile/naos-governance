@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:ai-component-inventory-rules:v1",
+  "title": "NAOS AI Component Inventory Rules",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "format",
+    "decision_supported",
+    "review_owner",
+    "profiles",
+    "applicability",
+    "lifecycle",
+    "required_component_fields",
+    "allowed_component_types",
+    "active_model_or_binding_required_declarations",
+    "sources",
+    "field_sources",
+    "routing",
+    "non_claims"
+  ],
+  "properties": {
+    "schema": {"const": "naos.ai_component_inventory_rules.v1"},
+    "format": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "kind", "standard_conformance"],
+      "properties": {
+        "id": {"const": "ai_component_inventory.v1"},
+        "version": {"const": 1},
+        "kind": {"const": "custom_declared_facts_inventory"},
+        "standard_conformance": {"type": "null"}
+      }
+    },
+    "decision_supported": {"type": "string", "minLength": 1},
+    "review_owner": {"type": "string", "minLength": 1},
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quickstart", "lite", "standard", "assured"],
+      "properties": {
+        "quickstart": {"$ref": "#/$defs/profile"},
+        "lite": {"$ref": "#/$defs/profile"},
+        "standard": {"$ref": "#/$defs/profile"},
+        "assured": {"$ref": "#/$defs/profile"}
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generated_adopter_required_profiles", "source_kit_missing_report", "rationale"],
+      "properties": {
+        "generated_adopter_required_profiles": {"const": ["standard", "assured"]},
+        "source_kit_missing_report": {"const": "not_applicable"},
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "regeneration_triggers",
+        "freshness_basis",
+        "wall_clock_expiry",
+        "copied_mtime_used",
+        "stale_when",
+        "owner"
+      ],
+      "properties": {
+        "regeneration_triggers": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "freshness_basis": {"const": "content_sha256_and_canonical_semantic_digest"},
+        "wall_clock_expiry": {"const": false},
+        "copied_mtime_used": {"const": false},
+        "stale_when": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "owner": {"type": "string", "minLength": 1}
+      }
+    },
+    "required_component_fields": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "allowed_component_types": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["agent", "skill", "instruction", "model_role", "ai_tool", "tool_model_binding"]}
+    },
+    "active_model_or_binding_required_declarations": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "sources": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+    "field_sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "component_type",
+        "name",
+        "status",
+        "source_file",
+        "source_sha256",
+        "declarations",
+        "redactions"
+      ],
+      "properties": {
+        "component_id": {"type": "string", "minLength": 1},
+        "component_type": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "minLength": 1},
+        "source_file": {"type": "string", "minLength": 1},
+        "source_sha256": {"type": "string", "minLength": 1},
+        "declarations": {"type": "string", "minLength": 1},
+        "redactions": {"type": "string", "minLength": 1}
+      }
+    },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consumer", "source_type", "target_gates", "conditions"],
+      "properties": {
+        "consumer": {"const": "scripts/naos_control_plane_review.py"},
+        "source_type": {"const": "ai_component_inventory_finding"},
+        "target_gates": {"const": ["G2", "G6"]},
+        "conditions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "non_claims": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "posture"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "posture": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:pr_risk_classification:v1",
+  "title": "NAOS PR Risk Classification Report",
+  "description": "Deterministic local PR risk-classification report. Findings are review evidence only and are not PR approval, sandbox execution, malware analysis, security proof, proof of compliance, or signing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "project_root",
+    "naos_root",
+    "rules_path",
+    "deterministic",
+    "cost_posture",
+    "git",
+    "contributor",
+    "changed_files",
+    "summary",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.pr_risk_classification.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "rules_path": {"type": ["string", "null"]},
+    "deterministic": {"type": "boolean"},
+    "cost_posture": {"$ref": "#/$defs/cost_posture"},
+    "git": {"type": "object", "additionalProperties": true},
+    "contributor": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["trust", "source", "reason", "not_claimed"],
+      "properties": {
+        "actor": {"type": ["string", "null"]},
+        "trust": {"type": "string", "enum": ["trusted", "untrusted", "unknown", "local_preview"]},
+        "event_name": {"type": ["string", "null"]},
+        "fork": {"type": "boolean"},
+        "source": {"type": "string"},
+        "reason": {"type": "string"},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "status", "risk_categories"],
+        "properties": {
+          "path": {"type": "string"},
+          "status": {"type": "string"},
+          "risk_categories": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["blocking", "required", "warnings", "advisory", "total_findings", "changed_files", "risk_files", "category_counts"],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "changed_files": {"type": "integer", "minimum": 0},
+        "risk_files": {"type": "integer", "minimum": 0},
+        "category_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "risk_tier": {"type": "string", "enum": ["low", "medium", "high"]},
+        "risk_implied_profile": {"type": ["string", "null"]},
+        "effective_profile": {"type": "string"}
+      }
+    },
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "cost_posture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cost_incurred_by_default",
+        "cost_usd",
+        "external_api_required",
+        "provider_dependency_required",
+        "model_dependency_required",
+        "human_approval_required_before_cost"
+      ],
+      "properties": {
+        "cost_incurred_by_default": {"type": "boolean"},
+        "cost_usd": {"type": "number", "minimum": 0},
+        "external_api_required": {"type": "boolean"},
+        "provider_dependency_required": {"type": "boolean"},
+        "model_dependency_required": {"type": "boolean"},
+        "human_approval_required_before_cost": {"type": "boolean"}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message", "category", "human_review_required", "not_claimed"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string"},
+        "status": {"type": "string"},
+        "message": {"type": "string"},
+        "category": {"type": "string"},
+        "path": {"type": "string"},
+        "line": {"type": "integer", "minimum": 1},
+        "human_review_required": {"type": "boolean"},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

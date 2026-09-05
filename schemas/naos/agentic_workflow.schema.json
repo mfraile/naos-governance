@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:agentic_workflow:v1",
+  "title": "NAOS Agentic Workflow Declaration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "profile",
+    "updated_at",
+    "context_hygiene",
+    "pre_implementation_alignment",
+    "vertical_slice_delivery",
+    "tdd_feedback",
+    "module_design",
+    "human_ai_work_split",
+    "kanban_dag",
+    "push_pull_context",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.agentic_workflow.v1"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "updated_at": {"type": ["string", "null"]},
+    "context_hygiene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "fresh_session_per_task", "compacted_chat_not_authoritative", "task_context_pack_required", "max_context_policy"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "fresh_session_per_task": {"type": "string"},
+        "compacted_chat_not_authoritative": {"type": "boolean"},
+        "task_context_pack_required": {"type": "string"},
+        "max_context_policy": {"type": "string"},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "pre_implementation_alignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "pattern", "required_artifact", "prompt_template", "required_questions", "human_review_required"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "pattern": {"type": "string"},
+        "required_artifact": {"type": "string"},
+        "prompt_template": {"type": "string"},
+        "required_questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"}
+        },
+        "human_review_required": {"type": "boolean"}
+      }
+    },
+    "vertical_slice_delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "preferred_slice_strategy", "tracer_bullet_required", "avoid_horizontal_big_bang", "evidence_required"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "preferred_slice_strategy": {"type": "string"},
+        "tracer_bullet_required": {"type": "string"},
+        "avoid_horizontal_big_bang": {"type": "boolean"},
+        "evidence_required": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "tdd_feedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "red_green_evidence_recommended", "implementation_without_tests_is_review_required", "public_interface_tests_preferred"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "red_green_evidence_recommended": {"type": "boolean"},
+        "implementation_without_tests_is_review_required": {"type": "boolean"},
+        "public_interface_tests_preferred": {"type": "boolean"}
+      }
+    },
+    "module_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "prefer_deep_modules_with_stable_interfaces", "avoid_shallow_wrapper_sprawl", "interface_evidence_required"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "prefer_deep_modules_with_stable_interfaces": {"type": "boolean"},
+        "avoid_shallow_wrapper_sprawl": {"type": "boolean"},
+        "interface_evidence_required": {"type": "string"}
+      }
+    },
+    "human_ai_work_split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "human_tasks", "afk_candidate_tasks", "afk_tasks_require_gates"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "human_tasks": {"type": "array", "items": {"type": "string"}},
+        "afk_candidate_tasks": {"type": "array", "items": {"type": "string"}},
+        "afk_tasks_require_gates": {"type": "boolean"}
+      }
+    },
+    "parallel_lane_opportunity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "advisory_values",
+        "decision_values",
+        "reason_codes",
+        "declaration_required_for_handoff",
+        "suggested_lanes_do_not_activate_handoff",
+        "solo_developer_posture",
+        "team_lane_posture",
+        "worktree_posture",
+        "no_silent_activation",
+        "no_branch_or_worktree_automation"
+      ],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "advisory_values": {
+          "type": "array",
+          "items": {
+            "enum": ["not_applicable", "sequential_recommended", "parallel_possible", "parallel_recommended"]
+          }
+        },
+        "decision_values": {
+          "type": "array",
+          "items": {"enum": ["sequential", "declared", "deferred"]}
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "independent_acceptance_criteria",
+              "distinct_path_scopes",
+              "dependency_unlocked",
+              "frontend_backend_test_docs_split",
+              "high_context_load",
+              "solo_checkpoint_value",
+              "unresolved_dependency",
+              "high_scope_overlap",
+              "schema_or_api_decision_first",
+              "high_risk_tightly_controlled_work",
+              "missing_task_or_requirement_link",
+              "missing_test_strategy"
+            ]
+          }
+        },
+        "declaration_required_for_handoff": {"type": "boolean"},
+        "suggested_lanes_do_not_activate_handoff": {"type": "boolean"},
+        "solo_developer_posture": {"type": "string"},
+        "team_lane_posture": {"type": "string"},
+        "worktree_posture": {"type": "string"},
+        "no_silent_activation": {"type": "boolean"},
+        "no_branch_or_worktree_automation": {"type": "boolean"}
+      }
+    },
+    "implementation_readiness_baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "applicable_profiles",
+        "required_artifact",
+        "planning_model",
+        "draft_and_discovery_allowed",
+        "profile_inputs",
+        "structural_evidence",
+        "replanning_method",
+        "routine_task_status_change_requires_rebaseline",
+        "horizontal_foundation_requires",
+        "does_not_authorize"
+      ],
+      "properties": {
+        "enabled": {"const": true},
+        "applicable_profiles": {
+          "const": ["lite", "standard", "assured"]
+        },
+        "required_artifact": {"const": "naos/PLANNING_BASELINES.yaml"},
+        "planning_model": {"const": "hybrid_vertical_default"},
+        "draft_and_discovery_allowed": {"const": true},
+        "profile_inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lite", "standard", "assured"],
+          "properties": {
+            "lite": {"const": ["requirements", "task_registry", "alignment", "owner_decision"]},
+            "standard": {"const": ["requirements", "architecture", "task_registry", "alignment", "owner_decision"]},
+            "assured": {"const": ["requirements", "architecture", "task_registry", "alignment", "owner_decision"]}
+          }
+        },
+        "structural_evidence": {
+          "const": ["spec_pack_contract", "pre_implementation_alignment_review"]
+        },
+        "replanning_method": {"const": "versioned_supersession"},
+        "routine_task_status_change_requires_rebaseline": {"const": false},
+        "horizontal_foundation_requires": {
+          "const": ["consuming_vertical_slice", "changed_consumed_result"]
+        },
+        "does_not_authorize": {
+          "type": "array",
+          "allOf": [
+            {"contains": {"const": "implementation"}},
+            {"contains": {"const": "task closure"}},
+            {"contains": {"const": "merge"}},
+            {"contains": {"const": "release"}}
+          ],
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "kanban_dag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "explicit_dependencies_required", "parallel_work_requires_task_claims"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "explicit_dependencies_required": {"type": "string"},
+        "parallel_work_requires_task_claims": {"type": "boolean"}
+      }
+    },
+    "push_pull_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "pull_context", "push_context", "silent_context_injection_prohibited"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "pull_context": {"type": "array", "items": {"type": "string"}},
+        "push_context": {"type": "array", "items": {"type": "string"}},
+        "silent_context_injection_prohibited": {"type": "boolean"}
+      }
+    },
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "extensions": {"type": "object"}
+  }
+}

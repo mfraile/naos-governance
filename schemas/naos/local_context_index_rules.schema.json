@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:local_context_index_rules:v1",
+  "title": "NAOS Local Context Index Rules",
+  "type": "object",
+  "required": [
+    "version",
+    "enabled",
+    "include_patterns",
+    "exclude_patterns",
+    "artifact_families",
+    "authority_levels",
+    "chunking",
+    "fts",
+    "sqlite_artifact",
+    "freshness_policy",
+    "source_hash_policy",
+    "default_exclusions",
+    "forbidden_content_categories",
+    "memory_indexing_policy",
+    "generated_artifact_feedback_loop_policy",
+    "future_semantic_vector_layer",
+    "future_graph_layer",
+    "profile_severity_behavior",
+    "human_review_required",
+    "limitations",
+    "not_claimed"
+  ],
+  "properties": {
+    "version": { "type": ["string", "number"] },
+    "enabled": { "type": "boolean" },
+    "include_patterns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "exclude_patterns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "artifact_families": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "artifact_type", "include_patterns", "authority_level"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "artifact_type": { "type": "string" },
+          "include_patterns": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "authority_level": { "type": "string" },
+          "profile_scope": { "type": ["string", "array"] },
+          "chunk_kind": { "type": "string" },
+          "max_chunks_per_artifact": { "type": "integer", "minimum": 0 },
+          "include_policy": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "authority_levels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "rank", "description"],
+        "properties": {
+          "id": { "type": "string" },
+          "rank": { "type": "integer" },
+          "description": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "chunking": {
+      "type": "object",
+      "required": ["max_artifacts", "max_chunks_per_artifact", "max_chars_per_chunk"],
+      "properties": {
+        "max_artifacts": { "type": "integer", "minimum": 1 },
+        "max_chunks_per_artifact": { "type": "integer", "minimum": 0 },
+        "max_chars_per_chunk": { "type": "integer", "minimum": 100 },
+        "include_full_source": { "type": "boolean" },
+        "include_full_reports": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "fts": {
+      "type": "object",
+      "required": ["enabled", "use_fts5_if_available", "fail_if_unavailable", "query_sanitization"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "use_fts5_if_available": { "type": "boolean" },
+        "fail_if_unavailable": { "type": "boolean" },
+        "query_sanitization": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "sqlite_artifact": {
+      "type": "object",
+      "required": ["enabled", "path", "rebuild_mode", "extension_loading_allowed"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "path": { "type": "string" },
+        "rebuild_mode": { "type": "string" },
+        "extension_loading_allowed": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "freshness_policy": { "type": "object" },
+    "source_hash_policy": { "type": "object" },
+    "default_exclusions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "forbidden_content_categories": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "memory_indexing_policy": { "type": "object" },
+    "generated_artifact_feedback_loop_policy": { "type": "object" },
+    "future_semantic_vector_layer": { "type": "object" },
+    "future_graph_layer": { "type": "object" },
+    "profile_severity_behavior": { "type": "object" },
+    "human_review_required": { "type": ["boolean", "object"] },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}

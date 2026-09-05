@@ -1,0 +1,77 @@
+id: CAP-DIGITAL-TWIN-EVALUATION
+name: Digital Twin Evaluation
+description: >
+  Experimental scaffold for future scaffold-realistic behavioral evaluation
+  inspired by PETRI-style scenario evidence and runtime-governance research.
+status: experimental
+default_maturity: L0
+minimum_profile: assured
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: not_applicable
+    notes: "Not activated."
+  lite:
+    target_maturity: L0
+    enforcement: not_applicable
+    notes: "Not activated."
+  standard:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Reference only."
+  assured:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Experimental behavioral evidence track only."
+authority:
+  may_read:
+    - task_battery/
+    - naos/evidence/
+  may_write:
+    - "future behavioral evaluation reports when explicitly configured"
+allowed_resources:
+  - "scenario YAML"
+  - "transcript references"
+  - "deterministic validator outputs"
+prohibited_resources:
+  - "LLM-only gatekeeping"
+  - "mandatory hosted judge"
+  - "mandatory runtime daemon"
+constraints:
+  - "Must remain deterministic-first with any LLM judging advisory."
+  - "Must label PETRI alignment as inspiration unless implemented evidence exists."
+required_evidence:
+  - "Scenario IDs and versions."
+  - "Transcript references when run."
+  - "Validator and judge metadata when configured."
+validators:
+  - id: digital_twin_evaluation_readiness
+    status: manual
+    notes: "Future readiness review only."
+gatekeepers:
+  - G7
+  - G8
+dashboard_signals:
+  - "digital_twin_evaluation.status"
+  - "digital_twin_evaluation.scenario_coverage"
+  - "digital_twin_evaluation.limitations"
+maturity_path:
+  L0: "Experimental capability contract and limitations exist."
+  L1: "Project configures scenario scope."
+  L2: "Evaluation run produces reproducible evidence."
+  L3: "Human reviewers inspect advisory behavioral-gate evidence before any durable governance decision."
+  L4: "Dashboard tracks scenario trends and variance."
+  L5: "Behavioral evidence supports external review discussions."
+known_limitations:
+  - "No default behavioral runtime system is implemented."
+  - "Model-backed evaluator outputs are advisory unless backed by deterministic validators."
+not_claimed:
+  - "PETRI fully implemented."
+  - "Guaranteed agent alignment."
+  - "Runtime assurance by installing this scaffold."
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts: []

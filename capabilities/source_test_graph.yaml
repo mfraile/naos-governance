@@ -1,0 +1,71 @@
+id: CAP-SOURCE-TEST-GRAPH
+name: Source-Test Graph
+description: >
+  Experimental scaffold for future graph-style source-to-test traceability that
+  may extend file-first test evidence without becoming mandatory.
+status: experimental
+default_maturity: L0
+minimum_profile: assured
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: not_applicable
+    notes: "Not activated."
+  lite:
+    target_maturity: L0
+    enforcement: not_applicable
+    notes: "Not activated."
+  standard:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Reference only."
+  assured:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Experimental track for mature projects."
+authority:
+  may_read:
+    - src/
+    - tests/
+    - naos/test_evidence/
+  may_write:
+    - "future source-test graph exports when explicitly configured"
+allowed_resources:
+  - "file-first JSON or YAML graph exports"
+prohibited_resources:
+  - "mandatory graph database"
+  - "mandatory coverage SaaS"
+constraints:
+  - "Must build on test evidence, not replace it."
+  - "Must not claim complete behavioral coverage."
+required_evidence:
+  - "Configured source/test roots."
+  - "Existing test evidence map."
+validators:
+  - id: source_test_graph_readiness
+    status: manual
+    notes: "Future readiness review only."
+gatekeepers:
+  - G8
+dashboard_signals:
+  - "source_test_graph.status"
+  - "source_test_graph.readiness"
+maturity_path:
+  L0: "Experimental contract exists."
+  L1: "Project configures source/test roots."
+  L2: "File-first graph export is produced."
+  L3: "Advisory gate reviews graph completeness."
+  L4: "Dashboard tracks graph freshness and gaps."
+  L5: "Graph evidence supports audit-style review."
+known_limitations:
+  - "No graph server is required."
+  - "Graph links do not prove tests are sufficient."
+not_claimed:
+  - "Complete source-to-test proof."
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+related_scripts:
+  - scripts/naos_test_evidence_map.py
+

@@ -1,0 +1,124 @@
+id: CAP-FAILURE-MODE-OBSERVATIONS
+name: Failure-Mode Observations
+description: >
+  Provides deterministic local statistics that aggregate configured NAOS report
+  findings into the canonical 21 failure modes, with counts by mode, family,
+  source report, reason code, severity, gate, and mapping basis for human
+  review, learning-loop review, or autoresearch scoping.
+status: active
+default_maturity: L1
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Optional observation statistics only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warn when configured source evidence produces review observations."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Route configured observation findings to human review."
+  assured:
+    target_maturity: L1
+    enforcement: required
+    notes: "Required review only in this slice; blocking requires future validated L3+ maturity and explicit gate wiring."
+authority:
+  may_read:
+    - naos/failure_mode_observations.yaml
+    - naos/reports/failure_mode_posture.json
+    - naos/reports/model_provider_policy.json
+    - naos/reports/model_telemetry_evidence.json
+    - naos/reports/opencode_config_hygiene.json
+    - naos/reports/design_traceability.json
+    - naos/reports/ui_experience_quality.json
+    - naos/reports/parallel_lane_handoff/*.json
+  may_write:
+    - naos/reports/failure_mode_observations.json
+  may_block: []
+allowed_resources:
+  - "configured repo-local NAOS JSON report files"
+  - "repo-local failure-mode observation mapping declaration"
+prohibited_resources:
+  - "naos/reports/control_plane_review.json as an input, learning state files, prompts, skills, workflows, hooks, provider/model APIs, MCP/Engram/memory tools, networks, browsers, runtime systems, IDE settings, credentials, or external services"
+constraints:
+  - "Must remain deterministic and local-file-first."
+  - "Must exclude control_plane_review.json as an input to avoid cyclic review evidence."
+  - "Must not write learning_candidates.yaml, learning_state.yaml, prompts, skills, workflows, hooks, or provider/model/MCP/memory configuration."
+  - "Must not call providers, models, APIs, MCP, Engram, memory tools, browsers, networks, hooks, local servers, or runtime systems."
+  - "Must treat counts as review statistics only, not as a numeric risk score authority."
+  - "Must keep assured severity required-only until a separately validated L3+ maturity control explicitly supports blocking."
+required_evidence:
+  - naos/failure_mode_observations.yaml
+  - naos/reports/failure_mode_observations.json
+validators:
+  - id: naos_failure_mode_observations
+    script: scripts/naos_failure_mode_observations.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - failure_mode_observations.status
+  - failure_mode_observations.summary.observations
+  - failure_mode_observations.summary.modes_with_observations
+  - failure_mode_observations.summary.unmapped_observations
+  - failure_mode_observations.summary.high_severity_observations
+  - failure_mode_observations.human_review_required
+maturity_path:
+  L0: "Candidate design card and challenge exist."
+  L1: "Disabled-by-default seed, schema, script, capability contract, setup module, CLI/Make dispatch, generated-adopter packaging, focused tests, and bounded control-plane route exist."
+  L2: "Dashboard, evidence-pack, SARIF, gate-status, systemic-impact, and learning-loop review consumers surface observation statistics without changing approval, blocking, runtime, or learning authority."
+  L3: "Adopter pilots show observation statistics help prioritize review without overclaiming prevention, approval, or compliance."
+  L4: "Broader automated learning or autoresearch actions may be considered only after external/team adopter evidence and claim-control review."
+  L5: "Any future learning or autoresearch automation remains separately approved, human-reviewed, reversible, and non-authoritative."
+known_limitations:
+  - "Mappings are deterministic but incomplete by design; unmapped observations require review."
+  - "Source reports can be stale or incomplete."
+  - "Counts can be misread as scores unless human-review boundaries remain explicit."
+  - "The report does not prove failure prevention or mitigation."
+not_claimed:
+  - "self-learning model weights"
+  - "autonomous skill promotion"
+  - "automatic memory write-back"
+  - "automatic context injection"
+  - "automatic prompt mutation"
+  - "automatic learning promotion"
+  - "provider call"
+  - "model call"
+  - "API call"
+  - "network access"
+  - "MCP activation"
+  - "Engram activation"
+  - "memory activation"
+  - "runtime orchestration"
+  - "numeric risk score authority"
+  - "approval"
+  - "automatic blocking"
+  - "merge approval"
+  - "release authority"
+  - "publication authority"
+  - "certification"
+  - "attestation"
+  - "proof of compliance"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
+related_scripts:
+  - scripts/naos_failure_mode_observations.py
+  - scripts/naos_control_plane_review.py
+  - scripts/naos_learning_loop_review.py
+  - scripts/naos_evidence_export.py
+  - scripts/naos_sarif_export.py
+  - scripts/naos_gate_status.py
+  - scripts/workflows/generate_naos_dashboard.py
+related_schemas:
+  - schemas/naos/failure_mode_observations.schema.json
+  - schemas/naos/control_plane_review.schema.json
+  - schemas/naos/learning_loop_review.schema.json
+  - schemas/naos/gate_status.schema.json
+  - schemas/naos/gate_evaluation.schema.json

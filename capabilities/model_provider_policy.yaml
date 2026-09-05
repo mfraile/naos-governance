@@ -1,0 +1,131 @@
+id: CAP-MODEL-PROVIDER-POLICY
+name: Model Provider Policy
+description: >
+  Provides a deterministic declaration-review report for model roles, optional
+  mixed-tool model and reasoning-effort bindings, provider kind, alias posture, cost/data posture,
+  and disabled-by-default runtime posture without calling providers, models,
+  APIs, proxies, local servers, MCP, or memory tools.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Optional declaration review only; no provider/model runtime is enabled."
+  lite:
+    target_maturity: L0
+    enforcement: warning
+    notes: "Warn on declaration drift while keeping model governance lightweight."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Review central model-role declarations before relying on model-backed or provider-specific posture."
+  assured:
+    target_maturity: L1
+    enforcement: required
+    notes: "Review central declarations; blocking is reserved for unsafe declaration states such as secrets or runtime escalation."
+authority:
+  may_read:
+    - naos/model_provider_policy.yaml
+    - naos/llm_grader_readiness_rules.yaml
+    - configs/naos_autoresearch.yaml
+    - .github/configs/naos_autoresearch.yaml
+    - .github/agents/*.agent.md
+    - templates/agents/*.agent.md
+  may_write:
+    - naos/reports/model_provider_policy.json
+  may_block:
+    - "only through configured deterministic policy when declarations attempt literal secrets, runtime/provider calls, approval, certification, compliance proof, maturity promotion, or unsafe assured alias posture"
+allowed_resources:
+  - "repo-local model-provider policy declarations"
+  - "repo-local agent frontmatter"
+  - "repo-local optional tool-model binding declarations"
+  - "dated proposal-only Codex, Claude Code, Cursor, GitHub Copilot CLI, and OpenCode projection metadata"
+  - "repo-local future-readiness metadata"
+  - "repo-local policy metadata"
+prohibited_resources:
+  - "provider SDKs, provider credentials, external network calls, API credentials, or credential validation"
+  - "local model startup, proxy startup, model downloads, or runtime route execution"
+  - "MCP/Engram calls by this capability, memory tools, private memory payload reads, or memory write-back"
+  - "model-quality benchmarking, pricing catalogs, provider availability probes, or model recommendations"
+constraints:
+  - "Must remain declaration-only and disabled for runtime behavior by default."
+  - "Must not call models, providers, APIs, local servers, proxies, MCP, or memory tools."
+  - "Must not inspect, mutate, enable, disable, or configure MCP/Engram; memory/MCP posture remains governed by the dedicated memory commands and reports."
+  - "Must not read, validate, print, or require secrets; policy may declare environment variable names only."
+  - "Must preserve host-tool model strings in agent frontmatter; optional NAOS model roles are review metadata."
+  - "Must treat tool-model bindings as central review metadata only; they must not rewrite IDE, CLI, MCP, provider, memory, or runtime configuration."
+  - "Must surface cross-tool model/reasoning-effort/provider/cost/data drift as human-review evidence when multiple AI tools declare materially different bindings for the same role without rationale."
+  - "Must treat client-specific model/effort fields as dated declaration contracts; unsupported clients must block selection and supported projections must never claim effective runtime use."
+  - "Must treat aliases, latest, preview, and experimental model posture as review input, not model-quality proof."
+  - "Must not claim hallucination prevention, semantic correctness proof, behavioral safety proof, legal/compliance/regulatory assurance, approval, certification, attestation, maturity promotion, release authority, or publication authority."
+required_evidence:
+  - naos/model_provider_policy.yaml
+  - naos/reports/model_provider_policy.json
+validators:
+  - id: naos_model_provider_policy
+    script: scripts/naos_model_provider_policy.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - model_provider_policy.status
+  - model_provider_policy.runtime_enabled
+  - model_provider_policy.provider_calls_allowed
+  - model_provider_policy.credentials_allowed_in_repo
+  - model_provider_policy.human_review_required
+  - model_provider_policy.tool_binding_counts
+  - model_provider_policy.agent_role_coverage
+maturity_path:
+  L0: "Policy seed, schema, and report runner exist; runtime remains disabled."
+  L1: "Report surfaces agent role references, optional tool-model bindings, cost/data posture, alias posture, obvious literal secrets, cross-tool drift, runtime escalation, and advisory-boundary findings."
+  L2: "Control-plane review may route local model-provider report findings into bounded human-review evidence without provider calls or runtime activation."
+  L3: "Assured blocking posture may be validated for unsafe declarations only after adopter maturity evidence supports it."
+  L4: "Projects maintain reviewed role and per-tool provider/model/version/cost/data-exposure metadata before any future advisory model use."
+  L5: "Future runtime provider routing, if ever approved, remains separate from this declaration policy."
+known_limitations:
+  - "The report does not prove provider availability, model quality, model safety, price accuracy, regional availability, or runtime behavior."
+  - "The report detects only obvious literal secret-like values in declared policy files."
+  - "Provider model IDs, aliases, lifecycle status, feature support, and pricing are time-sensitive."
+  - "Tool bindings do not prove the adopter's IDE, CLI, or provider runtime is actually configured that way."
+  - "Cursor currently has no supported repository-local CLI model-and-effort projection in the dated contract and therefore cannot be selected by the optional planner."
+  - "The report does not activate LLMGrader, autoresearch provider grading, behavioral scoring, semantic evidence, or telemetry."
+  - "Control-plane routing does not inspect or alter MCP/Engram configuration."
+not_claimed:
+  - "provider call"
+  - "local model call"
+  - "cloud API call"
+  - "SDK dependency"
+  - "network probe"
+  - "proxy startup"
+  - "credential validation"
+  - "runtime model routing"
+  - "model quality guarantee"
+  - "hallucination prevention"
+  - "semantic correctness proof"
+  - "behavioral safety proof"
+  - "legal/compliance/regulatory conclusion"
+  - "certification"
+  - "approval"
+  - "attestation"
+  - "maturity promotion"
+  - "release authority"
+  - "publication authority"
+related_docs:
+  - README.md
+  - docs/CONTROL_PLANE.md
+  - NAOS_CATALOG.md
+  - KNOWN_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_model_provider_policy.py
+  - scripts/naos_ai_component_inventory.py
+  - scripts/naos_agent_orchestration_plan.py
+  - scripts/naos_control_plane_review.py
+related_schemas:
+  - schemas/naos/model_provider_policy.schema.json
+  - schemas/naos/ai_component_inventory.schema.json
+  - schemas/naos/control_plane_review.schema.json

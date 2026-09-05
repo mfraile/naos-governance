@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_plan:v1",
+  "title": "NAOS Repository Intelligence Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "created_at", "status", "plan_id", "plan_sha256", "control", "bundle", "findings", "effectiveness_hypothesis", "limitations", "not_claimed", "human_review_required"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.plan.v1"},
+    "created_at": {"type": "string"},
+    "status": {"enum": ["confirmation_required", "enrollment_required", "not_applicable", "blocked_prerequisite"]},
+    "plan_id": {"type": "string", "pattern": "^RI-[0-9a-f]{16}$"},
+    "plan_sha256": {"$ref": "#/$defs/sha256"},
+    "plan_file": {"type": "string"},
+    "control": {
+      "type": "object",
+      "required": ["capability_id", "project_root", "profile", "purpose", "component_mode", "relationship_questions", "naos_root", "effective_source_sha256", "source_inventory", "rules", "runtime", "implementation", "provenance_gate", "maturity", "components", "graph_model_sha256", "generation_id", "generation_content_sha256", "bundle_sha256", "coverage", "ongoing_use_scope", "profile_gate", "apply_allowed", "generation_layout", "invalidated_by", "not_claimed"],
+      "properties": {
+        "capability_id": {"const": "CAP-LOCAL-CONTEXT-INDEX"},
+        "project_root": {"type": "string"},
+        "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+        "purpose": {"enum": ["brownfield-onboarding", "ongoing-change-impact", "task-context"]},
+        "component_mode": {"enum": ["auto", "baseline", "graph"]},
+        "relationship_questions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "naos_root": {"type": "string", "minLength": 1},
+        "effective_source_sha256": {"$ref": "#/$defs/sha256"},
+        "source_inventory": {"type": "array"},
+        "rules": {"type": "object"},
+        "runtime": {"type": "object"},
+        "implementation": {"type": "object"},
+        "provenance_gate": {"type": "object"},
+        "maturity": {"type": "object"},
+        "components": {"type": "object"},
+        "graph_model_sha256": {"$ref": "#/$defs/sha256"},
+        "generation_id": {"type": "string", "pattern": "^RI-[0-9a-f]{24}$"},
+        "generation_content_sha256": {"$ref": "#/$defs/sha256"},
+        "bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "coverage": {"type": "object"},
+        "ongoing_use_scope": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "profile_gate": {"type": "object"},
+        "apply_allowed": {"type": "boolean"},
+        "generation_layout": {"type": "object"},
+        "invalidated_by": {"type": "array", "items": {"type": "string"}},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "path", "generation_id", "generation_content_sha256", "files", "validation", "generated_state_only", "bundle_sha256"],
+      "properties": {
+        "schema": {"const": "naos.repository_intelligence.plan_bundle.v1"},
+        "path": {"type": "string", "minLength": 1},
+        "generation_id": {"type": "string", "pattern": "^RI-[0-9a-f]{24}$"},
+        "generation_content_sha256": {"$ref": "#/$defs/sha256"},
+        "files": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/file_record"}
+        },
+        "validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "sqlite_fts", "networkx_graphml", "source_revalidated", "exact_bytes_ready_for_activation", "provenance_valid"],
+          "properties": {
+            "status": {"enum": ["validated", "diagnostic_only"]},
+            "sqlite_fts": {"type": "object"},
+            "networkx_graphml": {"type": "object"},
+            "source_revalidated": {"const": true},
+            "exact_bytes_ready_for_activation": {"type": "boolean"},
+            "provenance_valid": {"type": "boolean"}
+          }
+        },
+        "generated_state_only": {"const": true},
+        "bundle_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "effectiveness_hypothesis": {"type": "object"},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "file_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes"],
+      "properties": {
+        "path": {"enum": ["inventory.json", "repository_intelligence_rules.yaml", "local_context_index.sqlite", "context.graphml", "validation_receipt.json", "manifest.json"]},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size_bytes": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

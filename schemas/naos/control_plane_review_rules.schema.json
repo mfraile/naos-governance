@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:control_plane_review_rules:v1",
+  "title": "NAOS Control-Plane Review Rules",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "version",
+    "semantics",
+    "enabled",
+    "source_types",
+    "target_surfaces",
+    "governed_surface_families",
+    "required_item_fields",
+    "allowed_dispositions",
+    "profile_severity_behavior",
+    "human_review_required",
+    "waiver_handling",
+    "limitations"
+  ],
+  "properties": {
+    "version": {"type": "string"},
+    "semantics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "enabled": {"type": "boolean"},
+    "items_file": {"type": "string"},
+    "source_types": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "target_surfaces": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "governed_surface_families": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/surface_family"}
+    },
+    "expected_routing_targets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"type": "string"}
+      }
+    },
+    "required_item_fields": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "allowed_dispositions": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "freshness_window_days": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "profile_severity_behavior": {
+      "type": "object",
+      "required": ["quickstart", "lite", "standard", "assured"],
+      "properties": {
+        "quickstart": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "lite": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "standard": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "assured": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]}
+      }
+    },
+    "human_review_required": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "waiver_handling": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "ignored_source_patterns": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "surface_family": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["family_id", "name", "enabled", "target_surfaces"],
+      "properties": {
+        "family_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "name": {"type": "string"},
+        "enabled": {"type": "boolean"},
+        "file_patterns": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "target_surfaces": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "severity_by_profile": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["none", "advisory", "warning", "required", "blocking"]
+          }
+        },
+        "human_review_required": {"type": "boolean"},
+        "rationale": {"type": "string"},
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

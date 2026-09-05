@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:systemic_impact_rules:v1",
+  "title": "NAOS Systemic Impact Rules",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "version",
+    "semantics",
+    "review_surfaces",
+    "changed_path_routing",
+    "artifact_families"
+  ],
+  "properties": {
+    "version": {"type": "string"},
+    "semantics": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "state": {"type": "string"},
+        "report": {"type": "string"},
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "freshness_window_days": {"type": "integer", "minimum": 0},
+        "severity_by_profile": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["none", "advisory", "warning", "required", "blocking"]
+          }
+        }
+      }
+    },
+    "artifact_families": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/artifact_family"}
+    },
+    "review_surfaces": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/review_surface"}
+    },
+    "changed_path_routing": {
+      "$ref": "#/$defs/changed_path_routing"
+    }
+  },
+  "$defs": {
+    "review_surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface_id", "name", "kind", "description"],
+      "properties": {
+        "surface_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "name": {"type": "string", "minLength": 1},
+        "kind": {
+          "type": "string",
+          "enum": [
+            "artifact_review",
+            "decision",
+            "boundary",
+            "evidence",
+            "integration",
+            "operation"
+          ]
+        },
+        "description": {"type": "string", "minLength": 1}
+      }
+    },
+    "changed_path_routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantics",
+        "governed_patterns",
+        "exclusions",
+        "routing_families"
+      ],
+      "properties": {
+        "semantics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kit_source", "adopter_generated", "not_claimed"],
+          "properties": {
+            "kit_source": {"type": "string"},
+            "adopter_generated": {"type": "string"},
+            "not_claimed": {"type": "string"}
+          }
+        },
+        "governed_patterns": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["patterns", "reason"],
+            "properties": {
+              "patterns": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 1
+              },
+              "reason": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "routing_families": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/routing_family"},
+          "minItems": 1
+        }
+      }
+    },
+    "routing_family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route_id",
+        "name",
+        "source_patterns",
+        "generated_patterns",
+        "review_triggers",
+        "targets"
+      ],
+      "properties": {
+        "route_id": {
+          "type": "string",
+          "pattern": "^route_[a-z0-9_]+$"
+        },
+        "name": {"type": "string", "minLength": 1},
+        "source_patterns": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "generated_patterns": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "review_triggers": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1
+        },
+        "targets": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1
+        },
+        "required_review_outputs": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "artifact_family": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["family_id", "name", "enabled", "file_patterns"],
+      "properties": {
+        "family_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "name": {"type": "string"},
+        "enabled": {"type": "boolean"},
+        "file_patterns": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "minimum_expected": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "related_families": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "review_triggers": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "impact_targets": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "required_review_outputs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "severity_by_profile": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["none", "advisory", "warning", "required", "blocking"]
+          }
+        },
+        "default_severity": {
+          "type": "string",
+          "enum": ["none", "advisory", "warning", "required", "blocking"]
+        },
+        "freshness_window_days": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "human_review_required": {"type": "boolean"},
+        "notes": {"type": "string"},
+        "rationale": {"type": "string"},
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "waivers": {
+          "type": "array",
+          "items": {"type": "object"}
+        }
+      }
+    }
+  }
+}

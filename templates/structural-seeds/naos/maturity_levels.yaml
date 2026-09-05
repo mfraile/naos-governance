@@ -1,0 +1,60 @@
+version: "1.0"
+description: >
+  NAOS capability maturity model for adopter projects. The kit ships the full
+  framework; projects activate and mature capabilities progressively through
+  profiles, readiness gates, and evidence.
+
+levels:
+  - id: L0
+    name: Scaffolded
+    description: "Capability exists in the kit as files, templates, schemas, or docs."
+    evidence_expectation: "Capability contract or template is present."
+  - id: L1
+    name: Configured
+    description: "Project has selected a profile and configured the capability."
+    evidence_expectation: "Profile policy and capability configuration are present."
+  - id: L2
+    name: Operational
+    description: "Capability runs and produces evidence."
+    evidence_expectation: "Validator or workflow output exists."
+  - id: L3
+    name: Enforced
+    description: "Gatekeeper warns or blocks based on profile severity."
+    evidence_expectation: "Gatekeeper status or evaluation output exists."
+  - id: L4
+    name: Measured
+    description: "Dashboard tracks maturity, exceptions, drift, and trends."
+    evidence_expectation: "Dashboard includes current capability signals."
+  - id: L5
+    name: Assured
+    description: "Evidence is complete enough for regulated or audit-style review."
+    evidence_expectation: "Evidence pack contains complete supporting artifacts."
+
+profiles:
+  quickstart:
+    default_target_maturity: L0
+    default_enforcement: advisory
+    description: "Scaffold/advisory only; no blocking advanced gates."
+  lite:
+    default_target_maturity: L1
+    default_enforcement: warning
+    description: "Warnings and lightweight checks with minimal evidence expectations."
+  standard:
+    default_target_maturity: L2
+    default_enforcement: required
+    description: "Required evidence for normal SDLC work and stronger gate expectations."
+  assured:
+    default_target_maturity: L3
+    default_enforcement: blocking
+    description: "Blocking gates where appropriate, evidence packs, exception approvals, and audit-style evidence."
+
+status_values:
+  shipped: "Available in the kit or generated project."
+  configured: "Selected and configured by the adopting project."
+  operational: "Runs and produces evidence."
+  enforced: "Gatekeeper applies profile severity."
+  measured: "Dashboard tracks the capability."
+  assured: "Evidence is complete enough for audit-style review."
+  experimental: "Scaffolded and advisory unless explicitly configured."
+  not_configured: "Available but not activated in this project."
+  not_applicable: "Outside the selected profile or project scope."

@@ -1,0 +1,137 @@
+version: "1.0"
+enabled: true
+state: readiness_only
+semantics:
+  state: "Rules declare how candidate learnings become reviewed active guidance or inactive history."
+  report: "NAOS evaluates governed learning lifecycle metadata only."
+  governance_boundary: "Learning records support review and continuity; they do not write memory, mutate skills/prompts/gates, approve work, or replace repository evidence."
+  flow: "capture -> verify -> consolidate -> consult -> act -> supersede/deprecate/archive/reject/redact"
+
+lifecycle_states:
+  - candidate
+  - verified
+  - active
+  - superseded
+  - deprecated
+  - archived
+  - rejected
+  - redacted
+
+learning_types:
+  - fact
+  - rule
+  - failure_mode
+  - anti_pattern
+  - skill_update
+  - prompt_update
+  - workflow_update
+  - baseline_update
+  - gate_policy_update
+
+retrieval_policies:
+  active:
+    allowed_for: [active]
+    meaning: "May guide work within declared scope after review."
+  gated:
+    allowed_for: [active]
+    meaning: "May guide work only after task-specific human confirmation."
+  suppressed:
+    allowed_for: [candidate, verified, rejected, deprecated, superseded, archived]
+    meaning: "Visible for review but not current guidance."
+  archive_only:
+    allowed_for: [superseded, deprecated, archived, rejected, redacted]
+    meaning: "Audit history only; never current instruction."
+
+promotion_policy:
+  candidate_records_are_proposal_only: true
+  active_records_require_human_approval: true
+  repository_evidence_remains_authoritative: true
+  high_authority_types_require_promotion_review:
+    - skill_update
+    - prompt_update
+    - workflow_update
+    - baseline_update
+    - gate_policy_update
+  promotion_review_required_fields:
+    - approved_by
+    - approved_at
+    - target_artifacts
+  active_required_fields:
+    - id
+    - type
+    - status
+    - scope
+    - evidence_refs
+    - source_session
+    - verified_by
+    - approved_by
+    - review_after
+    - risk
+    - retrieval_policy
+    - limitations
+
+forgetting_policy:
+  supported_actions:
+    - supersede
+    - deprecate
+    - archive
+    - reject
+    - redact
+    - rollback
+  superseded_requires_replaced_by: true
+  deprecated_requires_reason_and_review_path: true
+  redacted_keeps_safe_audit_metadata_only: true
+  inactive_records_are_not_current_guidance: true
+
+integration_policy:
+  session_lifecycle_may_propose_candidates: true
+  session_lifecycle_may_activate_learnings: false
+  failure_mode_observations_may_inform_review_scoping: true
+  failure_mode_observations_may_write_learning_records: false
+  autoresearch_may_create_candidate_findings: true
+  autoresearch_may_auto_tune_thresholds: false
+  ai_surface_budget_required_for_ai_surface_learning_changes: true
+  engram_is_optional_advisory_recall_only: true
+  durable_memory_write_back_enabled: false
+  provider_api_calls_enabled: false
+  llm_calls_enabled: false
+  mcp_calls_enabled: false
+
+profile_posture:
+  quickstart:
+    state: advisory
+    severity: advisory
+    human_review_required_for_active_learning: false
+  lite:
+    state: readiness_only
+    severity: warning
+    human_review_required_for_active_learning: false
+  standard:
+    state: readiness_only
+    severity: required
+    human_review_required_for_active_learning: true
+  assured:
+    state: readiness_only
+    severity: blocking
+    human_review_required_for_active_learning: true
+
+known_gaps: []
+residual_risks:
+  - id: RISK-LEARNING-001
+    description: "Validated learning metadata can still be semantically wrong; human review remains required before durable action."
+waivers: []
+limitations:
+  - "This control validates lifecycle metadata and evidence references, not semantic truth."
+  - "It does not call models, providers, MCP, Engram, or memory tools."
+  - "It does not automatically edit skills, prompts, workflows, baselines, gates, or maturity state."
+  - "Failure-mode observation statistics may focus human learning-loop review, but they do not create learning records automatically."
+not_claimed:
+  - "self-learning model weights"
+  - "hallucination prevention"
+  - "automatic memory write-back"
+  - "automatic context injection"
+  - "automatic skill promotion"
+  - "automatic learning from failure-mode observations"
+  - "approval"
+  - "certification"
+  - "proof of compliance"

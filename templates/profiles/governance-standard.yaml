@@ -1,0 +1,285 @@
+# NAOS Profile Preset: governance-standard
+# Created: 2026-03-19
+#
+# Target: Team project, standard software delivery
+# Depth: full-workflow — rules + agents + traceability + task registry
+#
+# REFERENCE document only — does NOT modify live project files.
+# Use the NAOS CLI to extract and adapt these components for a new project.
+
+---
+
+id: governance-standard
+name: "Governance Standard"
+depth: full-workflow
+target: "Small team (2-8 engineers), standard SaaS/backend project, 3-18 month horizon"
+description: >
+  Full governance workflow. Includes all portable rules, all agents, traceability
+  matrix, and task registry. Enables structured sprint planning, AI-assisted
+  code review, and duplicate-hygiene evidence. Designed for teams that want
+  AI governance without the overhead of behavioral evaluator infrastructure.
+  Profile-selection guidance: consider governance-assured when stronger
+  governance evidence, audit trails, or regulated-industry review support are
+  needed; existing-project apply is not currently available.
+
+# Rules included (Tier 1 + Tier 2 — all GENERIC rules)
+rules:
+  active_rule_ids: [1, 2, 5, 6, 7, 8, 9, 10, 11, 13, 14, 18, 19, 20, 21, 22, 24, 25, 26]
+  included:
+    # Tier 1 core
+    - id: RULES-01
+      name: "Update Existing Files"
+    - id: RULES-02
+      name: "No Archive Folders"
+    - id: RULES-05
+      name: "Exploration Notes Only"
+    - id: RULES-06
+      name: "Refresh README Before Push"
+    - id: RULES-07
+      name: "Deep Analysis Protocol"
+    - id: RULES-08
+      name: "Bulk Code Migration Safety Protocol"
+    - id: RULES-09
+      name: "Ultra Deep Analysis for Enhancements"
+    - id: RULES-10
+      name: "License Compliance"
+    - id: RULES-11
+      name: "Anti-Duplication Protocol"
+    # Tier 2 quality
+    - id: RULES-13
+      name: "Resilience & Retry Conventions"
+    - id: RULES-14
+      name: "Event Schema Evolution Protocol"
+    - id: RULES-18
+      name: "Agent & Skill Governance"
+    - id: RULES-19
+      name: "Memory Governance Protocol"
+    - id: RULES-20
+      name: "Dependency Declaration"
+    - id: RULES-21
+      name: "ML Model Governance"
+    - id: RULES-22
+      name: "Artifact & Resource Management"
+    - id: RULES-24
+      name: "WI Context Brief Protocol"
+    - id: RULES-25
+      name: "Instinct Recording Protocol"
+    - id: RULES-26
+      name: "Cognitive Checkpoint Protocol"
+  excluded:
+    - id: RULES-03
+      reason: "hardcodes source-project PM file names (naos/PROJECT_STATUS.md, etc.)"
+    - id: RULES-04
+      reason: "hardcodes source-project doc table (10 specs, 3 PM files)"
+    - id: RULES-12
+      reason: "source-project-specific: dual-schema architecture, domain enums"
+    - id: RULES-15
+      reason: "source-project-specific: bounded contexts, multi-stream architecture"
+    - id: RULES-16
+      reason: "source-project-specific: Implements: FR-XXX format, TASK_REGISTRY validation"
+    - id: RULES-17
+      reason: "source-project-specific: function_index_query.py plus optional project-configured similarity evidence"
+    - id: RULES-23
+      reason: "source-project-specific: F-XXXXXX hash IDs, MASTER_INVENTORY.md"
+  adaptation_notes:
+    - "Rules 03,04: replace with project-equivalent PM file names"
+    - "Rules 16,17: replace with project-equivalent function search tooling"
+    - "Rule 23: adopt ID header pattern but use project-specific registry"
+
+# Skills included (all portable skills)
+skills:
+  included:
+    - id: cookbook-python
+      path: ".github/skills/cookbook-python/SKILL.md"
+    - id: cookbook-tests
+      path: ".github/skills/cookbook-tests/SKILL.md"
+    - id: cookbook-docker
+      path: ".github/skills/cookbook-docker/SKILL.md"
+    - id: cookbook-frontend
+      path: ".github/skills/cookbook-frontend/SKILL.md"
+    - id: cookbook-configs
+      path: ".github/skills/cookbook-configs/SKILL.md"
+    - id: cookbook-ui
+      path: ".github/skills/cookbook-ui/SKILL.md"
+    - id: debug
+      path: ".github/skills/debug/SKILL.md"
+    - id: function-discovery
+      path: ".github/skills/function-discovery/SKILL.md"
+  excluded:
+    - id: cookbook-governance
+      reason: "Invokes source-project-specific governance scripts and file paths"
+    - id: gov-refresh
+      reason: "Calls make -f Makefile.naos gov-refresh which is source-project-specific"
+    - id: cookbook-migrations
+      reason: "Uses project-specific migration/DB patterns — review and adapt before use"
+    - id: cookbook-neo4j
+      reason: "Contains project-specific graph node names and tenant patterns — adapt to your schema before use"
+    - id: spec-extract
+      reason: "Calls scripts/naos_extract_spec_section.py — source-project-specific"
+
+# Agents included (all 7 generated agents)
+agents:
+  included:
+    - id: plan
+      path: ".github/agents/naos-plan.agent.md"
+    - id: implement
+      path: ".github/agents/naos-implement.agent.md"
+    - id: review
+      path: ".github/agents/naos-review.agent.md"
+    - id: debug
+      path: ".github/agents/naos-debug.agent.md"
+    - id: triage
+      path: ".github/agents/naos-triage.agent.md"
+    - id: conformance
+      path: ".github/agents/naos-conformance.agent.md"
+    - id: research
+      path: ".github/agents/naos-research.agent.md"
+  adaptation_notes:
+    - "Remove source-project-specific references (naos/TASK_REGISTRY.yaml, domain schemas, etc.)"
+    - "Replace with project-equivalent PM tooling references"
+
+# Scripts included
+scripts:
+  included:
+    - id: code_quality_audit
+      path: "scripts/naos_code_quality_audit.py"
+      rationale: "Function index generation — portable after removing source-project-specific paths"
+      adaptation: "Update hardcoded src/ paths to match project structure"
+    - id: function_index_query
+      path: "scripts/naos_function_index_query.py"
+      rationale: "Function-index query; exact search is baseline and similarity evidence is optional and project-configured"
+      adaptation: "Minimal: update package paths"
+  excluded:
+    - reason: "generate_naos_dashboard.py, validate_truth.py: source-project PM infra"
+    - reason: "extract_spec_section.py: references source-project specs/ structure"
+    - reason: "generate_inventory.py: tied to F-XXXXXX hash ID system"
+
+# Configs included
+configs:
+  included:
+    - id: features
+      path: "configs/features.yaml"
+    - id: architecture_boundaries
+      path: "configs/naos_architecture_boundaries.yaml"
+      adaptation: "Update module names to match project structure"
+  excluded:
+    - reason: "ai_models.yaml, thresholds.yaml, event_bus.yaml: source-project-specific"
+
+# Features enabled
+features:
+  pre_commit_hooks: true
+  task_registry: true
+  traceability_matrix: true
+  behavioral_testing: false
+  instinct_recording: false
+  drift_checks: false
+  profile_autoresearch: false
+  capability_framework: operational
+
+capabilities:
+  default_target_maturity: L2
+  default_enforcement: required
+  activated_by_default:
+    - CAP-CLAIMS-VALIDATION
+    - CAP-SELF-CONFORMANCE
+    - CAP-ROADMAP-CROSSWALK-VALIDATION
+    - CAP-FUNCTION-INDEX-HEALTH
+    - CAP-TEST-EVIDENCE
+    - CAP-GATEKEEPER-MANIFEST
+  required_evidence:
+    - CAP-CLAIMS-VALIDATION
+    - CAP-SELF-CONFORMANCE
+    - CAP-ROADMAP-CROSSWALK-VALIDATION
+    - CAP-FUNCTION-INDEX-HEALTH
+    - CAP-TEST-EVIDENCE
+  advisory_only:
+    - CAP-EVIDENCE-PACK
+  experimental_not_activated:
+    - CAP-RUNTIME-HANDOFF
+    - CAP-STRUCTURED-SUBSTRATE
+    - CAP-SOURCE-TEST-GRAPH
+    - CAP-DIGITAL-TWIN-EVALUATION
+
+gate_policy:
+  default_severity: required
+  allow_blocking: false
+  require_evidence_pack: false
+  require_exception_approval: false
+  gates:
+    G0: required
+    G1: required
+    G2: required
+    G3: required
+    G4: required
+    G5: required
+    G6: required
+    G7: advisory
+    G8: advisory
+
+# Setup effort
+setup:
+  effort_basis: "Project-dependent; record actual install and validation receipts rather than using a kit-wide estimate."
+  prerequisites:
+    - "VS Code with GitHub Copilot or Claude Code"
+    - "Python project (main skills target Python; frontend skills target Next.js/React)"
+    - "Git repository with pre-commit framework available"
+  steps:
+    - "Copy .github/agents/ (all 7 generated agents plus index and handoff template)"
+    - "Copy .github/skills/ (portable skills listed above)"
+    - "Create .github/copilot-instructions.md with all included rules"
+    - "Adapt configs/naos_architecture_boundaries.yaml with project module names"
+    - "Set up task registry (naos/TASK_REGISTRY.yaml equivalent)"
+    - "Configure pre-commit hooks (file-proliferation, duplicate detection)"
+    - "Run function discovery scripts to build initial FUNCTION_INDEX"
+
+notes: >
+  Select governance-assured instead when: a stronger configured evidence trail is required, compliance
+  evidence must be produced, behavioral drift checking is needed, or the
+  project is in a regulated industry (healthcare, finance, legal). This is a
+  purpose choice, not compulsory progression or proof of maturity.
+
+# ─── Context Phase Injection (fresh-context-per-task principle) ───────────────
+# For each SDLC phase, only the listed files should be injected into the AI
+# agent's context. Excluding irrelevant files prevents context pollution and
+# drift across tasks.
+# [ADAPT] Adjust paths to match your project structure.
+# ─────────────────────────────────────────────────────────────────────────────
+context_phases:
+  plan:
+    inject:
+      - .github/copilot-instructions.md
+      - .ai/RULES.md
+      - naos/active/            # [ADAPT] Active task cards
+      - naos/TASK_REGISTRY.yaml # [ADAPT] Task registry for context
+    exclude:
+      - .github/skills/         # Skills not needed in planning
+      - src/                    # [ADAPT] Source code not needed for planning
+    rationale: "Planning needs task context and governance rules"
+
+  implement:
+    inject:
+      - .github/copilot-instructions.md
+      - naos/active/            # [ADAPT] Active task card
+      - .github/skills/         # Cookbook skills for implementation
+    exclude:
+      - naos/DASHBOARD.md       # Dashboard is output, not input
+      - specs/                  # [ADAPT] Spec files add noise during coding
+    rationale: "Implementation needs task card + cookbook skills"
+
+  review:
+    inject:
+      - .github/copilot-instructions.md
+      - .ai/RULES.md
+    exclude:
+      - naos/active/            # Task details not needed for code review
+      - .github/skills/         # Skills are reference, not review criteria
+    rationale: "Review needs governance standards only"
+
+  commit:
+    inject:
+      - .github/copilot-instructions.md
+      - .github/prompts/naos-d-commit.prompt.md  # [ADAPT] Commit prompt
+    exclude:
+      - specs/
+      - naos/active/
+    rationale: "Commit: conventions and commit prompt only"

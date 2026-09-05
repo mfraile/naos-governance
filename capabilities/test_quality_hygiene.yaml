@@ -1,0 +1,76 @@
+id: CAP-TEST-QUALITY-HYGIENE
+name: Test Quality Hygiene
+description: >
+  Detects test functions with missing or trivial assertion evidence so
+  test-evidence claims remain bounded and reviewable.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Advisory test-quality hygiene only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns on tests with no recognized assertion evidence."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Test-quality hygiene report is expected for governed test evidence."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured test-quality findings can block until reviewed."
+authority:
+  may_read:
+    - tests/
+    - naos/test_quality_hygiene_rules.yaml
+  may_write:
+    - naos/reports/test_quality_hygiene.json
+allowed_resources:
+  - "repo-local Python tests"
+prohibited_resources:
+  - "test execution"
+  - "coverage SaaS"
+  - "model/provider/API calls"
+constraints:
+  - "Must inspect test source structure only."
+  - "Must not claim assertion presence proves correctness."
+  - "Must preserve human review for test sufficiency decisions."
+required_evidence:
+  - "naos/reports/test_quality_hygiene.json"
+validators:
+  - id: test_quality_hygiene
+    script: scripts/naos_test_quality_hygiene.py
+    status: available
+gatekeepers:
+  - G5
+dashboard_signals:
+  - "test_quality_hygiene.status"
+  - "test_quality_hygiene.missing_assertions"
+  - "test_quality_hygiene.trivial_assertions"
+maturity_path:
+  L0: "Capability contract and rules seed exist."
+  L1: "Report can be generated from local test files."
+  L2: "Report is wired into G5 and evidence surfaces."
+  L3: "Profile severity and reviewed waivers are applied."
+  L4: "Dashboard/SARIF summarize test-quality posture."
+  L5: "Test-quality posture is included in release gates."
+known_limitations:
+  - "Assertion presence does not prove meaningful behavioral coverage."
+  - "Dynamic assertion helpers may require adopter-local allowlist tuning."
+not_claimed:
+  - "behavioral correctness proof"
+  - "complete test coverage"
+  - "meaningful assertion proof"
+  - "runtime safety proof"
+  - "approval"
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_test_quality_hygiene.py

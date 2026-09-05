@@ -1,0 +1,70 @@
+schema: naos.package_reality_rules.v1
+scan_docs_by_default: false
+require_lockfile_entries: true
+manifest_files:
+  - pyproject.toml
+  - requirements.txt
+  - requirements/*.txt
+lock_files:
+  - requirements.txt
+  - requirements/*.txt
+  - poetry.lock
+  - uv.lock
+  - Pipfile.lock
+docs_roots:
+  - README.md
+  - docs
+  - INSTALLATION_MANUAL.md
+sbom_files:
+  - bom.json
+  - "*.cdx.json"
+  - sbom/*.json
+  - sbom/*.cdx.json
+provenance_files:
+  - naos/package_reality_provenance.yaml
+exclude_dirs:
+  - .git
+  - .venv
+  - venv
+  - node_modules
+  - dist
+  - build
+  - __pycache__
+  - dev
+allowlisted_packages: []
+known_packages:
+  - beautifulsoup4
+  - click
+  - django
+  - fastapi
+  - flask
+  - httpx
+  - jinja2
+  - jsonschema
+  - numpy
+  - pandas
+  - pillow
+  - pydantic
+  - pytest
+  - python-dotenv
+  - pyyaml
+  - requests
+  - scikit-learn
+  - sqlalchemy
+  - typer
+  - uvicorn
+typo_distance_threshold: 1
+require_declared_packages_in_sbom: false
+limitations:
+  - "Offline package-reality review cannot confirm registry existence."
+  - "Online registry checks require explicit operator consent and remain review evidence only."
+  - "Local SBOM and package provenance inputs are optional review evidence and do not prove complete inventory, authenticity, or supply-chain safety."
+not_claimed:
+  - "package safety proof"
+  - "malware detection"
+  - "vulnerability scanning"
+  - "supply-chain assurance"
+  - "registry trust proof"
+  - "SBOM completeness proof"
+  - "provenance authenticity proof"
+  - "hash attestation proof"

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:ai_artifact_inventory:v1",
+  "title": "NAOS AI Artifact Inventory Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "generated_at", "profile", "status", "command", "mode", "naos_root", "project_root", "human_review_required", "not_claimed", "limitations", "findings", "summary", "artifacts"],
+  "properties": {
+    "schema": {"const": "naos.ai_artifact_inventory.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
+    "command": {"const": "ai-artifact-inventory"},
+    "mode": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "session_id": {"type": ["string", "null"]},
+    "generated_by": {"type": "object"},
+    "human_review_required": {"type": "boolean"},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array"},
+    "residual_risks": {"type": "array"},
+    "summary": {"type": "object"},
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["artifact_id", "artifact_type", "path", "classification", "classifications", "detected_owner", "detected_source", "status", "conflict_category", "conflict_reason", "compared_surface", "profile_impact", "recommended_decision", "decision_state", "human_review_required", "human_review_boundary", "non_claims"],
+        "properties": {
+          "artifact_id": {"type": "string"},
+          "artifact_type": {"type": "string"},
+          "path": {"type": "string"},
+          "classification": {"enum": ["NAOS-owned", "user-owned", "third-party", "unknown"]},
+          "classifications": {
+            "type": "array",
+            "items": {"enum": ["NAOS-owned", "user-owned", "third-party", "compatible", "conflicting", "stale", "unknown", "review_required"]}
+          },
+          "detected_owner": {"enum": ["NAOS-owned", "user-owned", "third-party", "unknown"]},
+          "detected_source": {"type": "string"},
+          "status": {"enum": ["compatible", "conflicting", "stale", "unknown", "review_required"]},
+          "conflict_category": {"type": "string"},
+          "conflict_reason": {"type": "string"},
+          "compared_surface": {"type": "string"},
+          "profile_impact": {"type": "string"},
+          "recommended_decision": {"enum": ["keep", "merge", "replace", "quarantine", "create", "review_required"]},
+          "decision_state": {"enum": ["keep", "merge", "replace", "quarantine", "create", "review_required"]},
+          "human_review_required": {"type": "boolean"},
+          "human_review_boundary": {"type": "string"},
+          "non_claims": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "artifact_counts": {"type": "object"},
+    "classification_counts": {"type": "object"},
+    "status_counts": {"type": "object"},
+    "conflict_counts": {"type": "object"}
+  }
+}

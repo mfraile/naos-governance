@@ -1,0 +1,31 @@
+{
+  "integration_id": "codex_plugin_adapter",
+  "name": "NAOS Codex Plugin Adapter",
+  "core_dependency": false,
+  "activation": "manual_review_required",
+  "canonical_source": "plugins/naos-governance",
+  "adopter_copy_destination": "naos/integrations/codex-plugin",
+  "writes_by_default": [],
+  "commands": [
+    "naos adapter-coherence --profile <profile>",
+    "naos self-check --profile <profile>",
+    "naos learning-loop-review --profile <profile>",
+    "naos ai-surface-budget --profile <profile>",
+    "naos systemic-impact --profile <profile>",
+    "naos control-plane-review --profile <profile>",
+    "naos failure-mode-observations --profile <profile>",
+    "naos opencode-config-hygiene --profile <profile>"
+  ],
+  "not_claimed": [
+    "live Codex plugin installation proof",
+    "MCP access proof",
+    "automatic hook activation",
+    "silent context injection",
+    "automatic memory write-back",
+    "provider/model/API calls",
+    "Codex marketplace mutation",
+    "approval",
+    "certification",
+    "proof of compliance"
+  ]
+}

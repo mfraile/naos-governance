@@ -1,0 +1,86 @@
+# NAOS Profile Preset Schema v1.0
+# Created: 2026-03-19
+#
+# Profile presets define depth levels for NAOS governance adoption.
+# They are REFERENCE documents — they do NOT modify live project files.
+# Extraction and packaging into a portable kit is handled by the NAOS CLI.
+#
+# Four depth levels:
+#   governance-quickstart — scaffold/advisory only, try NAOS with minimal friction
+#   governance-lite       — guardrails and lightweight warnings
+#   governance-standard   — full workflow for teams with required evidence
+#   governance-assured    — full + evidence packs and blocking gates where appropriate
+
+---
+
+# Schema definition for profile preset YAML files
+
+profile_schema:
+  version: "1.0"
+  required_fields:
+    - id           # Unique profile identifier (e.g., governance-lite)
+    - name         # Human-readable name
+    - depth        # One of: scaffold | guardrails | full-workflow | assured-evidence
+    - target       # Intended adopter description
+    - description  # One-paragraph purpose statement
+    - rules        # Subset of RULES.md rules included (RULES-XX format)
+    - skills       # Subset of .github/skills/* included
+    - agents       # Subset of .github/agents/*.agent.md included
+    - scripts      # Scripts included from scripts/ directory
+    - configs      # Config files included from configs/ directory
+    - features     # Named features/capabilities enabled at this depth
+    - capabilities # Capability activation defaults for this profile
+    - gate_policy  # Gate severity defaults for this profile
+
+  optional_fields:
+    - autoresearch # Autoresearch configuration (governance-assured only)
+    - instincts    # Instinct recording system (governance-assured only)
+    - ci_checks    # CI drift check configuration (governance-assured only)
+    - notes        # Implementation notes for adopters
+
+  depth_values:
+    scaffold:
+      description: "Scaffold/advisory only — visible framework, no blocking advanced gates"
+      min_rules: 5
+      requires_autoresearch: false
+    guardrails:
+      description: "Core rules and hooks with warnings — minimal friction, maximum safety"
+      min_rules: 9
+      requires_autoresearch: false
+    full-workflow:
+      description: "Complete governance workflow — rules, agents, traceability"
+      min_rules: 19
+      requires_autoresearch: false
+    assured-evidence:
+      description: "Everything in full-workflow plus behavioral governance readiness and instincts"
+      min_rules: 19  # same active rows as Standard; posture and PGR extensions differ
+      requires_autoresearch: true
+
+  rule_portability_levels:
+    tier_1_core:
+      # Rules 1,2,5,6,7 — portable methodology, zero project-specific refs
+      rules: [RULES-01, RULES-02, RULES-05, RULES-06, RULES-07]
+      description: "Portable core methodology; profile membership is defined by the canonical RULES source"
+    tier_2_quality:
+      # Rules 8,9,10,11,13,14,18,19,24 — methodology + governance tooling
+      rules: [RULES-08, RULES-09, RULES-10, RULES-11, RULES-13, RULES-14, RULES-18, RULES-19, RULES-24]
+      description: "Quality methodology and governance machinery; profile membership is defined by the canonical RULES source"
+    tier_3_advanced:
+      # Rules 20,21,22,23 — ML/model governance and file registration
+      rules: [RULES-20, RULES-21, RULES-22, RULES-23]
+      description: "Advanced-governance portability classification; profile membership is defined by the canonical RULES source"
+
+  maturity_levels:
+    L0: "Scaffolded: capability exists in the kit as files, templates, schemas, or docs"
+    L1: "Configured: project selected a profile and configured the capability"
+    L2: "Operational: capability runs and produces evidence"
+    L3: "Enforced: gatekeeper warns or blocks based on profile severity"
+    L4: "Measured: dashboard tracks maturity, exceptions, drift, and trends"
+    L5: "Assured: evidence is complete enough for regulated or audit-style review"
+
+  gate_severity_values:
+    - none
+    - advisory
+    - warning
+    - required
+    - blocking

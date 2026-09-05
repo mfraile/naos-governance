@@ -1,0 +1,13 @@
+schema: naos.api_symbol_reality_manifest.v1
+symbols: []
+limitations:
+  - "Declare only API symbols that matter for the current project/review."
+  - "Missing or empty manifests are not proof that API symbols exist."
+  - "V1 checks Python source symbols only and does not import or execute target modules."
+not_claimed:
+  - "API semantic correctness proof"
+  - "runtime behavior proof"
+  - "option compatibility proof"
+  - "endpoint behavior proof"
+  - "package safety proof"
+  - "approval"

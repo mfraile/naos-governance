@@ -1,0 +1,48 @@
+name: Configs Drift Audit
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # nightly at 02:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  configs-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install minimal deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt || true
+
+      - name: Generate configs snapshot + diff
+        run: |
+          # [ADAPT: replace with your configs snapshot script path and output directories]
+          python scripts/configs_snapshot.py \
+            --out-dir data/configs_snapshots \
+            --latest data/configs_snapshot_latest.json \
+            --prev data/configs_snapshot_latest.json \
+            --diff-md naos/CONFIGS_DIFF.md
+
+      - name: Upload snapshot artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: configs-snapshots
+          # [ADAPT: update paths to match your snapshot output directories]
+          path: |
+            data/configs_snapshots/*.json
+            data/configs_snapshot_latest.json
+
+      - name: Upload diff markdown
+        uses: actions/upload-artifact@v4
+        with:
+          name: configs-diff-md
+          # [ADAPT: update to match your diff output path]
+          path: naos/CONFIGS_DIFF.md

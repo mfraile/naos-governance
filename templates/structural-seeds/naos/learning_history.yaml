@@ -1,0 +1,5 @@
+version: "1.0"
+semantics:
+  state: "Learning history stores superseded, deprecated, archived, rejected, and redacted records."
+  governance_boundary: "History records are audit context only and must not be used as current instruction."
+learning_history: []

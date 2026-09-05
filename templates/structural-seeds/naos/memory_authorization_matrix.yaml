@@ -1,0 +1,186 @@
+version: "1.0"
+semantics:
+  state: "Authorization matrix declares which AI surfaces may read, draft, write, or administer memory."
+  report: "NAOS reports memory access posture; it does not grant tool access."
+  governance_boundary: "Durable memory writes and admin setup require explicit configuration and human review."
+
+access_levels:
+  - none
+  - read_only
+  - draft_write
+  - approved_write
+  - admin_config
+
+platforms:
+  - id: claude_code
+    name: "Claude Code"
+    memory_access_declared: true
+    mcp_configured: false
+    mcp_required: true
+    read_access: read_only
+    write_access: draft_write
+    admin_access: none
+    fallback_when_unavailable: "Use repo evidence, active task card, compact summaries, and NAOS reports."
+    human_review_required_for_write: true
+    notes: "MCP access is config-dependent; do not assume Engram tools exist."
+  - id: claude_desktop
+    name: "Claude Desktop"
+    memory_access_declared: false
+    mcp_configured: false
+    mcp_required: true
+    read_access: none
+    write_access: none
+    admin_access: none
+    fallback_when_unavailable: "Use provided files and bounded context packs."
+    human_review_required_for_write: true
+    notes: "Configure MCP explicitly before memory access is expected."
+  - id: cursor
+    name: "Cursor"
+    memory_access_declared: true
+    mcp_configured: false
+    mcp_required: true
+    read_access: read_only
+    write_access: draft_write
+    admin_access: none
+    fallback_when_unavailable: "Use repo-local instructions, task cards, and deterministic reports."
+    human_review_required_for_write: true
+    notes: "Cursor may use MCP when configured; no universal access is assumed."
+  - id: vs_code
+    name: "VS Code"
+    memory_access_declared: true
+    mcp_configured: false
+    mcp_required: true
+    read_access: read_only
+    write_access: draft_write
+    admin_access: none
+    fallback_when_unavailable: "Use degraded recovery from compact files and repository evidence."
+    human_review_required_for_write: true
+    notes: "`vscode/memory` in frontmatter is not proof that Engram MCP tools are available."
+  - id: github_copilot
+    name: "GitHub Copilot"
+    memory_access_declared: false
+    mcp_configured: false
+    mcp_required: false
+    read_access: none
+    write_access: none
+    admin_access: none
+    fallback_when_unavailable: "Use instruction files and project artifacts; do not assume MCP access."
+    human_review_required_for_write: true
+    notes: "Instruction-aware, but memory tool access is not assumed."
+  - id: codex
+    name: "Codex"
+    memory_access_declared: false
+    mcp_configured: false
+    mcp_required: false
+    read_access: none
+    write_access: none
+    admin_access: none
+    fallback_when_unavailable: "Use repo evidence, context summaries, and explicit tool outputs available in the current session."
+    human_review_required_for_write: true
+    notes: "Do not assume local MCP access in Codex."
+  - id: gemini_cli
+    name: "Gemini CLI"
+    memory_access_declared: false
+    mcp_configured: false
+    mcp_required: true
+    read_access: none
+    write_access: none
+    admin_access: none
+    fallback_when_unavailable: "Use repository evidence and bounded context packs."
+    human_review_required_for_write: true
+    notes: "Config-dependent; no default memory access."
+  - id: chatgpt_openai_workflows
+    name: "ChatGPT/OpenAI workflows"
+    memory_access_declared: false
+    mcp_configured: false
+    mcp_required: false
+    read_access: none
+    write_access: none
+    admin_access: none
+    fallback_when_unavailable: "Use uploaded/provided artifacts and bounded summaries."
+    human_review_required_for_write: true
+    notes: "Do not assume local MCP access."
+  - id: local_ide_agents
+    name: "Local IDE agents"
+    memory_access_declared: false
+    mcp_configured: false
+    mcp_required: true
+    read_access: none
+    write_access: none
+    admin_access: none
+    fallback_when_unavailable: "Use project-local files and deterministic reports."
+    human_review_required_for_write: true
+    notes: "IDE-specific configuration required."
+  - id: ci
+    name: "CI"
+    memory_access_declared: false
+    mcp_configured: false
+    mcp_required: false
+    read_access: none
+    write_access: none
+    admin_access: none
+    fallback_when_unavailable: "Run deterministic repo-local checks only."
+    human_review_required_for_write: true
+    notes: "CI must not have memory access by default."
+
+surfaces:
+  - id: planning_agents
+    surface_type: agent
+    default_access: read_only
+    write_access: draft_write
+    human_review_required_for_write: true
+    examples:
+      - naos-plan
+  - id: implementation_agents
+    surface_type: agent
+    default_access: read_only
+    write_access: draft_write
+    human_review_required_for_write: true
+    examples:
+      - naos-implement
+      - naos-debug
+  - id: review_audit_conformance_agents
+    surface_type: agent
+    default_access: read_only
+    write_access: none
+    human_review_required_for_write: true
+    examples:
+      - naos-review
+      - naos-conformance
+      - naos-triage
+  - id: lifecycle_start_prompts
+    surface_type: prompt
+    default_access: read_only
+    write_access: none
+    human_review_required_for_write: true
+    examples:
+      - naos-d-start
+      - naos-task-start
+  - id: lifecycle_end_checkpoint_compact
+    surface_type: prompt_or_skill
+    default_access: read_only
+    write_access: draft_write
+    human_review_required_for_write: true
+    examples:
+      - naos-d-end
+      - cognitive-checkpoint
+      - strategic-compact
+  - id: setup_config_commands
+    surface_type: command
+    default_access: admin_config
+    write_access: admin_config
+    human_review_required_for_write: true
+    examples:
+      - naos memory setup --write
+  - id: ci_workflows
+    surface_type: workflow
+    default_access: none
+    write_access: none
+    human_review_required_for_write: true
+    examples:
+      - naos-control-plane-ci
+
+limitations:
+  - "This matrix declares intended access posture; it does not grant or verify tool access by itself."
+  - "Actual MCP namespace and tool availability must be confirmed in each platform."
+  - "Durable writes require explicit configuration and human review."

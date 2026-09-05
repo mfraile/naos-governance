@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:capability_maturity:v1",
+  "title": "NAOS Capability Maturity Model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "levels", "profiles"],
+  "properties": {
+    "version": {"type": "string"},
+    "levels": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["L0", "L1", "L2", "L3", "L4", "L5"]
+          },
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "evidence_expectation": {"type": "string"}
+        }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quickstart", "lite", "standard", "assured"],
+      "properties": {
+        "quickstart": {"$ref": "#/$defs/profile"},
+        "lite": {"$ref": "#/$defs/profile"},
+        "standard": {"$ref": "#/$defs/profile"},
+        "assured": {"$ref": "#/$defs/profile"}
+      }
+    }
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_target_maturity",
+        "default_enforcement",
+        "description"
+      ],
+      "properties": {
+        "default_target_maturity": {
+          "type": "string",
+          "enum": ["L0", "L1", "L2", "L3", "L4", "L5"]
+        },
+        "default_enforcement": {
+          "type": "string",
+          "enum": ["advisory", "warning", "required", "blocking"]
+        },
+        "description": {"type": "string"}
+      }
+    }
+  }
+}

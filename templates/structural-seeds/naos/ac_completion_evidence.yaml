@@ -1,0 +1,41 @@
+schema: naos.ac_completion_evidence_manifest.v1
+version: "1.0"
+semantics:
+  purpose: "Declare AC/SCEN completion evidence for deterministic review."
+  empty_manifest_rule: "An empty completions list means no completion evidence is configured or claimed."
+  repository_binding_rule: "Optional full Git object ids bind a record to declared base/subject commits and a verified subject tree for local human review; bound deterministic evidence remains unsatisfied unless at least one conservative path-shaped command operand resolves in that tree."
+  supersession_rule: "A successor record may reference one earlier same-AC record; the predecessor remains present and visible."
+  non_claim: "This manifest does not prove command execution, clean or independent execution, signing, identity, AC correctness, implementation correctness, complete coverage, approval, certification, or compliance."
+
+completions: []
+
+# Example once evidence exists:
+# completions:
+#   - record_id: ACE-AC-001-1-20260702
+#     supersedes: null
+#     correction_reason: null
+#     ac_id: AC-001-1
+#     status: claimed_complete
+#     source_ref: specs/06-acceptance.md#AC-001-1
+#     repository_binding:
+#       base_commit: "<full 40- or 64-character Git commit id>"
+#       subject_commit: "<full 40- or 64-character Git commit id>"
+#       subject_tree: "<full 40- or 64-character Git tree id for subject_commit>"
+#     evidence:
+#       - type: test_report
+#         path: naos/reports/test_evidence_health.json
+#         command: python -m unittest tests/test_example.py
+#         outcome: pass
+#         generated_at: 2026-07-02T00:00:00Z
+#         notes: "Path-shaped command operands are checked against subject_tree; the command is not re-executed."
+#
+# A correction appends a new same-AC record with its own evidence:
+#   - record_id: ACE-AC-001-1-CORRECTION-1
+#     supersedes: ACE-AC-001-1-20260702
+#     correction_reason: "The predecessor cited the wrong test path."
+#     ac_id: AC-001-1
+#     status: not_claimed
+#     evidence:
+#       - type: manual_review
+#         outcome: pass
+#         notes: "The predecessor remains present; this relation is review lineage, not revocation or approval."

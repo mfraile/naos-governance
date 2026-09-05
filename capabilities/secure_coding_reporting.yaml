@@ -1,0 +1,102 @@
+id: CAP-SECURE-CODING-REPORTING
+name: Secure-Coding Multidimensional Reporting
+description: >
+  Consumes the authoritative P1 reference-integrity result and P2 control/evidence
+  routing report, then exposes exactly five independent dimensions in existing
+  dashboard and evidence artifacts.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Kit-level structural validation only."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Generate the report and surface missing source or projection state."
+  standard:
+    target_maturity: L2
+    enforcement: warning
+    notes: "Require review of all five dimensions before relying on the presentation."
+  assured:
+    target_maturity: L3
+    enforcement: required
+    notes: "Require source provenance and human review; the report remains non-authoritative."
+authority:
+  may_read:
+    - naos/secure_coding_control_render_manifest.yaml
+    - naos/reports/secure_coding_reference_integrity.json
+    - naos/reports/secure_coding_controls.json
+    - naos/reports/dashboard_summary.json
+    - naos/evidence/evidence_pack.json
+    - naos/DASHBOARD.md
+  may_write:
+    - naos/reports/secure_coding_reference_integrity.json
+    - naos/reports/secure_coding_controls.json
+    - naos/reports/secure_coding_reporting.json
+    - naos/reports/dashboard_summary.json
+    - naos/evidence/evidence_pack.json
+    - naos/DASHBOARD.md
+allowed_resources:
+  - "repository-local P1/P2 reports"
+  - "portable reference path adapter"
+  - "existing generated dashboard and evidence artifacts"
+prohibited_resources:
+  - "network calls"
+  - "model or provider APIs"
+  - "policy, gate, waiver, approval, or release decisions"
+  - "blended or composite security scores"
+constraints:
+  - "Invoke P1 and P2 implementations; do not recreate their validation logic."
+  - "Expose exactly five dimensions: register validity, reference integrity, detector evidence, mapping verification, and human review."
+  - "Fail closed for missing, malformed, unsafe, or contract-incompatible sources."
+  - "Preflight all configured projection targets and reject symlinks before mutation."
+  - "Treat the P3 report as derived presentation, not a new gate input."
+required_evidence:
+  - naos/reports/secure_coding_reference_integrity.json
+  - naos/reports/secure_coding_controls.json
+  - naos/reports/secure_coding_reporting.json
+validators:
+  - id: secure_coding_reporting
+    script: scripts/naos_secure_coding_reporting.py
+    status: available
+gatekeepers: []
+dashboard_signals:
+  - secure_coding_reporting.register_validity
+  - secure_coding_reporting.reference_integrity
+  - secure_coding_reporting.detector_evidence
+  - secure_coding_reporting.mapping_verification
+  - secure_coding_reporting.human_review
+maturity_path:
+  L0: "Schema, command, and capability contract exist."
+  L1: "P1/P2 source reports can be consumed deterministically."
+  L2: "Portable adopter manifests and existing-artifact projection are validated."
+  L3: "Source provenance and projection failures are review-routed."
+  L4: "Dashboard and evidence pack expose all five dimensions without a composite score."
+  L5: "Independent reviews periodically confirm source and projection boundaries."
+known_limitations:
+  - "A valid report does not establish secure code or control satisfaction."
+  - "Evidence availability and freshness do not establish evidence validity or completeness."
+  - "Mapping verification metadata does not establish framework conformance."
+  - "Human review remains required."
+not_claimed:
+  - secure code proof
+  - control satisfaction
+  - vulnerability-free proof
+  - framework conformance
+  - compliance proof
+  - approval
+  - release authorization
+  - human review replacement
+  - composite security score
+related_docs:
+  - docs/SECURE_CODING_P3_REPORTING.md
+  - docs/SECURE_CODING_CONTROL_MODEL.md
+  - docs/decisions/ADR-0012-secure-and-agentic-coding-control-register.md
+related_scripts:
+  - scripts/naos_secure_coding_reporting.py
+  - scripts/secure_coding_reporting/portable_reference.py

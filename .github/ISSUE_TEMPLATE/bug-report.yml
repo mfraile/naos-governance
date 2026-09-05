@@ -1,0 +1,58 @@
+name: Bug report
+description: Something in the kit does not behave as documented.
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, do not use this template. See `SECURITY.md`.
+
+  - type: input
+    id: version
+    attributes:
+      label: NAOS kit version
+      description: Output of `cat NAOS_CATALOG.md | grep '^\*\*Version\*\*'` or `pip show naos-governance`
+      placeholder: "1.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Active profile
+      options: [quickstart, lite, standard, assured, not-applicable]
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What you expected the kit to do. Cite the relevant doc / source file if you can.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What the kit actually did. Include exact error text and a minimal reproduction if possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, AI tool in use (Claude Code / Copilot / Cursor / Continue.dev / Gemini CLI / none), relevant env vars (NAOS_ROOT, NAOS_TIER).
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Anything else (links to related issues, screenshots, logs).
+    validations:
+      required: false

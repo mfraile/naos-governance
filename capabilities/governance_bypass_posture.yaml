@@ -1,0 +1,84 @@
+id: CAP-GOVERNANCE-BYPASS-POSTURE
+name: Governance Bypass Posture
+description: >
+  Reports local hook, CI, commit-message, and tier/profile indicators that may
+  show governance bypass exposure without claiming to prevent bypasses.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Advisory bypass-posture visibility only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns on local hook or bypass-posture gaps."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Bypass-posture report is expected for governed coding and PR evidence."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured bypass-posture findings can block until reviewed under adopter policy."
+authority:
+  may_read:
+    - .git/config
+    - .githooks/pre-commit
+    - .github/workflows/
+    - local git commit messages
+  may_write:
+    - naos/reports/governance_bypass_posture.json
+allowed_resources:
+  - "repo-local git metadata"
+  - "repo-local workflow files"
+prohibited_resources:
+  - "network calls"
+  - "identity-provider lookup"
+  - "branch-protection mutation"
+  - "runtime hook enforcement"
+constraints:
+  - "Must remain deterministic and local."
+  - "Must report bypass posture without claiming bypass prevention."
+  - "Must not treat CI presence as proof that CI ran or passed."
+required_evidence:
+  - "naos/reports/governance_bypass_posture.json"
+validators:
+  - id: governance_bypass_posture
+    script: scripts/naos_governance_bypass_posture.py
+    status: available
+gatekeepers:
+  - G4
+  - G8
+dashboard_signals:
+  - "governance_bypass_posture.status"
+  - "governance_bypass_posture.summary.total_findings"
+maturity_path:
+  L0: "Capability contract, schema, and script exist."
+  L1: "Report can be generated from local hook/git/CI posture."
+  L2: "Report is visible in gates, evidence pack, dashboard, and self-check."
+  L3: "Profile severity and review disposition are applied."
+  L4: "Projects trend bypass posture over review cadence."
+  L5: "Branch protection and CI evidence are independently reviewed."
+known_limitations:
+  - "Git does not record --no-verify by default."
+  - "Local hook config can be changed by a user with repository access."
+not_claimed:
+  - "bypass prevention"
+  - "tamper-proof hook enforcement"
+  - "authentication"
+  - "authorization"
+  - "non-repudiation"
+  - "PR approval"
+  - "security proof"
+  - "proof of compliance"
+  - "certification"
+related_docs:
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_governance_bypass_posture.py

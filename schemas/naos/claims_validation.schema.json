@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:claims_validation:v1",
+  "title": "NAOS Claims Validation Report",
+  "description": "Schema for the report emitted by scripts/naos_validate_claims.py. Validation identifies scoped potential overclaims; it is not proof that claims are complete, correct, approved, certified, or compliant.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "profile",
+    "status",
+    "claims_file",
+    "claim_count",
+    "summary",
+    "claim_lifecycle",
+    "scope_model",
+    "findings",
+    "safe_disclaimer_matches",
+    "limitations",
+    "heuristic"
+  ],
+  "properties": {
+    "schema": {"const": "naos.claims_validation.v1"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string"},
+    "claims_file": {"type": ["string", "null"]},
+    "claim_count": {"type": "integer", "minimum": 0},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocking", "required", "warnings", "advisory", "total_findings", "safe_disclaimer_matches"],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "safe_disclaimer_matches": {"type": "integer", "minimum": 0}
+      }
+    },
+    "claim_lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status_values", "revalidation_triggers", "time_sensitive"],
+      "properties": {
+        "status_values": {"type": "array", "items": {"type": "string"}},
+        "revalidation_triggers": {"type": "array", "items": {"type": "string"}},
+        "time_sensitive": {"type": "boolean"}
+      }
+    },
+    "scope_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kit_level", "adopter_level"],
+      "properties": {
+        "kit_level": {"type": "array", "items": {"type": "string"}},
+        "adopter_level": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "safe_disclaimer_matches": {"type": "array", "items": {"type": "object"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "heuristic": {"type": "string"}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["id", "message", "severity", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "message": {"type": "string"},
+        "severity": {"type": "string"},
+        "status": {"type": "string"}
+      }
+    }
+  }
+}

@@ -1,0 +1,64 @@
+# naos_architecture_boundaries.yaml — NAOS Module Boundary Configuration
+# [ADAPT] sections: update module patterns to match YOUR source structure
+#
+# Purpose: Machine-readable rules for the Module Boundary Protocol (.ai/RULES.md Rule 15)
+# Validated by: scripts/validators/validate_architecture_coherence.py when installed/invoked
+# Pre-commit: the Assured architecture section invokes that validator conditionally
+#
+# Each rule defines a forbidden import pattern with:
+#   from: glob pattern for the importing module
+#   to: glob pattern for the imported module
+#   reason: human-readable explanation
+#   severity: ERROR (validator failure; blocks only when invoked by an enforced consumer) | WARNING (validator finding)
+#
+# Start with the standard layering rules below. Add your project-specific
+# bounded-context rules in the "Project-Specific Boundaries" section.
+
+forbidden_imports:
+
+  # ─── Standard Layering Rules (ADAPT paths, keep concepts) ────────────────
+  # These declare the API → Service → DB layering convention for a compatible validator.
+  # [ADAPT: update the "from"/"to" globs to match your source layout]
+
+  - from: "[ADAPT: src/api/routes/**]"
+    to: "[ADAPT: src/db/models.py]"
+    reason: "Routes must delegate to services, not query DB directly (Rule 15: Layering)"
+    severity: ERROR
+
+  - from: "[ADAPT: src/api/**]"
+    to: "[ADAPT: src/db/session.py]"
+    reason: "API layer must not manage DB sessions directly — use services"
+    severity: ERROR
+
+  - from: "[ADAPT: src/services/**]"
+    to: "[ADAPT: src/api/**]"
+    reason: "Services must not depend on API layer — reverse dependency (Rule 15: Layering)"
+    severity: ERROR
+
+  # ─── Project-Specific Boundaries [ADAPT or remove] ───────────────────────
+  # Add your bounded-context isolation rules here.
+  # Example: if you have an "analytics" module that must not write to "billing" DB
+
+  # - from: "[ADAPT: src/analytics/**]"
+  #   to: "[ADAPT: src/billing/**]"
+  #   reason: "[ADAPT: Analytics must read from billing events, not write to billing DB]"
+  #   severity: ERROR
+
+  # ─── Performance Rules [ADAPT or remove] ─────────────────────────────────
+  # Prevent synchronous LLM calls in request paths
+
+  # - from: "[ADAPT: src/api/routes/**]"
+  #   to: "[ADAPT: src/services/llm*.py]"
+  #   reason: "Synchronous LLM calls forbidden in request path — use background tasks"
+  #   severity: WARNING
+
+# ─── Allowed Exceptions ──────────────────────────────────────────────────────
+# Patterns that are permitted even if they would match a forbidden rule above.
+# Use sparingly — document the reason for each exception.
+
+allowed_exceptions:
+  # Example:
+  # - from: "src/api/routes/health.py"
+  #   to: "src/db/models.py"
+  #   reason: "Health check needs direct DB ping — no business logic, acceptable exception"
+  []  # Empty list = no exceptions (remove [] and add entries as needed)

@@ -1,0 +1,273 @@
+version: 1
+enabled: true
+state: readiness_only
+semantics:
+  principle: Graph links are relationship candidates and navigation aids only.
+  posture: readiness_only_future_project_configured
+  deterministic_baseline: Explicit source artifacts, exact links, metadata, and FTS remain the default baseline.
+
+graph_runtime_enabled: false
+explicit_link_traversal_only: true
+global_graph_scan_allowed: false
+graph_database_allowed: false
+networkx_enabled: false
+graphml_enabled: false
+graph_algorithms_enabled: false
+
+max_hops: 2
+max_seed_nodes: 5
+max_edges_returned: 50
+traversal_limits:
+  max_hops: 2
+  max_allowed_hops: 3
+  max_seed_nodes: 5
+  max_allowed_seed_nodes: 10
+  max_edges_returned: 50
+  max_allowed_edges_returned: 100
+  require_bounded_results: true
+  require_explicit_seed_nodes: true
+
+profile_posture:
+  quickstart:
+    state: disabled
+    severity: advisory
+    human_review_required: false
+    notes: "Graph-context readiness remains quiet; direct source review and explicit links are enough."
+  lite:
+    state: readiness_only
+    severity: advisory
+    human_review_required: false
+    notes: "Graph posture is visible, but no graph runtime, database, or algorithm is enabled."
+  standard:
+    state: readiness_only
+    severity: review_required
+    human_review_required: true
+    notes: "Human review is expected before project-specific graph traversal is considered."
+  assured:
+    state: readiness_only
+    severity: review_required
+    human_review_required: true
+    notes: "Human review is required before graph runtime, graph database, graph export, or algorithm posture is considered."
+
+allowed_link_types:
+  - task_to_spec
+  - task_to_capability
+  - task_to_module
+  - task_to_test
+  - spec_to_capability
+  - module_to_test
+  - report_to_finding
+  - finding_to_known_gap
+  - finding_to_residual_risk
+  - waiver_to_finding
+  - evidence_to_report
+  - memory_reference_to_task
+  - context_query_to_artifact
+  - task_context_pack_to_source_artifact
+  - local_index_artifact_link
+
+prohibited_link_types:
+  - private_memory_payload_to_artifact
+  - secret_to_artifact
+  - credential_to_artifact
+  - generated_context_pack_to_source_by_default
+  - global_inferred_link
+  - semantic_ranked_link_as_truth
+  - graph_algorithm_rank_as_truth
+
+link_family_posture:
+  - family: task_to_spec
+    status: explicit_links_only
+    source: task card or task registry metadata
+  - family: task_to_capability
+    status: explicit_links_only
+    source: task card, registry, or capability reference metadata
+  - family: task_to_module
+    status: explicit_links_only
+    source: module-header or task metadata
+  - family: task_to_test
+    status: explicit_links_only
+    source: source-to-test or test-evidence metadata
+  - family: spec_to_capability
+    status: explicit_links_only
+    source: capability cards and spec references
+  - family: module_to_test
+    status: explicit_links_only
+    source: source-to-test map
+  - family: report_to_finding
+    status: explicit_links_only
+    source: deterministic NAOS reports
+  - family: finding_to_known_gap
+    status: explicit_links_only
+    source: known-gap report metadata
+  - family: finding_to_residual_risk
+    status: explicit_links_only
+    source: residual-risk report metadata
+  - family: waiver_to_finding
+    status: explicit_links_only
+    source: waiver metadata
+  - family: evidence_to_report
+    status: explicit_links_only
+    source: evidence pack and report metadata
+  - family: memory_reference_to_task
+    status: metadata_only
+    source: memory-readiness metadata only
+  - family: context_query_to_artifact
+    status: explicit_links_only
+    source: local context query results
+  - family: task_context_pack_to_source_artifact
+    status: explicit_links_only
+    source: task context pack source artifact references
+  - family: local_index_artifact_link
+    status: explicit_links_only
+    source: generated local context index links
+
+source_authority_policy:
+  source_artifacts_remain_authoritative: true
+  graph_links_are_candidates_only: true
+  graph_links_are_not_truth: true
+  cannot_outrank_source_artifacts: true
+  cannot_outrank_current_user_instruction: true
+  cannot_outrank_deterministic_reports: true
+  source_hash_freshness_required_if_traversal_enabled_later: true
+
+stale_link_policy:
+  required: true
+  stale_links_become_findings: true
+  source_hash_mismatch_makes_link_stale: true
+  missing_source_makes_link_stale: true
+  stale_links_cannot_be_used_for_decisions: true
+
+sensitive_link_policy:
+  required: true
+  sensitive_links_become_findings: true
+  link_sensitive_content_by_default: false
+  requires_explicit_allowlist: true
+  sensitive_categories:
+    - secrets
+    - credentials
+    - tokens
+    - API keys
+    - passwords
+    - private keys
+    - certificates
+    - connection strings
+    - customer data
+    - tenant data
+    - regulated data
+    - private memory payloads
+    - exploit details unless explicitly approved
+
+generated_artifact_feedback_loop_policy:
+  generated_context_packs_are_graph_sources_by_default: false
+  generated_query_reports_are_graph_sources_by_default: false
+  generated_index_reports_are_graph_sources_by_default: false
+  generated_artifacts_require_explicit_allowlist: true
+  generated_artifact_feedback_loops_become_findings: true
+
+task_scoped_traversal_policy:
+  required: true
+  start_from_explicit_task_spec_artifact_or_query_seed: true
+  no_global_traversal: true
+  max_hops_required: true
+  max_seed_nodes_required: true
+  max_edges_returned_required: true
+  fallback_when_unavailable: use_direct_source_artifacts_and_local_context_query
+
+memory_policy:
+  graph_private_memory_payloads: false
+  read_engram_db: false
+  call_engram: false
+  call_mcp: false
+  call_memory_tools: false
+  memory_reference_to_task_metadata_only: true
+  memory_links_are_advisory: true
+
+future_graph_runtime:
+  status: deferred
+  graph_database: deferred
+  networkx: deferred
+  graphml: deferred
+  graph_algorithms: deferred
+  pagerank: deferred
+  centrality: deferred
+  community_detection: deferred
+  global_traversal: prohibited
+  semantic_graph_ranking: deferred
+  note: "Future traversal must be bounded from explicit seed nodes and reviewed before enablement."
+
+local_context_index_integration:
+  status: readiness_metadata_only
+  may_reference_explicit_artifact_links: true
+  graph_runtime_enabled: false
+  rule: "Local index artifact links can inform readiness, but graph traversal is not implemented."
+local_context_query_integration:
+  status: readiness_metadata_only
+  may_reference_query_to_artifact_links: true
+  rule: "Query results remain candidate references and do not become graph truth."
+task_context_pack_integration:
+  status: readiness_metadata_only
+  may_reference_source_artifacts: true
+  generated_context_packs_graph_sources_by_default: false
+  rule: "Task context packs can display graph readiness posture but do not inject graph context automatically."
+semantic_candidate_layer_integration:
+  status: readiness_metadata_only
+  semantic_graph_ranking_enabled: false
+  rule: "Semantic candidates do not rank graph traversal or create graph authority."
+
+profile_severity_behavior:
+  quickstart: advisory
+  lite: advisory
+  standard: review_required
+  assured: review_required
+
+human_review_requirements:
+  quickstart_required: false
+  lite_required: false
+  standard_required_if_readiness_enabled: true
+  assured_required_if_readiness_enabled: true
+  required_before_runtime_enablement: true
+  required_before_graph_database_or_export: true
+  required_before_graph_algorithms: true
+  required_before_sensitive_linking: true
+
+known_gaps:
+  - id: GCR-KG-001
+    summary: "No graph runtime, graph database, graph export, or graph algorithm is implemented in core NAOS."
+  - id: GCR-KG-002
+    summary: "Relationship traversal is represented as readiness posture only; explicit links remain source references."
+residual_risks:
+  - id: GCR-RR-001
+    summary: "Future graph traversal may be over-trusted unless source paths, hashes, freshness, and authority remain visible."
+  - id: GCR-RR-002
+    summary: "Generated artifacts can create feedback loops unless graph sources stay allowlisted and reviewed."
+waivers: []
+limitations:
+  - "This is readiness/configuration/reporting only."
+  - "No NetworkX, GraphML, graph database, graph algorithm, PageRank, centrality, community detection, or global traversal is implemented."
+  - "No semantic graph ranking, sqlite-vec, embeddings, model/API/network dependency, MCP/FastMCP, Engram, or memory tool call is made."
+  - "Graph links are candidate relationships only; explicit source artifacts and deterministic NAOS reports remain authoritative."
+  - "Future traversal must be bounded by explicit seed nodes, max hops, max seed nodes, and max returned edges."
+not_claimed:
+  - source of truth
+  - authoritative truth
+  - graph runtime
+  - graph database
+  - NetworkX
+  - GraphML
+  - graph algorithms
+  - PageRank
+  - centrality
+  - community detection
+  - global traversal
+  - semantic graph ranking
+  - hallucination prevention
+  - sqlite-vec
+  - embeddings
+  - MCP server tools
+  - Engram access
+  - memory payload graphing
+  - automatic context injection
+  - durable memory write-back
+  - compliance proof
+  - legal or regulatory proof

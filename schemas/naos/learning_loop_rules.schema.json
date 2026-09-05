@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:learning_loop_rules:v1",
+  "title": "NAOS Governed Learning Lifecycle Rules",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["version", "enabled", "state", "semantics", "profile_posture", "lifecycle_states", "learning_types"],
+  "properties": {
+    "version": {"type": "string"},
+    "enabled": {"type": "boolean"},
+    "state": {"type": "string"},
+    "semantics": {"type": "object"},
+    "profile_posture": {"type": "object"},
+    "lifecycle_states": {"type": "array", "items": {"type": "string"}},
+    "learning_types": {"type": "array", "items": {"type": "string"}},
+    "known_gaps": {"type": "array", "items": {"type": "object"}},
+    "residual_risks": {"type": "array", "items": {"type": "object"}},
+    "waivers": {"type": "array", "items": {"type": "object"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  }
+}

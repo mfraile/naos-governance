@@ -1,0 +1,42 @@
+# NAOS Instinct Seed — INS-003
+# Tier 1 seed — stripped of source-project evidence for kit distribution.
+# Set evidence_count ≥ 1 and add your source_sessions as you observe this pattern.
+---
+
+id: INS-003
+title: "Compaction recovery requires 3-step sequence not 1-step task-card read"
+status: hypothesis
+tier: 1
+
+observed_pattern: >
+  After token compaction, implement agent reads the active task card (single step)
+  and resumes coding. This misses: (a) Engram observations from the compacted
+  session, (b) mid-WI in-progress state not yet written to the task card,
+  (c) task-specific decisions stored in Engram via mem_save during the session only when write access is configured, authorized, verified, permitted by memory-use policy, and explicitly human-approved.
+  Result: agent redoes completed work, misses critical blockers, or breaks
+  established conventions from the compacted session.
+
+context: >
+  Any compaction event (visible as context-reset message or conversation-summary
+  block). Particularly dangerous when: multiple WIs were in-progress, files were
+  created but not yet committed, or the card's AC checkboxes lag behind actual
+  implementation state (which is common mid-session).
+
+mitigation: >
+  The agent instructions mandate the 3-step recovery. The minimum safe sequence is:
+    1. mem_context          — recover last-session observations when configured, authorized, verified, and permitted by memory-use policy
+    2. mem_search "<task-id>" — find task-specific decisions when configured, authorized, verified, and permitted by memory-use policy
+    3. Read active task card  — restore acceptance criteria and scope
+  Step 1 is the most skipped. Without authorized memory or degraded fallback,
+  session data (mid-WI status, design choices, "do not redo X") is invisible.
+  Enforce recovery as a blocking pre-flight.
+
+evidence_count: 0
+first_observed: null
+last_confirmed: null
+source_sessions: []
+
+confidence: 0.0   # evidence_count = 0 → seed only
+tags: [compaction, memory, recovery, implement-agent, pre-flight]
+promoted_to_rule: null
+dismissed: false

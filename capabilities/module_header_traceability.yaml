@@ -1,0 +1,94 @@
+id: CAP-MODULE-HEADER-TRACEABILITY
+name: Module Header Traceability
+description: >
+  Evaluates canonical NAOS module headers for source files so projects can
+  connect implementation modules to requirements, tasks, specs, rationale, and
+  design notes without claiming complete code correctness.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Reports missing, legacy, stale, or duplicate headers without blocking onboarding."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns when configured source modules lack canonical traceability headers."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires module-header traceability evidence where configured."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Can block when configured source traceability evidence is missing or materially stale."
+authority:
+  may_read:
+    - "naos/module_header_rules.yaml"
+    - "configured Python source roots"
+    - "specs/"
+    - "naos/TASK_REGISTRY.yaml"
+  may_write:
+    - "naos/reports/module_header_traceability.json"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "repo-local Python source files"
+  - "file-first YAML, JSON, and Markdown governance artifacts"
+prohibited_resources:
+  - "automatic source rewrites"
+  - "mandatory semantic model"
+  - "mandatory external service"
+  - "mandatory database"
+  - "runtime gateway"
+constraints:
+  - "Must not auto-fix headers."
+  - "Must report legacy headers as evidence findings, not silently rewrite them."
+  - "Must not claim complete source traceability or code correctness."
+  - "Must keep non-Python language adapters project-configured or future work."
+required_evidence:
+  - "naos/module_header_rules.yaml"
+  - "naos/reports/module_header_traceability.json"
+validators:
+  - id: module_header_traceability
+    script: scripts/naos_module_header_traceability.py
+    status: available
+gatekeepers:
+  - G4
+  - G6
+dashboard_signals:
+  - "module_header_traceability.status"
+  - "module_header_traceability.missing_headers"
+  - "module_header_traceability.legacy_headers"
+  - "module_header_traceability.stale_headers"
+  - "module_header_traceability.duplicate_headers"
+maturity_path:
+  L0: "Capability contract, rules schema, report schema, and seed rules exist in the kit."
+  L1: "Project configures source roots, exclusions, required sections, and severity behavior."
+  L2: "Module-header traceability report is generated as file-first evidence."
+  L3: "Gatekeepers apply profile severity to missing, legacy, stale, or duplicate headers."
+  L4: "Dashboard tracks module-header traceability trends, gaps, waivers, and review status."
+  L5: "Evidence is complete enough to support governed review of source traceability decisions."
+known_limitations:
+  - "Does not prove code correctness."
+  - "Does not prove complete source traceability."
+  - "Does not auto-fix or rewrite headers."
+  - "Python source modules are the default Group 14 scope; non-Python adapters are future or project-configured."
+  - "Rationale quality still requires human review."
+not_claimed:
+  - "complete code correctness"
+  - "complete traceability proof"
+  - "automatic stale-design detection"
+  - "automatic source remediation"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+related_scripts:
+  - scripts/naos_module_header_traceability.py
+  - scripts/validators/validate_traceability_headers.py
+  - scripts/naos_code_quality_audit.py
+  - scripts/naos_detect_spec_drift.py

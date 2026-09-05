@@ -1,0 +1,37 @@
+schema: naos.challenge_rules.v1
+profile: quickstart
+updated_at: null
+description: >
+  Rules for challenge-before-build reports. Challenge commands inspect local
+  evidence, identify assumptions and missing information, and make no edits.
+modes:
+  - install
+  - greenfield
+  - brownfield
+  - requirements
+  - architecture
+  - task
+  - implementation-plan
+  - evidence
+  - gate
+  - decision
+  - remediation
+required_report_fields:
+  - evidence_used
+  - facts_confirmed
+  - assumptions_detected
+  - inferred_candidates
+  - missing_information
+  - contradictions
+  - risks
+  - decisions_required
+  - no_edit_confirmation
+  - human_review_boundary
+not_claimed:
+  - automatic approval
+  - requirements completeness proof
+  - runtime safety proof
+  - behavioral correctness proof
+  - source truth proof
+  - human review replacement
+human_review_required: true

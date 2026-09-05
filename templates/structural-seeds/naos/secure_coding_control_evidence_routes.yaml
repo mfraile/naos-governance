@@ -1,0 +1,67 @@
+
+schema: naos.secure_coding_control_evidence_routes.v1
+version: "1.0"
+status: active
+semantics:
+  purpose: "Bind canonical detector ids to bounded local evidence artifacts and review gates."
+  authority: "This contract routes evidence only; central policy, capability contracts, gatekeepers, exceptions, and humans retain enforcement and decision authority."
+  evidence: "Presence and freshness are review signals, not control satisfaction or security proof."
+  staleness_source: "policies/default_policy.yaml evidence.default_staleness_days"
+  not_claimed:
+    - "control satisfaction"
+    - "secure code proof"
+    - "complete detector coverage"
+    - "framework conformance"
+    - "compliance proof"
+    - "approval"
+register_path: secure_coding_control_register.yaml
+report_path: reports/secure_coding_controls.json
+routes:
+  - detector_id: CAP-SECRET-HYGIENE
+    evidence_path: reports/secret_hygiene.json
+    evidence_kind: deterministic_local
+    requirement: required
+    minimum_profile: lite
+    applies_when: always
+    gates: [G4, G6]
+    boundary: "Repository-local static secret-pattern hygiene only; no prompt, runtime, credential-validity, or secret-free proof."
+  - detector_id: CAP-DEPENDENCY-INTEGRITY
+    evidence_path: reports/dependency_integrity.json
+    evidence_kind: deterministic_local
+    requirement: required
+    minimum_profile: lite
+    applies_when: always
+    gates: [G4, G6]
+    boundary: "Configured local Python import/declaration hygiene only; no registry identity, provenance, existence, or package-safety proof."
+  - detector_id: CAP-PR-RISK-CLASSIFICATION
+    evidence_path: reports/pr_risk_classification.json
+    evidence_kind: deterministic_local
+    requirement: conditional
+    minimum_profile: lite
+    applies_when: pull_request
+    gates: [G4, G6]
+    boundary: "Local path/diff risk metadata only; no execution, malware analysis, semantic truth, approval, or release authorization."
+  - detector_id: VALIDATOR-CLAIMS
+    evidence_path: reports/claims_validation.json
+    evidence_kind: deterministic_local
+    requirement: required
+    minimum_profile: lite
+    applies_when: always
+    gates: [G6]
+    boundary: "Claim/evidence structure and overclaim checks only; no factual-truth, security, or compliance proof."
+  - detector_id: EXTERNAL-SARIF-INGEST
+    evidence_path: reports/external_evidence_ingest.json
+    evidence_kind: unverified_external
+    requirement: optional
+    minimum_profile: lite
+    applies_when: external_evidence_supplied
+    gates: [G6]
+    boundary: "Project-supplied SARIF is imported as unverified external review evidence and does not prove finding truth or control satisfaction."
+  - detector_id: VALIDATOR-AGENT-TRACE
+    evidence_path: reports/agent_trace_validation.json
+    evidence_kind: deterministic_local
+    requirement: optional
+    minimum_profile: lite
+    applies_when: always
+    gates: [G6]
+    boundary: "Deterministic checks over declared agent trace events only (incl. autonomy-boundary violations); not a runtime sandbox, execution monitor, or autonomy-safety proof."

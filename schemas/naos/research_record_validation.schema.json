@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/research_record_validation.schema.json",
+  "title": "NAOS research record validation report",
+  "type": "object",
+  "required": ["schema", "status", "profile", "record_id", "research_outcome", "record_path", "findings", "human_review_required", "limitations", "not_claimed", "summary"],
+  "properties": {
+    "schema": {"const": "naos.research_record_validation.v1"},
+    "status": {"enum": ["valid", "invalid"]},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "record_id": {"type": ["string", "null"]},
+    "research_outcome": {"type": ["string", "null"], "enum": ["confirmed", "refuted", "inconclusive", null]},
+    "record_path": {"type": "string"},
+    "contract": {"type": "object"},
+    "record_schema_path": {"type": "string"},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "human_review_required": {"type": "boolean"},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "summary": {"type": "object"}
+  },
+  "additionalProperties": false
+}

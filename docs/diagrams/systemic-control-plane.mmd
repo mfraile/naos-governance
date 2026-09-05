@@ -1,0 +1,40 @@
+flowchart TD
+    USER["Human operator / reviewer"] --> CLI["CLI command surface"]
+    CLI --> ADOPT["Professional adoption commands<br/>adopt, preflight, intake, install-plan"]
+    CLI --> INVENTORY["Inventory commands<br/>existing-resource, AI artifact, memory, MCP"]
+    CLI --> CHALLENGE["Challenge commands<br/>context, repo-context, plan, decision-probe"]
+    CLI --> CONTROL["Control-plane commands<br/>claims, ai-surface-budget, learning-loop-review,<br/>systemic-impact, control-plane-review"]
+    CLI --> TRACE["Traceability commands<br/>spec-pack contract, materialize, worksheet,<br/>spec-cascade, module-headers, test evidence"]
+    CLI --> HYGIENE["Deterministic hygiene commands<br/>duplicate, secret, test-quality, dependency, PR risk"]
+    CLI --> LANES["Parallel lane review<br/>opportunity decision, handoff report, HITL reasons"]
+    CLI --> EVIDENCE["Evidence commands<br/>gate-status, gate-evaluate, evidence-pack, dashboard"]
+
+    CONFIG["Local configs and seeds"] --> ADOPT
+    CONFIG --> INVENTORY
+    CONFIG --> CONTROL
+    SCHEMAS["Local schemas under schemas/naos"] --> REPORTS
+    POLICIES["Policies and profile behavior"] --> CONTROL
+    POLICIES --> EVIDENCE
+
+    ADOPT --> REPORTS["JSON reports under naos/reports"]
+    INVENTORY --> REPORTS
+    CHALLENGE --> REPORTS
+    CONTROL --> REPORTS
+    TRACE --> REPORTS
+    HYGIENE --> REPORTS
+    LANES --> REPORTS
+    EVIDENCE --> REPORTS
+
+    REPORTS --> GATES["Gate/readiness posture"]
+    REPORTS --> PACK["Evidence pack"]
+    REPORTS --> DASH["Dashboard summary"]
+    GATES --> REVIEW["Human review and decisions"]
+    PACK --> REVIEW
+    DASH --> REVIEW
+
+    REVIEW --> OUTCOME["Decision, waiver, remediation, or next action"]
+
+    BOUNDARY["Boundaries:<br/>no proof of compliance<br/>no certification<br/>no runtime-safety proof<br/>no automatic approval<br/>spec materialization does not fill specs<br/>worksheets do not promote candidates<br/>traceability is structural evidence, not correctness proof<br/>AI-surface budget is context-health evidence, not hallucination prevention<br/>hygiene and PR-risk reports are review evidence<br/>parallel lane suggestions do not activate handoff<br/>memory and learning candidates remain advisory"]:::boundary
+    REVIEW --> BOUNDARY
+
+    classDef boundary fill:#fde2e2,stroke:#b91c1c,color:#5a0d0d,stroke-dasharray:4 3

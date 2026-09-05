@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:mcp_resource_inventory:v1",
+  "title": "NAOS MCP Resource Inventory Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "command",
+    "mode",
+    "naos_root",
+    "project_root",
+    "human_review_required",
+    "not_claimed",
+    "limitations",
+    "findings",
+    "summary",
+    "mcp_configs",
+    "mcp_config_count",
+    "descriptor_review",
+    "descriptor_review_summary",
+    "configuration_presence_only",
+    "live_access_verified",
+    "provider_calls_performed",
+    "activation_performed",
+    "authentication_verified",
+    "tool_authority_verified",
+    "write_authority_verified"
+  ],
+  "properties": {
+    "schema": {"const": "naos.mcp_resource_inventory.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
+    "command": {"const": "mcp-resource-inventory"},
+    "mode": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "session_id": {"type": ["string", "null"]},
+    "generated_by": {"type": "object"},
+    "human_review_required": {"type": "boolean"},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array"},
+    "residual_risks": {"type": "array"},
+    "summary": {"type": "object"},
+    "mcp_configs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "config_id",
+          "path",
+          "status",
+          "authorization_status",
+          "human_review_required",
+          "scope",
+          "kind",
+          "server_declarations",
+          "configuration_presence_only",
+          "live_access_verified"
+        ],
+        "properties": {
+          "config_id": {"type": "string"},
+          "path": {"type": "string"},
+          "status": {"type": "string"},
+          "authorization_status": {"type": "string"},
+          "human_review_required": {"type": "boolean"},
+          "scope": {"type": "string"},
+          "kind": {"const": "server_definition"},
+          "server_declarations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "config_id",
+                "config_path",
+                "container",
+                "name",
+                "declared_keys",
+                "declared_key_count",
+                "declared_keys_sha256",
+                "unreported_declared_key_count",
+                "transport_field",
+                "transport",
+                "command_declared",
+                "execution_or_auth_fields_declared",
+                "endpoint_declared",
+                "endpoint_key",
+                "endpoint_safe_for_static_review",
+                "endpoint_sha256",
+                "endpoint_shape_status",
+                "access_verified"
+              ],
+              "properties": {
+                "config_id": {"type": "string"},
+                "config_path": {"type": "string"},
+                "container": {"type": "string"},
+                "name": {"type": "string"},
+                "declared_keys": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+                "declared_key_count": {"type": "integer", "minimum": 0},
+                "declared_keys_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "unreported_declared_key_count": {"type": "integer", "minimum": 0},
+                "transport_field": {"type": ["string", "null"]},
+                "transport": {"type": ["string", "null"]},
+                "command_declared": {"type": "boolean"},
+                "execution_or_auth_fields_declared": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+                "endpoint_declared": {"type": "boolean"},
+                "endpoint_key": {"type": ["string", "null"]},
+                "endpoint_safe_for_static_review": {"type": "boolean"},
+                "endpoint_sha256": {
+                  "anyOf": [
+                    {"type": "null"},
+                    {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+                  ]
+                },
+                "endpoint_shape_status": {
+                  "enum": [
+                    "missing",
+                    "multiple_endpoint_fields",
+                    "non_string",
+                    "invalid",
+                    "unsafe_scheme",
+                    "unsafe_userinfo",
+                    "unsafe_whitespace",
+                    "unsafe_query",
+                    "unsafe_fragment",
+                    "safe_https"
+                  ]
+                },
+                "access_verified": {"const": false}
+              }
+            }
+          },
+          "configuration_presence_only": {"const": true},
+          "live_access_verified": {"const": false}
+        }
+      }
+    },
+    "mcp_config_count": {"type": "integer", "minimum": 0},
+    "descriptor_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "rules_path",
+        "rules_sha256",
+        "expected_rules_sha256",
+        "policy_integrity_status",
+        "policy_schema",
+        "policy_version",
+        "policy_rule_count",
+        "declaration_count",
+        "summary",
+        "activation_performed",
+        "authentication_verified",
+        "live_access_verified",
+        "tool_authority_verified",
+        "write_authority_verified",
+        "provider_calls_performed",
+        "remote_identity_verified",
+        "declaration_reviews",
+        "non_claims"
+      ],
+      "properties": {
+        "status": {"enum": ["not_configured", "valid", "invalid_rules", "review_required"]},
+        "rules_path": {"type": "string"},
+        "rules_sha256": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          ]
+        },
+        "expected_rules_sha256": {"const": "2a5b39d7f89673df223f35890393da528ae413b4979e3766be155aea37c30375"},
+        "policy_integrity_status": {"enum": ["valid", "missing", "invalid", "drifted"]},
+        "policy_schema": {"const": "naos.mcp_descriptor_review_policy.v1"},
+        "policy_version": {"const": "1.0.0"},
+        "policy_rule_count": {"type": "integer", "minimum": 0},
+        "declaration_count": {"type": "integer", "minimum": 0},
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowlisted_pending_activation", "review_required"],
+          "properties": {
+            "allowlisted_pending_activation": {"type": "integer", "minimum": 0},
+            "review_required": {"type": "integer", "minimum": 0}
+          }
+        },
+        "activation_performed": {"const": false},
+        "authentication_verified": {"const": false},
+        "live_access_verified": {"const": false},
+        "tool_authority_verified": {"const": false},
+        "write_authority_verified": {"const": false},
+        "provider_calls_performed": {"const": false},
+        "remote_identity_verified": {"const": false},
+        "declaration_reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "declaration_ref",
+              "config_id",
+              "observed_tuple_sha256",
+              "policy_rule_id",
+              "status",
+              "reason_codes",
+              "risk_owner_authority_declared",
+              "risk_owner_identity_verified",
+              "pin_declared",
+              "pin_verified",
+              "static_declaration_pin_matched",
+              "server_label_used_as_identity",
+              "human_review_required"
+            ],
+            "properties": {
+              "declaration_ref": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "config_id": {"type": "string"},
+              "observed_tuple_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "policy_rule_id": {"type": ["string", "null"]},
+              "status": {"enum": ["allowlisted_pending_activation", "review_required"]},
+              "reason_codes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+              "risk_owner_authority_declared": {"type": "boolean"},
+              "risk_owner_identity_verified": {"const": false},
+              "pin_declared": {"type": "boolean"},
+              "pin_verified": {"const": false},
+              "static_declaration_pin_matched": {"type": "boolean"},
+              "server_label_used_as_identity": {"const": false},
+              "human_review_required": {"const": true}
+            }
+          }
+        },
+        "non_claims": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "descriptor_review_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowlisted_pending_activation", "review_required"],
+      "properties": {
+        "allowlisted_pending_activation": {"type": "integer", "minimum": 0},
+        "review_required": {"type": "integer", "minimum": 0}
+      }
+    },
+    "configuration_presence_only": {"const": true},
+    "live_access_verified": {"const": false},
+    "provider_calls_performed": {"const": false},
+    "activation_performed": {"const": false},
+    "authentication_verified": {"const": false},
+    "tool_authority_verified": {"const": false},
+    "write_authority_verified": {"const": false}
+  }
+}

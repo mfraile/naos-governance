@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:audit_log_summary:v1",
+  "title": "NAOS Audit Log Summary",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "audit_log_root",
+    "event_count",
+    "event_type_counts",
+    "session_ids",
+    "operator_ids",
+    "date_range",
+    "latest_event_at",
+    "missing_session_id_events",
+    "missing_operator_id_events",
+    "invalid_event_count",
+    "invalid_events",
+    "event_files",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": { "const": "naos.audit_log_summary.v1" },
+    "generated_at": { "type": "string" },
+    "profile": {
+      "type": "string",
+      "enum": ["quickstart", "lite", "standard", "assured"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ready", "advisory", "no_events", "invalid_events", "not_configured", "blocked", "unknown"]
+    },
+    "naos_root": { "type": "string" },
+    "project_root": { "type": "string" },
+    "audit_log_root": { "type": "string" },
+    "event_count": { "type": "integer", "minimum": 0 },
+    "event_type_counts": { "type": "object" },
+    "session_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "operator_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "date_range": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": ["string", "null"] },
+        "end": { "type": ["string", "null"] }
+      }
+    },
+    "latest_event_at": { "type": ["string", "null"] },
+    "missing_session_id_events": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "missing_operator_id_events": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "invalid_event_count": { "type": "integer", "minimum": 0 },
+    "invalid_events": { "type": "array" },
+    "event_files": { "type": "array" },
+    "findings": { "type": "array" },
+    "known_gaps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "human_review_required": { "type": "boolean" },
+    "summary": { "type": "object" }
+  }
+}

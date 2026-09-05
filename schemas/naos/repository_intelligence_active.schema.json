@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_active:v1",
+  "title": "NAOS Repository Intelligence Active Pointer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "active_sha256", "control", "source_artifacts_remain_authoritative", "human_review_required"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.active.v1"},
+    "status": {"const": "validated_active"},
+    "active_sha256": {"$ref": "#/$defs/sha256"},
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transaction_id", "generation_id", "generation_content_sha256", "manifest_path", "manifest_file_sha256", "manifest_sha256", "validation_receipt_path", "validation_receipt_file_sha256", "validation_receipt_sha256", "activation_receipt_path", "activation_receipt_file_sha256", "activation_receipt_sha256", "plan_sha256", "bundle_sha256", "effective_source_sha256", "profile", "purpose", "component_mode", "provenance_project_id", "provenance_owner_sha3_512", "provenance_scope_sha3_512", "ongoing_use_scope", "previous_generation_id"],
+      "properties": {
+        "transaction_id": {"type": "string", "pattern": "^RIT-[0-9a-f]{24}$"},
+        "generation_id": {"type": "string", "pattern": "^RI-[0-9a-f]{24}$"},
+        "generation_content_sha256": {"$ref": "#/$defs/sha256"},
+        "manifest_path": {"type": "string"},
+        "manifest_file_sha256": {"$ref": "#/$defs/sha256"},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "validation_receipt_path": {"type": "string"},
+        "validation_receipt_file_sha256": {"$ref": "#/$defs/sha256"},
+        "validation_receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "activation_receipt_path": {"type": "string"},
+        "activation_receipt_file_sha256": {"$ref": "#/$defs/sha256"},
+        "activation_receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "plan_sha256": {"$ref": "#/$defs/sha256"},
+        "bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "effective_source_sha256": {"$ref": "#/$defs/sha256"},
+        "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+        "purpose": {"enum": ["brownfield-onboarding", "ongoing-change-impact", "task-context"]},
+        "component_mode": {"enum": ["auto", "baseline", "graph"]},
+        "provenance_project_id": {"type": "string", "pattern": "^urn:uuid:[0-9a-f-]{36}$"},
+        "provenance_owner_sha3_512": {"type": "string", "pattern": "^[0-9a-f]{128}$"},
+        "provenance_scope_sha3_512": {"type": "string", "pattern": "^[0-9a-f]{128}$"},
+        "ongoing_use_scope": {"type": "array", "items": {"type": "string"}},
+        "previous_generation_id": {"type": ["string", "null"]}
+      }
+    },
+    "source_artifacts_remain_authoritative": {"const": true},
+    "human_review_required": {"const": true}
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

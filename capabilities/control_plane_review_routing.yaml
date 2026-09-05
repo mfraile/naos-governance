@@ -1,0 +1,108 @@
+id: CAP-CONTROL-PLANE-REVIEW-ROUTING
+name: Control-Plane Review Routing
+description: >
+  Evaluates structured governance-surface review items and research/autoresearch
+  routing declarations so actionable findings do not remain standalone analysis.
+  The capability reports routing status, known gaps, residual risks, waivers, and
+  next actions without claiming complete research coverage or governance proof.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Shows missing routing and review obligations without blocking onboarding."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns when structured findings or governance-surface changes are not routed."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires routing evidence for configured governance-surface and research items."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Can block when configured review-routing evidence is missing or unresolved."
+authority:
+  may_read:
+    - "naos/control_plane_review_rules.yaml"
+    - "naos/control_plane_review_items.yaml"
+    - "naos/ai_component_inventory_rules.yaml"
+    - "naos/reports/ai_component_inventory.json"
+    - "naos/aivss_assessments.yaml"
+    - "naos/reports/aivss_arithmetic_verification.json"
+    - "configured governance and research routing item declarations"
+  may_write:
+    - "naos/reports/control_plane_review.json"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "file-first YAML, JSON, and Markdown governance artifacts"
+  - "structured adopter-local review items"
+prohibited_resources:
+  - "automatic remediation"
+  - "mandatory web research"
+  - "mandatory model-backed behavioral grading"
+  - "mandatory semantic inference"
+  - "private/internal dev scanning by default"
+constraints:
+  - "Must treat review items as structured declarations, not proof by themselves."
+  - "Must not infer routed status merely because a report exists."
+  - "Must keep missing routing, waivers, residual risks, and known gaps visible."
+  - "Must route a missing, malformed, stale, content-mismatched, or incomplete required AI component inventory to G2/G6 human review without granting gate authority."
+  - "Must treat optional AIVSS arithmetic evidence as fixed advisory G2/G6 review input and never as approval, blocking, prioritization, merge, release, or risk-acceptance authority."
+  - "Must not claim complete research coverage, complete governance-surface review, or governance proof."
+required_evidence:
+  - "naos/control_plane_review_rules.yaml"
+  - "naos/control_plane_review_items.yaml"
+  - "naos/reports/control_plane_review.json"
+validators:
+  - id: control_plane_review_routing
+    script: scripts/naos_control_plane_review.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+dashboard_signals:
+  - "control_plane_review.status"
+  - "control_plane_review.missing_routing"
+  - "control_plane_review.review_required"
+  - "control_plane_review.known_gaps"
+  - "control_plane_review.residual_risks"
+  - "control_plane_review.human_review_required"
+  - "control_plane_review.ai_component_inventory_reconciliation"
+  - "control_plane_review.aivss_arithmetic_verification_reconciliation"
+maturity_path:
+  L0: "Capability contract, rules schema, item seed, report schema, and seed rules exist in the kit."
+  L1: "Project declares structured review/routing items for actionable governance-surface changes and research findings."
+  L2: "Control-plane review report is generated as file-first routing evidence."
+  L3: "Gatekeepers apply profile severity to missing routing and review-required items."
+  L4: "Dashboard and evidence pack expose routing decisions, known gaps, residual risks, waivers, and next actions."
+  L5: "Evidence is complete enough to support governed review of routing disposition decisions."
+known_limitations:
+  - "Does not perform web research."
+  - "Does not implement behavioral autoresearch or model-backed behavioral grading."
+  - "Does not infer complete routing from free-text analysis."
+  - "Does not scan private/internal dev content by default for adopter behavior."
+  - "Human review is required for disposition, waiver, risk, and remediation decisions."
+  - "AI component inventory reconciliation covers declared repository facts only; it is not runtime discovery, completeness, signing, attestation, or standards conformance."
+  - "AIVSS arithmetic reconciliation verifies assessor-supplied v0.8 arithmetic only; it is not a risk assessment, CVSS validation, exploitability proof, vulnerability discovery, runtime observation, mitigation proof, security assurance, or compliance evidence."
+not_claimed:
+  - "complete research coverage"
+  - "complete governance-surface review"
+  - "automatic remediation"
+  - "governance proof"
+  - "compliance proof"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/SYSTEMIC_CAPABILITY_WIRING.md
+related_scripts:
+  - scripts/naos_control_plane_review.py
+  - scripts/naos_ai_component_inventory.py
+  - scripts/naos_aivss_arithmetic_verification.py

@@ -1,0 +1,150 @@
+version: "1.0"
+semantics:
+  state: "Rules declare which local evidence artifacts NAOS should hash and review."
+  report: "NAOS reports local SHA-256 digests and reviewer metadata for human review."
+  governance_boundary: "Local digest plus reviewer metadata is bounded evidence, not approval."
+  not_claimed:
+    - "cryptographic signing"
+    - "signature verification"
+    - "tamper-proof evidence"
+    - "certified evidence"
+    - "legal or regulatory approval"
+    - "compliance approval"
+    - "guaranteed integrity"
+
+enabled: true
+digest_algorithm: sha256
+default_freshness_window_days: 30
+
+excluded_paths:
+  - ".git/**"
+  - ".venv/**"
+  - "venv/**"
+  - "__pycache__/**"
+  - "**/__pycache__/**"
+  - "*.pyc"
+  - "dist/**"
+  - "build/**"
+  - "*.egg-info/**"
+  - ".mypy_cache/**"
+  - ".pytest_cache/**"
+  - ".DS_Store"
+  - "naos/reports/evidence_attestation.json"
+
+artifact_groups:
+  - id: control_plane_reports
+    name: "Control-plane reports"
+    enabled: true
+    included_paths:
+      - "naos/reports/*.json"
+      - "naos/evidence/*.json"
+      - "naos/evidence/*.yaml"
+    required_artifacts:
+      - "naos/reports/claims_validation.json"
+      - "naos/reports/self_check.json"
+      - "naos/evidence/evidence_pack.json"
+    optional_artifacts:
+      - "naos/reports/capability_maturity.json"
+      - "naos/reports/systemic_impact_review.json"
+      - "naos/reports/module_header_traceability.json"
+      - "naos/reports/spec_cascade_coherence.json"
+      - "naos/reports/control_plane_review.json"
+      - "naos/reports/ai_surface_context_budget.json"
+      - "naos/reports/setup_recommendations.json"
+      - "naos/reports/dashboard_summary.json"
+    excluded_paths:
+      - "naos/reports/evidence_attestation.json"
+    freshness_window_days: 30
+    human_review_required: true
+    limitations:
+      - "If evidence_pack.json is hashed, its digest may not include the final evidence pack that later embeds this attestation report."
+
+  - id: governing_configuration
+    name: "Governing configuration"
+    enabled: true
+    included_paths:
+      - "naos/*.yaml"
+      - "naos/policy/*.yaml"
+      - "policies/*.yaml"
+    required_artifacts:
+      - "naos/evidence_attestation_rules.yaml"
+      - "naos/evidence_review_attestations.yaml"
+    optional_artifacts:
+      - "naos/capability_state.yaml"
+      - "naos/systemic_impact_rules.yaml"
+      - "naos/module_header_rules.yaml"
+      - "naos/control_plane_review_rules.yaml"
+      - "naos/control_plane_review_items.yaml"
+      - "naos/setup_module_catalog.yaml"
+    excluded_paths: []
+    freshness_window_days: 90
+    human_review_required: true
+    limitations:
+      - "Configuration hashing does not prove the configuration is correct or approved."
+
+reviewer_attestation_requirements:
+  required_by_profile:
+    quickstart: false
+    lite: false
+    standard: true
+    assured: true
+  allowed_review_outcomes:
+    - acknowledged
+    - accepted_with_gaps
+    - review_required
+    - deferred
+    - waived
+  required_fields:
+    - id
+    - review_date
+    - review_scope
+    - review_outcome
+
+profile_severity_behavior:
+  quickstart: advisory
+  lite: warning
+  standard: required
+  assured: blocking
+
+human_review_required:
+  missing_required_artifact: true
+  stale_artifact: true
+  uncovered_artifact:
+    quickstart: false
+    lite: false
+    standard: true
+    assured: true
+  missing_reviewer_metadata:
+    quickstart: false
+    lite: false
+    standard: true
+    assured: true
+
+waiver_handling:
+  waivers_remain_visible: true
+  waiver_is_not_pass: true
+
+residual_risk_handling:
+  residual_risks_remain_visible: true
+  residual_risk_requires_human_review: true
+
+known_gap_handling:
+  known_gaps_remain_visible: true
+  known_gap_requires_disposition: true
+
+limitations:
+  - "Local SHA-256 digests show file content at report generation time only."
+  - "Reviewer metadata is not a digital signature and does not verify identity."
+  - "Someone with repository write access can edit evidence unless external controls are used."
+  - "The report does not implement key custody, PKI, notarization, timestamping, ledger storage, or legal e-signature semantics."
+  - "Evidence-pack circularity is possible when the pack embeds the attestation report after digest calculation."
+
+not_claimed:
+  - "cryptographic signing"
+  - "signature verification"
+  - "tamper-proof evidence"
+  - "certified evidence"
+  - "legal or regulatory approval"
+  - "compliance approval"
+  - "guaranteed integrity"
+  - "identity verification"

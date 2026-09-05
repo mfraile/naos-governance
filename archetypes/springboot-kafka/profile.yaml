@@ -1,0 +1,112 @@
+# Spring Boot + Kafka Archetype Profile
+# NAOS Portable Governance Kit
+# ─────────────────────────────────────────────────────────────────────────────
+# Pre-adapted for a Spring Boot Java/Kotlin application with Kafka as the
+# event backbone.
+# Signals: Java/Kotlin, Spring Boot, Kafka, PostgreSQL or MySQL, Kubernetes.
+# ─────────────────────────────────────────────────────────────────────────────
+
+project:
+  name: "[YOUR_PROJECT_NAME]"
+  path: "."
+  archetype: springboot-kafka
+  naos_profile: assured      # Spring Boot enterprise projects often need assured level
+
+languages:
+  - java                   # ADAPT: or kotlin
+
+web_frameworks:
+  - spring-boot
+  - spring-web             # Spring MVC / Spring WebFlux (reactive)
+
+database:
+  engines:
+    - postgresql           # ADAPT: mysql, oracle, mssql
+  orm:
+    - spring-data-jpa
+  migrations:
+    - flyway               # ADAPT: liquibase
+  vector_store: []
+
+llm_toolchain:
+  api_providers: []
+  local_models: []
+  frameworks:
+    - spring-ai            # ADAPT: remove if not using AI features
+  embedding_frameworks: []
+  local_oss_models: []
+
+graph_db: []
+
+event_bus:
+  - kafka                  # Apache Kafka via spring-kafka
+
+auth:
+  - spring-security        # Spring Security (OAuth2, JWT, or session-based)
+  - oauth2                 # ADAPT: remove if not using OAuth2
+
+testing:
+  - junit5
+  - mockito
+  - testcontainers         # Integration tests with Testcontainers
+  - spring-boot-test
+
+infrastructure:
+  containerisation:
+    - docker
+    - kubernetes
+    - helm                 # ADAPT: remove if not using Helm charts
+  ci_cd:
+    - github-actions       # ADAPT: jenkins, gitlab-ci
+  cloud:
+    - aws                  # ADAPT: gcp, azure, on-prem
+
+multi_tenancy: false       # ADAPT: set true if multi-tenant
+
+signals:
+  has_api: true
+  has_sql_db: true
+  has_vector_store: false
+  has_llm: false
+  has_event_bus: true
+  has_auth: true
+  has_graph_db: false
+  has_multi_tenancy: false
+  has_containerisation: true
+  has_ci_cd: true
+  is_python: false
+  is_node: false
+
+adapt_stubs:
+  db_schema_conventions: |
+    [ADAPT: JPA entity naming conventions, schema management strategy,
+     Flyway migration naming rules (V{version}__{description}.sql),
+     connection pool settings, N+1 query prevention approach (e.g.,
+     fetch type rules, EntityGraph usage).]
+
+  module_boundaries: |
+    [ADAPT: Spring package structure and layering. Forbidden imports
+     (e.g., @Controller must not import @Repository directly, must go
+     through @Service). Domain boundaries between bounded contexts.
+     Event contract ownership (which team owns which Kafka topic?).]
+
+  spec_alignment: |
+    [ADAPT: Paths to your OpenAPI spec (springdoc-openapi annotation-driven
+     or static spec/), requirements documentation, and Avro/JSON schemas
+     for Kafka topics.]
+
+  data_flow_invariants: |
+    [ADAPT: Kafka producer/consumer invariants. Examples:
+     - Kafka schema registry rules for schema evolution (backwards-compatible only)
+     - Idempotent consumers (at-least-once delivery assumed)
+     - Transactional outbox pattern requirements
+     - Dead letter topic naming convention]
+
+  ssrf_allowed_domains: |
+    [ADAPT: External REST APIs or Kafka brokers your application connects to.
+     Example: kafka.broker.internal:9092, api.stripe.com, auth.okta.com]
+
+  conflict_resolution: |
+    [ADAPT: Code review process, Kafka topic schema change approval
+     (backwards-compatible required for consumer compatibility), JPA
+     migration review (database changes require DBA sign-off?)]

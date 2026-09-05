@@ -1,0 +1,202 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: '3.11'
+  # [ADAPT: set your Node.js version if you have a frontend]
+  # NODE_VERSION: '18'
+
+jobs:
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run Ruff Lint
+        # [ADAPT: adjust source directories if your project uses a different layout]
+        run: ruff check src/ tests/
+
+      - name: Run Ruff Format Check
+        run: ruff format --check src/ tests/
+
+      - name: Run MyPy
+        run: mypy src/
+
+      - name: Mermaid diagram lint
+        run: python scripts/validators/lint_mermaid_diagrams.py .
+
+      - name: Governance licence-boundary placeholder
+        run: |
+          # [ADAPT: add checks for packages not allowed in your production source]
+          echo "::warning::No licence-boundary check is configured in this placeholder"
+
+  test:
+    name: Testing
+    runs-on: ubuntu-latest
+    env:
+      # [ADAPT: set your required test environment variables]
+      REDIS_URL: redis://localhost:6379/0
+    services:
+      # [ADAPT: add/remove services depending on your stack]
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_runner
+          POSTGRES_PASSWORD: ${{ github.run_id }}_${{ github.run_attempt }}
+          # [ADAPT: replace with your test database name]
+          POSTGRES_DB: app_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set CI database URL
+        run: |
+          # [ADAPT: replace 'app_test' with your test database name]
+          echo "DATABASE_URL=postgresql://ci_runner:${{ github.run_id }}_${{ github.run_attempt }}@localhost:5432/app_test" >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        run: pytest tests/unit/ -v --cov=src --cov-report=xml
+
+      - name: Run acceptance tests
+        run: pytest tests/acceptance/ -v
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install bandit safety pip-audit pip-licenses
+          pip install -r requirements.txt
+
+      - name: Run Bandit
+        run: bandit -r src/ -f json -o bandit-report.json
+
+      - name: Run Safety
+        run: safety check --json
+
+      - name: Run pip-audit
+        run: pip-audit --requirement requirements.txt --strict --desc
+
+      - name: License scanning report (warn on AGPL or unknown licences)
+        run: |
+          pip-licenses --format=json --output-file=license-report.json
+          pip-licenses \
+            --fail-on="GNU Affero General Public License v3 (AGPLv3);AGPL-3.0-only;AGPL-3.0-or-later;AGPL-3.0" \
+            --allow-only="MIT;BSD License;BSD-2-Clause;BSD-3-Clause;Apache Software License;Apache-2.0;ISC;PSF;Python Software Foundation License;Mozilla Public License 2.0 (MPL 2.0);LGPL-2.1-only;LGPL-3.0-only;GNU Lesser General Public License v2 or later (LGPLv2+);GNU Lesser General Public License v3 (LGPLv3);Public Domain;The Unlicense (Unlicense);Unlicense" \
+            || echo "::warning::Unknown licenses detected — review license-report.json"
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            license-report.json
+
+  config-schemas:
+    name: Config Schema Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install deps
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Validate configs via JSON Schemas
+        run: |
+          # [ADAPT: set --configs-dir, --schema-dir, and --required-config as needed]
+          python scripts/validators/validate_configs.py
+
+  governance:
+    name: Governance Check
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+      - name: Run governance validation
+        run: |
+          make -f Makefile.naos gov-refresh
+          make -f Makefile.naos validate-all
+          make -f Makefile.naos naos-spec-pack-materialize NAOS_PROFILE="${NAOS_PROFILE:-standard}" SPEC_PACK_MATERIALIZE_ARGS="--dry-run"
+          make -f Makefile.naos naos-spec-assembly-worksheet NAOS_PROFILE="${NAOS_PROFILE:-standard}"

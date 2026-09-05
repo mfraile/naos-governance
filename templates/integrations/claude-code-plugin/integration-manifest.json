@@ -1,0 +1,20 @@
+{
+  "id": "claude_code_plugin_adapter",
+  "name": "NAOS Claude Code Plugin Adapter Guidance",
+  "version": "0.1.0",
+  "canonical_source": "plugins/naos-governance-claude-code",
+  "destination": "naos/integrations/claude-code-plugin",
+  "activation": "manual",
+  "runtime_surfaces_enabled": [],
+  "non_claims": [
+    "live Claude Code plugin installation proof",
+    "MCP access proof",
+    "automatic hook activation",
+    "silent context injection",
+    "automatic memory write-back",
+    "provider/model/API calls",
+    "approval",
+    "certification",
+    "proof of compliance"
+  ]
+}

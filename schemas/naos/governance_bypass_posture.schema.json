@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:governance_bypass_posture:v1",
+  "title": "NAOS Governance Bypass Posture Report",
+  "description": "Deterministic local posture report for hook/CI bypass indicators. Findings are review evidence only and are not bypass prevention, approval, certification, or proof of compliance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "generated_at", "profile", "status", "project_root", "naos_root", "deterministic", "cost_posture", "summary", "scans", "findings", "waivers", "known_gaps", "residual_risks", "limitations", "not_claimed", "human_review_required"],
+  "properties": {
+    "schema": {"const": "naos.governance_bypass_posture.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "deterministic": {"type": "boolean"},
+    "cost_posture": {"type": "object"},
+    "summary": {"type": "object", "additionalProperties": true},
+    "scans": {"type": "object", "additionalProperties": true},
+    "findings": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+    "waivers": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  }
+}

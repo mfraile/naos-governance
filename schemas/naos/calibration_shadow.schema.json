@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:calibration_shadow:v1",
+  "title": "NAOS Calibration Shadow Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "profile",
+    "updated_at",
+    "description",
+    "enabled",
+    "mode",
+    "baseline_policy",
+    "expected_reports",
+    "comparison_rules",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.calibration_shadow.v1"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "updated_at": {"type": ["string", "null"]},
+    "description": {"type": "string"},
+    "enabled": {"type": "boolean"},
+    "mode": {"const": "deterministic_shadow"},
+    "baseline_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow_missing_optional_reports",
+        "review_required_on_schema_mismatch",
+        "review_required_on_status_regression",
+        "review_required_on_unexpected_source_change"
+      ],
+      "properties": {
+        "allow_missing_optional_reports": {"type": "boolean"},
+        "review_required_on_schema_mismatch": {"type": "boolean"},
+        "review_required_on_status_regression": {"type": "boolean"},
+        "review_required_on_unexpected_source_change": {"type": "boolean"}
+      }
+    },
+    "expected_reports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["report_id", "path", "required", "expected_schema_prefix", "expected_statuses"],
+        "properties": {
+          "report_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+          "path": {"type": "string"},
+          "required": {"type": "boolean"},
+          "expected_schema_prefix": {"type": "string"},
+          "expected_statuses": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1
+          },
+          "expected_finding_ids": {"type": "array", "items": {"type": "string"}},
+          "expected_source_categories": {"type": "array", "items": {"type": "string"}},
+          "expected_summary_counts": {
+            "type": "object",
+            "additionalProperties": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "comparison_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compare_schema",
+        "compare_status",
+        "compare_finding_ids",
+        "compare_source_categories",
+        "compare_summary_counts",
+        "ignore_fields"
+      ],
+      "properties": {
+        "compare_schema": {"type": "boolean"},
+        "compare_status": {"type": "boolean"},
+        "compare_finding_ids": {"type": "boolean"},
+        "compare_source_categories": {"type": "boolean"},
+        "compare_summary_counts": {"type": "boolean"},
+        "ignore_fields": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  }
+}

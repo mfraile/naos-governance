@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:design_traceability:v1",
+  "title": "NAOS Design Traceability Report",
+  "description": "Deterministic local review evidence for optional UI spec-object identity declarations. It is not design quality proof, accessibility compliance proof, privacy compliance proof, brand compliance proof, Figma/MCP/html.to.design sync, approval, certification, attestation, compliance proof, release authority, publication authority, runtime orchestration, provider calls, model calls, or memory activation.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "deterministic",
+    "declaration_path",
+    "declaration_source",
+    "enabled",
+    "object_identity_declared",
+    "runtime_enabled",
+    "design_tool_calls_allowed",
+    "external_api_calls_allowed",
+    "tool_mutation_allowed",
+    "capability_maturity",
+    "object_type_counts",
+    "object_status_counts",
+    "objects",
+    "referenced_paths",
+    "findings",
+    "reason_code_counts",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "generated_by",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.design_traceability.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["pass", "advisory", "warning", "required_missing", "blocked", "not_configured", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "declaration_path": {"type": "string"},
+    "declaration_source": {"type": "string", "enum": ["project", "template", "explicit"]},
+    "declaration_hash": {"type": ["string", "null"]},
+    "enabled": {"type": "boolean"},
+    "object_identity_declared": {"type": "boolean"},
+    "runtime_enabled": {"const": false},
+    "design_tool_calls_allowed": {"const": false},
+    "external_api_calls_allowed": {"const": false},
+    "tool_mutation_allowed": {"const": false},
+    "capability_maturity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["current", "assured_blocking_enabled", "blocking_requires_l3_plus_and_gate_wiring"],
+      "properties": {
+        "current": {"type": "string"},
+        "assured_blocking_enabled": {"const": false},
+        "blocking_requires_l3_plus_and_gate_wiring": {"const": true}
+      }
+    },
+    "profile_posture": {"type": "object"},
+    "object_type_counts": {"type": "object"},
+    "object_status_counts": {"type": "object"},
+    "objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "index",
+          "object_id",
+          "object_type",
+          "status",
+          "fr_refs",
+          "nfr_refs",
+          "task_refs",
+          "screen_spec_path",
+          "implementation_paths",
+          "changed_file_refs",
+          "test_evidence_refs",
+          "optional_design_refs",
+          "design_ref_reviewed",
+          "human_review_required",
+          "residual_risks",
+          "non_claims"
+        ],
+        "properties": {
+          "index": {"type": "integer", "minimum": 0},
+          "object_id": {"type": ["string", "null"]},
+          "object_type": {"type": ["string", "null"]},
+          "status": {"type": ["string", "null"]},
+          "fr_refs": {"type": "array", "items": {"type": "string"}},
+          "nfr_refs": {"type": "array", "items": {"type": "string"}},
+          "task_refs": {"type": "array", "items": {"type": "string"}},
+          "screen_spec_path": {"type": ["string", "null"]},
+          "screen_spec_path_safe": {"type": "boolean"},
+          "screen_spec_path_exists": {"type": "boolean"},
+          "implementation_paths": {"type": "array", "items": {"type": "object"}},
+          "changed_file_refs": {"type": "array", "items": {"type": "string"}},
+          "test_evidence_refs": {"type": "array", "items": {"type": "string"}},
+          "optional_design_refs": {"type": "array", "items": {"type": "object"}},
+          "design_ref_reviewed": {"type": "boolean"},
+          "human_review_required": {"type": "boolean"},
+          "review_disposition": {},
+          "residual_risks": {"type": "array", "items": {"type": "string"}},
+          "non_claims": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "referenced_paths": {"type": "array", "items": {"type": "object"}},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "severity", "status", "reason_code", "gate", "message", "human_review_required"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+          "status": {"type": "string"},
+          "reason_code": {"type": "string"},
+          "related_gates": {"type": "array", "items": {"type": "string"}},
+          "gate": {"type": "string"},
+          "message": {"type": "string"},
+          "human_review_required": {"type": "boolean"}
+        }
+      }
+    },
+    "reason_code_counts": {"type": "object"},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"},
+      "allOf": [
+        {"contains": {"const": "approval"}},
+        {"contains": {"const": "merge approval"}},
+        {"contains": {"const": "compliance proof"}},
+        {"contains": {"const": "certification"}},
+        {"contains": {"const": "attestation"}},
+        {"contains": {"const": "runtime orchestration"}},
+        {"contains": {"const": "MCP activation"}},
+        {"contains": {"const": "provider calls"}},
+        {"contains": {"const": "model calls"}},
+        {"contains": {"const": "memory activation"}}
+      ]
+    },
+    "human_review_required": {"type": "boolean"},
+    "generated_by": {"type": "object", "additionalProperties": true},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "objects": {"type": "integer", "minimum": 0},
+        "referenced_paths_missing": {"type": "integer", "minimum": 0},
+        "assured_blocking_enabled": {"const": 0}
+      }
+    }
+  }
+}

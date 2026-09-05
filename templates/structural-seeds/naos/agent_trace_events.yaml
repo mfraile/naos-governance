@@ -1,0 +1,63 @@
+# NAOS Agent Trace Events
+#
+# This seed is intentionally empty. Add manually declared trace events only when
+# a project wants file-first records for future StaticGrader, audit, or drift
+# review. Trace events are records, not proof, approval, evidence authority,
+# memory writes, or compliance/legal/regulatory proof.
+#
+# Do not place secrets, customer data, tenant data, private memory payloads,
+# provider credentials, prompts, or project-private facts here.
+#
+# Workflow for standard/assured projects:
+# 1. Add a declared event after a meaningful agent action, review checkpoint, or
+#    hallucination-sensitive claim.
+# 2. Include action_receipt when the action involved side effects, approval
+#    posture, memory trust, or claim-to-evidence review.
+# 3. Run `naos agent-traces --profile <profile>` or
+#    `make -f Makefile.naos naos-agent-traces`.
+#
+# Example shape for a future manual event. Keep this metadata concise and do not
+# store prompts, private memory payloads, customer data, credentials, or secrets:
+# events:
+#   - event_id: trace-T-001-001
+#     generated_at: "2026-05-18T12:00:00Z"
+#     session_id: "session-local-001"
+#     task_id: "T-001"
+#     agent_or_surface: "local_agent"
+#     lifecycle_phase: "implementation"
+#     action_type: "validate"
+#     input_artifacts: ["specs/03-requirements.md"]
+#     output_artifacts: ["naos/reports/example.json"]
+#     source_references: ["specs/03-requirements.md"]
+#     deterministic_controls_used: ["naos self-check"]
+#     advisory_controls_used: []
+#     memory_refs: []
+#     authority_layer: "record_only"
+#     trace_origin: "manual"
+#     trace_status: "declared"
+#     action_receipt:
+#       intended_action: "update local implementation notes"
+#       action_contract: "local_write"
+#       side_effect_class: "local_write"
+#       permission_scope: "repo-local files under dev/**"
+#       approval_required: true
+#       approval_status: "approved"
+#       approval_ref: "reviewer-comment-or-task-card-id"
+#       tool_decision: "allowed"
+#       claim_refs:
+#         - claim: "AC-001 has local evidence"
+#           evidence_refs:
+#             - "naos/reports/ac_completion_evidence.json"
+#       memory_operation: "read_reviewed"
+#       memory_trust_state: "supporting_context_memory"
+#       memory_use_level: "supporting_context"
+#     human_review_required: true
+#     limitations:
+#       - "Declared record only; not runtime capture."
+#     not_claimed:
+#       - "correctness proof"
+#       - "approval"
+#       - "memory write"
+
+version: 1
+events: []

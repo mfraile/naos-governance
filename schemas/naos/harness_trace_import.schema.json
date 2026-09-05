@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:harness_trace_import:v1",
+  "title": "NAOS Harness Trace Import Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "mode",
+    "naos_root",
+    "project_root",
+    "source_path",
+    "source_format",
+    "source_present",
+    "source_sha256",
+    "target_trace_file",
+    "write_events",
+    "events_written",
+    "raw_record_count",
+    "imported_event_count",
+    "rejected_record_count",
+    "normalized_events",
+    "findings",
+    "known_gaps",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.harness_trace_import.v1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["ready", "written", "no_events", "not_configured", "review_required", "blocked"]
+    },
+    "mode": {"type": "string", "enum": ["report_only", "write_events"]},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "source_path": {"type": ["string", "null"]},
+    "source_format": {"type": "string", "enum": ["jsonl", "ndjson"]},
+    "source_present": {"type": "boolean"},
+    "source_sha256": {"type": ["string", "null"]},
+    "target_trace_file": {"type": ["string", "null"]},
+    "write_events": {"type": "boolean"},
+    "events_written": {"type": "boolean"},
+    "raw_record_count": {"type": "integer", "minimum": 0},
+    "imported_event_count": {"type": "integer", "minimum": 0},
+    "rejected_record_count": {"type": "integer", "minimum": 0},
+    "normalized_events": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": true}
+    },
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object", "additionalProperties": true}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message", "human_review_required"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string"},
+        "status": {"type": "string"},
+        "message": {"type": "string"},
+        "human_review_required": {"type": "boolean"}
+      }
+    }
+  }
+}

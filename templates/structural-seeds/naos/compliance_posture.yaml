@@ -1,0 +1,50 @@
+schema: naos.compliance_posture_manifest.v1
+updated_at: null
+status: unknown
+description: >
+  Project-local declaration surface for compliance posture review. This file
+  records adopter-declared regulated contexts and evidence references only. It
+  is not legal advice, a regulatory applicability decision, compliance
+  certification, conformity assessment, audit opinion, control completion,
+  release approval, publication authorization, or proof of compliance.
+posture_scope:
+  summary: "Describe the reviewed project, product, service, or delivery scope."
+  no_regulated_context_asserted: false
+no_regulated_context_review:
+  declared_basis: ""
+  reviewer: ""
+  reviewed_at: null
+declared_contexts: []
+# Example shape, left commented so no regime is selected by default:
+# declared_contexts:
+#   - context_id: REG-CTX-001
+#     status: draft
+#     regime: "DORA"
+#     jurisdiction: "EU"
+#     declared_basis: "Explain why this context is relevant to the project."
+#     evidence_refs:
+#       - naos/evidence/evidence_pack.json
+#       - naos/reports/dashboard_summary.json
+#     reviewer: ""
+#     reviewed_at: null
+#     unresolved_questions: []
+unresolved_questions: []
+human_review_required: true
+not_claimed:
+  - legal advice
+  - legal opinion
+  - regulatory applicability decision
+  - legal or regulatory compliance
+  - compliance pass/fail
+  - compliance score
+  - certification
+  - conformity assessment
+  - audit opinion
+  - regulatory approval
+  - operational-resilience execution
+  - model-risk approval
+  - control completion
+  - signing
+  - publication authorization
+  - release authorization
+  - proof of compliance

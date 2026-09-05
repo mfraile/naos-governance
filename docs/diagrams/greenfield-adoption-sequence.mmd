@@ -1,0 +1,21 @@
+sequenceDiagram
+    participant User as Human adopter
+    participant CLI as naos adopt --mode greenfield
+    participant Intake as Intake/install-plan
+    participant Challenge as Challenge reports
+    participant Surface as AI-surface budget
+    participant SpecPack as Spec-pack lifecycle checks
+    participant Trace as Spec/source traceability checks
+    participant Decision as Install decision record
+    participant Review as Human review
+
+    Note over User,Review: Preview generation is exercised on Linux/Python 3.11.<br/>Create-only activation is currently supported only on Darwin ARM64/CPython 3.11-3.13;<br/>unsupported tuples refuse before target mutation.
+    User->>CLI: Preview greenfield adoption
+    CLI->>Intake: Collect purpose, profile, risk, evidence expectations
+    Intake->>Challenge: Challenge assumptions before build
+    Challenge->>Surface: Check generated AI/governance instruction context health
+    Challenge->>SpecPack: Run contract, materialization dry-run, and worksheet when applicable
+    SpecPack->>Trace: Run spec-cascade when specs/source refs exist
+    Trace->>Decision: Record facts, unknowns, traceability gaps, next actions
+    Decision->>Review: Present adoption evidence
+    Review->>Review: Activate, defer, remediate, or record residual risk

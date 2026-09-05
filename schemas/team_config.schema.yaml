@@ -1,0 +1,98 @@
+# team_config Schema — NAOS Portable Governance Kit
+# ─────────────────────────────────────────────────────────────────────────────
+# This schema defines the optional team_config block in TASK_REGISTRY.yaml.
+#
+# Purpose: Allow teams to filter PM views (BACKLOG, DASHBOARD, etc.) to only
+# tasks relevant to their scope without modifying the flat tasks: list.
+#
+# Zero blast radius: all governance scripts continue reading the flat tasks: list.
+# The team_config block is purely additive — when enabled: false (default),
+# scripts behave identically to before this feature was added.
+#
+# Usage in TASK_REGISTRY.yaml:
+#   Add this block at the top level of TASK_REGISTRY.yaml, alongside
+#   the existing tasks: list.
+#
+# Usage from CLI:
+#   python naos/workflows/scripts/sync_from_registry.py --team backend
+#   python naos/workflows/scripts/generate_naos_dashboard.py --team frontend
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Annotated schema with inline documentation
+
+team_config:
+  # enabled: false means the multi-team feature is off.
+  # All scripts return all tasks regardless of --team flag.
+  # Set to true only when running multi-team development.
+  enabled: false         # boolean, default: false
+
+  # Teams list (only read when enabled: true)
+  teams:
+    - id: backend          # string — used in --team flag: --team backend
+      label: "Backend Team"  # human-readable name for reports
+      members:             # ADAPT: list team members for ownership tracking
+        - alice
+        - bob
+      scope:               # task IDs, phase numbers, or module names
+        - T-001            # (assignment_mode: task_scope — uses task IDs)
+        - T-002
+        # - "3"            # (assignment_mode: phase_scope — phase numbers as strings)
+        # - "Engineering"  # (assignment_mode: module_scope — owner field values)
+
+    - id: frontend
+      label: "Frontend Team"
+      members:
+        - carol
+      scope:
+        - T-010
+        - T-011
+
+  # assignment_mode: controls how scope entries are interpreted
+  #
+  #   task_scope    — scope contains task IDs (T-001, T-002, T-003)
+  #                   Most flexible; tasks explicitly assigned to teams.
+  #
+  #   phase_scope   — scope contains phase numbers as strings ("1", "2")
+  #                   Natural fit when phases map to team ownership areas.
+  #
+  #   module_scope  — scope contains task.owner values ("Engineering", "Frontend")
+  #                   Works without modifying scope list when owner field is reliable.
+  #
+  # All modes are additive — tasks not in scope are HIDDEN from filtered views,
+  # NOT deleted from the registry.
+  assignment_mode: task_scope   # task_scope | phase_scope | module_scope
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VALIDATION RULES (enforced by naos_validate_task_registry.py)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# When team_config.enabled: true, the validator checks:
+#   1. team.id must be unique across all teams
+#   2. task_scope: each ID in scope must match an actual task.id in tasks: list
+#   3. phase_scope: each phase number must match an actual task.phase (as int)
+#   4. module_scope: each owner name must match an actual task.owner value
+#   5. members: no validation (advisory only — used for reports, not access control)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXAMPLE: Minimal team_config for a 2-team project
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# team_config:
+#   enabled: true
+#   teams:
+#     - id: core
+#       label: "Core Platform"
+#       members: [alice, bob]
+#       scope: [T-001, T-002, T-003, T-010]
+#     - id: integrations
+#       label: "Integrations"
+#       members: [carol]
+#       scope: [T-004, T-005, T-006]
+#   assignment_mode: task_scope
+#
+# Then run:
+#   python naos/workflows/scripts/sync_from_registry.py --team core
+#   python naos/workflows/scripts/sync_from_registry.py --team integrations
+#
+# ─────────────────────────────────────────────────────────────────────────────

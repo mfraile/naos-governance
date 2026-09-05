@@ -1,0 +1,16 @@
+schema: naos.package_reality_provenance.v1
+packages: []
+limitations:
+  - "Package provenance entries are adopter-maintained review evidence only."
+  - "This manifest does not prove package safety, vulnerability absence, supply-chain assurance, or approval."
+not_claimed:
+  - "package safety proof"
+  - "malware detection"
+  - "vulnerability scanning"
+  - "supply-chain assurance"
+  - "registry trust proof"
+  - "provenance authenticity proof"
+  - "hash attestation proof"
+  - "approval"
+  - "certification"
+  - "proof of compliance"

@@ -1,0 +1,659 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:ai-surface-profile-footprint-baseline:v1",
+  "title": "NAOS Fresh Profile Footprint Baseline",
+  "description": "Complete deterministic measurements for isolated fresh Quickstart, Lite, Standard, and Assured scaffolds. This report is measurement and intake-gate evidence; it is not candidate approval, pilot closure, runtime proof, or publication authority.",
+  "$comment": "Every accepted report is content-addressed and includes complete generated-input provenance. JSON Schema cannot recompute declared digests; all report accounting also requires scripts/naos_ai_surface_budget.py::validate_fresh_profiles_report.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "status",
+    "deterministic",
+    "isolated_temp_scaffolds",
+    "complete_json",
+    "legacy_singleton_unchanged",
+    "profile_order",
+    "source",
+    "command_contract",
+    "global_cli_envelope",
+    "profiles",
+    "threshold_contract",
+    "threshold_findings",
+    "summary",
+    "limitations",
+    "not_claimed",
+    "stable_payload_sha256"
+  ],
+  "properties": {
+    "schema": {"const": "naos.ai_surface_profile_footprint_baseline.v1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["pass", "warning", "unapproved", "stop"]},
+    "deterministic": {"const": true},
+    "isolated_temp_scaffolds": {"const": true},
+    "complete_json": {"const": true},
+    "legacy_singleton_unchanged": {"const": true},
+    "profile_order": {
+      "const": ["quickstart", "lite", "standard", "assured"]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "content_addressed_before_measurement",
+        "inputs",
+        "input_set_sha256",
+        "generated_input_provenance",
+        "rules"
+      ],
+      "properties": {
+        "content_addressed_before_measurement": {"const": true},
+        "inputs": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/sourceInput"}
+        },
+        "input_set_sha256": {"$ref": "#/$defs/sha256"},
+        "generated_input_provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "coverage",
+            "phase",
+            "content_addressed",
+            "mtime_independent"
+          ],
+          "properties": {
+            "version": {"const": "1"},
+            "coverage": {"const": "every scaffold-declared regular file"},
+            "phase": {"const": "post-isolation-overlay_pre-self-check"},
+            "content_addressed": {"const": true},
+            "mtime_independent": {"const": true}
+          }
+        },
+        "rules": {"$ref": "#/$defs/sourceInput"}
+      }
+    },
+    "command_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controlled_command",
+        "complete_human_command",
+        "default_writes_report",
+        "explicit_output_required_to_persist",
+        "fixed_time",
+        "default_display_max_rows"
+      ],
+      "properties": {
+        "controlled_command": {"const": "naos ai-surface-budget --fresh-profiles --json"},
+        "complete_human_command": {"const": "naos ai-surface-budget --fresh-profiles --all"},
+        "default_writes_report": {"const": false},
+        "explicit_output_required_to_persist": {"const": true},
+        "fixed_time": {"type": "string", "format": "date-time"},
+        "default_display_max_rows": {"type": "integer", "minimum": 1, "maximum": 24}
+      }
+    },
+    "global_cli_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "declared_script_command_count",
+        "resolvable_script_command_count",
+        "unresolved_script_commands",
+        "script_commands",
+        "built_in_commands",
+        "built_in_command_count"
+      ],
+      "properties": {
+        "basis": {"type": "string", "minLength": 1},
+        "declared_script_command_count": {"type": "integer", "minimum": 0},
+        "resolvable_script_command_count": {"type": "integer", "minimum": 0},
+        "unresolved_script_commands": {"type": "array", "items": {"$ref": "#/$defs/command"}},
+        "script_commands": {"type": "array", "items": {"$ref": "#/$defs/command"}},
+        "built_in_commands": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "built_in_command_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/profile"}
+    },
+    "threshold_contract": {"$ref": "#/$defs/thresholdContract"},
+    "threshold_findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/thresholdFinding"}
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profiles",
+        "finding_occurrences",
+        "generated_files",
+        "resident_context_tokens",
+        "reachable_cli_commands",
+        "threshold_findings"
+      ],
+      "properties": {
+        "profiles": {"const": 4},
+        "finding_occurrences": {"type": "integer", "minimum": 0},
+        "generated_files": {"type": "integer", "minimum": 0},
+        "resident_context_tokens": {"type": "integer", "minimum": 0},
+        "reachable_cli_commands": {"type": "integer", "minimum": 0},
+        "threshold_findings": {"type": "integer", "minimum": 0}
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "stable_payload_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sourceInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "script"],
+      "properties": {
+        "command": {"type": "string", "minLength": 1},
+        "script": {"type": "string", "minLength": 1},
+        "resolvable_in_kit": {"type": "boolean"}
+      }
+    },
+    "stateCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "not_configured",
+        "not_applicable",
+        "disabled",
+        "advisory",
+        "actionable",
+        "satisfied",
+        "unknown"
+      ],
+      "properties": {
+        "not_configured": {"type": "integer", "minimum": 0},
+        "not_applicable": {"type": "integer", "minimum": 0},
+        "disabled": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "actionable": {"type": "integer", "minimum": 0},
+        "satisfied": {"type": "integer", "minimum": 0},
+        "unknown": {"type": "integer", "minimum": 0}
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fresh_project_finding_count",
+        "resident_context_tokens",
+        "generated_file_count",
+        "cli_command_count"
+      ],
+      "properties": {
+        "fresh_project_finding_count": {"type": "integer", "minimum": 0},
+        "resident_context_tokens": {"type": "integer", "minimum": 0},
+        "generated_file_count": {"type": "integer", "minimum": 0},
+        "cli_command_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "profileCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "script"],
+      "properties": {
+        "command": {"type": "string", "minLength": 1},
+        "script": {"type": "string", "minLength": 1}
+      }
+    },
+    "fileMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "lines", "chars", "estimated_tokens", "sha256", "families"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "lines": {"type": "integer", "minimum": 0},
+        "chars": {"type": "integer", "minimum": 0},
+        "estimated_tokens": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "families": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "stateClass": {
+      "enum": [
+        "not_configured",
+        "not_applicable",
+        "disabled",
+        "advisory",
+        "actionable",
+        "satisfied",
+        "unknown"
+      ]
+    },
+    "checkState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "check_index",
+        "id",
+        "returncode",
+        "status",
+        "state_class",
+        "finding_count",
+        "summary"
+      ],
+      "properties": {
+        "check_index": {"type": "integer", "minimum": 0},
+        "id": {"type": "string", "minLength": 1},
+        "returncode": {"type": ["integer", "null"]},
+        "status": {"type": "string", "minLength": 1},
+        "state_class": {"$ref": "#/$defs/stateClass"},
+        "finding_count": {"type": "integer", "minimum": 0},
+        "summary": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "metadataOverrideValues": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_binary_check_allowed",
+        "provider_data_dir_metadata_check_allowed",
+        "provider_database_metadata_check_allowed",
+        "provider_store_metadata_check_allowed",
+        "user_mcp_config_metadata_check_allowed"
+      ],
+      "properties": {
+        "provider_binary_check_allowed": {"type": ["boolean", "null"]},
+        "provider_data_dir_metadata_check_allowed": {"type": ["boolean", "null"]},
+        "provider_database_metadata_check_allowed": {"type": ["boolean", "null"]},
+        "provider_store_metadata_check_allowed": {"type": ["boolean", "null"]},
+        "user_mcp_config_metadata_check_allowed": {"type": ["boolean", "null"]}
+      }
+    },
+    "selfCheckIsolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_state",
+        "temporary_rules_overlay",
+        "rules_path",
+        "overrides",
+        "prior_values",
+        "environment",
+        "normalizations",
+        "not_claimed"
+      ],
+      "properties": {
+        "external_state": {"const": "excluded"},
+        "temporary_rules_overlay": {"const": true},
+        "rules_path": {"const": "naos/memory_provider_access_rules.yaml"},
+        "overrides": {"$ref": "#/$defs/metadataOverrideValues"},
+        "prior_values": {"$ref": "#/$defs/metadataOverrideValues"},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "inherited_scope",
+            "naos_fixed_time",
+            "python_hash_seed",
+            "temporary_provider_and_git_metadata_roots"
+          ],
+          "properties": {
+            "inherited_scope": {
+              "const": ["PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT"]
+            },
+            "naos_fixed_time": {"type": "string", "format": "date-time"},
+            "python_hash_seed": {"const": "0"},
+            "temporary_provider_and_git_metadata_roots": {"const": true}
+          }
+        },
+        "normalizations": {
+          "oneOf": [
+            {
+              "const": [
+                "temporary roots",
+                "Python executable",
+                "user-home paths",
+                "generated session UUIDs",
+                "generated audit event IDs"
+              ]
+            },
+            {
+              "const": [
+                "temporary roots",
+                "Python executable",
+                "user-home paths",
+                "generated session UUIDs",
+                "generated audit event IDs",
+                "generated input mtimes to the fixed replay instant"
+              ]
+            }
+          ]
+        },
+        "not_claimed": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "thresholdEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current", "status", "baseline", "warn_above", "stop_above"],
+      "properties": {
+        "current": {"type": "integer", "minimum": 0},
+        "delta": {"type": "integer"},
+        "status": {
+          "enum": ["unapproved", "invalid", "below_baseline", "within_baseline", "warn", "stop"]
+        },
+        "baseline": {"type": ["integer", "null"], "minimum": 0},
+        "warn_above": {"type": ["integer", "null"], "minimum": 0},
+        "stop_above": {"type": ["integer", "null"], "minimum": 0},
+        "basis": {"type": ["string", "null"]},
+        "falsifier": {"type": ["string", "null"]}
+      }
+    },
+    "thresholdEvaluations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fresh_project_finding_count",
+        "resident_context_tokens",
+        "generated_file_count",
+        "cli_command_count"
+      ],
+      "properties": {
+        "fresh_project_finding_count": {"$ref": "#/$defs/thresholdEvaluation"},
+        "resident_context_tokens": {"$ref": "#/$defs/thresholdEvaluation"},
+        "generated_file_count": {"$ref": "#/$defs/thresholdEvaluation"},
+        "cli_command_count": {"$ref": "#/$defs/thresholdEvaluation"}
+      }
+    },
+    "thresholdFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "profile", "metric", "status", "message"],
+      "properties": {
+        "id": {
+          "enum": ["PROFILE_FOOTPRINT_THRESHOLD_MISSING", "PROFILE_FOOTPRINT_THRESHOLD_RESULT"]
+        },
+        "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+        "metric": {
+          "enum": [
+            "fresh_project_finding_count",
+            "resident_context_tokens",
+            "generated_file_count",
+            "cli_command_count"
+          ]
+        },
+        "status": {"enum": ["unapproved", "invalid", "warn", "stop"]},
+        "message": {"type": "string", "minLength": 1}
+      }
+    },
+    "thresholdContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "controlled_command",
+        "baseline_ref",
+        "default_display_max_rows",
+        "approval",
+        "methodology",
+        "candidate_freeze",
+        "auto_tuning_performed",
+        "human_review_required_before_change"
+      ],
+      "properties": {
+        "status": {"enum": ["approved", "unapproved", "invalid"]},
+        "controlled_command": {"const": "naos ai-surface-budget --fresh-profiles --json"},
+        "baseline_ref": {"const": "baselines/ai_surface_profile_footprint_baseline.json"},
+        "default_display_max_rows": {"type": "integer", "minimum": 1, "maximum": 24},
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "authority_ref", "authority_basis", "approved_on"],
+          "properties": {
+            "status": {"enum": ["pending_measurement", "approved"]},
+            "authority_ref": {"type": "string", "minLength": 1},
+            "authority_basis": {"type": "string", "minLength": 1},
+            "approved_on": {"type": ["string", "null"], "format": "date"}
+          }
+        },
+        "methodology": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["warning", "stop", "rationale", "falsifier"],
+          "properties": {
+            "warning": {"type": "string", "minLength": 1},
+            "stop": {"type": "string", "minLength": 1},
+            "rationale": {"type": "string", "minLength": 1},
+            "falsifier": {"type": "string", "minLength": 1}
+          }
+        },
+        "candidate_freeze": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "release_requires", "exemptions", "not_substitutes"],
+          "properties": {
+            "status": {"enum": ["active", "released"]},
+            "release_requires": {
+              "type": "array",
+              "minItems": 2,
+              "items": {"type": "string", "minLength": 1},
+              "uniqueItems": true
+            },
+            "exemptions": {
+              "const": ["defect_repair", "evidence_deepening", "noise_footprint_reduction"]
+            },
+            "not_substitutes": {
+              "type": "array",
+              "minItems": 2,
+              "items": {"type": "string", "minLength": 1},
+              "uniqueItems": true
+            }
+          }
+        },
+        "auto_tuning_performed": {"const": false},
+        "human_review_required_before_change": {"const": true}
+      }
+    },
+    "findingOccurrence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "check_index",
+        "check_id",
+        "finding_index",
+        "state_class",
+        "finding"
+      ],
+      "properties": {
+        "identity": {"type": "string", "minLength": 1},
+        "check_index": {"type": "integer", "minimum": 0},
+        "check_id": {"type": "string", "minLength": 1},
+        "finding_index": {"type": "integer", "minimum": 0},
+        "state_class": {"$ref": "#/$defs/stateClass"},
+        "finding": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "scaffold_contract",
+        "generated_surface",
+        "resident_context",
+        "cli_commands",
+        "self_check",
+        "metrics",
+        "threshold_evaluations"
+      ],
+      "properties": {
+        "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+        "scaffold_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "project_name",
+            "archetype",
+            "backend",
+            "memory",
+            "signals",
+            "isolated_temporary_root"
+          ],
+          "properties": {
+            "project_name": {"const": "fresh-project"},
+            "archetype": {"const": "custom"},
+            "backend": {"enum": ["disabled", "static_only"]},
+            "memory": {"const": "disabled"},
+            "signals": {"const": "fixed_empty_greenfield"},
+            "isolated_temporary_root": {"const": true}
+          }
+        },
+        "generated_surface": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "declared_entry_count",
+            "declared_unique_count",
+            "actual_unique_file_count",
+            "duplicate_declarations",
+            "files",
+            "provenance_phase",
+            "content_manifest",
+            "content_set_sha256",
+            "mtime_normalization"
+          ],
+          "properties": {
+            "declared_entry_count": {"type": "integer", "minimum": 0},
+            "declared_unique_count": {"type": "integer", "minimum": 0},
+            "actual_unique_file_count": {"type": "integer", "minimum": 0},
+            "duplicate_declarations": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1},
+              "uniqueItems": true
+            },
+            "files": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1},
+              "uniqueItems": true
+            },
+            "provenance_phase": {
+              "const": "post-isolation-overlay_pre-self-check"
+            },
+            "content_manifest": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/sourceInput"},
+              "uniqueItems": true
+            },
+            "content_set_sha256": {"$ref": "#/$defs/sha256"},
+            "mtime_normalization": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scope",
+                "fixed_time",
+                "normalized_file_count",
+                "copied_source_mtimes_used"
+              ],
+              "properties": {
+                "scope": {"const": "every scaffold-declared regular file"},
+                "fixed_time": {"type": "string", "format": "date-time"},
+                "normalized_file_count": {"type": "integer", "minimum": 0},
+                "copied_source_mtimes_used": {"const": false}
+              }
+            }
+          }
+        },
+        "resident_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["basis", "file_count", "chars", "estimated_tokens", "files"],
+          "properties": {
+            "basis": {"type": "string", "minLength": 1},
+            "file_count": {"type": "integer", "minimum": 0},
+            "chars": {"type": "integer", "minimum": 0},
+            "estimated_tokens": {"type": "integer", "minimum": 0},
+            "files": {"type": "array", "items": {"$ref": "#/$defs/fileMetric"}}
+          }
+        },
+        "cli_commands": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["basis", "count", "commands"],
+          "properties": {
+            "basis": {"type": "string", "minLength": 1},
+            "count": {"type": "integer", "minimum": 0},
+            "commands": {"type": "array", "items": {"$ref": "#/$defs/profileCommand"}}
+          }
+        },
+        "self_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "profile",
+            "status",
+            "returncode",
+            "summary",
+            "check_count",
+            "check_states",
+            "check_state_counts",
+            "finding_count",
+            "finding_state_counts",
+            "finding_occurrences",
+            "command",
+            "limitations",
+            "isolation"
+          ],
+          "properties": {
+            "schema": {"const": "naos.self_check.v1"},
+            "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+            "status": {"type": "string"},
+            "returncode": {"type": "integer"},
+            "summary": {"type": "object", "additionalProperties": true},
+            "check_count": {"type": "integer", "minimum": 0},
+            "check_states": {"type": "array", "items": {"$ref": "#/$defs/checkState"}},
+            "check_state_counts": {"$ref": "#/$defs/stateCounts"},
+            "finding_count": {"type": "integer", "minimum": 0},
+            "finding_state_counts": {"$ref": "#/$defs/stateCounts"},
+            "finding_occurrences": {"type": "array", "items": {"$ref": "#/$defs/findingOccurrence"}},
+            "command": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "limitations": {"type": "array", "items": {"type": "string"}},
+            "isolation": {"$ref": "#/$defs/selfCheckIsolation"}
+          }
+        },
+        "metrics": {"$ref": "#/$defs/metrics"},
+        "threshold_evaluations": {"$ref": "#/$defs/thresholdEvaluations"}
+      }
+    }
+  }
+}

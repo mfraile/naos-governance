@@ -1,0 +1,665 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:control_plane_review:v1",
+  "title": "NAOS Control-Plane Review Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "summary",
+    "governance_surface_review",
+    "research_routing",
+    "routing_decisions",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "waivers",
+    "human_review_required",
+    "limitations"
+  ],
+  "properties": {
+    "schema": {"const": "naos.control_plane_review.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string"},
+    "status": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "routed",
+        "review_required",
+        "missing_routing",
+        "blocked",
+        "advisory",
+        "warning",
+        "required_missing",
+        "not_configured",
+        "disabled",
+        "waived",
+        "unknown"
+      ]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "rules": {"type": "object"},
+    "items": {"type": "object"},
+    "summary": {"type": "object"},
+    "governance_surface_review": {"$ref": "#/$defs/section"},
+    "research_routing": {"$ref": "#/$defs/section"},
+    "parallel_lane_handoff_reconciliation": {"$ref": "#/$defs/parallel_lane_handoff_reconciliation"},
+    "external_sarif_result_reconciliation": {"$ref": "#/$defs/model_provider_policy_reconciliation"},
+    "ai_component_inventory_reconciliation": {"$ref": "#/$defs/model_provider_policy_reconciliation"},
+    "agent_sponsor_registry_reconciliation": {"$ref": "#/$defs/model_provider_policy_reconciliation"},
+    "aivss_arithmetic_verification_reconciliation": {"$ref": "#/$defs/model_provider_policy_reconciliation"},
+    "model_provider_policy_reconciliation": {"$ref": "#/$defs/model_provider_policy_reconciliation"},
+    "model_telemetry_evidence_reconciliation": {"$ref": "#/$defs/model_telemetry_evidence_reconciliation"},
+    "failure_mode_posture_reconciliation": {"$ref": "#/$defs/failure_mode_posture_reconciliation"},
+    "failure_mode_observations_reconciliation": {"$ref": "#/$defs/failure_mode_observations_reconciliation"},
+    "opencode_config_hygiene_reconciliation": {"$ref": "#/$defs/opencode_config_hygiene_reconciliation"},
+    "design_traceability_reconciliation": {"$ref": "#/$defs/design_traceability_reconciliation"},
+    "ui_experience_quality_reconciliation": {"$ref": "#/$defs/ui_experience_quality_reconciliation"},
+    "routing_decisions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/routing_decision"}
+    },
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "known_gaps": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "waivers": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "human_review_required": {"type": "boolean"},
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "summary", "items"],
+      "properties": {
+        "status": {"type": "string"},
+        "summary": {"type": "object"},
+        "items": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/routing_decision"}
+        }
+      }
+    },
+    "routing_decision": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "source_type",
+        "source_ref",
+        "summary",
+        "target_surfaces",
+        "status",
+        "human_review_required",
+        "required_next_actions"
+      ],
+      "properties": {
+        "id": {"type": "string"},
+        "source_type": {"type": "string"},
+        "source_ref": {"type": "string"},
+        "summary": {"type": "string"},
+        "source_artifact_family": {"type": "string"},
+        "target_surfaces": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "routed",
+            "review_required",
+            "missing_routing",
+            "blocked",
+            "advisory",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown"
+          ]
+        },
+        "human_review_required": {"type": "boolean"},
+        "known_gap_ref": {"type": ["string", "null"]},
+        "residual_risk_ref": {"type": ["string", "null"]},
+        "waiver_ref": {"type": ["string", "null"]},
+        "required_next_actions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "parallel_lane_handoff_reconciliation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "summary", "source_reports", "routes", "limitations", "not_claimed"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "routed",
+            "review_required",
+            "missing_routing",
+            "blocked",
+            "advisory",
+            "warning",
+            "required_missing",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "handoff_reports_found",
+            "declared_lane_reports",
+            "routes_generated",
+            "hitl_required",
+            "reason_code_counts"
+          ],
+          "properties": {
+            "handoff_reports_found": {"type": "integer", "minimum": 0},
+            "declared_lane_reports": {"type": "integer", "minimum": 0},
+            "routes_generated": {"type": "integer", "minimum": 0},
+            "hitl_required": {"type": "integer", "minimum": 0},
+            "reason_code_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "source_reports": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": true}
+        },
+        "optional_report_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "routes": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": true}
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "model_provider_policy_reconciliation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "summary", "source_report", "routes", "limitations", "not_claimed"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "routed",
+            "review_required",
+            "missing_routing",
+            "blocked",
+            "advisory",
+            "warning",
+            "required_missing",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "report_present",
+            "findings_seen",
+            "routes_generated",
+            "human_review_required",
+            "reason_code_counts"
+          ],
+          "properties": {
+            "report_present": {"type": "boolean"},
+            "findings_seen": {"type": "integer", "minimum": 0},
+            "routes_generated": {"type": "integer", "minimum": 0},
+            "human_review_required": {"type": "integer", "minimum": 0},
+            "reason_code_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "source_report": {"type": "object", "additionalProperties": true},
+        "source_report_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "routes": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": true}
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "design_traceability_reconciliation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "summary", "source_report", "routes", "limitations", "not_claimed"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "routed",
+            "review_required",
+            "missing_routing",
+            "blocked",
+            "advisory",
+            "warning",
+            "required_missing",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "report_present",
+            "findings_seen",
+            "routes_generated",
+            "human_review_required",
+            "reason_code_counts"
+          ],
+          "properties": {
+            "report_present": {"type": "boolean"},
+            "findings_seen": {"type": "integer", "minimum": 0},
+            "routes_generated": {"type": "integer", "minimum": 0},
+            "human_review_required": {"type": "integer", "minimum": 0},
+            "reason_code_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "source_report": {"type": "object", "additionalProperties": true},
+        "source_report_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "routes": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": true}
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "opencode_config_hygiene_reconciliation": {
+      "$ref": "#/$defs/model_provider_policy_reconciliation"
+    },
+    "failure_mode_observations_reconciliation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "summary", "source_report", "routes", "limitations", "not_claimed"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "routed",
+            "review_required",
+            "missing_routing",
+            "blocked",
+            "advisory",
+            "warning",
+            "required_missing",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "report_present",
+            "findings_seen",
+            "observations_seen",
+            "routes_generated",
+            "human_review_required",
+            "reason_code_counts"
+          ],
+          "properties": {
+            "report_present": {"type": "boolean"},
+            "findings_seen": {"type": "integer", "minimum": 0},
+            "observations_seen": {"type": "integer", "minimum": 0},
+            "routes_generated": {"type": "integer", "minimum": 0},
+            "human_review_required": {"type": "integer", "minimum": 0},
+            "reason_code_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            },
+            "mode_observation_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            },
+            "family_observation_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            },
+            "source_report_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            },
+            "observation_reason_code_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            },
+            "mapping_basis_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            },
+            "unmapped_observations": {"type": "integer", "minimum": 0}
+          }
+        },
+        "source_report": {"type": "object", "additionalProperties": true},
+        "source_report_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "routes": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": true}
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "model_telemetry_evidence_reconciliation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "summary", "source_report", "routes", "limitations", "not_claimed"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "routed",
+            "review_required",
+            "missing_routing",
+            "blocked",
+            "advisory",
+            "warning",
+            "required_missing",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "report_present",
+            "findings_seen",
+            "routes_generated",
+            "human_review_required",
+            "reason_code_counts"
+          ],
+          "properties": {
+            "report_present": {"type": "boolean"},
+            "findings_seen": {"type": "integer", "minimum": 0},
+            "routes_generated": {"type": "integer", "minimum": 0},
+            "human_review_required": {"type": "integer", "minimum": 0},
+            "reason_code_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "source_report": {"type": "object", "additionalProperties": true},
+        "source_report_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "routes": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": true}
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "failure_mode_posture_reconciliation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "summary", "source_report", "routes", "limitations", "not_claimed"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "routed",
+            "review_required",
+            "missing_routing",
+            "blocked",
+            "advisory",
+            "warning",
+            "required_missing",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "report_present",
+            "findings_seen",
+            "routes_generated",
+            "human_review_required",
+            "reason_code_counts"
+          ],
+          "properties": {
+            "report_present": {"type": "boolean"},
+            "findings_seen": {"type": "integer", "minimum": 0},
+            "routes_generated": {"type": "integer", "minimum": 0},
+            "human_review_required": {"type": "integer", "minimum": 0},
+            "reason_code_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            },
+            "mode_finding_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            },
+            "family_finding_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "source_report": {"type": "object", "additionalProperties": true},
+        "source_report_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "routes": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": true}
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "ui_experience_quality_reconciliation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "summary", "source_report", "routes", "limitations", "not_claimed"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "routed",
+            "review_required",
+            "missing_routing",
+            "blocked",
+            "advisory",
+            "warning",
+            "required_missing",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "report_present",
+            "findings_seen",
+            "routes_generated",
+            "human_review_required",
+            "reason_code_counts"
+          ],
+          "properties": {
+            "report_present": {"type": "boolean"},
+            "findings_seen": {"type": "integer", "minimum": 0},
+            "routes_generated": {"type": "integer", "minimum": 0},
+            "human_review_required": {"type": "integer", "minimum": 0},
+            "reason_code_counts": {
+              "type": "object",
+              "additionalProperties": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "source_report": {"type": "object", "additionalProperties": true},
+        "source_report_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "routes": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": true}
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {
+          "type": "string",
+          "enum": ["none", "advisory", "warning", "required", "blocking"]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "routed",
+            "review_required",
+            "missing_routing",
+            "blocked",
+            "advisory",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown",
+            "invalid_item",
+            "stale_review",
+            "waiver_visible"
+          ]
+        },
+        "message": {"type": "string"},
+        "required_next_actions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

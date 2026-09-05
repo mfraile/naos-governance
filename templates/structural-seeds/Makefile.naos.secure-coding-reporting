@@ -1,0 +1,34 @@
+# NAOS secure-coding P3 reporting targets.
+# Run directly with: make -f Makefile.naos.secure-coding-reporting <target>
+
+PYTHON ?= python
+NAOS_PROFILE ?= lite
+NAOS_ROOT ?= naos
+NAOS_POLICY ?=
+NAOS_STRICT ?=
+
+NAOS_POLICY_ARG := $(if $(NAOS_POLICY),--policy $(NAOS_POLICY),)
+NAOS_STRICT_ARG := $(if $(NAOS_STRICT),--strict,)
+NAOS_P3_ARGS := --profile $(NAOS_PROFILE) --naos-root $(NAOS_ROOT) $(NAOS_POLICY_ARG) $(NAOS_STRICT_ARG)
+
+.PHONY: naos-secure-coding-reporting naos-secure-coding-reporting-project
+
+naos-secure-coding-reporting: ## Refresh P1/P2 sources and generate the five P3 dimensions
+	@echo "[naos-secure-coding-reporting] profile=$(NAOS_PROFILE)"
+	@if command -v naos-secure-coding-reporting >/dev/null 2>&1; then \
+		naos-secure-coding-reporting $(NAOS_P3_ARGS) --refresh-sources; \
+	elif [ -f scripts/naos_secure_coding_reporting.py ]; then \
+		$(PYTHON) scripts/naos_secure_coding_reporting.py $(NAOS_P3_ARGS) --refresh-sources; \
+	else \
+		$(PYTHON) -m naos_governance.secure_coding_reporting_cli $(NAOS_P3_ARGS) --refresh-sources; \
+	fi
+
+naos-secure-coding-reporting-project: ## Project P3 into existing dashboard/evidence artifacts
+	@echo "[naos-secure-coding-reporting-project] profile=$(NAOS_PROFILE)"
+	@if command -v naos-secure-coding-reporting >/dev/null 2>&1; then \
+		naos-secure-coding-reporting $(NAOS_P3_ARGS) --refresh-sources --project; \
+	elif [ -f scripts/naos_secure_coding_reporting.py ]; then \
+		$(PYTHON) scripts/naos_secure_coding_reporting.py $(NAOS_P3_ARGS) --refresh-sources --project; \
+	else \
+		$(PYTHON) -m naos_governance.secure_coding_reporting_cli $(NAOS_P3_ARGS) --refresh-sources --project; \
+	fi

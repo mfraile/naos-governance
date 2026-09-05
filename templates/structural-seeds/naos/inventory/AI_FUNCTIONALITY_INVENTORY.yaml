@@ -1,0 +1,5 @@
+# AI Functionality Inventory
+# Manual registry of all AI/LLM usage in the codebase.
+# Format: see any NAOS-governed project's AI_FUNCTIONALITY_INVENTORY.yaml for reference.
+ai_functions: []
+last_updated: null

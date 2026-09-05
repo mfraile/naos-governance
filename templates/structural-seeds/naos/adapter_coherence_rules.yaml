@@ -1,0 +1,362 @@
+schema: naos.adapter_coherence_rules.v1
+version: "1.0"
+enabled: true
+description: >
+  Rules for deterministic, file-first review of NAOS tool adapter coherence.
+  Adapters include Codex and Claude Code plugin sources, optional
+  integration templates, and project-local copied adapter guidance. The report
+  checks structure and boundary claims; it does not install, activate, or
+  mutate adapters.
+
+canonical_plugin:
+  id: codex_plugin
+  name: "NAOS Governance Codex Plugin"
+  source_path: plugins/naos-governance
+  manifest_path: plugins/naos-governance/.codex-plugin/plugin.json
+  required_manifest:
+    name: naos-governance
+    skills: ./skills/
+  required_skills:
+    - naos-forensic-audit
+    - naos-forensic-review
+    - naos-systemic-wiring
+    - naos-governed-learning
+    - naos-ai-surface-health
+    - naos-adoption-readiness
+    - naos-control-plane-evidence
+    - naos-adapter-coexistence
+  required_references:
+    - boundaries.md
+    - command-map.md
+    - adapter-coherence.md
+    - greenfield-brownfield.md
+    - mcp-roadmap.md
+
+canonical_plugins:
+  - id: codex_plugin
+    name: "NAOS Governance Codex Plugin"
+    source_path: plugins/naos-governance
+    manifest_path: plugins/naos-governance/.codex-plugin/plugin.json
+    required_manifest:
+      name: naos-governance
+      skills: ./skills/
+    unsupported_manifest_fields: [hooks, mcpServers, apps]
+    required_skills:
+      - naos-forensic-audit
+      - naos-forensic-review
+      - naos-systemic-wiring
+      - naos-governed-learning
+      - naos-ai-surface-health
+      - naos-adoption-readiness
+      - naos-control-plane-evidence
+      - naos-adapter-coexistence
+    required_references:
+      - boundaries.md
+      - command-map.md
+      - adapter-coherence.md
+      - greenfield-brownfield.md
+      - mcp-roadmap.md
+  - id: claude_code_plugin
+    name: "NAOS Governance Claude Code Plugin"
+    source_path: plugins/naos-governance-claude-code
+    manifest_path: plugins/naos-governance-claude-code/.claude-plugin/plugin.json
+    required_manifest:
+      name: naos-governance-claude-code
+      skills: ./skills/
+    unsupported_manifest_fields: [displayName, hooks, mcpServers, lspServers, outputStyles, userConfig, channels, dependencies]
+    manifest_field_policy:
+      displayName:
+        disposition: compatibility_forbidden
+        reason: "NAOS v1 keeps the Claude Code plugin manifest compatible with the currently supported local validator baseline; displayName requires a newer Claude Code baseline before it can be reintroduced."
+        compatibility_note: "Official Claude Code docs list displayName as version-gated for Claude Code v2.1.143 or later."
+      hooks:
+        disposition: policy_forbidden
+        reason: "NAOS v1 Claude plugin remains skills-only and must not bundle hook activation."
+      mcpServers:
+        disposition: policy_forbidden
+        reason: "NAOS v1 Claude plugin remains skills-only and must not bundle MCP server activation."
+      lspServers:
+        disposition: policy_forbidden
+        reason: "NAOS v1 Claude plugin remains skills-only and must not bundle LSP server activation."
+      outputStyles:
+        disposition: policy_forbidden
+        reason: "NAOS v1 Claude plugin remains skills-only and must not bundle output-style activation."
+      userConfig:
+        disposition: policy_forbidden
+        reason: "NAOS v1 Claude plugin must not ship user configuration or mutate local settings."
+      channels:
+        disposition: policy_forbidden
+        reason: "NAOS v1 Claude plugin does not declare marketplace or release channels."
+      dependencies:
+        disposition: policy_forbidden
+        reason: "NAOS v1 Claude plugin must not auto-install plugin dependencies."
+    forbidden_runtime_paths:
+      - hooks
+      - .mcp.json
+      - .lsp.json
+      - monitors
+      - bin
+      - settings.json
+      - agents
+      - output-styles
+      - themes
+    required_skills:
+      - naos-forensic-audit
+      - naos-forensic-review
+      - naos-systemic-wiring
+      - naos-governed-learning
+      - naos-ai-surface-health
+      - naos-adoption-readiness
+      - naos-control-plane-evidence
+      - naos-adapter-coexistence
+    required_references:
+      - boundaries.md
+      - command-map.md
+      - adapter-coherence.md
+      - greenfield-brownfield.md
+      - governed-learning.md
+      - claude-code-hooks.md
+
+adapter_surfaces:
+  - id: codex_plugin_source
+    kind: codex_plugin
+    source: canonical
+    paths:
+      - plugins/naos-governance/README.md
+      - plugins/naos-governance/.codex-plugin/plugin.json
+      - plugins/naos-governance/skills
+      - plugins/naos-governance/references
+  - id: codex_plugin_adopter_template
+    kind: optional_integration_template
+    source: template
+    paths:
+      - templates/integrations/codex-plugin/README.md
+      - templates/integrations/codex-plugin/integration-manifest.json
+  - id: claude_code_plugin_source
+    kind: claude_code_plugin
+    source: canonical
+    paths:
+      - plugins/naos-governance-claude-code/README.md
+      - plugins/naos-governance-claude-code/.claude-plugin/plugin.json
+      - plugins/naos-governance-claude-code/skills
+      - plugins/naos-governance-claude-code/references
+  - id: claude_code_plugin_adopter_template
+    kind: optional_integration_template
+    source: template
+    paths:
+      - templates/integrations/claude-code-plugin/README.md
+      - templates/integrations/claude-code-plugin/integration-manifest.json
+  - id: claude_code_hooks
+    kind: optional_integration_template
+    source: template
+    paths:
+      - templates/integrations/claude-code/README.md
+      - templates/integrations/claude-code/settings.template.json
+  - id: spec_kit_adapter
+    kind: optional_integration_template
+    source: template
+    paths:
+      - templates/integrations/spec-kit/README.md
+      - templates/integrations/spec-kit/extension-manifest.json
+
+project_local_adapter_paths:
+  - naos/integrations/codex-plugin
+  - naos/integrations/claude-code-plugin
+  - naos/integrations/claude-code
+  - naos/integrations/spec-kit
+
+propagation_state_path: adapter_propagation_state.yaml
+
+propagation_links:
+  - id: systemic_wiring_skill_to_plugins
+    description: "Systemic wiring guidance must stay reflected in Codex and Claude plugin operator skills."
+    equivalence: adapter_summary
+    source_paths:
+      - templates/skills/systemic-wiring/SKILL.md
+      - templates/skills/systemic-capability-wiring/SKILL.md
+    target_paths:
+      - plugins/naos-governance/skills/naos-systemic-wiring/SKILL.md
+      - plugins/naos-governance-claude-code/skills/naos-systemic-wiring/SKILL.md
+
+  - id: forensic_audit_skill_to_plugins
+    description: "Generic forensic-audit methodology and NAOS-specific audit probes must stay reflected in Codex and Claude deep-audit plugin skills."
+    equivalence: adapter_summary
+    source_paths:
+      - templates/skills/forensic-audit/SKILL.md
+    target_paths:
+      - plugins/naos-governance/skills/naos-forensic-audit/SKILL.md
+      - plugins/naos-governance-claude-code/skills/naos-forensic-audit/SKILL.md
+
+  - id: governed_learning_skill_to_plugins
+    description: "Governed learning lifecycle changes must be reviewed against plugin learning guidance."
+    equivalence: adapter_summary
+    source_paths:
+      - templates/skills/governed-learning-lifecycle/SKILL.md
+      - templates/structural-seeds/naos/learning_loop_rules.yaml
+    target_paths:
+      - plugins/naos-governance/skills/naos-governed-learning/SKILL.md
+      - plugins/naos-governance-claude-code/skills/naos-governed-learning/SKILL.md
+      - plugins/naos-governance-claude-code/references/governed-learning.md
+
+  - id: ai_surface_health_skill_to_plugins
+    description: "AI-surface budget and health changes must be reviewed against plugin guidance."
+    equivalence: adapter_summary
+    source_paths:
+      - templates/skills/ai-surface-health-review/SKILL.md
+      - templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml
+    target_paths:
+      - plugins/naos-governance/skills/naos-ai-surface-health/SKILL.md
+      - plugins/naos-governance-claude-code/skills/naos-ai-surface-health/SKILL.md
+
+  - id: adapter_command_map_to_plugins
+    description: "Adapter architecture, command routing, and non-claims must stay reflected in plugin references."
+    equivalence: adapter_summary
+    source_paths:
+      - docs/CODEX_PLUGIN_AND_MCP.md
+      - docs/TOOL_NEUTRAL_USAGE.md
+      - templates/structural-seeds/naos/adapter_coherence_rules.yaml
+      - scripts/naos_adapter_coherence.py
+    target_paths:
+      - plugins/naos-governance/references/command-map.md
+      - plugins/naos-governance/references/adapter-coherence.md
+      - plugins/naos-governance/references/boundaries.md
+      - plugins/naos-governance/skills/naos-adapter-coexistence/SKILL.md
+      - plugins/naos-governance-claude-code/references/command-map.md
+      - plugins/naos-governance-claude-code/references/adapter-coherence.md
+      - plugins/naos-governance-claude-code/references/boundaries.md
+      - plugins/naos-governance-claude-code/skills/naos-adapter-coexistence/SKILL.md
+      - templates/integrations/codex-plugin/README.md
+      - templates/integrations/claude-code-plugin/README.md
+
+  - id: adoption_readiness_to_plugins
+    description: "Greenfield/brownfield adoption guidance must be reviewed against plugin adoption skills."
+    equivalence: adapter_summary
+    source_paths:
+      - docs/ADOPTION_GUIDE.md
+      - INSTALLATION_MANUAL.md
+      - templates/structural-seeds/naos/setup_module_catalog.yaml
+    target_paths:
+      - plugins/naos-governance/skills/naos-adoption-readiness/SKILL.md
+      - plugins/naos-governance/references/greenfield-brownfield.md
+      - plugins/naos-governance-claude-code/skills/naos-adoption-readiness/SKILL.md
+      - plugins/naos-governance-claude-code/references/greenfield-brownfield.md
+      - templates/integrations/codex-plugin/README.md
+      - templates/integrations/claude-code-plugin/README.md
+
+  - id: control_plane_evidence_to_plugins
+    description: "Control-plane evidence/dashboard changes must be reviewed against plugin evidence guidance."
+    equivalence: adapter_summary
+    source_paths:
+      - docs/CONTROL_PLANE.md
+      - scripts/naos_evidence_export.py
+      - scripts/workflows/generate_naos_dashboard.py
+    target_paths:
+      - plugins/naos-governance/skills/naos-control-plane-evidence/SKILL.md
+      - plugins/naos-governance/references/adapter-coherence.md
+      - plugins/naos-governance-claude-code/skills/naos-control-plane-evidence/SKILL.md
+      - plugins/naos-governance-claude-code/references/adapter-coherence.md
+
+  - id: forensic_review_to_plugins
+    description: "Forensic/systemic review changes must be reviewed against plugin forensic skills."
+    equivalence: adapter_summary
+    source_paths:
+      - templates/skills/systemic-capability-wiring/SKILL.md
+      - templates/structural-seeds/naos/control_plane_review_rules.yaml
+      - templates/structural-seeds/naos/systemic_impact_rules.yaml
+    target_paths:
+      - plugins/naos-governance/skills/naos-forensic-review/SKILL.md
+      - plugins/naos-governance-claude-code/skills/naos-forensic-review/SKILL.md
+
+  - id: claude_runtime_boundary_to_plugin
+    description: "Claude Code runtime boundary changes must be reviewed against the skills-only Claude plugin."
+    equivalence: adapter_specific
+    source_paths:
+      - docs/CODEX_PLUGIN_AND_MCP.md
+      - templates/integrations/claude-code/README.md
+      - templates/structural-seeds/naos/adapter_coherence_rules.yaml
+    target_paths:
+      - plugins/naos-governance-claude-code/.claude-plugin/plugin.json
+      - plugins/naos-governance-claude-code/references/boundaries.md
+      - plugins/naos-governance-claude-code/references/claude-code-hooks.md
+
+required_boundary_phrases:
+  - "NAOS core is canonical"
+  - "tool adapters are thin, explicit, reversible, and scoped"
+  - "Learn anywhere, approve centrally, propagate deliberately"
+
+required_non_claims:
+  - "automatic memory write-back"
+  - "silent context injection"
+  - "provider/model/API calls"
+  - "MCP access proof"
+  - "live Claude Code plugin installation proof"
+  - "hook activation"
+  - "approval"
+  - "certification"
+  - "proof of compliance"
+
+forbidden_claim_phrases:
+  - "automatic memory write-back enabled"
+  - "silent context injection enabled"
+  - "provider credentials required"
+  - "model api required"
+  - "mcp access guaranteed"
+  - "approval granted"
+  - "certified by naos"
+  - "proof of compliance provided"
+  - "auto-push enabled"
+  - "auto-release enabled"
+  - "deployment enabled"
+
+propagation_policy:
+  canonical_source_first: true
+  adapter_edits_require_review: true
+  learning_candidates_are_proposal_only: true
+  active_learning_requires_approval: true
+  adapter_specific_delta_must_be_documented: true
+  plugin_marketplace_copy_is_not_canonical: true
+  claude_plugin_cache_is_not_canonical: true
+
+mcp_policy:
+  phase: readiness_only
+  active_server_enabled: false
+  read_only_mcp_tools_planned: true
+  write_mcp_tools_enabled: false
+  memory_write_back_enabled: false
+  provider_api_calls_enabled: false
+
+profile_posture:
+  quickstart:
+    state: advisory
+    severity: advisory
+  lite:
+    state: advisory
+    severity: warning
+  standard:
+    state: required_review
+    severity: required
+  assured:
+    state: required_review
+    severity: blocking
+
+known_gaps: []
+residual_risks:
+  - id: RISK-ADAPTER-001
+    description: "Adapters can still drift after installation if external tools cache or copy plugin content outside the repository."
+  - id: RISK-ADAPTER-002
+    description: "Claude Code plugins support hooks, MCP, monitors, settings, binaries, and agents; v1 must remain skills-only until separately reviewed."
+limitations:
+  - "This report checks static files and claims only; it does not verify live Codex or Claude Code installation state."
+  - "This report does not install plugins, mutate marketplace files, activate hooks, call MCP, or edit IDE settings."
+not_claimed:
+  - "live Codex plugin installation proof"
+  - "live Claude Code plugin installation proof"
+  - "MCP access proof"
+  - "adapter auto-repair"
+  - "automatic propagation"
+  - "automatic stale-content repair"
+  - "semantic equivalence proof"
+  - "automatic memory write-back"
+  - "approval"
+  - "certification"
+  - "proof of compliance"

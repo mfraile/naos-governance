@@ -1,0 +1,19 @@
+version: "1.0"
+semantics:
+  state: "Reviewer attestations are structured reviewer metadata, not digital signatures."
+  report: "NAOS includes this metadata in evidence_attestation.json for human review."
+  not_claimed:
+    - "cryptographic signing"
+    - "identity verification"
+    - "legal approval"
+    - "compliance approval"
+
+attestations: []
+
+known_gaps: []
+residual_risks: []
+waivers: []
+
+limitations:
+  - "Populate attestations only after a human reviewer has reviewed the stated scope."
+  - "This file records review metadata; it is not a signing system."

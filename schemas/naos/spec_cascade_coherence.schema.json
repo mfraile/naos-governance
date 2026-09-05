@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:spec_cascade_coherence:v1",
+  "title": "NAOS Spec Cascade Coherence Report",
+  "description": "Deterministic local spec-cascade coherence report. Findings are bounded traceability evidence only and are not code correctness, complete traceability proof, approval, certification, or compliance proof.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "project_root",
+    "naos_root",
+    "src_root",
+    "specs_root",
+    "deterministic",
+    "summary",
+    "findings",
+    "orphan_headers",
+    "overloaded_frs",
+    "stale_statuses",
+    "uncovered_requirements",
+    "untraced_sources",
+    "unresolved_source_references",
+    "limitations",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.spec_cascade_coherence.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "src_root": {"type": "string"},
+    "source_roots": {"type": "array", "items": {"type": "string"}},
+    "specs_root": {"type": "string"},
+    "requirements_spec": {"type": "string"},
+    "task_registry": {"type": "string"},
+    "deterministic": {"type": "boolean"},
+    "overload_threshold": {"type": "integer", "minimum": 1},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "blocking",
+        "required",
+        "warnings",
+        "advisory",
+        "total_findings",
+        "files_scanned",
+        "frs_in_spec",
+        "frs_in_source",
+        "ac_scen_in_spec",
+        "total_issues"
+      ],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "files_scanned": {"type": "integer", "minimum": 0},
+        "frs_in_spec": {"type": "integer", "minimum": 0},
+        "frs_in_source": {"type": "integer", "minimum": 0},
+        "ac_scen_in_spec": {"type": "integer", "minimum": 0},
+        "total_issues": {"type": "integer", "minimum": 0},
+        "orphan_headers": {"type": "integer", "minimum": 0},
+        "overloaded_frs": {"type": "integer", "minimum": 0},
+        "stale_statuses": {"type": "integer", "minimum": 0},
+        "uncovered_requirements": {"type": "integer", "minimum": 0},
+        "untraced_sources": {"type": "integer", "minimum": 0},
+        "unresolved_source_references": {"type": "integer", "minimum": 0}
+      }
+    },
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "orphan_headers": {"type": "array", "items": {"type": "object"}},
+    "overloaded_frs": {"type": "array", "items": {"type": "object"}},
+    "stale_statuses": {"type": "array", "items": {"type": "object"}},
+    "uncovered_requirements": {"type": "array", "items": {"type": "string"}},
+    "untraced_sources": {"type": "array", "items": {"type": "string"}},
+    "unresolved_source_references": {"type": "array", "items": {"type": "object"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "severity",
+        "status",
+        "category",
+        "message",
+        "human_review_required",
+        "not_claimed"
+      ],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+        "status": {
+          "type": "string",
+          "enum": [
+            "orphan_header",
+            "overloaded_requirement",
+            "stale_status",
+            "uncovered_requirement",
+            "untraced_source",
+            "unresolved_source_reference"
+          ]
+        },
+        "category": {"type": "string"},
+        "message": {"type": "string"},
+        "path": {"type": "string"},
+        "requirement_id": {"type": "string"},
+        "files": {"type": "array", "items": {"type": "string"}},
+        "required_next_actions": {"type": "array", "items": {"type": "string"}},
+        "human_review_required": {"type": "boolean"},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

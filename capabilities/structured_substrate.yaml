@@ -1,0 +1,69 @@
+id: CAP-STRUCTURED-SUBSTRATE
+name: Structured Substrate
+description: >
+  Experimental scaffold for future structured storage or graph-style governance
+  substrate work while preserving the current file-first kit as the default.
+status: experimental
+default_maturity: L0
+minimum_profile: assured
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: not_applicable
+    notes: "Not activated."
+  lite:
+    target_maturity: L0
+    enforcement: not_applicable
+    notes: "Not activated."
+  standard:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Design reference only."
+  assured:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Experimental readiness track only."
+authority:
+  may_read:
+    - naos/
+    - docs/
+  may_write:
+    - "future design notes when explicitly configured"
+allowed_resources:
+  - "file-first design records"
+  - "optional future export schemas"
+prohibited_resources:
+  - "mandatory database"
+  - "mandatory graph server"
+  - "mandatory vector store"
+constraints:
+  - "Must not replace file-first controls."
+  - "Must remain optional and experimental."
+required_evidence:
+  - "Readiness assessment before non-file-first substrate work."
+validators:
+  - id: structured_substrate_readiness
+    status: manual
+    notes: "Future readiness review only."
+gatekeepers:
+  - G8
+dashboard_signals:
+  - "structured_substrate.status"
+  - "structured_substrate.readiness"
+maturity_path:
+  L0: "Experimental capability contract exists."
+  L1: "Project records rationale and scope."
+  L2: "Prototype evidence exists without changing default kit install."
+  L3: "Human reviewers inspect advisory architecture-readiness risk before substrate adoption."
+  L4: "Dashboard tracks readiness and exceptions."
+  L5: "External review evidence exists for substrate adoption."
+known_limitations:
+  - "No structured substrate is required or shipped as default."
+not_claimed:
+  - "Graph-backed NAOS production capability."
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+related_scripts: []

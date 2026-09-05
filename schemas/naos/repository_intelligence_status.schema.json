@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_status:v1",
+  "title": "NAOS Repository Intelligence Status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "project_root", "provenance", "lock", "transactions", "unresolved_transaction_count", "active", "source_artifacts_modified"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.status.v1"},
+    "status": {"type": "string", "minLength": 1},
+    "project_root": {"type": "string"},
+    "provenance": {"type": "object"},
+    "lock": {"type": "object"},
+    "transactions": {"type": "array", "items": {"type": "object"}},
+    "unresolved_transaction_count": {"type": "integer", "minimum": 0},
+    "active": {"type": "object"},
+    "source_artifacts_modified": {"type": "array", "maxItems": 0}
+  }
+}

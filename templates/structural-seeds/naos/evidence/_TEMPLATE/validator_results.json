@@ -1,0 +1,14 @@
+{
+  "schema": "naos.evidence.validator_results.v1",
+  "profile": "quickstart",
+  "results": [
+    {
+      "id": "",
+      "path": "",
+      "status": "not_configured",
+      "summary": {},
+      "known_limitations": []
+    }
+  ],
+  "external_references": []
+}

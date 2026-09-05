@@ -1,0 +1,94 @@
+id: CAP-AIVSS-ARITHMETIC-VERIFICATION
+name: "AIVSS-Agentic v0.8 Arithmetic Verification"
+description: >-
+  Recalculates assessor-supplied AIVSS-Agentic v0.8 values from a pinned
+  published PDF and supplies advisory High/Critical or mismatch evidence to
+  G2/G6 human security review without creating scoring authority.
+status: active
+default_maturity: L1
+minimum_profile: standard
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Not installed by default and not recommended for Quickstart."
+  lite:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Not installed by default and not recommended for Lite."
+  standard:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Optional; exact mismatches and computed High/Critical bands create G2/G6 review prompts only."
+  assured:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Optional; exact mismatches and computed High/Critical bands create G2/G6 review prompts only."
+authority:
+  may_read:
+    - naos/aivss_assessments.yaml
+  may_write:
+    - naos/reports/aivss_arithmetic_verification.json
+  may_block: []
+allowed_resources:
+  - repo-local assessor-supplied AIVSS input and evidence references
+  - pinned AIVSS-Agentic v0.8 publication URL and SHA-256
+  - local Decimal arithmetic and JSON Schema validation
+prohibited_resources:
+  - network calls, OWASP code or schema, vulnerability discovery, CVSS calculation, runtime observation, provider/model/MCP/memory activation, automatic decisions, signing, release, or publication actions
+constraints:
+  - "Must remain opt-in and absent from all default profiles."
+  - "Must use only the pinned published AIVSS-Agentic v0.8 PDF as the normative rubric."
+  - "Must use Decimal arithmetic and round-half-up to one decimal place."
+  - "Must preserve 0.0 as unbanded because the v0.8 PDF defines bands only from 0.1."
+  - "Must route only exact arithmetic mismatches and computed High/Critical results to advisory G2/G6 human review."
+  - "Must never approve, block, prioritize, merge, release, accept risk, certify, or claim security/compliance."
+required_evidence:
+  - naos/aivss_assessments.yaml
+  - naos/reports/aivss_arithmetic_verification.json
+validators:
+  - id: naos_aivss_arithmetic_verification
+    script: scripts/naos_aivss_arithmetic_verification.py
+    status: available
+gatekeepers: [G2, G6]
+dashboard_signals:
+  - aivss_arithmetic_verification.status
+  - aivss_arithmetic_verification.summary.review_prompts
+  - aivss_arithmetic_verification.human_review_required
+maturity_path:
+  L0: "No project AIVSS assessment intake is installed; the capability is not applicable."
+  L1: "A schema-valid input and current report verify arithmetic and feed advisory G2/G6 review."
+  L2: "Adopters preserve exact source pins, evidence references, boundary fixtures, and human disposition."
+  L3: "Independent review confirms score outputs never become gate, approval, priority, release, or risk authority."
+  L4: "Multiple adopters preserve arithmetic and authority boundaries across rubric-version review."
+  L5: "Any stronger assessment, calibration, runtime, or decision claim remains separately governed."
+known_limitations:
+  - "Assessor-selected CVSS, factor, threat, mitigation, and evidence inputs are not independently validated."
+  - "AIVSS v0.8 permits 0.0 but defines no severity band for it."
+  - "The publication pin detects source drift but does not sign, authenticate, or attest the rubric."
+not_claimed:
+  - risk assessment
+  - exploitability proof
+  - vulnerability discovery
+  - CVSS calculation or vector validation
+  - runtime observation
+  - mitigation proof
+  - security assurance
+  - compliance evidence
+  - certification
+  - approval or automatic blocking
+  - automatic prioritization
+  - merge, release, risk-acceptance, or publication authority
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ASI_AICM_MAPPING.md
+  - KNOWN_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_aivss_arithmetic_verification.py
+  - scripts/naos_control_plane_review.py
+related_schemas:
+  - schemas/naos/aivss_assessments.schema.json
+  - schemas/naos/aivss_arithmetic_verification_report.schema.json
+  - schemas/naos/control_plane_review.schema.json

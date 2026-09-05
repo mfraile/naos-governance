@@ -1,0 +1,26 @@
+# naos_memory.yaml — NAOS memory onboarding state
+#
+# Engram runtime data lives under data_dir; the database is derived as
+# <data_dir>/engram.db. ENGRAM_DATA_DIR overrides the declared path at runtime.
+# The maintained replication profile is local. NAOS does not configure Git sync.
+# Never store credentials, API keys, tokens, connection strings, PII, customer data,
+# or regulated data in memory configuration or memory checkpoints.
+
+memory:
+  enabled: false
+  state: deferred
+  disposition: defer
+  provider: engram
+  scope: none
+  data_dir: ~/.engram
+  replication_profile: local
+  mcp_namespace: null
+  mcp_project: null
+  notes:
+    - "NAOS memory is local-first and external to the project repository."
+    - "Engram derives the live database as <data_dir>/engram.db; NAOS never reads its payload."
+    - "The maintained replication profile is local; NAOS does not configure Git memory synchronization."
+    - "If Engram is already installed, run `naos memory check` and connect to the existing setup."
+    - "Resolve project identity per workspace from an approved registry/remote; never infer it from the folder name or set one global project."
+    - "Setup never marks memory configured; an authorized maintainer must review external client access and mem_current_project evidence first."
+    - "When memory is pending, deferred, disabled, or unavailable, NAOS uses degraded recovery: task cards, compact files, git state, and repo governance files."

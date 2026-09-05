@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:spec_assembly_worksheet:v1",
+  "title": "NAOS Spec Assembly Worksheet Report",
+  "description": "Review-only worksheet mapping adoption evidence and candidate requirements to manifest-declared spec files. It does not approve, promote, fill, complete, implement, test, or prove specs.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "project_root",
+    "naos_root",
+    "specs_root",
+    "manifest",
+    "deterministic",
+    "summary",
+    "evidence_inputs",
+    "specs",
+    "candidate_mappings",
+    "gap_mappings",
+    "findings",
+    "limitations",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.spec_assembly_worksheet.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "specs_root": {"type": "string"},
+    "manifest": {"type": "string"},
+    "deterministic": {"type": "boolean"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "blocking",
+        "required",
+        "warnings",
+        "advisory",
+        "total_findings",
+        "required_spec_files",
+        "required_spec_files_present",
+        "required_spec_files_missing",
+        "candidate_requirements",
+        "traceability_gaps",
+        "specs_with_candidate_evidence",
+        "non_applicability_decisions_needed"
+      ],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "required_spec_files": {"type": "integer", "minimum": 0},
+        "required_spec_files_present": {"type": "integer", "minimum": 0},
+        "required_spec_files_missing": {"type": "integer", "minimum": 0},
+        "candidate_requirements": {"type": "integer", "minimum": 0},
+        "traceability_gaps": {"type": "integer", "minimum": 0},
+        "specs_with_candidate_evidence": {"type": "integer", "minimum": 0},
+        "non_applicability_decisions_needed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "evidence_inputs": {"type": "object", "additionalProperties": {"type": "object"}},
+    "specs": {"type": "array", "items": {"type": "object"}},
+    "candidate_mappings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "target_spec", "promoted_to_authority", "human_review_required"],
+        "properties": {
+          "id": {"type": "string"},
+          "target_spec": {"type": "string"},
+          "promoted_to_authority": {"const": false},
+          "human_review_required": {"type": "boolean"}
+        }
+      }
+    },
+    "gap_mappings": {"type": "array", "items": {"type": "object"}},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "category", "message", "human_review_required", "not_claimed"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+        "status": {
+          "type": "string",
+          "enum": [
+            "missing_spec_file",
+            "non_applicability_decision_needed",
+            "manifest_load_error",
+            "invalid_manifest"
+          ]
+        },
+        "category": {"type": "string"},
+        "message": {"type": "string"},
+        "path": {"type": "string"},
+        "expected": {},
+        "actual": {},
+        "required_next_actions": {"type": "array", "items": {"type": "string"}},
+        "human_review_required": {"type": "boolean"},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

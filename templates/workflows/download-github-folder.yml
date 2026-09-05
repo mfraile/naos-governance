@@ -1,0 +1,33 @@
+name: Download .github Folder
+
+"on":
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight (optional)
+
+jobs:
+  create-github-folder-zip:
+    name: Create .github Folder Zip
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create zip of .github folder
+        run: |
+          # Create a zip file of the .github directory
+          zip -r github-folder.zip .github
+
+          # Show zip file info
+          ls -lh github-folder.zip
+          echo "Zip file created successfully"
+
+      - name: Upload .github folder as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: github-folder
+          path: github-folder.zip
+          retention-days: 30

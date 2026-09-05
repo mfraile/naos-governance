@@ -1,0 +1,24 @@
+{
+  "name": "naos-governance",
+  "version": "0.1.0",
+  "description": "Codex operator interface for NAOS-Governance projects.",
+  "author": {
+    "name": "NAOS-Governance maintainers"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "NAOS Governance",
+    "shortDescription": "Operate an installed NAOS kit from Codex.",
+    "longDescription": "NAOS Governance provides Codex skills and references for using an already-installed project-local NAOS kit. It guides adoption, audit, learning, evidence, and adapter-coherence workflows without replacing repository evidence or silently enabling MCP, memory writes, hooks, provider calls, approvals, or compliance claims.",
+    "developerName": "NAOS-Governance maintainers",
+    "category": "Productivity",
+    "capabilities": [
+      "Project-local NAOS command routing",
+      "Greenfield and brownfield adoption guidance",
+      "Forensic review guidance",
+      "Governed learning lifecycle guidance",
+      "Adapter coexistence and coherence guidance"
+    ],
+    "defaultPrompt": "Use the NAOS Governance plugin to inspect the current repository, confirm whether NAOS is installed, and recommend the next governed command sequence."
+  }
+}

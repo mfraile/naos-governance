@@ -1,0 +1,59 @@
+schema: naos.planning_baselines.v1
+current_baseline_id: PB-001
+
+# The task registry may be drafted and revised before this baseline is ready.
+# Move a baseline to implementation_ready only after the applicable source
+# bindings, deterministic evidence, and attributable human decision exist.
+baselines:
+  - baseline_id: PB-001
+    version: 1
+    mode: greenfield
+    state: draft
+    supersedes: null
+    owner: "[ADAPT: planning owner]"
+    planning_model: hybrid_vertical_default
+    source_bindings:
+      requirements:
+        path: specs/03-requirements.md
+        digest_kind: file_sha256
+        sha256: null
+      architecture:
+        path: specs/04-architecture.md
+        applicability: required_by_profile
+        digest_kind: file_sha256
+        sha256: null
+      task_registry:
+        path: naos/TASK_REGISTRY.yaml
+        # Excludes delivery/status fields so routine task progress does not
+        # force a new plan version; structural task changes still do.
+        digest_kind: task_registry_planning_projection_sha256_v1
+        sha256: null
+      alignment:
+        path: naos/PRE_IMPLEMENTATION_ALIGNMENT.md
+        digest_kind: file_sha256
+        sha256: null
+    evidence_refs:
+      spec_pack_contract:
+        path: naos/reports/spec_pack_contract.json
+        required_by_profile: true
+        digest_kind: file_sha256
+        sha256: null
+      pre_implementation_alignment_review:
+        path: naos/reports/pre_implementation_alignment_review.json
+        required_by_profile: true
+        digest_kind: file_sha256
+        sha256: null
+    decision_ref: null
+    # Every non-terminal task must appear exactly once when implementation_ready.
+    vertical_slices: []
+    horizontal_foundations: []
+
+not_claimed:
+  - requirements completeness proof
+  - design approval
+  - implementation approval
+  - task closure
+  - merge or release authority
+  - publication authority
+  - real-world role or identity proof
+human_review_required: true

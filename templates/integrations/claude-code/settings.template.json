@@ -1,0 +1,49 @@
+{
+  "schema": "naos.claude_code_hook_template.v1",
+  "description": "Optional NAOS hook references for Claude Code. Review and merge manually; do not copy blindly into active settings.",
+  "activation": "manual_review_required",
+  "not_claimed": [
+    "automatic hook activation",
+    "silent context injection",
+    "memory write-back",
+    "provider/model/API calls",
+    "approval",
+    "certification",
+    "proof of compliance",
+    "official Claude support",
+    "official Anthropic support"
+  ],
+  "hooks": {
+    "PreSession": [
+      {
+        "command": "naos/integrations/claude-code/hooks/pre-session.sh"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "command": "naos/integrations/claude-code/hooks/pre-tool-edit.sh"
+      },
+      {
+        "matcher": "Bash",
+        "command": "naos/integrations/claude-code/hooks/pre-tool-bash.sh"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "command": "naos/integrations/claude-code/hooks/post-tool-write.sh"
+      }
+    ],
+    "PreCompact": [
+      {
+        "command": "naos/integrations/claude-code/hooks/pre-compact.sh"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "naos/integrations/claude-code/hooks/stop.sh"
+      }
+    ]
+  }
+}

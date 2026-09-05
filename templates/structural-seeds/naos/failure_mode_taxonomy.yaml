@@ -1,0 +1,261 @@
+version: 1
+enabled: false
+failure_mode_posture_declared: false
+runtime_enabled: false
+provider_calls_allowed: false
+model_calls_allowed: false
+mcp_allowed: false
+memory_allowed: false
+api_calls_allowed: false
+browser_automation_allowed: false
+network_calls_allowed: false
+tool_mutation_allowed: false
+gate_blocking_enabled: false
+assured_blocking_enabled: false
+behavioral_battery_execution: false
+opencode_runtime_enabled: false
+capability_maturity: L1
+
+profile_posture:
+  quickstart:
+    state: optional
+    severity: advisory
+    human_review_required: false
+    notes: "Optional local failure-mode posture hints only."
+  lite:
+    state: optional
+    severity: warning
+    human_review_required: false
+    notes: "Warn when configured posture evidence is missing, stale, or overclaimed."
+  standard:
+    state: optional
+    severity: required
+    human_review_required: true
+    notes: "Route configured failure-mode posture gaps to human review."
+  assured:
+    state: optional
+    severity: required
+    human_review_required: true
+    notes: "First implementation slice remains required review only; blocking requires future validated L3+ maturity and gate wiring."
+
+# Enable only after the project has reviewed which controls and evidence map to
+# each failure mode. This file is a taxonomy/evidence posture declaration, not a
+# runtime guard, behavioral grader, MCP bridge, memory writer, or provider route.
+modes:
+  - mode_id: F1
+    family: factual
+    name: "API/library fabrication"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: F2
+    family: factual
+    name: "Package fabrication"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: F3
+    family: factual
+    name: "Config-key fabrication"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: F4
+    family: factual
+    name: "Doc/citation fabrication"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: S1
+    family: structural
+    name: "Silent duplication"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: S2
+    family: structural
+    name: "Context-amnesia duplication"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: S3
+    family: structural
+    name: "Interface mismatch"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: S4
+    family: structural
+    name: "Cross-module divergence"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: B1
+    family: behavioral
+    name: "Test-requirement mismatch"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: B2
+    family: behavioral
+    name: "Mock hallucination"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: B3
+    family: behavioral
+    name: "Coverage theater"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: B4
+    family: behavioral
+    name: "Assertion hallucination"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: D1
+    family: drift
+    name: "Attention drift"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: D2
+    family: drift
+    name: "Goal drift"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: D3
+    family: drift
+    name: "Reasoning drift"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: D4
+    family: drift
+    name: "Compaction loss"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: M1
+    family: multi_agent
+    name: "State collision"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: M2
+    family: multi_agent
+    name: "Handoff hallucination"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: M3
+    family: multi_agent
+    name: "Authority hallucination"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: M4
+    family: multi_agent
+    name: "Cascade drift"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+  - mode_id: M5
+    family: multi_agent
+    name: "Consensus cascade"
+    coverage: gap
+    control_refs: []
+    evidence_refs: []
+    known_gaps: []
+    residual_risks: []
+    human_review_required: false
+
+known_gaps:
+  - "disabled_until_project_declares_failure_mode_posture"
+residual_risks: []
+not_claimed:
+  - "hallucination prevention"
+  - "failure prevention"
+  - "fully mitigated failure modes"
+  - "behavioral safety proof"
+  - "runtime monitoring"
+  - "runtime orchestration"
+  - "provider call"
+  - "model call"
+  - "API call"
+  - "network access"
+  - "MCP activation"
+  - "memory activation"
+  - "browser automation"
+  - "hook activation"
+  - "automatic approval"
+  - "automatic blocking"
+  - "merge approval"
+  - "release authority"
+  - "publication authority"
+  - "certification"
+  - "attestation"
+  - "legal or regulatory assurance"
+  - "compliance proof"

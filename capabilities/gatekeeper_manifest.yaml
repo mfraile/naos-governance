@@ -1,0 +1,88 @@
+id: CAP-GATEKEEPER-MANIFEST
+name: Gatekeeper Manifest
+description: >
+  Defines file-first gates, required inputs, required evidence, validators,
+  outputs, profile severity, and maturity dependencies for NAOS control-plane
+  evaluation.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Gate model is visible but non-blocking."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Configured gates warn on missing readiness."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Gate status is expected evidence."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured blocking gates can prevent completion."
+authority:
+  may_read:
+    - naos/gatekeepers.yaml
+    - templates/structural-seeds/naos/gatekeepers.yaml
+    - naos/reports/
+  may_write:
+    - naos/reports/gate_status.json
+    - naos/reports/gate_evaluation.json
+allowed_resources:
+  - "file-first YAML manifest"
+  - "repo-local reports"
+prohibited_resources:
+  - "mandatory workflow orchestrator"
+  - "mandatory daemon"
+constraints:
+  - "Must keep G8 advisory and experimental by default."
+  - "Must not require Tier 3 capabilities for normal installation."
+required_evidence:
+  - "Gatekeeper manifest."
+  - "Profile severity policy."
+validators:
+  - id: gate_status
+    script: scripts/naos_gate_status.py
+    status: available
+  - id: gate_evaluate
+    script: scripts/naos_gate_evaluate.py
+    status: available
+gatekeepers:
+  - G0
+  - G1
+  - G2
+  - G3
+  - G4
+  - G5
+  - G6
+  - G7
+  - G8
+dashboard_signals:
+  - "gatekeeper.ready"
+  - "gatekeeper.blocked"
+  - "gatekeeper.advisory"
+  - "gatekeeper.experimental"
+maturity_path:
+  L0: "Manifest schema and template exist."
+  L1: "Project selects profile and configures gate behavior."
+  L2: "Gate status/evaluation reports are produced."
+  L3: "Gatekeeper enforces profile severity."
+  L4: "Dashboard tracks readiness, waivers, and drift."
+  L5: "Gate evidence is complete enough for audit-style review."
+known_limitations:
+  - "File-first gates evaluate available artifacts only."
+not_claimed:
+  - "Runtime gateway enforcement."
+  - "Autonomous deployment approval."
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+related_scripts:
+  - scripts/naos_gate_status.py
+  - scripts/naos_gate_evaluate.py
+

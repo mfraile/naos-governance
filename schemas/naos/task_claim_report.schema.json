@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:task_claim_report:v1",
+  "title": "NAOS Task Claim Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "session_id",
+    "operator_id",
+    "generated_by",
+    "claims_file",
+    "claim_count",
+    "active_claim_count",
+    "released_claim_count",
+    "expired_claim_count",
+    "stale_claim_count",
+    "conflicting_claim_count",
+    "claims",
+    "active_claims",
+    "released_claims",
+    "expired_claims",
+    "stale_claims",
+    "conflicting_claims",
+    "unknown_operator_claims",
+    "missing_session_claims",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": { "const": "naos.task_claim_report.v1" },
+    "generated_at": { "type": "string" },
+    "profile": {
+      "type": "string",
+      "enum": ["quickstart", "lite", "standard", "assured"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "advisory",
+        "no_claims",
+        "claim_created",
+        "claim_released",
+        "conflicts_detected",
+        "review_required",
+        "invalid_claims",
+        "not_configured",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "naos_root": { "type": "string" },
+    "project_root": { "type": "string" },
+    "session_id": { "type": ["string", "null"] },
+    "operator_id": { "type": ["string", "null"] },
+    "generated_by": { "type": "object" },
+    "claims_file": { "type": "string" },
+    "claim_count": { "type": "integer", "minimum": 0 },
+    "active_claim_count": { "type": "integer", "minimum": 0 },
+    "released_claim_count": { "type": "integer", "minimum": 0 },
+    "expired_claim_count": { "type": "integer", "minimum": 0 },
+    "stale_claim_count": { "type": "integer", "minimum": 0 },
+    "conflicting_claim_count": { "type": "integer", "minimum": 0 },
+    "claims": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "active_claims": { "type": "array" },
+    "released_claims": { "type": "array" },
+    "expired_claims": { "type": "array" },
+    "stale_claims": { "type": "array" },
+    "conflicting_claims": { "type": "array" },
+    "unknown_operator_claims": { "type": "array" },
+    "missing_session_claims": { "type": "array" },
+    "findings": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "known_gaps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "human_review_required": { "type": "boolean" },
+    "summary": { "type": "object" }
+  }
+}

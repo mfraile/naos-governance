@@ -1,0 +1,37 @@
+schema: naos.research_record_contract.v1
+contract_version: 1
+purpose: >-
+  Preserve bounded research questions, provenance, counterevidence, and outcomes
+  without treating research records as implementation, approval, or proof.
+profiles:
+  quickstart:
+    required_fields: [id, revision, record_state, supersedes, superseded_by, retirement_reason, profile, question, scope, sources, observations, contradictions, outcome, review, authority, limitations, next_action]
+    optional_fields: [hypothesis, counterevidence, traceability]
+  lite:
+    required_fields: [id, revision, record_state, supersedes, superseded_by, retirement_reason, profile, question, scope, hypothesis, sources, observations, contradictions, counterevidence, outcome, review, authority, limitations, next_action]
+    optional_fields: [traceability]
+  standard:
+    required_fields: [id, revision, record_state, supersedes, superseded_by, retirement_reason, profile, question, scope, hypothesis, sources, observations, contradictions, counterevidence, outcome, review, authority, limitations, next_action, traceability]
+    optional_fields: []
+  assured:
+    required_fields: [id, revision, record_state, supersedes, superseded_by, retirement_reason, profile, question, scope, hypothesis, sources, observations, contradictions, counterevidence, outcome, review, authority, limitations, next_action, traceability]
+    optional_fields: []
+outcome_states: [confirmed, refuted, inconclusive]
+nullable_required_fields: [supersedes, superseded_by, retirement_reason]
+claim_types: [verified_fact, source_supported, reasoned_inference, assumption, unknown]
+claim_postures: [confirmed, deduced, hypothesized, unknown]
+uncertainty_levels: [none, low, moderate, high, unresolved]
+source_quality_dimensions:
+  authority: [primary, authoritative_secondary, secondary, provided, unknown]
+  recency: [current, dated_but_applicable, stale_or_unknown]
+  directness: [direct, indirect, contextual]
+revision_and_supersession:
+  revision_is_monotonic: true
+  supersedes_must_reference_a_prior_record_or_be_null: true
+  supersession_does_not_erase_prior_outcomes: true
+  record_states: [active_candidate, superseded, retired]
+authority:
+  repository_and_executed_evidence_remain_authoritative: true
+  research_is_advisory: true
+  human_review_required_for_admission_or_action: true
+  does_not_authorize: [implementation, merge, release, evidence_admission, exception, compliance_claim]

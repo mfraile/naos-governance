@@ -1,0 +1,115 @@
+id: CAP-GOVERNED-LEARNING-LIFECYCLE
+name: Governed Learning Lifecycle
+description: >
+  Provides deterministic, file-first review of candidate, active, and historical
+  learning records so project lessons can be captured, verified, promoted,
+  consulted, superseded, deprecated, archived, rejected, redacted, or rolled
+  back under human review. The capability supports governed self-improvement of
+  the repository environment, not self-learning model weights or autonomous
+  mutation of skills, prompts, workflows, gates, baselines, or maturity state.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Advisory visibility for candidate/active/history learning metadata."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns on malformed lifecycle records, active authority overclaims, or unsafe history use."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires reviewed active-learning metadata before durable governance action."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Can block on unverified active high-authority learning, stale critical learning, unsafe retrieval policy, or redaction gaps."
+authority:
+  may_read:
+    - "naos/learning_loop_rules.yaml"
+    - "naos/learning_candidates.yaml"
+    - "naos/learning_state.yaml"
+    - "naos/learning_history.yaml"
+    - "naos/reports/failure_mode_observations.json"
+    - "repo-local evidence references declared by learning records"
+  may_write:
+    - "naos/reports/learning_loop_review.json"
+  may_block:
+    - "only through configured profile policy, strict mode, or assured gates"
+allowed_resources:
+  - "repo-local YAML learning lifecycle records"
+  - "repo-local deterministic evidence references"
+  - "safe external reference strings declared by reviewers"
+prohibited_resources:
+  - "LLM calls"
+  - "model/provider/API calls"
+  - "Engram, MCP, memory tools, or private memory payload reads"
+  - "automatic memory writes"
+  - "automatic context injection"
+  - "automatic skill, prompt, workflow, baseline, gate, maturity, or policy mutation"
+  - "semantic scoring"
+constraints:
+  - "Must remain deterministic, local, and file-first."
+  - "Must treat candidates as proposal-only until reviewed and promoted."
+  - "Must keep repository evidence, current user instructions, and explicit human decisions authoritative."
+  - "Must support supersede, deprecate, archive, reject, redact, and rollback semantics so stale or wrong learnings do not accumulate as active guidance."
+  - "Must not auto-tune thresholds from autoresearch, grader outcomes, or AI-surface budget findings."
+  - "Must not claim hallucination prevention, behavioral safety, semantic correctness, approval, certification, maturity promotion, or proof of compliance."
+required_evidence:
+  - "scripts/naos_learning_loop_review.py"
+  - "templates/structural-seeds/naos/learning_loop_rules.yaml"
+  - "naos/reports/learning_loop_review.json when generated"
+validators:
+  - id: learning_loop_review
+    script: scripts/naos_learning_loop_review.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+dashboard_signals:
+  - learning_loop_review.status
+  - learning_loop_review.summary.learning_records
+  - learning_loop_review.summary.active_records
+  - learning_loop_review.summary.high_authority_active_records
+  - learning_loop_review.failure_mode_observations_review.summary.failure_mode_observation_review_findings
+  - learning_loop_review.human_review_required
+maturity_path:
+  L0: "Capability contract, rules seed, record seeds, schemas, and validator exist."
+  L1: "Project can record candidate, active, and historical learning lifecycle metadata."
+  L2: "Learning review reports are generated and reviewed before active promotion."
+  L3: "Profile policy and gates surface unsafe active learning, stale learning, and redaction gaps."
+  L4: "Learning lifecycle findings are routinely reviewed through control-plane, systemic-impact, evidence, and dashboard surfaces."
+  L5: "Projects combine governed learning lifecycle review with independently approved human governance and retention controls."
+known_limitations:
+  - "The report validates lifecycle metadata and local evidence references; it does not prove semantic truth."
+  - "The report does not call LLMs, providers, Engram, MCP, memory tools, or external services."
+  - "The report does not automatically edit governed AI surfaces, baselines, gates, policies, or maturity state."
+  - "Failure-mode observation reports can focus human review only; they do not create or activate learning records."
+  - "Human review remains required before promoting lessons into durable project guidance."
+not_claimed:
+  - "self-learning model weights"
+  - "hallucination prevention"
+  - "behavioral correctness proof"
+  - "semantic correctness proof"
+  - "automatic memory write-back"
+  - "automatic context injection"
+  - "automatic skill promotion"
+  - "approval"
+  - "certification"
+  - "maturity promotion"
+  - "proof of compliance"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+  - docs/ENGRAM_SETUP.md
+  - docs/SYSTEMIC_CAPABILITY_WIRING.md
+  - NAOS_CATALOG.md
+related_scripts:
+  - scripts/naos_learning_loop_review.py

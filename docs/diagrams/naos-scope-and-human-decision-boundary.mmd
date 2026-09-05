@@ -1,0 +1,25 @@
+flowchart LR
+    INPUTS["Project-owned inputs: specs, tasks, code, tests, policies, and configuration"]
+
+    subgraph NAOS["Current NAOS scope"]
+        CHECKS["Repository-local deterministic checks and traceability"]
+        EVIDENCE["Local review evidence and explicit gaps"]
+    end
+
+    REVIEW{"Human and project-owned review"}
+    DECISION["Project-owned decision: remediate, defer, waive, or proceed"]
+
+    INPUTS --> CHECKS
+    CHECKS --> EVIDENCE
+    EVIDENCE --> REVIEW
+    REVIEW --> DECISION
+
+    RUNTIME["NAOS does not control adopter runtime systems"]:::boundary
+    PROOF["Review evidence is not compliance or certification proof"]:::boundary
+    AUTHORITY["No automatic approval, blocking, merge, release, or publication authority"]:::boundary
+
+    EVIDENCE -. "scope boundary" .-> RUNTIME
+    EVIDENCE -. "claim boundary" .-> PROOF
+    REVIEW -. "authority boundary" .-> AUTHORITY
+
+    classDef boundary fill:#fde2e2,stroke:#b91c1c,color:#5a0d0d,stroke-dasharray:4 3

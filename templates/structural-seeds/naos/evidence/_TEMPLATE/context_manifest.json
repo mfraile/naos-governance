@@ -1,0 +1,24 @@
+{
+  "schema": "naos.evidence.context_manifest.v1",
+  "project": {
+    "name": "",
+    "repository": "",
+    "branch": "",
+    "commit": "",
+    "profile": "quickstart",
+    "project_type": "",
+    "scope": ""
+  },
+  "toolchain_context": {
+    "llm_models": [],
+    "ide_agents": [],
+    "validators": [],
+    "dependencies": []
+  },
+  "evidence_context": {
+    "validity_period": "",
+    "owners": [],
+    "revalidation_triggers": []
+  },
+  "external_references": []
+}

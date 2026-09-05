@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:memory_context_readiness:v1",
+  "title": "NAOS Memory Context Readiness Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "memory_readiness",
+    "provider_posture",
+    "mcp_tool_access",
+    "project_identity",
+    "platform_access_matrix",
+    "memory_authorization",
+    "source_of_truth_hierarchy",
+    "forbidden_memory_categories",
+    "allowed_memory_categories",
+    "memory_scopes",
+    "staleness_policy",
+    "conflict_policy",
+    "context_continuity",
+    "context_pack_readiness",
+    "fallback_readiness",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "waivers",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.memory_context_readiness.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"$ref": "#/$defs/status"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "memory_readiness": {"type": "object"},
+    "provider_posture": {"type": "object"},
+    "mcp_tool_access": {"type": "object"},
+    "project_identity": {"$ref": "#/$defs/project_identity"},
+    "platform_access_matrix": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "memory_authorization": {"type": "object"},
+    "source_of_truth_hierarchy": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "forbidden_memory_categories": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "allowed_memory_categories": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "memory_scopes": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "staleness_policy": {"type": "object"},
+    "conflict_policy": {"type": "object"},
+    "context_continuity": {"type": "object"},
+    "context_pack_readiness": {"type": "object"},
+    "fallback_readiness": {"type": "object"},
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "known_gaps": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "waivers": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object"}
+  },
+  "$defs": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "advisory",
+        "review_required",
+        "missing",
+        "stale",
+        "conflict",
+        "not_configured",
+        "disabled",
+        "waived",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {
+          "type": "string",
+          "enum": ["none", "advisory", "warning", "required", "blocking"]
+        },
+        "status": {"$ref": "#/$defs/status"},
+        "message": {"type": "string"},
+        "required_next_actions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "project_identity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "expected_project",
+        "declared_project",
+        "workspace_declarations",
+        "user_declarations",
+        "global_fixed_project_detected",
+        "project_identity_verified",
+        "provider_observed_project"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["missing", "declared_candidate", "declared_consistent", "conflict", "global_only", "unresolved_equivalence"]
+        },
+        "expected_project": {"type": ["string", "null"]},
+        "declared_project": {"type": ["string", "null"]},
+        "workspace_declarations": {"type": "array", "items": {"type": "object"}},
+        "user_declarations": {"type": "array", "items": {"type": "object"}},
+        "global_fixed_project_detected": {"type": "boolean"},
+        "project_identity_verified": {"const": false},
+        "provider_observed_project": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_query:v1",
+  "title": "NAOS Repository Intelligence Query Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "generated_at", "status", "project_root", "generation", "query", "lanes", "summary", "source_revalidation", "limitations", "not_claimed", "human_review_required"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.query.v1"},
+    "generated_at": {"type": "string"},
+    "status": {"enum": ["candidates_found", "no_candidates"]},
+    "project_root": {"type": "string"},
+    "generation": {"type": "object"},
+    "query": {"type": "object"},
+    "lanes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exact", "reference", "fts", "graph", "semantic"],
+      "properties": {
+        "exact": {"type": "array", "items": {"$ref": "#/$defs/candidate"}},
+        "reference": {"type": "array", "items": {"$ref": "#/$defs/candidate"}},
+        "fts": {"type": "array", "items": {"$ref": "#/$defs/candidate"}},
+        "graph": {"type": "array", "items": {"$ref": "#/$defs/candidate"}},
+        "semantic": {"type": "array", "maxItems": 0}
+      }
+    },
+    "summary": {"type": "object"},
+    "source_revalidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checked_path_count", "checked_paths"],
+      "properties": {
+        "status": {"const": "current_sources_confirmed"},
+        "checked_path_count": {"type": "integer", "minimum": 0},
+        "checked_paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": {"type": "string"},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            }
+          }
+        }
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"const": true}
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["lane", "source_path", "source_sha256", "source_kind", "authority_level", "retrieval", "source_revalidated", "candidate_only", "human_review_required"],
+      "properties": {
+        "lane": {"enum": ["exact", "reference", "fts", "graph"]},
+        "source_path": {"type": "string", "minLength": 1},
+        "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "source_kind": {"type": ["string", "null"]},
+        "authority_level": {"type": ["string", "null"]},
+        "retrieval": {"type": "object"},
+        "source_revalidated": {"const": true},
+        "candidate_only": {"const": true},
+        "human_review_required": {"const": true}
+      }
+    }
+  }
+}

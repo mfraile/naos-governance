@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_recovery_result:v1",
+  "title": "NAOS Repository Intelligence Recovery Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "project_root", "recovered_transactions", "source_artifacts_modified"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.recovery_result.v1"},
+    "status": {"enum": ["recovery_incomplete", "recovered", "nothing_to_recover"]},
+    "project_root": {"type": "string"},
+    "recovered_transactions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["transaction_id", "state"],
+        "properties": {
+          "transaction_id": {"type": "string"},
+          "state": {"type": "string"},
+          "journal_path": {"type": ["string", "null"]},
+          "unreferenced_generation_preserved": {"type": "boolean"},
+          "detail": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "source_artifacts_modified": {"type": "array", "maxItems": 0}
+  }
+}

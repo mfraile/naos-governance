@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:memory_resource_inventory:v1",
+  "title": "NAOS Memory Resource Inventory Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "command",
+    "mode",
+    "naos_root",
+    "project_root",
+    "human_review_required",
+    "not_claimed",
+    "limitations",
+    "findings",
+    "summary",
+    "resources",
+    "resource_counts",
+    "memory_remains_advisory",
+    "inspection_mode",
+    "memory_payloads_read",
+    "provider_calls_performed",
+    "replication_profile_declared",
+    "replication_mode",
+    "git_memory_chunks_used",
+    "inventory_observation_sha256"
+  ],
+  "properties": {
+    "schema": {"const": "naos.memory_resource_inventory.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
+    "command": {"const": "memory-resource-inventory"},
+    "mode": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "session_id": {"type": ["string", "null"]},
+    "generated_by": {"type": "object"},
+    "human_review_required": {"type": "boolean"},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array"},
+    "residual_risks": {"type": "array"},
+    "summary": {"type": "object"},
+    "resources": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["resource_id", "resource_type", "status", "path", "classification", "human_review_required"],
+        "properties": {
+          "resource_id": {"type": "string"},
+          "resource_type": {"type": "string"},
+          "status": {"type": "string"},
+          "path": {"type": ["string", "null"]},
+          "classification": {"type": "string"},
+          "human_review_required": {"type": "boolean"},
+          "metadata_only": {"type": "boolean"},
+          "path_redacted": {"type": "boolean"},
+          "store_location_status": {
+            "enum": ["allowed_external_user_store", "prohibited_project_local"]
+          },
+          "replication_profile_declared": {"type": "string"},
+          "replication_mode": {
+            "enum": ["local_only", "configured_non_local_unverified", "invalid_or_unknown"]
+          }
+        }
+      }
+    },
+    "resource_counts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "memory_remains_advisory": {"const": true},
+    "inspection_mode": {"const": "metadata_only"},
+    "memory_payloads_read": {"const": false},
+    "provider_calls_performed": {"const": false},
+    "replication_profile_declared": {"type": "string"},
+    "replication_mode": {
+      "enum": ["local_only", "configured_non_local_unverified", "invalid_or_unknown"]
+    },
+    "git_memory_chunks_used": {"const": false},
+    "inventory_observation_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

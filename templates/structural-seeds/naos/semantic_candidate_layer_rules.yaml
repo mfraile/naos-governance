@@ -1,0 +1,350 @@
+version: 1
+enabled: true
+state: readiness_only
+semantics:
+  principle: Semantic candidates, if enabled in a future project-specific layer, are candidate references only.
+  posture: readiness_only_future_project_configured
+  deterministic_baseline: Exact path, metadata, explicit links, and FTS keyword query remain the default baseline.
+semantic_runtime_enabled: false
+sqlite_vec_enabled: false
+embeddings_enabled: false
+extension_loading_allowed: false
+external_embedding_calls_allowed: false
+cloud_embedding_allowed: false
+local_provider_required_if_enabled_later: true
+semantic_results_are_candidates_only: true
+source_artifacts_remain_authoritative: true
+exact_fts_baseline_required: true
+
+profile_posture:
+  quickstart:
+    state: disabled
+    severity: advisory
+    human_review_required: false
+    notes: "Semantic readiness remains quiet; deterministic exact/FTS context query remains available when configured."
+  lite:
+    state: readiness_only
+    severity: advisory
+    human_review_required: false
+    notes: "Semantic candidate posture is visible but no runtime, provider, or model is enabled."
+  standard:
+    state: readiness_only
+    severity: review_required
+    human_review_required: true
+    notes: "Human review is expected before any project-specific semantic runtime is considered."
+  assured:
+    state: readiness_only
+    severity: review_required
+    human_review_required: true
+    notes: "Human review is required before any project-specific semantic runtime, provider, embedding, or extension posture is considered."
+
+provider_posture:
+  status: not_configured
+  default_provider: none
+  local_only_if_enabled_later: true
+  project_configured_only: true
+  core_dependency_added: false
+  external_service_default: false
+  api_key_default: false
+  evidence_required_if_enabled_later:
+    - local provider configuration
+    - model identity and version
+    - embedding dimension
+    - source hash alignment
+    - human review record
+
+embedding_model_policy:
+  enabled_by_default: false
+  local_only_if_enabled_later: true
+  external_embedding_apis_prohibited_by_default: true
+  cloud_embedding_prohibited_by_default: true
+  core_model_dependency_allowed: false
+  required_metadata_if_enabled_later:
+    - provider
+    - model
+    - dimension
+    - device
+    - created_at
+    - source_hash
+    - embedding_version
+    - proof_of_local_configuration
+
+sqlite_vec_posture:
+  status: deferred
+  dependency_added: false
+  vec0_tables_enabled: false
+  vec_each_enabled: false
+  knn_enabled: false
+  extension_loading_required: false
+  note: "sqlite-vec may be evaluated later as project-configured candidate retrieval; it is not active in core NAOS."
+
+extension_loading_posture:
+  status: prohibited
+  allowed: false
+  native_binary_loading_allowed: false
+  note: "SQLite extension loading is prohibited in this readiness layer."
+
+semantic_query_posture:
+  mode_name_if_enabled_later: semantic_candidate_search
+  implemented_now: false
+  result_role: candidate_reference_only
+  hybrid_merge_order:
+    - exact_path_link
+    - metadata_fts
+    - semantic_candidates
+  task_scoped_prefilter_required: true
+  result_limit_required: true
+  ranking_explanation_required: true
+  score_type_required: true
+  model_metadata_required: true
+  source_path_hash_freshness_authority_required: true
+
+source_hash_invalidation_policy:
+  required: true
+  stale_when_source_hash_changes: true
+  stale_embeddings_block_runtime_claims: true
+  stale_embeddings_become_findings: true
+
+stale_embedding_policy:
+  statuses:
+    - fresh
+    - stale
+    - missing
+    - unknown
+    - invalidated
+  stale_vectors_become_findings: true
+  use_stale_vectors_for_decisions: false
+
+sensitive_content_embedding_policy:
+  embed_sensitive_content_by_default: false
+  sensitive_embedding_attempts_become_findings: true
+  requires_explicit_allowlist: true
+  sensitive_categories:
+    - secrets
+    - credentials
+    - tokens
+    - API keys
+    - passwords
+    - private keys
+    - certificates
+    - connection strings
+    - customer data
+    - tenant data
+    - regulated data
+    - private memory payloads
+    - Engram databases
+
+memory_payload_embedding_policy:
+  embed_private_memory_payloads: false
+  read_engram_db: false
+  call_engram: false
+  call_mcp: false
+  call_memory_tools: false
+  memory_role: readiness_metadata_only
+
+task_scoped_prefilter_policy:
+  required_before_future_vector_search: true
+  allowed_filters:
+    - task_id
+    - spec_ref
+    - capability_id
+    - artifact_type
+    - authority_level
+    - freshness_status
+  fallback_when_unavailable: use_exact_metadata_fts_only
+
+global_semantic_scan_policy:
+  allowed: false
+  default: prohibited
+  rationale: "Future semantic search must be bounded by task, metadata, or explicit source-family scope."
+
+result_limit_policy:
+  default_limit: 10
+  maximum_limit: 25
+  require_bounded_results: true
+
+ranking_explanation_policy:
+  required: true
+  must_explain:
+    - query_mode
+    - score_type
+    - source_hash_freshness
+    - authority_level
+    - why_candidate_only
+
+model_metadata_policy:
+  required_if_enabled_later: true
+  required_fields:
+    - provider
+    - model
+    - model_version
+    - dimension
+    - local_or_external
+    - device
+    - created_at
+
+provider_metadata_policy:
+  required_if_enabled_later: true
+  required_fields:
+    - provider_name
+    - provider_kind
+    - local_only
+    - external_calls_allowed
+    - configured_by
+    - review_status
+
+review_status_policy:
+  required_if_enabled_later: true
+  allowed_statuses:
+    - not_configured
+    - readiness_only
+    - project_configured
+    - review_required
+    - approved_for_project_use
+    - disabled
+  human_review_required_for_runtime_enablement: true
+
+candidate_only_policy:
+  candidates_only: true
+  not_answers: true
+  cannot_outrank_exact_or_source_evidence: true
+  source_artifacts_remain_authoritative: true
+  exact_fts_baseline_required: true
+  semantic_overtrust_routes_to_control_plane_review: true
+
+future_data_model:
+  status: documented_not_implemented
+  tables:
+    embedding_runs:
+      purpose: "Future metadata for project-configured embedding runs."
+      implemented_now: false
+      fields:
+        - run_id
+        - provider
+        - model
+        - dimension
+        - created_at
+        - source_hash_policy
+        - review_status
+    artifact_embeddings:
+      purpose: "Future artifact-level embedding metadata."
+      implemented_now: false
+      fields:
+        - artifact_id
+        - integer_row_id
+        - source_path
+        - source_hash
+        - authority_level
+        - embedding_run_id
+        - freshness_status
+        - scope
+        - use_policy
+        - provenance
+    chunk_embeddings:
+      purpose: "Future chunk-level embedding metadata."
+      implemented_now: false
+      fields:
+        - chunk_id
+        - integer_row_id
+        - artifact_id
+        - source_hash
+        - embedding_hash
+        - embedding_dimension
+        - freshness_status
+        - sensitive_content_policy_status
+    semantic_query_runs:
+      purpose: "Future query metadata for candidate retrieval review."
+      implemented_now: false
+      fields:
+        - query_id
+        - query_mode
+        - filters_applied
+        - result_limit
+        - ranking_explanation
+        - model_metadata
+        - source_reference
+
+ob1_metadata_hooks:
+  provenance: readiness_metadata_only
+  scope: readiness_metadata_only
+  use_policy: readiness_metadata_only
+  review_status: readiness_metadata_only
+  source_reference: readiness_metadata_only
+  confidence: readiness_metadata_only
+  recall_trace_readiness: readiness_metadata_only
+  audit_event_readiness: readiness_metadata_only
+  not_implemented:
+    - recall trace execution
+    - audit event runtime
+    - agent-memory write-back
+
+integration_points:
+  local_context_index: "May summarize semantic readiness posture; no vector runtime is enabled."
+  local_context_query: "May display semantic candidate mode as unavailable/readiness-only; exact/FTS remains baseline."
+  task_context_pack: "May include semantic readiness posture as optional candidate context only."
+  graph_context_readiness: "Graph context may reference semantic readiness posture only; no semantic graph ranking is enabled."
+  setup_recommendations: "Recommends readiness-only review, not provider/model installation."
+  evidence_pack: "Includes readiness report as bounded governance evidence, not semantic proof."
+  dashboard: "Shows readiness posture, disabled runtime flags, findings, and limitations."
+  gates: "Surfaces findings; quickstart remains advisory/low-noise."
+  systemic_impact: "Routes changes to semantic candidate policies and future runtime posture."
+  control_plane_review: "Routes overtrust, stale embedding, sensitive embedding, runtime enablement, extension loading, external embedding, and global scan findings."
+
+profile_severity_behavior:
+  quickstart: advisory
+  lite: advisory
+  standard: review_required
+  assured: review_required
+
+human_review_requirements:
+  quickstart_required: false
+  lite_required: false
+  standard_required_if_readiness_enabled: true
+  assured_required_if_readiness_enabled: true
+  required_before_runtime_enablement: true
+  required_before_provider_or_model_configuration: true
+  required_before_sensitive_content_embedding: true
+
+known_gaps:
+  - id: SCL-KG-001
+    summary: "No semantic/vector runtime is implemented in core NAOS."
+  - id: SCL-KG-002
+    summary: "No embedding provider, model dependency, sqlite-vec runtime, or vector table is configured by default."
+residual_risks:
+  - id: SCL-RR-001
+    summary: "Future semantic candidates may be over-trusted unless source paths, hashes, freshness, authority, and ranking explanations remain visible."
+  - id: SCL-RR-002
+    summary: "Future embedding freshness and sensitive-content policy must be enforced before any project-specific runtime is enabled."
+waivers: []
+limitations:
+  - "This is readiness/configuration/reporting only."
+  - "No semantic/vector search, KNN, sqlite-vec runtime, embeddings, or extension loading is implemented."
+  - "No model, API, network, provider, memory, MCP, or Engram call is made."
+  - "Future semantic/vector candidates must remain subordinate to repository evidence and deterministic NAOS reports."
+  - "Exact path, metadata, explicit links, and FTS keyword query remain the deterministic baseline."
+not_claimed:
+  - source of truth
+  - authoritative truth
+  - answers
+  - hallucination prevention
+  - semantic/vector runtime
+  - semantic relevance scoring
+  - sqlite-vec runtime
+  - embeddings runtime
+  - KNN
+  - vec0 tables
+  - extension loading
+  - NetworkX
+  - GraphML
+  - graph traversal
+  - MCP server tools
+  - Engram access
+  - memory payload search
+  - cloud embedding
+  - cloud memory
+  - automatic context injection
+  - durable memory write-back
+  - recall trace execution
+  - agent-memory write-back
+  - compliance proof
+  - legal or regulatory proof

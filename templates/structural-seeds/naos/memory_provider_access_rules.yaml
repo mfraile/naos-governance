@@ -1,0 +1,193 @@
+version: "1.0"
+enabled: true
+state: readiness_only
+semantics:
+  state: "Rules declare how NAOS verifies memory provider and MCP/tool access posture."
+  report: "NAOS inspects safe local declarations and metadata only; it does not call providers, MCP, or memory tools."
+  governance_boundary: "Configured memory is not usable memory. MCP config presence is not active MCP access. Memory access is not evidence or approval."
+
+provider_access_verification_mode: config_only
+live_provider_calls_allowed: false
+live_mcp_calls_allowed: false
+memory_payload_reads_allowed: false
+memory_writes_allowed: false
+cloud_memory_allowed: false
+external_sync_allowed: false
+provider_binary_check_allowed: true
+provider_data_dir_metadata_check_allowed: true
+provider_database_metadata_check_allowed: true
+# Compatibility only for older generated projects. New code treats store_path as
+# deprecated/ambiguous and never uses it as Engram's runtime data directory.
+provider_store_metadata_check_allowed: true
+mcp_config_presence_check_allowed: true
+mcp_access_claim_requires_verification: true
+configured_provider_does_not_imply_access: true
+mcp_config_does_not_imply_access: true
+read_access_does_not_imply_write_access: true
+ci_memory_access_default: none
+
+# Empty means every canonical workspace server location from the shared MCP
+# registry. Client-policy files are not server declarations.
+allowed_config_locations: []
+user_mcp_config_metadata_check_allowed: true
+# User-scope coverage is supplied by the shared registry and listed by config ID
+# in each report. The scanner emits server names, project declarations, and
+# secret-like key names only; it never emits commands or environment values.
+
+provider_data_exclusions:
+  - "**/engram.db"
+  - "**/*.sqlite"
+  - "**/*.db"
+  - ".git/**"
+  - "dev/**"
+  - "naos/context_index/**"
+  - "naos/context_packs/**"
+  - ".env"
+  - ".env.*"
+# Compatibility alias consumed by older report implementations.
+provider_store_exclusions:
+  - "**/engram.db"
+  - "**/*.sqlite"
+  - "**/*.db"
+  - ".git/**"
+  - "dev/**"
+  - "naos/context_index/**"
+  - "naos/context_packs/**"
+  - ".env"
+  - ".env.*"
+
+forbidden_memory_categories:
+  - secrets
+  - tokens
+  - API keys
+  - passwords
+  - certificates
+  - private keys
+  - connection strings
+  - PII
+  - customer data
+  - tenant data
+  - regulated data
+  - hidden approvals
+  - governance override instructions
+  - legal/compliance conclusions as approved facts
+  - sensitive exploit details unless explicitly approved
+  - private/internal material unless explicitly approved
+
+access_levels:
+  - id: none
+    definition: "No memory read, write, or admin access."
+  - id: read_only
+    definition: "May read verified advisory memory context when platform access is configured, authorized, and verified."
+  - id: draft_write
+    definition: "May prepare draft memory candidates only; durable write still requires human review."
+  - id: approved_write
+    definition: "May perform durable writes only when explicit project rules and human approval boundary exist."
+  - id: admin_config
+    definition: "Human-initiated setup/configuration access only."
+
+access_level_clarifications:
+  read_only_does_not_imply_draft_write: true
+  draft_write_does_not_imply_approved_write: true
+  approved_write_requires_explicit_human_boundary: true
+  admin_config_human_initiated_only: true
+  ci_remains_none_by_default: true
+
+platform_verification_expectations:
+  - id: claude_code
+    expected_default: "possible MCP only if configured, authorized, and verified"
+    fallback: "Use repo evidence, active task cards, compact summaries, and NAOS reports."
+  - id: claude_desktop
+    expected_default: "config-dependent"
+    fallback: "Use provided files and bounded context packs."
+  - id: cursor
+    expected_default: "possible MCP only if configured, authorized, and verified"
+    fallback: "Use repo-local instructions, task cards, and deterministic reports."
+  - id: vs_code
+    expected_default: "possible MCP only if configured, authorized, and verified"
+    fallback: "Use degraded recovery from compact files and repository evidence."
+  - id: github_copilot
+    expected_default: "instruction-aware; no assumed MCP memory access"
+    fallback: "Use instruction files and project artifacts."
+  - id: codex
+    expected_default: "no assumed local MCP access"
+    fallback: "Use repo evidence, context summaries, and explicit tool outputs available in the current session."
+  - id: chatgpt_openai_workflows
+    expected_default: "no assumed local MCP; provided artifacts only unless separately configured"
+    fallback: "Use uploaded/provided artifacts and bounded summaries."
+  - id: gemini_cli
+    expected_default: "config-dependent"
+    fallback: "Use repository evidence and bounded context packs."
+  - id: local_ide_agents
+    expected_default: "project/tool-specific"
+    fallback: "Use project-local files and deterministic reports."
+  - id: ci
+    expected_default: "none by default"
+    fallback: "Run deterministic repo-local checks only."
+
+fallback_policy:
+  required: true
+  degraded_recovery_allowed: true
+  no_verified_memory_access_action: "Use repository evidence, task/context packs, deterministic reports, and current git state."
+  agents_must_state_when_memory_unavailable: true
+
+human_review_requirements:
+  provider_configuration_change: true
+  mcp_access_change: true
+  durable_memory_write: true
+  approved_write_access: true
+  admin_config_access: true
+  cloud_memory_enablement: true
+  external_sync_enablement: true
+  forbidden_category_exception: true
+  cross_project_scope: true
+
+profile_posture:
+  quickstart:
+    state: disabled
+    severity: advisory
+    human_review_required_if_memory_configured: false
+  lite:
+    state: readiness_only
+    severity: advisory
+    human_review_required_if_memory_configured: false
+  standard:
+    state: readiness_only
+    severity: review_required
+    human_review_required_if_memory_configured: true
+  assured:
+    state: readiness_only
+    severity: review_required
+    human_review_required_if_memory_configured: true
+
+known_gaps: []
+residual_risks: []
+waivers: []
+
+limitations:
+  - "Verification is config-only in v1; it does not prove live MCP tool availability."
+  - "The report does not call Engram, MCP, memory tools, or external services."
+  - "The report does not read Engram databases or private memory payloads."
+  - "Provider binary, data-directory, and database metadata presence do not prove usable memory access."
+  - "ENGRAM_DATA_DIR overrides the declared data_dir; the database path is derived as <data_dir>/engram.db."
+  - "Legacy store_path values are deprecated and are not interpreted as a live store or synchronization repository."
+  - "Only actual Engram server declarations count as MCP configured; unrelated MCP files remain sanitized inventory metadata."
+  - "User-scope MCP coverage follows the shared registry; reports list descriptor IDs and never expose command arguments or environment values."
+  - "A non-local replication_profile is preserved and reported unsafe/review-required; NAOS does not normalize or configure it."
+  - "Pending-to-configured transition requires separately reviewed active-client, mem_current_project, storage, and authorization evidence; this report cannot verify it."
+  - "Platform support for MCP varies by local toolchain and configuration."
+
+not_claimed:
+  - "memory access guaranteed"
+  - "MCP access guaranteed"
+  - "memory as evidence"
+  - "memory as approval"
+  - "source of truth"
+  - "authoritative truth"
+  - "compliance proof"
+  - "legal or regulatory approval"
+  - "hallucination prevention"
+  - "cloud memory by default"
+  - "automatic memory writes"
+  - "automatic memory usage"
+  - "provider installation"

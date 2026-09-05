@@ -1,0 +1,85 @@
+name: NAOS PR Governance Evidence
+
+"on":
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  NAOS_PROFILE: standard
+  NAOS_ROOT: naos
+  # Optional governance metadata only. These values do not authenticate,
+  # authorize, prove team membership, approve work, or satisfy separation of duties.
+  TEAM_ID: ""
+  NAOS_OPERATOR_ID: ""
+
+jobs:
+  pr-governance:
+    name: NAOS deterministic PR governance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install local package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Run source validators
+        run: |
+          python scripts/validators/validate_capability_contracts.py
+          python scripts/validators/validate_docs_consistency.py
+          python scripts/validators/validate_tutorial_consistency.py
+          python scripts/validators/validate_implementation_reality.py
+          python -m unittest discover -s tests
+
+      - name: Generate NAOS PR governance reports
+        run: |
+          python cli.py session-id --profile "$NAOS_PROFILE"
+          python cli.py operator-attribution --profile "$NAOS_PROFILE"
+          python cli.py policy-overrides --profile "$NAOS_PROFILE" --dry-run
+          python cli.py ai-surface-budget --profile "$NAOS_PROFILE"
+          python cli.py learning-loop-review --profile "$NAOS_PROFILE"
+          python cli.py self-check --profile "$NAOS_PROFILE"
+          python cli.py spec-pack-contract --profile "$NAOS_PROFILE"
+          python cli.py spec-pack-materialize . --profile "$NAOS_PROFILE" --dry-run
+          python cli.py spec-assembly-worksheet . --profile "$NAOS_PROFILE"
+          python cli.py spec-cascade --profile "$NAOS_PROFILE"
+          python cli.py gate-status --profile "$NAOS_PROFILE" ${TEAM_ID:+--team-id "$TEAM_ID"}
+          python cli.py gate-evaluate --profile "$NAOS_PROFILE" ${TEAM_ID:+--team-id "$TEAM_ID"}
+          python cli.py evidence-conflicts --profile "$NAOS_PROFILE"
+          python cli.py task-claims --profile "$NAOS_PROFILE"
+          python cli.py pr-risk-classify --profile "$NAOS_PROFILE"
+          python cli.py governance-bypass-posture --profile "$NAOS_PROFILE"
+          python cli.py external-evidence-ingest --profile "$NAOS_PROFILE"
+          python cli.py evidence-pack --profile "$NAOS_PROFILE"
+          python cli.py dashboard --profile "$NAOS_PROFILE" --json
+          python cli.py sarif-export --profile "$NAOS_PROFILE"
+          python cli.py pr-governance-summary --profile "$NAOS_PROFILE"
+
+      - name: Upload NAOS governance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: naos-pr-governance
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            naos/reports/*.json
+            naos/reports/*.sarif
+            naos/evidence/evidence_pack.json
+            naos/DASHBOARD.md
+
+      # Optional SARIF code-scanning publication can be added by adopters after
+      # reviewing sensitivity and repository policy. It is intentionally not
+      # enabled here; SARIF remains findings export, not approval or certification.

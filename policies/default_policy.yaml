@@ -1,0 +1,335 @@
+version: "1.0"
+description: >
+  Default file-first NAOS governance policy. Adopter projects may override this
+  by placing a project-local policy at NAOS_ROOT/policy/default_policy.yaml or
+  by passing --policy to standalone validators.
+
+profiles:
+  supported:
+    - quickstart
+    - lite
+    - standard
+    - assured
+  default: quickstart
+  severity_by_profile:
+    quickstart: advisory
+    lite: warning
+    standard: required
+    assured: blocking
+  # Graduated blocking ramp: enforced control increases monotonically
+  # quickstart -> lite -> standard -> assured. `fail_on` is the enforce-mode
+  # target; `transition_fail_on` is the conservative baseline used while
+  # `enforcement_transition: warn` (records would-block findings without failing
+  # the build). `strict_fail_on` applies under --strict and ignores transition.
+  exit_code:
+    quickstart:
+      fail_on: []
+      transition_fail_on: []
+      strict_fail_on: [blocking, required]
+    lite:
+      fail_on: [blocking]
+      transition_fail_on: []
+      strict_fail_on: [blocking, required, warning]
+    standard:
+      fail_on: [blocking, required]
+      transition_fail_on: []
+      strict_fail_on: [blocking, required, warning]
+    assured:
+      fail_on: [blocking, required, warning]
+      transition_fail_on: [blocking]
+      strict_fail_on: [blocking, required, warning]
+
+# Enforcement transition mode for the graduated ramp.
+#   warn    -> ramp values are advisory-preview; exit codes follow
+#              transition_fail_on (v1-compatible). Records what WOULD block.
+#   enforce -> exit codes follow the graduated `fail_on` ramp.
+# Ships as `warn` by default (non-breaking: exit codes unchanged); adopters flip to
+# `enforce` when ready to apply the graduated ramp.
+enforcement_transition: warn
+
+paths:
+  default_naos_root: naos
+  reports_dir: reports
+  claims_report: claims_validation.json
+  roadmap_report: roadmap_crosswalk_validation.json
+  function_index_report: function_index_health.json
+  test_evidence_report: test_evidence_health.json
+  ac_completion_evidence_manifest: ac_completion_evidence.yaml
+  ac_completion_evidence_report: ac_completion_evidence.json
+  self_check_report: self_check.json
+  capability_maturity_report: capability_maturity.json
+  capability_state: capability_state.yaml
+  systemic_impact_report: systemic_impact_review.json
+  systemic_impact_rules: systemic_impact_rules.yaml
+  module_header_traceability_report: module_header_traceability.json
+  spec_pack_contract_report: spec_pack_contract.json
+  spec_pack_materialization_report: spec_pack_materialization.json
+  spec_assembly_worksheet_report: spec_assembly_worksheet.json
+  spec_cascade_report: spec_cascade_coherence.json
+  module_header_rules: module_header_rules.yaml
+  control_plane_review_report: control_plane_review.json
+  control_plane_review_rules: control_plane_review_rules.yaml
+  control_plane_review_items: control_plane_review_items.yaml
+  setup_recommendations_report: setup_recommendations.json
+  setup_module_catalog: setup_module_catalog.yaml
+  governance_bypass_posture_report: governance_bypass_posture.json
+  external_evidence_ingest_report: external_evidence_ingest.json
+  evidence_attestation_report: evidence_attestation.json
+  evidence_verification_report: evidence_verification.json
+  evidence_conflict_detection_report: evidence_conflict_detection.json
+  evidence_attestation_rules: evidence_attestation_rules.yaml
+  evidence_review_attestations: evidence_review_attestations.yaml
+  memory_context_readiness_report: memory_context_readiness.json
+  memory_context_rules: memory_context_rules.yaml
+  memory_authorization_matrix: memory_authorization_matrix.yaml
+  memory_provider_access_report: memory_provider_access.json
+  memory_provider_access_rules: memory_provider_access_rules.yaml
+  memory_use_policy_report: memory_use_policy.json
+  memory_use_policy_rules: memory_use_policy_rules.yaml
+  memory_review_items: memory_review_items.yaml
+  learning_loop_review_report: learning_loop_review.json
+  learning_loop_rules: learning_loop_rules.yaml
+  learning_candidates: learning_candidates.yaml
+  learning_state: learning_state.yaml
+  learning_history: learning_history.yaml
+  adapter_coherence_report: adapter_coherence.json
+  adapter_coherence_rules: adapter_coherence_rules.yaml
+  adapter_propagation_state: adapter_propagation_state.yaml
+  task_context_pack_report: task_context_pack.json
+  task_context_pack_rules: task_context_pack_rules.yaml
+  task_context_pack_markdown_dir: context_packs
+  task_lifecycle_report: task_lifecycle.json
+  task_lifecycle_contract: task_lifecycle_contract.yaml
+  completed_task_history: completed_history.yaml
+  research_record_report: research_record_validation.json
+  composed_traceability_report: composed_traceability.json
+  task_claims_file: task_claims.yaml
+  task_claim_report: task_claim_report.json
+  local_context_index_report: local_context_index.json
+  local_context_index_rules: local_context_index_rules.yaml
+  local_context_index_sqlite: context_index/local_context_index.sqlite
+  local_context_index_db_lock: context_index/local_context_index.sqlite.lock
+  sqlite_write_coordination_report: sqlite_write_coordination.json
+  local_context_query_report: local_context_query.json
+  local_context_query_markdown_dir: context_queries
+  semantic_candidate_layer_report: semantic_candidate_layer.json
+  semantic_candidate_layer_rules: semantic_candidate_layer_rules.yaml
+  graph_context_readiness_report: graph_context_readiness.json
+  graph_context_rules: graph_context_rules.yaml
+  graph_context_query_report: graph_context_query.json
+  graph_context_query_markdown_dir: context_queries
+  session_lifecycle_report: session_lifecycle.json
+  session_lifecycle_rules: session_lifecycle_rules.yaml
+  sessions_root: sessions
+  sessions_index: sessions_index.json
+  session_identity_report: session_identity.json
+  operator_attribution_report: operator_attribution.json
+  audit_log_root: audit_log
+  audit_log_summary_report: audit_log_summary.json
+  agent_trace_events: agent_trace_events.yaml
+  agent_trace_validation_report: agent_trace_validation.json
+  harness_trace_import_report: harness_trace_import.json
+  ai_surface_context_budget_report: ai_surface_context_budget.json
+  ai_surface_context_budget_rules: ai_surface_context_budget_rules.yaml
+  ai_surface_health_baseline: baselines/ai_surface_health_baseline.json
+  static_grader_report: static_grader_report.json
+  grader_assessment_report: grader_assessment.json
+  model_provider_policy: model_provider_policy.yaml
+  model_provider_policy_report: model_provider_policy.json
+  ai_component_inventory_rules: ai_component_inventory_rules.yaml
+  ai_component_inventory_report: ai_component_inventory.json
+  agent_sponsor_registry: agent_sponsor_registry.yaml
+  agent_sponsor_registry_report: agent_sponsor_registry.json
+  aivss_assessments: aivss_assessments.yaml
+  aivss_arithmetic_verification_report: aivss_arithmetic_verification.json
+  model_telemetry_evidence: model_telemetry_evidence.yaml
+  model_telemetry_evidence_report: model_telemetry_evidence.json
+  failure_mode_taxonomy: failure_mode_taxonomy.yaml
+  failure_mode_posture_report: failure_mode_posture.json
+  failure_mode_observations: failure_mode_observations.yaml
+  failure_mode_observations_report: failure_mode_observations.json
+  opencode_config_hygiene: opencode_config_hygiene.yaml
+  opencode_config_hygiene_report: opencode_config_hygiene.json
+  design_traceability: design_traceability.yaml
+  design_traceability_report: design_traceability.json
+  ui_experience_quality: ui_experience_quality.yaml
+  ui_experience_quality_report: ui_experience_quality.json
+  llm_grader_readiness_rules: llm_grader_readiness_rules.yaml
+  llm_grader_readiness_report: llm_grader_readiness.json
+  behavioral_governance_readiness_rules: behavioral_governance_readiness_rules.yaml
+  behavioral_governance_readiness_baseline_state: behavioral_baseline_state.yaml
+  behavioral_governance_readiness_report: behavioral_governance_readiness.json
+  sarif_report: naos_findings.sarif
+  sarif_export_summary_report: sarif_export.json
+  policy_override_merge_report: policy_override_merge.json
+  package_reality_report: package_reality.json
+  package_reality_rules: package_reality_rules.yaml
+  package_reality_provenance: package_reality_provenance.yaml
+  api_symbol_reality_manifest: api_symbol_reality.yaml
+  api_symbol_reality_report: api_symbol_reality.json
+  pr_risk_classification_report: pr_risk_classification.json
+  plan_coherence_report: plan_coherence.json
+  secure_coding_control_routes: secure_coding_control_evidence_routes.yaml
+  secure_coding_controls_report: secure_coding_controls.json
+  secure_coding_reference_integrity_report: secure_coding_reference_integrity.json
+  secure_coding_reporting_report: secure_coding_reporting.json
+  pr_risk_rules: pr_risk_rules.yaml
+  pr_governance_summary_report: pr_governance_summary.json
+  agentic_workflow: agentic_workflow.yaml
+  agentic_coding_playbook: AGENTIC_CODING_PLAYBOOK.md
+  agentic_workflow_review_report: agentic_workflow_review.json
+  pre_implementation_alignment: PRE_IMPLEMENTATION_ALIGNMENT.md
+  pre_implementation_alignment_review_report: pre_implementation_alignment_review.json
+  calibration_shadow: calibration_shadow.yaml
+  calibration_shadow_report: calibration_shadow_report.json
+  evidence_classification_policy: evidence_classification_policy.yaml
+  evidence_classification_report: evidence_classification_report.json
+  cross_harness_review_readiness: cross_harness_review_readiness.yaml
+  cross_harness_review_readiness_report: cross_harness_review_readiness.json
+  adoption_summary_report: adoption_summary.json
+  preflight_report: preflight_report.json
+  intake_report: intake_report.json
+  install_plan_report: install_plan.json
+  existing_resource_inventory_report: existing_resource_inventory.json
+  ai_artifact_inventory_report: ai_artifact_inventory.json
+  ai_artifact_reconciliation_report: ai_artifact_reconciliation.json
+  ai_code_provenance_report: ai_code_provenance.json
+  compliance_posture_report: compliance_posture.json
+  memory_resource_inventory_report: memory_resource_inventory.json
+  memory_resource_reconciliation_report: memory_resource_reconciliation.json
+  mcp_resource_inventory_report: mcp_resource_inventory.json
+  brownfield_baseline_report: brownfield_baseline.json
+  candidate_requirements_report: candidate_requirements.json
+  traceability_gap_register_report: traceability_gap_register.json
+  install_decision_record_report: install_decision_record.json
+  context_challenge_report: context_challenge_report.json
+  repo_context_challenge_report: repo_context_challenge_report.json
+  plan_challenge_report: plan_challenge_report.json
+  decision_probe_report: decision_probe_report.json
+  planning_gate_review_report: planning_gate_review_report.json
+  intake_answers: intake_answers.yaml
+  install_plan_rules: install_plan_rules.yaml
+  existing_resource_inventory_rules: existing_resource_inventory_rules.yaml
+  ai_artifact_inventory_rules: ai_artifact_inventory_rules.yaml
+  ai_code_provenance_manifest: ai_code_provenance.yaml
+  compliance_posture_manifest: compliance_posture.yaml
+  memory_mcp_inventory_rules: memory_mcp_inventory_rules.yaml
+  traceability_gap_register_rules: traceability_gap_register_rules.yaml
+  challenge_rules: challenge_rules.yaml
+  install_decision_record_rules: install_decision_record_rules.yaml
+  effective_policy: effective_policy.yaml
+  team_operator_map: team_operator_map.yaml
+  source_to_test_map: test_evidence/source_to_test_map.json
+  dashboard_markdown: DASHBOARD.md
+  dashboard_summary_report: dashboard_summary.json
+  evidence_dir: evidence
+  evidence_pack_report: evidence_pack.json
+  task_path_report: evidence/task_path.yaml
+  context_manifest_report: evidence/context_manifest.json
+  validator_results_report: validator_results.json
+  completion_certificate_report: evidence/completion_certificate.yaml
+  exceptions_report: evidence/exceptions.yaml
+  gate_status_report: gate_status.json
+  gate_evaluation_report: gate_evaluation.json
+  gatekeeper_team_overrides: gatekeepers.yaml
+  task_path_template: evidence/_TEMPLATE/task_path.yaml
+  context_manifest_template: evidence/_TEMPLATE/context_manifest.json
+  validator_results_template: evidence/_TEMPLATE/validator_results.json
+  test_evidence_template: evidence/_TEMPLATE/test_evidence.json
+  completion_certificate_template: evidence/_TEMPLATE/completion_certificate.yaml
+  adopter_policy: policy/default_policy.yaml
+  ignored_scan_dirs:
+    - .git
+    - .venv
+    - venv
+    - node_modules
+    - dist
+    - build
+    - __pycache__
+
+claims:
+  status_values:
+    - candidate
+    - supported
+    - unsupported
+    - expired
+    - experimental
+    - needs_revalidation
+  revalidation_triggers:
+    - model_version_change
+    - ide_agent_change
+    - profile_change
+    - validator_change
+    - repository_architecture_change
+    - dependency_change
+    - release_boundary
+    - evidence_stale
+    - project_scope_change
+  external_evidence_verification_default: unverified
+  safe_context_window_chars: 120
+  safe_context_phrases:
+    - "does not claim"
+    - "does not prove"
+    - "not universal proof"
+    - "bounded evidence"
+    - "cannot guarantee"
+    - "must not be claimed"
+    - "unless evidence exists"
+    - "not claimed"
+    - "limitation"
+  disclaimers:
+    - "Claim validation does not prove legal or regulatory compliance."
+    - "Dogfood, pilot, reference, research, model, IDE, and toolchain results are bounded evidence only."
+    - "Claims may drift as models, tools, dependencies, validators, repository architecture, profile policy, gatekeeper configuration, project scope, or evidence freshness changes."
+  overclaim_patterns:
+    legal_regulatory_compliance:
+      - "\\bguarantee[sd]?\\s+compliance\\b"
+      - "\\bproves?\\s+(legal|regulatory)?\\s*compliance\\b"
+      - "\\bcertif(?:y|ies|ied)\\s+compliance\\b"
+      - "\\bfully\\s+compliant\\b"
+    runtime_assurance:
+      - "\\bguarantee[sd]?\\s+runtime\\s+safety\\b"
+      - "\\bproves?\\s+runtime\\s+safety\\b"
+      - "\\bfully\\s+runtime\\s+safe\\b"
+      - "\\bruntime\\s+safety\\s+guarantee\\b"
+    complete_test_coverage:
+      - "\\bevery\\s+(generated\\s+)?source\\s+file\\s+is\\s+fully\\s+tested\\b"
+      - "\\ball\\s+(generated\\s+)?code\\s+is\\s+fully\\s+tested\\b"
+      - "\\bcomplete\\s+test\\s+coverage\\b"
+      - "\\b100%\\s+test\\s+coverage\\b"
+    neuroscience_validation:
+      - "\\bneuroscience[- ]proven\\b"
+      - "\\bproves?\\s+neuroscience\\s+valid(?:ity|ation)\\b"
+      - "\\bvalidated\\s+by\\s+neuroscience\\b"
+    petri_runtime_overclaim:
+      - "\\bPETRI\\s+fully\\s+implemented\\b"
+      - "\\bruntime\\s+governance\\s+fully\\s+implemented\\b"
+      - "\\bcontinuous\\s+authorization\\s+implemented\\b"
+    reference_generalization:
+      - "\\buniversal\\s+proof\\b"
+      - "\\bproves?\\s+universal\\s+outcomes\\b"
+      - "\\bworks?\\s+for\\s+all\\s+projects\\b"
+      - "\\bsingle\\s+project\\s+proves?\\b"
+
+evidence:
+  default_staleness_days: 30
+  external_reference_default_status: external_reference_unverified
+
+test_evidence:
+  accepted_types:
+    - unit
+    - integration
+    - acceptance
+    - security
+    - coverage
+  coverage_supports_source_default: unknown
+  global_coverage_maps_sources: false
+
+task_claims:
+  default_ttl_hours: 72
+
+task_claim_default_ttl_hours: 72
+
+team_gatekeepers:
+  team_gatekeeper_config_enabled: true
+  team_gatekeeper_strict_mode: false

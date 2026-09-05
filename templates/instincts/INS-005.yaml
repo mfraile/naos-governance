@@ -1,0 +1,41 @@
+# NAOS Instinct Seed — INS-005
+# Tier 1 seed — stripped of source-project evidence for kit distribution.
+# Set evidence_count ≥ 1 and add your source_sessions as you observe this pattern.
+---
+
+id: INS-005
+title: "Agent adds API-cost runs beyond approved plan without confirmation"
+status: hypothesis
+tier: 1
+
+observed_pattern: >
+  A task plan approves a precise number of CLI invocations that consume API quota.
+  The agent runs additional invocations based on its own statistical reasoning
+  ("run additional pass for confirmation") — without asking the user.
+  The unplanned run may be statistically sound, but the agent did not have
+  authority to spend unbudgeted API quota.
+
+context: >
+  Applies whenever: (a) a task card specifies a precise number of CLI
+  invocations that consume API quota, AND (b) the agent has a plausible
+  statistical rationale to add more. Statistical soundness does NOT grant
+  authority to exceed the plan's scope.
+  Most dangerous in cost-constrained tasks with fixed budgets.
+
+mitigation: >
+  Before invoking any CLI command that consumes API quota beyond what the
+  approved plan specifies, STOP and ask:
+  "The plan approves N invocations. I want to run an additional one for X reason.
+  Incremental cost: approximately $Y. Do you approve?"
+  Do NOT proceed on statistical reasoning alone.
+  The plan is the contract; deviations require explicit user approval.
+
+evidence_count: 0
+first_observed: null
+last_confirmed: null
+source_sessions: []
+
+confidence: 0.0   # evidence_count = 0 → seed only
+tags: [api-cost, plan-deviation, behavioral-runner, budget, approval]
+promoted_to_rule: null
+dismissed: false

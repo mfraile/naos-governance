@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:memory_resource_reconciliation:v1",
+  "title": "NAOS Memory Resource Reconciliation Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "command",
+    "mode",
+    "naos_root",
+    "project_root",
+    "human_review_required",
+    "not_claimed",
+    "limitations",
+    "findings",
+    "summary",
+    "decisions",
+    "resources_source",
+    "source_inventory_validation",
+    "write_mode",
+    "write_requested",
+    "write_performed",
+    "provider_or_client_mutation_performed",
+    "memory_remains_advisory"
+  ],
+  "properties": {
+    "schema": {"const": "naos.memory_resource_reconciliation.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
+    "command": {"const": "memory-resource-reconcile"},
+    "mode": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "session_id": {"type": ["string", "null"]},
+    "generated_by": {"type": "object"},
+    "human_review_required": {"type": "boolean"},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array"},
+    "residual_risks": {"type": "array"},
+    "summary": {"type": "object"},
+    "decisions": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "resource_id",
+          "selected_option",
+          "available_options",
+          "write_requested",
+          "write_performed",
+          "human_review_required",
+          "status",
+          "memory_remains_advisory",
+          "human_review_boundary"
+        ],
+        "properties": {
+          "resource_id": {"type": "string"},
+          "requested_option": {"enum": ["connect", "reuse", "repair", "new", "disabled", "deferred", "review_required"]},
+          "selected_option": {"enum": ["connect", "reuse", "repair", "new", "disabled", "deferred", "review_required"]},
+          "available_options": {
+            "type": "array",
+            "items": {"enum": ["connect", "reuse", "repair", "new", "disabled", "deferred", "review_required"]}
+          },
+          "write_requested": {"type": "boolean"},
+          "prohibited_project_local_store": {"type": "boolean"},
+          "requested_option_rejected": {"type": "boolean"},
+          "write_performed": {"const": false},
+          "human_review_required": {"type": "boolean"},
+          "status": {"enum": ["recorded", "review_required"]},
+          "memory_remains_advisory": {"const": true},
+          "human_review_boundary": {"type": "string"}
+        }
+      }
+    },
+    "resources_source": {"enum": ["persisted_inventory", "fresh_metadata_scan"]},
+    "source_inventory_validation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "reason",
+        "current_observation_sha256",
+        "project_root_match_required",
+        "profile_match_required",
+        "metadata_boundary_required"
+      ],
+      "properties": {
+        "status": {"enum": ["accepted", "missing", "rejected"]},
+        "reason": {
+          "enum": [
+            "accepted",
+            "missing",
+            "invalid_resource_shape",
+            "schema_mismatch",
+            "schema_unavailable",
+            "schema_validation_failed",
+            "project_mismatch",
+            "profile_mismatch",
+            "metadata_boundary_mismatch",
+            "inventory_fingerprint_invalid",
+            "current_observation_changed"
+          ]
+        },
+        "current_observation_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "project_root_match_required": {"const": true},
+        "profile_match_required": {"const": true},
+        "metadata_boundary_required": {"const": true}
+      }
+    },
+    "write_mode": {"const": "dry_run"},
+    "write_requested": {"type": "boolean"},
+    "write_performed": {"const": false},
+    "provider_or_client_mutation_performed": {"const": false},
+    "memory_remains_advisory": {"const": true}
+  }
+}

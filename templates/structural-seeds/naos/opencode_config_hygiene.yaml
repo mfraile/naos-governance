@@ -1,0 +1,82 @@
+version: 1
+enabled: false
+opencode_config_declared: false
+runtime_enabled: false
+opencode_execution_allowed: false
+mcp_allowed: false
+provider_calls_allowed: false
+model_calls_allowed: false
+memory_allowed: false
+hook_activation_allowed: false
+tool_mutation_allowed: false
+
+allow_remote_instructions: false
+allow_absolute_instruction_refs: false
+allow_broad_permissions: false
+allow_auto_approval: false
+allow_enabled_mcp: false
+allow_remote_mcp: false
+allow_mcp_auth: false
+allow_external_plugins: false
+allow_local_plugins_without_review: false
+
+allowed_instruction_paths: []
+allowed_mcp_servers: []
+allowed_plugins: []
+model_policy_report_ref: "naos/reports/model_provider_policy.json"
+
+profile_posture:
+  quickstart:
+    state: optional
+    severity: advisory
+    notes: "Optional OpenCode config hygiene hints only."
+  lite:
+    state: optional
+    severity: warning
+    notes: "Warn when configured OpenCode hygiene evidence needs review."
+  standard:
+    state: optional
+    severity: required
+    notes: "Route OpenCode config hygiene findings to human review."
+  assured:
+    state: optional
+    severity: required
+    notes: "Required review only in this slice; blocking is reserved for obvious unsafe declarations such as literal secrets or runtime-authority attempts."
+
+# This file configures NAOS review posture only. It is not an OpenCode config.
+# Enable only when a project already has repo-local OpenCode surfaces to review:
+# - AGENTS.md
+# - opencode.json or opencode.jsonc
+# - .opencode/agents, commands, modes, plugins, skills, tools, or themes
+
+known_gaps:
+  - "disabled_until_project_declares_opencode_config_hygiene"
+residual_risks: []
+not_claimed:
+  - "OpenCode installation"
+  - "OpenCode execution"
+  - "OpenCode plugin creation"
+  - "global OpenCode config inspection"
+  - "MCP activation"
+  - "memory activation"
+  - "provider call"
+  - "model call"
+  - "API call"
+  - "network access"
+  - "credential validation"
+  - "secret scanner completeness"
+  - "malware absence"
+  - "supply-chain safety proof"
+  - "prompt-injection prevention"
+  - "runtime sandboxing"
+  - "runtime orchestration"
+  - "provider route correctness"
+  - "model recommendation"
+  - "IDE/tool configuration mutation"
+  - "approval"
+  - "merge approval"
+  - "release authority"
+  - "publication authority"
+  - "certification"
+  - "attestation"
+  - "proof of compliance"

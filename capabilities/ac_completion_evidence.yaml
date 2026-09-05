@@ -1,0 +1,119 @@
+id: CAP-AC-COMPLETION-EVIDENCE
+name: AC Completion Evidence
+description: >
+  Validates project-declared AC/SCEN completion evidence from an explicit
+  manifest without inferring completion or changing source-to-test semantics.
+  Optional record-level Git bindings validate exact base/subject commits,
+  subject trees, conservative path-shaped command operands, and preserved
+  predecessor supersession for local human review.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Missing or empty manifest is non-blocking and does not prove completion."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns when declared completion evidence is structurally missing or unresolved."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Declared claimed-complete AC/SCEN entries are expected to have passing deterministic evidence."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured completion-evidence gaps can block until reviewed under policy."
+authority:
+  may_read:
+    - specs/
+    - naos/ac_completion_evidence.yaml
+    - repo-local evidence paths declared in the manifest
+    - "local Git object metadata for explicitly declared base/subject commits and subject trees"
+  may_write:
+    - naos/reports/ac_completion_evidence.json
+  may_block:
+    - "only through configured deterministic profile policy for unresolved declared completion evidence"
+allowed_resources:
+  - "repo-local spec files"
+  - "repo-local test, validator, or command evidence artifacts"
+  - "exact local Git commit/tree objects declared by the adopter"
+  - "manual review notes as review-only evidence"
+prohibited_resources:
+  - "provider/API calls"
+  - "runtime hooks"
+  - "model judging"
+  - "automatic approval"
+  - "completion inference from narrative"
+  - "cryptographic signing, signer identity, or key custody"
+  - "independent or clean-room execution proof"
+constraints:
+  - "Must treat missing or empty manifests as not configured, not as completion proof."
+  - "Must validate declared AC/SCEN ids against specs where definitions exist."
+  - "Must require passing deterministic evidence for claimed_complete entries."
+  - "When repository_binding is declared, must resolve full object ids in the exact project repository and verify subject_tree against subject_commit."
+  - "When repository_binding is declared, must check conservative path-shaped command operands against subject_tree and keep unsupported operands visible."
+  - "Repository-bound deterministic evidence must expose at least one conservatively recognized path-shaped command operand; zero-operand bindings remain unsatisfied."
+  - "Shell comments, environment assignments, variable or command substitution, tilde or brace expansion, globs, path-shaped values attached to options, direct @file-style response syntax, URI/URL-bearing or otherwise unsupported colon forms, C0/DEL control characters, bang/history-negation forms, grouping, and compound commands are unsupported and must fail closed before any subject-tree receipt is accepted."
+  - "Must preserve superseded predecessor records byte-for-byte in the manifest and derive current/superseded review posture from validated successor links."
+  - "Must not treat manual review alone as deterministic completion evidence."
+  - "Must not claim command execution, clean or independent execution, signing, identity, correctness, complete test coverage, approval, certification, or compliance."
+required_evidence:
+  - "naos/ac_completion_evidence.yaml when completion claims are declared."
+  - "naos/reports/ac_completion_evidence.json"
+validators:
+  - id: ac_completion_evidence
+    script: scripts/naos_ac_completion_evidence.py
+    status: available
+gatekeepers:
+  - G5
+dashboard_signals:
+  - "ac_completion_evidence.status"
+  - "ac_completion_evidence.configured"
+  - "ac_completion_evidence.claimed_complete"
+  - "ac_completion_evidence.unsatisfied_completions"
+  - "ac_completion_evidence.repository_bound_completions"
+  - "ac_completion_evidence.subject_operands_checked"
+  - "ac_completion_evidence.superseded_completion_records"
+maturity_path:
+  L0: "Capability contract, empty manifest seed, report schema, and validator exist."
+  L1: "Project declares completion evidence only when AC/SCEN completion is claimed."
+  L2: "Report is wired into CLI, Make, evidence, dashboard, and docs surfaces, including optional Git binding and visible supersession posture."
+  L3: "Profile severity applies to unresolved declared completion-evidence gaps when the adopter opts into the bounded repository-binding contract."
+  L4: "Projects routinely refresh evidence after AC-impacting changes."
+  L5: "Completion-evidence review is paired with human acceptance decisions and waivers where required."
+known_limitations:
+  - "The validator checks declared evidence paths and outcomes; it does not re-run commands."
+  - "Git binding proves only that declared objects and conservative path operands resolve in the local repository object database; it does not prove the command ran against that tree."
+  - "Compound or grouped shell commands, bang/history-negation forms, comments, environment assignments, variable/command/tilde/brace expansion, globs, path-shaped values attached to options, direct @file-style response syntax, URI/URL-bearing or otherwise unsupported colon forms, C0/DEL control characters, module-style operands, generated output operands, symlink targets, and submodule contents are outside the bounded operand grammar."
+  - "Bare tokens without a slash or supported file suffix are not inferred as paths; repository-bound evidence with no recognized path operand remains unsatisfied."
+  - "Supersession changes current review posture without deleting or revoking predecessor records."
+  - "A passing evidence artifact does not prove AC correctness or complete coverage."
+  - "Freshness is advisory unless configured."
+  - "Projects must decide when an AC is legitimately claimable as complete."
+not_claimed:
+  - "AC correctness"
+  - "complete test coverage"
+  - "implementation correctness"
+  - "semantic quality"
+  - "requirements approval"
+  - "hallucination prevention"
+  - "independent or clean execution proof"
+  - "cryptographic signing or signer identity"
+  - "non-repudiation"
+  - "certification"
+  - "compliance proof"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_ac_completion_evidence.py
+related_schemas:
+  - schemas/naos/ac_completion_evidence_manifest.schema.json
+  - schemas/naos/ac_completion_evidence.schema.json
+  - schemas/naos/evidence_pack.schema.json

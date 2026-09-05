@@ -1,0 +1,104 @@
+id: CAP-PR-RISK-CLASSIFICATION
+name: PR Risk Classification
+description: >
+  Classifies pull-request risk from deterministic local diff metadata so
+  protected paths, workflow changes, dependency changes, AI/governance-surface
+  changes, prompt-injection-like text, and secret-like added lines can be routed
+  to human review before relying on PR-time evidence.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Advisory local-preview PR risk metadata only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns when risky PR surfaces are changed."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "PR risk classification report is expected before PR governance summary."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured PR risk findings can block until reviewed under adopter policy."
+authority:
+  may_read:
+    - git diff metadata
+    - naos/pr_risk_rules.yaml
+  may_write:
+    - naos/reports/pr_risk_classification.json
+  may_block:
+    - "only through configured profile gate policy and human review"
+allowed_resources:
+  - "repo-local git metadata and changed lines"
+  - "adopter-local PR risk rules"
+prohibited_resources:
+  - "sandbox execution"
+  - "untrusted code execution"
+  - "LLM, provider, model, API, SaaS, or network calls"
+  - "cryptographic signing or signature verification"
+  - "key custody or private-key access"
+  - "automatic PR approval"
+constraints:
+  - "Must remain deterministic, local, file-first, and metadata bounded."
+  - "Must not execute changed code, install dependencies, call providers, or run sandboxed reviewers."
+  - "Must not include raw secret-like values in reports."
+  - "Must route risky surfaces to human review without approving, rejecting, merging, or publishing."
+required_evidence:
+  - "naos/pr_risk_rules.yaml"
+  - "naos/reports/pr_risk_classification.json"
+validators:
+  - id: pr_risk_classification
+    script: scripts/naos_pr_risk_classification.py
+    status: available
+gatekeepers:
+  - G4
+  - G6
+  - G8
+dashboard_signals:
+  - "pr_risk_classification.status"
+  - "pr_risk_classification.summary.risk_files"
+  - "pr_risk_classification.summary.total_findings"
+  - "pr_risk_classification.human_review_required"
+maturity_path:
+  L0: "Capability contract, rules seed, report schema, and script exist."
+  L1: "Report can be generated from local git diff metadata."
+  L2: "Report is consumed by PR governance, gates, evidence pack, dashboard, and SARIF."
+  L3: "Profile severity and reviewed trusted-author/path rules are applied."
+  L4: "Workflow examples generate the report before PR governance summary."
+  L5: "Projects maintain reviewed PR risk rules as part of release evidence."
+known_limitations:
+  - "Path and pattern checks can miss malicious behavior or flag harmless text."
+  - "Contributor trust metadata is governance metadata, not authentication or authorization."
+  - "The classifier does not sandbox, execute, sign, verify signatures, or prove security."
+not_claimed:
+  - "PR approval"
+  - "security proof"
+  - "malware analysis"
+  - "sandbox execution"
+  - "prompt-injection prevention"
+  - "legal or regulatory compliance"
+  - "proof of compliance"
+  - "certification"
+  - "release authorization"
+  - "deployment authorization"
+  - "DSSE signing"
+  - "signature verification"
+  - "key custody"
+  - "proof of execution"
+  - "human review replacement"
+related_docs:
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/CONTROL_PLANE.md
+  - docs/NAOS_THREAT_MODEL.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+  - templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md
+related_scripts:
+  - scripts/naos_pr_risk_classification.py
+  - scripts/naos_pr_governance_summary.py

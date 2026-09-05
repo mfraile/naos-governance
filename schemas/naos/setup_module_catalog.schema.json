@@ -1,0 +1,371 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:setup_module_catalog:v1",
+  "title": "NAOS Setup Module Catalog",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["version", "semantics", "modules"],
+  "properties": {
+    "version": {"type": "string"},
+    "semantics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "modules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/module"}
+    }
+  },
+  "$defs": {
+    "profile_recommendation": {
+      "type": "string",
+      "enum": [
+        "recommended",
+        "optional",
+        "defer",
+        "readiness_only",
+        "experimental",
+        "not_configured",
+        "disabled",
+        "not_applicable",
+        "unknown"
+      ]
+    },
+    "string_list": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "module_profile_override": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "prerequisites": {"$ref": "#/$defs/string_list"},
+        "evidence_outputs": {"$ref": "#/$defs/string_list"},
+        "commands": {"$ref": "#/$defs/string_list"},
+        "related_reports": {"$ref": "#/$defs/string_list"},
+        "related_docs": {"$ref": "#/$defs/string_list"},
+        "next_actions": {"$ref": "#/$defs/string_list"},
+        "post_install_next_actions": {"$ref": "#/$defs/string_list"}
+      }
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "name",
+        "category",
+        "status",
+        "profile_default",
+        "recommended_profiles",
+        "project_signals",
+        "why_recommended",
+        "benefit",
+        "prerequisites",
+        "evidence_outputs",
+        "commands",
+        "warning_if_enabled_too_early",
+        "consequence_if_deferred",
+        "dependency_posture",
+        "noise_risk",
+        "human_review_boundary",
+        "not_claimed",
+        "related_capabilities",
+        "related_reports",
+        "related_docs",
+        "next_actions",
+        "installable",
+        "install_actions",
+        "requires_confirmation",
+        "not_addable_reason",
+        "post_install_next_actions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "name": {"type": "string"},
+        "category": {"type": "string"},
+        "status": {"type": "string"},
+        "profile_default": {
+          "type": "object",
+          "required": ["quickstart", "lite", "standard", "assured"],
+          "properties": {
+            "quickstart": {"$ref": "#/$defs/profile_recommendation"},
+            "lite": {"$ref": "#/$defs/profile_recommendation"},
+            "standard": {"$ref": "#/$defs/profile_recommendation"},
+            "assured": {"$ref": "#/$defs/profile_recommendation"}
+          }
+        },
+        "profile_overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "quickstart": {"$ref": "#/$defs/module_profile_override"},
+            "lite": {"$ref": "#/$defs/module_profile_override"},
+            "standard": {"$ref": "#/$defs/module_profile_override"},
+            "assured": {"$ref": "#/$defs/module_profile_override"}
+          }
+        },
+        "recommended_profiles": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]}
+        },
+        "project_signals": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "why_recommended": {"type": "string"},
+        "benefit": {"type": "string"},
+        "prerequisites": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "evidence_outputs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "commands": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "warning_if_enabled_too_early": {"type": "string"},
+        "consequence_if_deferred": {"type": "string"},
+        "dependency_posture": {"type": "string"},
+        "noise_risk": {"type": "string", "enum": ["low", "medium", "high"]},
+        "human_review_boundary": {"type": "string"},
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "related_capabilities": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "related_reports": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "related_docs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "next_actions": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "installable": {"type": "boolean"},
+        "install_actions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/install_action"}
+        },
+        "activation_gate": {"$ref": "#/$defs/activation_gate"},
+        "requires_confirmation": {"type": "boolean"},
+        "not_addable_reason": {"type": "string"},
+        "post_install_next_actions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"installable": {"const": true}},
+            "required": ["installable"]
+          },
+          "then": {
+            "properties": {
+              "install_actions": {"minItems": 1},
+              "not_addable_reason": {"maxLength": 0}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"installable": {"const": false}},
+            "required": ["installable"]
+          },
+          "then": {
+            "properties": {
+              "install_actions": {"maxItems": 0},
+              "requires_confirmation": {"const": false},
+              "not_addable_reason": {"minLength": 1}
+            }
+          }
+        }
+      ]
+    },
+    "activation_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_profiles",
+        "profile_policy_path",
+        "capability_id",
+        "capability_state_path",
+        "minimum_maturity",
+        "config_path",
+        "config_schema_path",
+        "required_host",
+        "require_host_acknowledgement",
+        "require_host_contract_review",
+        "required_transition",
+        "required_trigger",
+        "required_limits",
+        "require_human_approval",
+        "require_manual_fallback"
+      ],
+      "properties": {
+        "allowed_profiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]}
+        },
+        "profile_policy_path": {"type": "string", "minLength": 1},
+        "capability_id": {"type": "string", "pattern": "^CAP-[A-Z0-9-]+$"},
+        "capability_state_path": {"type": "string", "minLength": 1},
+        "minimum_maturity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["standard", "assured"],
+          "properties": {
+            "standard": {"type": "string", "enum": ["L0", "L1", "L2", "L3", "L4", "L5"]},
+            "assured": {"type": "string", "enum": ["L0", "L1", "L2", "L3", "L4", "L5"]}
+          }
+        },
+        "config_path": {"type": "string", "minLength": 1},
+        "config_schema_path": {"type": "string", "minLength": 1},
+        "required_host": {"type": "string", "minLength": 1},
+        "require_host_acknowledgement": {"type": "boolean"},
+        "require_host_contract_review": {"type": "boolean"},
+        "required_transition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "properties": {
+            "from": {"type": "string", "minLength": 1},
+            "to": {"type": "string", "minLength": 1}
+          }
+        },
+        "required_trigger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["failed_attempt_threshold", "same_focused_reproducer_required", "materially_different_attempts_required"],
+          "properties": {
+            "failed_attempt_threshold": {"type": "integer", "minimum": 1},
+            "same_focused_reproducer_required": {"type": "boolean"},
+            "materially_different_attempts_required": {"type": "boolean"}
+          }
+        },
+        "required_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_debug_dispatches_per_task", "recursive_invocation_allowed", "child_write_allowed", "child_approval_allowed"],
+          "properties": {
+            "max_debug_dispatches_per_task": {"type": "integer", "minimum": 0},
+            "recursive_invocation_allowed": {"type": "boolean"},
+            "child_write_allowed": {"type": "boolean"},
+            "child_approval_allowed": {"type": "boolean"}
+          }
+        },
+        "require_human_approval": {"type": "boolean"},
+        "require_manual_fallback": {"type": "boolean"}
+      }
+    },
+    "install_action": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "type",
+        "source",
+        "destination",
+        "copy_mode",
+        "overwrite",
+        "profiles",
+        "explanation",
+        "post_install_next_actions"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["copy_file", "copy_tree", "repair_seed"]
+        },
+        "source": {"type": "string"},
+        "destination": {"type": "string"},
+        "copy_mode": {
+          "type": "string",
+          "enum": ["file", "tree"]
+        },
+        "overwrite": {
+          "type": "string",
+          "const": "skip"
+        },
+        "profiles": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]}
+        },
+        "explanation": {"type": "string"},
+        "post_install_next_actions": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "profile_patch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "pattern": {"type": "string"},
+            "replacement_template": {"type": "string"}
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {"enabled": {"const": true}},
+                "required": ["enabled"]
+              },
+              "then": {
+                "required": ["pattern", "replacement_template"],
+                "properties": {
+                  "pattern": {"minLength": 1},
+                  "replacement_template": {"minLength": 1}
+                }
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {"enum": ["copy_file", "repair_seed"]}
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "copy_mode": {"const": "file"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {"const": "copy_tree"}
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "copy_mode": {"const": "tree"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

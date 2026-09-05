@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:governed_debug_escalation:v1",
+  "title": "NAOS Governed Debug Escalation Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "semantics",
+    "enabled",
+    "profile",
+    "host",
+    "transition",
+    "trigger",
+    "limits",
+    "human_approval",
+    "manual_fallback_required"
+  ],
+  "properties": {
+    "version": {"const": "1.0"},
+    "semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_rule", "evidence_rule", "fallback_rule"],
+      "properties": {
+        "authority_rule": {"type": "string", "minLength": 1},
+        "evidence_rule": {"type": "string", "minLength": 1},
+        "fallback_rule": {"type": "string", "minLength": 1}
+      }
+    },
+    "enabled": {"type": "boolean"},
+    "profile": {
+      "type": "string",
+      "enum": ["not_configured", "standard", "assured"]
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "capability_acknowledged", "contract_reviewed_at"],
+      "properties": {
+        "id": {"const": "vscode-copilot"},
+        "capability_acknowledged": {"type": "boolean"},
+        "contract_reviewed_at": {
+          "oneOf": [
+            {"type": "string", "format": "date-time"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": {"const": "naos-implement-with-debug"},
+        "to": {"const": "naos-debug"}
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "failed_attempt_threshold",
+        "same_focused_reproducer_required",
+        "materially_different_attempts_required"
+      ],
+      "properties": {
+        "failed_attempt_threshold": {"const": 2},
+        "same_focused_reproducer_required": {"const": true},
+        "materially_different_attempts_required": {"const": true}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_debug_dispatches_per_task",
+        "recursive_invocation_allowed",
+        "child_write_allowed",
+        "child_approval_allowed"
+      ],
+      "properties": {
+        "max_debug_dispatches_per_task": {"const": 1},
+        "recursive_invocation_allowed": {"const": false},
+        "child_write_allowed": {"const": false},
+        "child_approval_allowed": {"const": false}
+      }
+    },
+    "human_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approved", "approved_by", "approved_at"],
+      "properties": {
+        "approved": {"type": "boolean"},
+        "approved_by": {"type": "string", "minLength": 1},
+        "approved_at": {
+          "oneOf": [
+            {"type": "string", "format": "date-time"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "manual_fallback_required": {"const": true}
+  }
+}

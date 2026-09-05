@@ -1,0 +1,143 @@
+# AI Tools Configuration — NAOS Portable Governance Kit
+# Copy to: .ai/config.yml in your project root
+# Advisory map; no shipped NAOS consumer auto-loads or enforces it.
+
+version: 2.0.0
+# NAOS_ROOT: override via NAOS_ROOT env var (default: naos)
+
+# Desired order for a host configured to load these paths
+mandatory_context:
+  - path: .ai/RULES.md
+    priority: 1
+    when: session_start
+    description: "Golden rules for AI governance"
+
+  - path: NAOS_QUICKSTART.md
+    priority: 2
+    when: session_start
+    description: "Installed NAOS guide"
+
+# Optional context (read as needed)
+optional_context:
+  - path: naos/PROJECT_STATUS.md
+    when: session_start_if_present
+    description: "Optional project status"
+
+  - path: docs/DOCS_INDEX.md
+    when: session_start_if_present
+    description: "[ADAPT: documentation index]"
+
+  - path: "[ADAPT: specs/]"
+    when: feature_work
+    description: "[ADAPT: Path to your requirements/arch specs]"
+
+  - path: naos/NAOS_QUICK_REFERENCE.md
+    when: pm_task
+    description: "NAOS workflow guide"
+
+  - path: CONTRIBUTING.md
+    when: contribution
+    description: "Development workflow and guidelines"
+
+# Validation gates
+validation:
+  pre_response:
+    - Check existing root documentation impacted by the change
+    - Check impact on specs/ (if FR/NFR change) [ADAPT: update path if different]
+    - If specs/04-architecture.md changes, check linkage to specs 01-03, task registry, traceability, capabilities, gates/evidence, known gaps, and residual risks
+    - Check naos/PROJECT_STATUS.md when present and status changes
+    - Check naos/active/*.md when present before implementation
+    - Check FUNCTION_INDEX.yaml and source search before proposing new functions
+    - Check related tests, source-to-test mapping, and capability constraints where present
+    - Route actionable research/autoresearch/trend-review findings into the control plane
+    - Review changed agents, skills, prompts, instructions, workflows, module headers, policies, capabilities, gatekeepers, validators, evidence, dashboards, and AI tool surfaces for contradictions and excessive authority
+    - Use templates/skills/systemic-capability-wiring/SKILL.md as the canonical wiring checklist for capability, feature, validator, AI-surface, doc, source-module, or project-configuration changes
+    - Run or recommend naos setup-recommendations when orienting adopters or module choices; use naos add setup-module <module_id> --profile <profile> --dry-run for selected installable modules and never silently enable readiness-only/deferred modules
+    - Run or recommend naos memory-readiness before claiming memory or MCP access; memory is advisory recall only, repo evidence outranks memory, do not assume every tool has MCP, and MCP access is not guaranteed; durable writes require authorization and human review, secrets/customer data must not be stored, and unavailable memory means degraded recovery
+    - Run or recommend naos task-context --task <id> for active-task handoff context; packs are derived and bounded, do not inject context automatically, and do not replace source artifacts or make memory authoritative
+    - Run or recommend naos evidence-attestation when evidence artifacts or reviewer metadata change; treat local digests as bounded evidence, not signing, tamper-proof storage, or compliance approval
+    - Run or recommend naos systemic-impact when governed artifact families change; treat the report as review evidence, not proof of perfect coherence
+    - Run or recommend naos control-plane-review when governance-surface changes or actionable research/autoresearch findings need routing; do not claim research completeness
+    - Run or recommend naos failure-mode-observations when local report findings should be aggregated into failure-mode observation statistics; do not treat counts as scores, learning writes, approval, certification, or compliance proof
+    - Run or recommend naos module-headers when source modules are added or materially changed; do not auto-rewrite all headers blindly
+    - Use adopter-facing names: Deterministic Conformance Review is implemented static/file-first checking; Autoresearch Readiness and Behavioral Governance Readiness are readiness/future-configured tracks
+    - Do not use internal work-item labels or claim behavioral grading exists in the default kit
+    - Verify no new files created (unless approved by user)
+
+  pre_commit:
+    - Run make -f Makefile.naos validate-all [ADAPT: update target if different]
+    - Run make -f Makefile.naos naos-function-index-health when source functions changed
+    - Run make -f Makefile.naos naos-module-headers when source modules changed
+    - Run make -f Makefile.naos naos-setup-recommendations when module choices or onboarding posture changed
+    - Run make -f Makefile.naos naos-memory-readiness when memory rules, authorization, MCP/tool access, AI memory guidance, or context-continuity posture changed
+    - Run make -f Makefile.naos naos-task-context TASK=<id> when active task handoff context is needed or context-pack rules changed
+    - Run make -f Makefile.naos naos-evidence-attestation when evidence artifacts or reviewer metadata changed
+    - Run make -f Makefile.naos naos-systemic-impact when governed artifact families changed
+    - Run make -f Makefile.naos naos-control-plane-review when governance-surface or research-routing items changed
+    - Run make -f Makefile.naos naos-failure-mode-observations when failure-mode observation statistics or related evidence changed
+    - Run make -f Makefile.naos naos-test-evidence-map and make -f Makefile.naos naos-test-evidence when source/tests changed
+    - Run make -f Makefile.naos naos-evidence-pack and make -f Makefile.naos naos-dashboard when governance evidence changed
+    - Verify no archive/ folders
+    - Verify no backup files (*.bak, *_backup.*)
+    - Verify no session_* files
+    - Verify new docs in DOCS_INDEX.md [ADAPT: update path if different]
+
+# Advisory only; the host's active configuration controls actual behavior.
+tools:
+  github_copilot: {auto_load: unverified, enforce_rules: unverified}
+  cursor: {auto_load: unverified, enforce_rules: unverified}
+  continue: {auto_load: unverified, enforce_rules: unverified}
+  chatgpt: {auto_load: manual_or_unverified, enforce_rules: unverified}
+  claude: {auto_load: unverified, enforce_rules: unverified}
+
+# Enforcement actions
+enforcement:
+  archive_folder:
+    action: pre_commit_reject
+    message: "Archive folders forbidden. Use 'git rm' for deletion."
+
+  new_unindexed_doc:
+    action: pre_commit_warn
+    message: "Add new docs to docs/DOCS_INDEX.md first."
+
+  backup_file:
+    action: pre_commit_reject
+    message: "Backup files forbidden. Git history is the backup."
+
+  session_summary_file:
+    action: pre_commit_reject
+    message: "Session summaries forbidden. Update PROJECT_STATUS.md instead."
+
+# Excluded from selected checks only
+exempt_paths:
+  - docs/exploration/
+
+# Success metrics (review weekly)
+metrics:
+  pre_commit_rejections:
+    target: "<2/week"
+    action: "Review AI suggestions with user"
+
+  ai_corrections:
+    target: "<10% of suggestions"
+    action: "Update .ai/RULES.md with new examples"
+
+  unauthorized_files:
+    target: "0 in naos/"
+    action: "Review staged paths; hook coverage is bounded"
+
+# Notes for AI assistants
+notes: |
+  This is posture, not automation. Hook and validator source define automation.
+
+  Key principles:
+  1. Update existing files, don't create new ones
+  2. No archive folders (git history is the archive)
+  3. PM status in one place (naos/PROJECT_STATUS.md)
+  4. Check impact on ALL documentation
+  5. Exploration folder exempt from validation
+  6. Preventive controls happen before generation: task, function index, source search, tests, capabilities
+  7. Detective controls happen after generation: function-index health, test-evidence, evidence pack, dashboard
+  8. Remediation is proposed patch + evidence + approval, not silent rewrite of risky code
+  9. Spec 04 architecture changes must be linked back to specs 01-03, task registry, traceability, capabilities, gates/evidence, known gaps, and residual risks
+  10. Control-plane self-review is review/routing for governance surfaces; it is not fully automated unless a validator/gate exists

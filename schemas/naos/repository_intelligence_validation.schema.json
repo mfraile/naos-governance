@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_validation_receipt:v1",
+  "title": "NAOS Repository Intelligence Validation Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "receipt_sha256", "control", "not_claimed"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.validation_receipt.v1"},
+    "status": {"enum": ["validated_generation", "diagnostic_generation"]},
+    "receipt_sha256": {"$ref": "#/$defs/sha256"},
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation_id", "generation_content_sha256", "effective_source_sha256", "profile", "purpose", "component_mode", "runtime", "implementation", "provenance_gate", "sqlite_fts", "networkx_graphml", "source_revalidated_after_generation", "candidate_only"],
+      "properties": {
+        "generation_id": {"type": "string", "pattern": "^RI-[0-9a-f]{24}$"},
+        "generation_content_sha256": {"$ref": "#/$defs/sha256"},
+        "effective_source_sha256": {"$ref": "#/$defs/sha256"},
+        "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+        "purpose": {"enum": ["brownfield-onboarding", "ongoing-change-impact", "task-context"]},
+        "component_mode": {"enum": ["auto", "baseline", "graph"]},
+        "runtime": {"type": "object"},
+        "implementation": {"type": "object"},
+        "provenance_gate": {"type": "object"},
+        "sqlite_fts": {"type": "object"},
+        "networkx_graphml": {"type": "object"},
+        "source_revalidated_after_generation": {"const": true},
+        "candidate_only": {"const": true}
+      }
+    },
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

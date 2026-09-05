@@ -1,0 +1,8 @@
+schema: "naos.task_claims.v1"
+updated_at: null
+
+# Task claims are local coordination metadata, not task truth.
+# TASK_REGISTRY.yaml remains the source for task definitions/status.
+# Claims do not authorize work, approve tasks, prove ownership, prove separation
+# of duties, resolve evidence conflicts, or indicate task completion.
+claims: []

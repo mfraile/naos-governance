@@ -1,0 +1,112 @@
+schema: naos.upgrade.source_policy_bundle.v1
+active_snapshot: v2
+snapshots:
+  - id: v1
+    sha256_aliases:
+      - 98b707b621722fef2e59a10f96ce56fde9e35c3618393d66763656b515f9e586
+    policy:
+      version: 1
+      scope: managed-content
+      semantics:
+        ownership_inference: forbidden
+        unmatched_new_path: create_once_adopter_owned
+        existing_without_valid_base: preserve_and_refuse
+      rules:
+        - id: executable_kit_surface
+          ownership: kit_owned_derived
+          creation_policy: create
+          first_components:
+            - scripts
+            - naos_tools
+            - schemas
+            - upgrade_contract
+            - capabilities
+            - autoresearch
+        - id: adopter_governance_surface
+          ownership: adopter_owned
+          creation_policy: create_once_adopter_owned
+          first_components:
+            - .ai
+            - .cursor
+            - .github
+            - .githooks
+            - configs
+            - docs
+            - naos
+            - policies
+            - templates
+        - id: adopter_root_surface
+          ownership: adopter_owned
+          creation_policy: create_once_adopter_owned
+          exact_paths:
+            - CLAUDE.md
+            - CONTRIBUTING.md
+            - Makefile.naos
+            - Makefile.naos.secure-coding-reporting
+            - NAOS_QUICKSTART.md
+            - QUICK_START.md
+      fallback:
+        id: fallback
+        ownership: adopter_owned
+        creation_policy: create_once_adopter_owned
+        rationale: Unmatched new files are created once and never become replacement authority.
+  - id: v2
+    sha256_aliases: []
+    policy:
+      version: 2
+      scope: managed-content
+      semantics:
+        ownership_inference: forbidden
+        unmatched_new_path: create_once_adopter_owned
+        existing_without_valid_base: preserve_and_refuse
+        exact_path_precedence: true
+        prior_manifest_ownership: preserve_verbatim
+      rules:
+        - id: profile_transition_generated_controls
+          ownership: kit_owned_derived
+          creation_policy: create
+          exact_paths:
+            - .ai/RULES.md
+            - .githooks/pre-commit
+            - .github/workflows/naos-control-plane-ci.yml
+            - Makefile.naos
+            - configs/naos_ai_surface_catalogue.yaml
+            - naos/policy/default_policy.yaml
+            - naos/profile_generated_surface_contract.json
+        - id: executable_kit_surface
+          ownership: kit_owned_derived
+          creation_policy: create
+          first_components:
+            - scripts
+            - naos_tools
+            - schemas
+            - upgrade_contract
+            - capabilities
+            - autoresearch
+        - id: adopter_governance_surface
+          ownership: adopter_owned
+          creation_policy: create_once_adopter_owned
+          first_components:
+            - .ai
+            - .cursor
+            - .github
+            - .githooks
+            - configs
+            - docs
+            - naos
+            - policies
+            - templates
+        - id: adopter_root_surface
+          ownership: adopter_owned
+          creation_policy: create_once_adopter_owned
+          exact_paths:
+            - CLAUDE.md
+            - CONTRIBUTING.md
+            - Makefile.naos.secure-coding-reporting
+            - NAOS_QUICKSTART.md
+            - QUICK_START.md
+      fallback:
+        id: fallback
+        ownership: adopter_owned
+        creation_policy: create_once_adopter_owned
+        rationale: Unmatched new files are created once and never become replacement authority.

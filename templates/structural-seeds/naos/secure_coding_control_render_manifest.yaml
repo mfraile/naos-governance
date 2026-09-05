@@ -1,0 +1,11 @@
+schema: naos.secure_coding_portable_reference_manifest.v1
+version: 1.0.0
+register: secure_coding_control_register.yaml
+targets:
+  - canonical_path: templates/instructions/security.instructions.md
+    project_path: .github/instructions/security.instructions.md
+  - canonical_path: templates/instructions/ai-pipeline.instructions.md
+    project_path: .github/instructions/ai-pipeline.instructions.md
+    optional: true
+  - canonical_path: templates/cursor-rules/naos-security-standards.mdc
+    project_path: .cursor/rules/naos-security-standards.mdc

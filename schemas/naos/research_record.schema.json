@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/research_record.schema.json",
+  "title": "NAOS structured research record",
+  "type": "object",
+  "required": ["schema", "id", "revision", "record_state", "supersedes", "superseded_by", "retirement_reason", "profile", "question", "scope", "sources", "observations", "contradictions", "outcome", "review", "authority", "limitations", "next_action", "not_claimed"],
+  "properties": {
+    "schema": {"const": "naos.research_record.v1"},
+    "id": {"type": "string", "pattern": "^RESEARCH-[A-Z0-9-]+$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "record_state": {"enum": ["active_candidate", "superseded", "retired"]},
+    "supersedes": {"type": ["string", "null"], "pattern": "^RESEARCH-[A-Z0-9-]+$"},
+    "superseded_by": {"type": ["string", "null"], "pattern": "^RESEARCH-[A-Z0-9-]+$"},
+    "retirement_reason": {"type": ["string", "null"]},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "question": {"type": "string", "minLength": 1},
+    "scope": {
+      "type": "object",
+      "required": ["included", "excluded"],
+      "properties": {
+        "included": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+        "excluded": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      },
+      "additionalProperties": false
+    },
+    "hypothesis": {"type": "string", "minLength": 1},
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["ref", "identity", "locator", "kind", "version_or_date_or_commit", "quality"],
+        "properties": {
+          "ref": {"type": "string", "minLength": 1},
+          "identity": {"type": "string", "minLength": 1},
+          "locator": {"type": "string", "minLength": 1},
+          "kind": {"enum": ["repository_source", "executed_output", "authoritative_external", "provided_material"]},
+          "inspected_at": {"type": "string", "minLength": 1},
+          "version_or_date_or_commit": {"type": ["string", "null"]},
+          "quality": {
+            "type": "object",
+            "required": ["authority", "recency", "directness"],
+            "properties": {
+              "authority": {"enum": ["primary", "authoritative_secondary", "secondary", "provided", "unknown"]},
+              "recency": {"enum": ["current", "dated_but_applicable", "stale_or_unknown"]},
+              "directness": {"enum": ["direct", "indirect", "contextual"]}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["claim", "claim_type", "posture", "uncertainty", "evidence_refs"],
+        "properties": {
+          "claim": {"type": "string", "minLength": 1},
+          "claim_type": {"enum": ["verified_fact", "source_supported", "reasoned_inference", "assumption", "unknown"]},
+          "posture": {"enum": ["confirmed", "deduced", "hypothesized", "unknown"]},
+          "uncertainty": {"enum": ["none", "low", "moderate", "high", "unresolved"]},
+          "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "contradictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "evidence_refs", "disposition"],
+        "properties": {
+          "claim": {"type": "string", "minLength": 1},
+          "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+          "disposition": {"enum": ["resolved", "unresolved", "not_material"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "counterevidence": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "outcome": {
+      "type": "object",
+      "required": ["state", "rationale", "residual_uncertainty"],
+      "properties": {
+        "state": {"enum": ["confirmed", "refuted", "inconclusive"]},
+        "rationale": {"type": "string", "minLength": 1},
+        "residual_uncertainty": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "review": {
+      "type": "object",
+      "required": ["state", "reviewer", "reviewed_at", "disposition_rationale"],
+      "properties": {
+        "state": {"enum": ["pending_human_review", "reviewed_candidate", "rejected", "retired"]},
+        "reviewer": {"type": ["string", "null"]},
+        "reviewed_at": {"type": ["string", "null"]},
+        "disposition_rationale": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"state": {"enum": ["reviewed_candidate", "rejected", "retired"]}}},
+          "then": {
+            "properties": {
+              "reviewer": {"type": "string", "minLength": 1},
+              "reviewed_at": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "required": ["posture", "explicit_attributable_transition_required", "transition_record"],
+      "properties": {
+        "posture": {"const": "candidate_only"},
+        "explicit_attributable_transition_required": {"const": true},
+        "transition_record": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "next_action": {
+      "type": "object",
+      "required": ["recommendation", "requires_human_review"],
+      "properties": {
+        "recommendation": {"type": "string", "minLength": 1},
+        "requires_human_review": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "traceability": {
+      "type": "object",
+      "required": ["task_ids", "spec_refs", "implementation_refs", "test_refs"],
+      "properties": {
+        "task_ids": {"type": "array", "items": {"type": "string"}},
+        "spec_refs": {"type": "array", "items": {"type": "string"}},
+        "implementation_refs": {"type": "array", "items": {"type": "string"}},
+        "test_refs": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "not_claimed": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"properties": {"profile": {"enum": ["lite", "standard", "assured"]}}},
+      "then": {"required": ["hypothesis", "counterevidence"]}
+    },
+    {
+      "if": {"properties": {"profile": {"enum": ["standard", "assured"]}}},
+      "then": {"required": ["traceability"]}
+    },
+    {
+      "if": {"properties": {"record_state": {"const": "superseded"}}},
+      "then": {"properties": {"superseded_by": {"type": "string", "minLength": 1}}}
+    },
+    {
+      "if": {"properties": {"record_state": {"const": "retired"}}},
+      "then": {"properties": {"retirement_reason": {"type": "string", "minLength": 1}}}
+    }
+  ]
+}

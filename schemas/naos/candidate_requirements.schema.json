@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:candidate_requirements:v1",
+  "title": "NAOS Candidate Requirements Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "generated_at", "profile", "status", "command", "mode", "naos_root", "project_root", "human_review_required", "not_claimed", "limitations", "findings", "summary", "candidates", "confidence_classes", "promotion_rule"],
+  "properties": {
+    "schema": {"const": "naos.candidate_requirements.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
+    "command": {"const": "requirements-reconstruct"},
+    "mode": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "session_id": {"type": ["string", "null"]},
+    "generated_by": {"type": "object"},
+    "human_review_required": {"type": "boolean"},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array"},
+    "residual_risks": {"type": "array"},
+    "summary": {"type": "object"},
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["candidate_id", "candidate_type", "title", "rationale", "evidence_refs", "confidence_class", "source_basis", "open_questions", "human_review_required", "non_claims"],
+        "properties": {
+          "candidate_id": {"type": "string"},
+          "candidate_type": {"enum": ["FR", "NFR"]},
+          "type": {"enum": ["functional", "non_functional"]},
+          "title": {"type": "string"},
+          "text": {"type": "string"},
+          "rationale": {"type": "string"},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}},
+          "confidence_class": {
+            "enum": [
+              "confirmed_by_existing_spec",
+              "supported_by_docs",
+              "inferred_from_code",
+              "inferred_from_tests",
+              "hypothesized_requires_review"
+            ]
+          },
+          "source_basis": {"type": "string"},
+          "open_questions": {"type": "array", "items": {"type": "string"}},
+          "human_review_required": {"type": "boolean"},
+          "non_claims": {"type": "array", "items": {"type": "string"}},
+          "repository_intelligence_evidence": {
+            "type": "array",
+            "items": {"type": "object"}
+          }
+        }
+      }
+    },
+    "candidate_counts": {"type": "object"},
+    "candidate_type_counts": {"type": "object"},
+    "confidence_classes": {"type": "array", "items": {"type": "string"}},
+    "promotion_rule": {"const": "human_review_required"},
+    "non_claims": {"type": "array", "items": {"type": "string"}},
+    "repository_intelligence": {"type": ["object", "null"]}
+  }
+}

@@ -1,0 +1,116 @@
+name: NAOS Governance Validation
+
+on:
+  push:
+    branches: [ main, updates ]
+    paths:
+      - 'specs/**'
+      - 'naos/**'
+      - 'src/**'
+      - 'scripts/**'
+      - '.github/workflows/naos-governance.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'specs/**'
+      - 'naos/**'
+      - 'src/**'
+      - 'scripts/**'
+
+jobs:
+  validate:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+      - name: Run governance refresh (Rule 8 chain)
+        run: make -f Makefile.naos gov-refresh
+
+      - name: Run coherence validation
+        run: make -f Makefile.naos validate-all
+
+      - name: Run spec-pack contract
+        run: make -f Makefile.naos naos-spec-pack-contract NAOS_PROFILE="${NAOS_PROFILE:-standard}" NAOS_STRICT=1
+
+      - name: Run spec-pack materialization preview
+        run: make -f Makefile.naos naos-spec-pack-materialize NAOS_PROFILE="${NAOS_PROFILE:-standard}" SPEC_PACK_MATERIALIZE_ARGS="--dry-run"
+
+      - name: Run spec assembly worksheet
+        run: make -f Makefile.naos naos-spec-assembly-worksheet NAOS_PROFILE="${NAOS_PROFILE:-standard}"
+
+      - name: Run spec cascade coherence
+        run: make -f Makefile.naos naos-spec-cascade NAOS_PROFILE="${NAOS_PROFILE:-standard}" NAOS_STRICT=1
+
+      - name: Validate governance truth table
+        run: python scripts/naos_validate_truth.py
+
+      - name: Build admissibility evidence pack
+        run: make -f Makefile.naos admissibility-pack
+
+      - name: Validate TASK_REGISTRY schema
+        run: python scripts/naos_validate_task_registry.py
+
+      - name: Governance file existence check
+        run: |
+          set -euo pipefail
+          echo "Checking required governance files exist..."
+          # [ADAPT: update list of required governance files for your project]
+          for f in .ai/RULES.md .github/copilot-instructions.md; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Required governance file missing: $f"
+              exit 1
+            fi
+          done
+          echo "Checking prompt files exist..."
+          if [ ! -d ".github/prompts" ] || [ -z "$(ls -A .github/prompts/*.prompt.md 2>/dev/null)" ]; then
+            echo "::error::No prompt files found in .github/prompts/"
+            exit 1
+          fi
+          echo "All governance files present."
+
+      - name: Review PM artifacts
+        run: |
+          echo "Governance artifacts are review evidence only."
+          echo "Commit generated or updated artifacts through normal human-reviewed PR flow."
+
+      - name: Drift check (fail if generated artifacts changed)
+        run: |
+          set -euo pipefail
+          echo "Checking for uncommitted changes after generation..."
+          git update-index -q --refresh
+          # [ADAPT: adjust the file list to match your auto-generated artifacts]
+          FILES="naos/TRACEABILITY_MATRIX.md naos/BACKLOG.md naos/RELEASE_NOTES.md naos/DASHBOARD.md naos/inventory/MASTER_INVENTORY.md"
+          CHANGED=$(git --no-pager diff --name-only -- $FILES)
+          if [ -n "$CHANGED" ]; then
+            echo "::error::Generated artifacts are out of date. Please run the governance generators locally and commit the changes."
+            echo "Changed files:" && echo "$CHANGED"
+            echo "--- Unified diff (limited) ---"
+            git --no-pager diff -- $FILES | head -n 400
+            exit 1
+          fi
+
+      - name: Save governance artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-artifacts
+          # [ADAPT: adjust artifact path list]
+          path: |
+            naos/TRACEABILITY_MATRIX.md
+            naos/BACKLOG.md
+            naos/DASHBOARD.md
+            naos/inventory/MASTER_INVENTORY.md
+            naos/admissibility-*.zip

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_manifest:v1",
+  "title": "NAOS Repository Intelligence Generation Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "manifest_sha256", "control", "limitations", "not_claimed"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.manifest.v1"},
+    "status": {"enum": ["validated", "diagnostic_only"]},
+    "manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation_id", "generation_content_sha256", "project_root", "effective_source_sha256", "graph_model_sha256", "profile", "purpose", "component_mode", "rules", "rules_snapshot", "runtime", "implementation", "provenance_gate", "components", "coverage", "ongoing_use_scope", "files", "validation_receipt_sha256", "candidate_only"],
+      "properties": {
+        "generation_id": {"type": "string", "pattern": "^RI-[0-9a-f]{24}$"},
+        "generation_content_sha256": {"$ref": "#/$defs/sha256"},
+        "project_root": {"type": "string"},
+        "effective_source_sha256": {"$ref": "#/$defs/sha256"},
+        "graph_model_sha256": {"$ref": "#/$defs/sha256"},
+        "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+        "purpose": {"enum": ["brownfield-onboarding", "ongoing-change-impact", "task-context"]},
+        "component_mode": {"enum": ["auto", "baseline", "graph"]},
+        "rules": {"type": "object"},
+        "rules_snapshot": {"const": "repository_intelligence_rules.yaml"},
+        "runtime": {"type": "object"},
+        "implementation": {"type": "object"},
+        "provenance_gate": {"type": "object"},
+        "components": {"type": "object"},
+        "coverage": {"type": "object"},
+        "ongoing_use_scope": {"type": "array", "items": {"type": "string"}},
+        "files": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256", "size_bytes"],
+            "properties": {
+              "path": {"type": "string", "pattern": "^[^/]+$"},
+              "sha256": {"$ref": "#/$defs/sha256"},
+              "size_bytes": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "validation_receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "candidate_only": {"const": true}
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

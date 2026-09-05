@@ -1,0 +1,80 @@
+id: CAP-EVIDENCE-PACK
+name: Evidence Pack
+description: >
+  Bundles task path, context manifest, validator results, test evidence,
+  function-index snapshot, gatekeeper status, exceptions, known gaps, residual
+  risk notes, and completion certificate for review.
+status: active
+default_maturity: L0
+minimum_profile: standard
+enforcement_default: required
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Template exists, no expected pack."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Lightweight pack can be configured."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Evidence pack is expected for governed work."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Missing evidence pack can block completion gates."
+authority:
+  may_read:
+    - naos/evidence/
+    - naos/reports/
+    - naos/inventory/
+    - naos/TASK_REGISTRY.yaml
+  may_write:
+    - naos/evidence/
+    - naos/admissibility-*.zip
+  may_block:
+    - "completion gate only under configured profile policy"
+allowed_resources:
+  - "repo-local evidence files"
+  - "zip export generated from local files"
+prohibited_resources:
+  - "legal certification claims"
+  - "mandatory document management service"
+constraints:
+  - "Must use supports review or audit-style review, not proves compliance."
+  - "Must preserve known gaps and residual risks."
+required_evidence:
+  - "Task path."
+  - "Validator results."
+  - "Gatekeeper status."
+  - "Completion certificate."
+validators:
+  - id: evidence_export
+    script: scripts/naos_evidence_export.py
+    status: available
+gatekeepers:
+  - G6
+dashboard_signals:
+  - "evidence_pack.completeness"
+  - "evidence_pack.waivers"
+  - "evidence_pack.known_gaps"
+maturity_path:
+  L0: "Evidence pack templates exist."
+  L1: "Project configures required pack contents."
+  L2: "Pack export produces evidence."
+  L3: "Gatekeeper applies profile severity."
+  L4: "Dashboard tracks pack completeness and waivers."
+  L5: "Pack supports regulated or audit-style review."
+known_limitations:
+  - "Evidence pack supports review; it is not a legal compliance certificate."
+not_claimed:
+  - "Proof of compliance."
+  - "Runtime assurance by itself."
+related_docs:
+  - docs/ADMISSIBILITY.md
+related_scripts:
+  - scripts/naos_evidence_export.py
+  - scripts/workflows/make_admissibility_pack.py

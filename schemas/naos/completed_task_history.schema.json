@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/completed_task_history.schema.json",
+  "title": "NAOS Completed Task History",
+  "$defs": {
+    "rootedPath": {
+      "type": "object",
+      "required": ["base", "path"],
+      "properties": {
+        "base": {"enum": ["project_root", "naos_root"]},
+        "path": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "referenceReceipt": {
+      "type": "object",
+      "required": ["original_reference", "portable_reference", "resolved_path", "fragment", "exists", "regular_file", "allowed_root", "path_base", "path_traversal", "failures"],
+      "properties": {
+        "original_reference": {"type": "string"},
+        "portable_reference": {"type": ["string", "null"]},
+        "resolved_path": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/rootedPath"}]},
+        "fragment": {"type": ["string", "null"]},
+        "exists": {"type": "boolean"},
+        "regular_file": {"type": "boolean"},
+        "allowed_root": {"type": "boolean"},
+        "path_base": {"type": ["string", "null"]},
+        "path_traversal": {"type": "boolean"},
+        "failures": {"type": "array", "items": {"type": "string"}},
+        "decision_type": {"type": ["string", "null"]},
+        "outcome": {"type": ["string", "null"]},
+        "structurally_attributable": {"type": "boolean"},
+        "evidence_linked": {"type": "boolean"},
+        "qualifies_for_verified_delivery": {"type": "boolean"},
+        "authority_failures": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "completionVerification": {
+      "type": "object",
+      "required": ["requested_state", "effective_state", "prerequisites_met", "test_references", "evidence_references", "decision_references", "failures", "limitations"],
+      "properties": {
+        "requested_state": {"type": "string"},
+        "effective_state": {"type": "string"},
+        "prerequisites_met": {"type": "boolean"},
+        "test_references": {"type": "array", "items": {"$ref": "#/$defs/referenceReceipt"}},
+        "evidence_references": {"type": "array", "items": {"$ref": "#/$defs/referenceReceipt"}},
+        "decision_references": {"type": "array", "items": {"$ref": "#/$defs/referenceReceipt"}},
+        "failures": {"type": "array", "items": {"type": "string"}},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["schema", "contract_version", "records"],
+  "properties": {
+    "schema": {"const": "naos.completed_task_history.v1"},
+    "contract_version": {"const": 1},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "revision", "lifecycle_state", "delivery_state", "verification_state", "acceptance_criteria", "requirement_spec_links", "implementation_references", "test_references", "evidence_references", "decision_references", "evidence_posture", "decision_posture", "unresolved_risks", "completion_provenance", "active_record_digest", "completed_card_path"],
+        "properties": {
+          "task_id": {"type": "string", "pattern": "^(?:[A-Z0-9]+-)*T-[0-9]{3,}$"},
+          "revision": {"type": "integer", "minimum": 1},
+          "lifecycle_state": {"const": "completed"},
+          "delivery_state": {"enum": ["delivered", "not_delivered"]},
+          "verification_state": {"enum": ["unverified", "partially_verified", "verified", "inconclusive", "failed", "not_applicable"]},
+          "requested_verification_state": {"enum": ["unverified", "partially_verified", "verified", "inconclusive", "failed", "not_applicable"]},
+          "effective_verification_state": {"enum": ["unverified", "partially_verified", "verified", "inconclusive", "failed", "not_applicable"]},
+          "effective_delivery_state": {"enum": ["delivered", "not_delivered"]},
+          "verification_prerequisites_met": {"type": "boolean"},
+          "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+          "acceptance_criteria_extraction_status": {"enum": ["extracted", "unstructured_or_missing"]},
+          "acceptance_criteria_extraction_source": {"type": ["string", "null"]},
+          "acceptance_criteria_extraction_limitations": {"type": "array", "items": {"type": "string"}},
+          "requirement_spec_links": {"type": "array", "items": {"type": "string"}},
+          "implementation_references": {"type": "array", "items": {"type": "string"}},
+          "test_references": {"type": "array", "items": {"type": "string"}},
+          "evidence_references": {"type": "array", "items": {"type": "string"}},
+          "decision_references": {"type": "array", "items": {"type": "string"}},
+          "evidence_posture": {"const": "candidate_only"},
+          "decision_posture": {"enum": ["pending_attributable_human_decision", "structurally_attributable_task_delivery_decision"]},
+          "completion_verification": {"$ref": "#/$defs/completionVerification"},
+          "unresolved_risks": {"type": "array", "items": {"type": "string"}},
+          "completion_provenance": {"type": "object"},
+          "active_record_digest": {
+            "type": "object",
+            "required": ["algorithm", "value"],
+            "properties": {
+              "algorithm": {"const": "sha256"},
+              "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            }
+          },
+          "completed_card_path": {
+            "oneOf": [
+              {"type": "string"},
+              {
+                "type": "object",
+                "required": ["base", "path"],
+                "$ref": "#/$defs/rootedPath"
+              }
+            ]
+          },
+          "superseded_by": {"type": ["string", "null"]},
+          "cancelled_reason": {"type": ["string", "null"]},
+          "deferred_reason": {"type": ["string", "null"]},
+          "absorbed_into": {"type": ["string", "null"]}
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"completed_card_path": {"type": "object"}},
+              "required": ["completed_card_path"]
+            },
+            "then": {
+              "required": ["requested_verification_state", "effective_verification_state", "effective_delivery_state", "verification_prerequisites_met", "acceptance_criteria_extraction_status", "acceptance_criteria_extraction_source", "acceptance_criteria_extraction_limitations", "completion_verification"]
+            }
+          }
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

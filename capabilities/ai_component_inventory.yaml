@@ -1,0 +1,95 @@
+id: CAP-AI-COMPONENT-INVENTORY
+name: Declared AI Component Inventory
+description: >-
+  Builds a deterministic custom inventory of declared NAOS AI authoring
+  surfaces, model roles, AI tools, and tool-model bindings, and supplies a
+  freshness-aware review input to the control plane without runtime discovery.
+status: active
+default_maturity: L1
+minimum_profile: standard
+enforcement_default: required
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Optional and not installed by the quickstart profile."
+  lite:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Not installed by the Lite profile; missing evidence does not route as required."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Missing, malformed, stale, or incomplete required inventory routes to G2/G6 human review."
+  assured:
+    target_maturity: L1
+    enforcement: required
+    notes: "Missing, malformed, stale, or incomplete required inventory routes to G2/G6 human review; it does not grant gate authority."
+authority:
+  may_read:
+    - naos/ai_component_inventory_rules.yaml
+    - naos/model_provider_policy.yaml
+    - .github/agents/*.agent.md
+    - .github/skills/*/SKILL.md
+    - .github/instructions/*.instructions.md
+  may_write:
+    - naos/reports/ai_component_inventory.json
+  may_block: []
+allowed_resources:
+  - repo-local declared AI component metadata
+  - repo-relative source paths and SHA-256 content digests
+prohibited_resources:
+  - provider, model, MCP, memory, network, runtime, credential, signing, attestation, release, or publication actions
+constraints:
+  - "Must use content digests and canonical semantics; wall-clock age and copied mtimes are not freshness authority."
+  - "Must route missing, malformed, stale, or incomplete required declarations to G2/G6 human review."
+  - "Must not claim CycloneDX/SPDX conformance, runtime discovery, completeness, signing, attestation, supply-chain assurance, compliance, release, or publication authority."
+  - "The source kit supplies the contract and consumer but does not persist a project report; missing-report routing applies to generated Standard and Assured adopters."
+required_evidence:
+  - naos/ai_component_inventory_rules.yaml
+  - naos/reports/ai_component_inventory.json
+validators:
+  - id: naos_ai_component_inventory
+    script: scripts/naos_ai_component_inventory.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - ai_component_inventory.status
+  - ai_component_inventory.inventory_digest
+  - ai_component_inventory.human_review_required
+maturity_path:
+  L0: "Custom declared-facts format, rules, generator, and schemas exist."
+  L1: "Control-plane review routes missing, invalid, stale, or incomplete required inventory to G2/G6 human review."
+  L2: "Adopter evidence confirms maintained declarations and freshness across supported profiles."
+  L3: "Any external-standard export remains separately designed and validated."
+  L4: "Projects maintain reviewed declared-component inventory evidence across supported lifecycle changes."
+  L5: "Any broader ecosystem integration remains adopter-owned and separately assured without changing this inventory's non-authority boundary."
+known_limitations:
+  - "The inventory describes repository declarations, not runtime reality or completeness."
+  - "SHA-256 content digests detect change but do not authenticate provenance."
+not_claimed:
+  - CycloneDX conformance
+  - SPDX conformance
+  - runtime discovery
+  - inventory completeness
+  - signing
+  - attestation
+  - supply-chain assurance
+  - compliance approval
+  - release authority
+  - publication authority
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ASI_AICM_MAPPING.md
+  - KNOWN_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_ai_component_inventory.py
+  - scripts/naos_emit_capabilities.py
+  - scripts/naos_control_plane_review.py
+related_schemas:
+  - schemas/naos/ai_component_inventory_rules.schema.json
+  - schemas/naos/ai_component_inventory.schema.json
+  - schemas/naos/control_plane_review.schema.json

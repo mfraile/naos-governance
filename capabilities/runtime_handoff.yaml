@@ -1,0 +1,73 @@
+id: CAP-RUNTIME-HANDOFF
+name: Runtime Handoff
+description: >
+  Experimental scaffold for documenting how SDLC evidence could be handed to a
+  future runtime-governance layer without making that layer part of normal NAOS
+  installation.
+status: experimental
+default_maturity: L0
+minimum_profile: assured
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: not_applicable
+    notes: "Not activated."
+  lite:
+    target_maturity: L0
+    enforcement: not_applicable
+    notes: "Not activated."
+  standard:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Reference only when explicitly configured."
+  assured:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Experimental handoff scaffold only."
+authority:
+  may_read:
+    - naos/evidence/
+    - naos/reports/
+  may_write:
+    - "future handoff manifests when explicitly configured"
+allowed_resources:
+  - "YAML handoff manifest"
+  - "evidence-pack references"
+prohibited_resources:
+  - "mandatory runtime gateway"
+  - "mandatory daemon"
+  - "mandatory scheduler"
+  - "mandatory external service"
+constraints:
+  - "Must remain scaffolded and experimental."
+  - "Must not imply runtime assurance enforcement is shipped."
+required_evidence:
+  - "Explicit project readiness decision before activation."
+validators:
+  - id: runtime_handoff_review
+    status: manual
+    notes: "Future design review only."
+gatekeepers:
+  - G8
+dashboard_signals:
+  - "runtime_handoff.status"
+  - "runtime_handoff.readiness"
+maturity_path:
+  L0: "Scaffold and limitations exist."
+  L1: "Project records a runtime handoff intent."
+  L2: "Handoff manifest references evidence packs."
+  L3: "Advisory review gate checks readiness."
+  L4: "Dashboard tracks handoff readiness."
+  L5: "External runtime-governance review has complete supporting evidence."
+known_limitations:
+  - "No runtime gateway is implemented."
+  - "No continuous authorization is implemented."
+not_claimed:
+  - "Runtime assurance by installing this scaffold."
+  - "Runtime governance implementation."
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts: []

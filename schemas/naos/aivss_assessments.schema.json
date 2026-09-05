@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:aivss-assessments:v1",
+  "title": "NAOS AIVSS-Agentic v0.8 Assessment Arithmetic Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "enabled",
+    "format",
+    "rubric",
+    "decision",
+    "assessments",
+    "non_claims"
+  ],
+  "properties": {
+    "schema": {"const": "naos.aivss_assessments.v1"},
+    "enabled": {"const": true},
+    "format": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "kind"],
+      "properties": {
+        "id": {"const": "aivss_arithmetic_verification.v1"},
+        "version": {"const": 1},
+        "kind": {"const": "offline_arithmetic_verification"}
+      }
+    },
+    "rubric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "normative_pdf_url",
+        "normative_pdf_sha256",
+        "normative_scope"
+      ],
+      "properties": {
+        "id": {"const": "AIVSS-Agentic"},
+        "version": {"const": "0.8"},
+        "normative_pdf_url": {
+          "const": "https://aivss.owasp.org/assets/publications/AIVSS%20Scoring%20System%20For%20OWASP%20Agentic%20AI%20Core%20Security%20Risks%20v0.8.pdf"
+        },
+        "normative_pdf_sha256": {
+          "const": "a2abbd215f0d7790d273c30a893a09c0dc37a6c109765eb0363c01af897fd9af"
+        },
+        "normative_scope": {"const": "published_v0.8_pdf_only"}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consumer", "target_gates", "prompt_bands", "behavior"],
+      "properties": {
+        "consumer": {"const": "scripts/naos_control_plane_review.py"},
+        "target_gates": {"const": ["G2", "G6"]},
+        "prompt_bands": {"const": ["high", "critical"]},
+        "behavior": {"const": "human_review_prompt_only"}
+      }
+    },
+    "assessments": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {"$ref": "#/$defs/assessment"}
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 256}
+    }
+  },
+  "$defs": {
+    "decimal": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+    },
+    "score": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(?:[0-9](?:\\.[0-9]+)?|10(?:\\.0+)?)$"
+    },
+    "factor_value": {
+      "enum": ["0.0", "0.5", "1.0"]
+    },
+    "evidence_ref": {
+      "type": "string",
+      "pattern": "^(?:evidence|report|task|finding|control|policy):[A-Za-z0-9][A-Za-z0-9._/-]*$",
+      "maxLength": 256
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/evidence_ref"}
+    },
+    "factor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "evidence_refs"],
+      "properties": {
+        "value": {"$ref": "#/$defs/factor_value"},
+        "evidence_refs": {"$ref": "#/$defs/evidence_refs"}
+      }
+    },
+    "factors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "autonomy",
+        "tools",
+        "language",
+        "context",
+        "non_determinism",
+        "opacity",
+        "persistence",
+        "identity",
+        "multi_agent",
+        "self_modification"
+      ],
+      "properties": {
+        "autonomy": {"$ref": "#/$defs/factor"},
+        "tools": {"$ref": "#/$defs/factor"},
+        "language": {"$ref": "#/$defs/factor"},
+        "context": {"$ref": "#/$defs/factor"},
+        "non_determinism": {"$ref": "#/$defs/factor"},
+        "opacity": {"$ref": "#/$defs/factor"},
+        "persistence": {"$ref": "#/$defs/factor"},
+        "identity": {"$ref": "#/$defs/factor"},
+        "multi_agent": {"$ref": "#/$defs/factor"},
+        "self_modification": {"$ref": "#/$defs/factor"}
+      }
+    },
+    "claimed_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "risk_gap",
+        "factor_sum",
+        "aars",
+        "raw_score",
+        "score",
+        "severity_band"
+      ],
+      "properties": {
+        "risk_gap": {"$ref": "#/$defs/score"},
+        "factor_sum": {"$ref": "#/$defs/score"},
+        "aars": {"$ref": "#/$defs/score"},
+        "raw_score": {"$ref": "#/$defs/score"},
+        "score": {"$ref": "#/$defs/score"},
+        "severity_band": {
+          "type": ["string", "null"],
+          "enum": [null, "low", "medium", "high", "critical"]
+        }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessment_id",
+        "finding_ref",
+        "assessor_ref",
+        "assessed_at",
+        "system_scope_ref",
+        "cvss",
+        "factors",
+        "threat_maturity",
+        "mitigation_strength",
+        "claimed_result"
+      ],
+      "properties": {
+        "assessment_id": {
+          "type": "string",
+          "pattern": "^AIVSS-[A-Z0-9][A-Z0-9._-]*$",
+          "maxLength": 96
+        },
+        "finding_ref": {
+          "type": "string",
+          "pattern": "^finding:[A-Za-z0-9][A-Za-z0-9._/-]*$",
+          "maxLength": 256
+        },
+        "assessor_ref": {
+          "type": "string",
+          "pattern": "^(?:role|team|group):[a-z0-9][a-z0-9._/-]*$",
+          "maxLength": 128
+        },
+        "assessed_at": {"type": "string", "format": "date-time"},
+        "system_scope_ref": {
+          "type": "string",
+          "pattern": "^scope:[A-Za-z0-9][A-Za-z0-9._/-]*$",
+          "maxLength": 256
+        },
+        "cvss": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "vector", "base_score", "evidence_refs"],
+          "properties": {
+            "version": {"const": "4.0"},
+            "vector": {
+              "type": "string",
+              "pattern": "^CVSS:4\\.0/",
+              "maxLength": 512
+            },
+            "base_score": {"$ref": "#/$defs/score"},
+            "evidence_refs": {"$ref": "#/$defs/evidence_refs"}
+          }
+        },
+        "factors": {"$ref": "#/$defs/factors"},
+        "threat_maturity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["level", "evidence_refs"],
+          "properties": {
+            "level": {
+              "enum": ["unreported", "proof_of_concept", "attacked"]
+            },
+            "evidence_refs": {"$ref": "#/$defs/evidence_refs"}
+          }
+        },
+        "mitigation_strength": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["level", "evidence_refs"],
+          "properties": {
+            "level": {"enum": ["strong", "partial", "no_or_weak"]},
+            "evidence_refs": {"$ref": "#/$defs/evidence_refs"}
+          }
+        },
+        "claimed_result": {"$ref": "#/$defs/claimed_result"}
+      }
+    }
+  }
+}

@@ -1,0 +1,123 @@
+# NAOS Profile Preset: governance-quickstart
+# Created: 2026-05-16
+#
+# Target: Trial adoption, early exploration, brownfield reconnaissance
+# Depth: scaffold — advisory only, no blocking advanced gates
+#
+# REFERENCE document only — does NOT modify live project files.
+# Use the NAOS CLI to extract and adapt these components for a new project.
+
+---
+
+id: governance-quickstart
+name: "Governance Quickstart"
+depth: scaffold
+target: "Developers evaluating NAOS or adding first-pass guardrails to an existing project"
+description: >
+  The lowest-friction NAOS profile. It exposes the governance capability model
+  and safe public-claim language without implying the adopting project is fully
+  governed. Advanced behavioral and architecture tracks are not activated, and
+  Tier 3 tracks remain experimental.
+
+rules:
+  active_rule_ids: [1, 2, 7, 10, 11]
+  included:
+    - id: RULES-01
+      name: "Update Existing Files"
+    - id: RULES-02
+      name: "No Archive Folders"
+    - id: RULES-07
+      name: "Deep Analysis Protocol"
+    - id: RULES-10
+      name: "License Compliance"
+    - id: RULES-11
+      name: "Anti-Duplication Protocol"
+  excluded:
+    - reason: "Traceability, dashboard, evidence packs, and behavioral tracks require project configuration."
+
+skills:
+  included: []
+  excluded:
+    - reason: "Quickstart keeps context minimal and defers skill installation."
+
+agents:
+  included:
+    - id: research
+      path: ".github/agents/naos-research.agent.md"
+      rationale: "Thin read-only evidence handoff without planning or implementation authority."
+  excluded:
+    - reason: "Planning, implementation, review, and conformance agents remain lite+ surfaces."
+
+scripts:
+  included: []
+  excluded:
+    - reason: "No blocking validators are required in quickstart."
+
+configs:
+  included:
+    - id: profile_generated_surface_contract
+      path: "naos/profile_generated_surface_contract.json"
+      rationale: "Makes generated Quickstart applicability and omissions inspectable."
+  excluded:
+    - reason: "Capability configuration is advisory unless the project deliberately selects a different purpose-fit profile."
+
+features:
+  pre_commit_hooks: true
+  task_registry: false
+  traceability_matrix: false
+  behavioral_testing: false
+  instinct_recording: false
+  drift_checks: false
+  profile_autoresearch: false
+  capability_framework: scaffolded
+
+commands:
+  gov-refresh:
+    applicability: not_applicable
+    alternative: "naos doctor"
+  naos-readiness:
+    applicability: not_applicable
+    alternative: "naos doctor"
+  research:
+    applicability: available
+    surface: ".github/agents/naos-research.agent.md"
+
+capabilities:
+  default_target_maturity: L0
+  default_enforcement: advisory
+  activated_by_default:
+    - CAP-CLAIMS-VALIDATION
+    - CAP-GATEKEEPER-MANIFEST
+  advisory_only:
+    - CAP-CLAIMS-VALIDATION
+    - CAP-SELF-CONFORMANCE
+    - CAP-ROADMAP-CROSSWALK-VALIDATION
+    - CAP-FUNCTION-INDEX-HEALTH
+    - CAP-TEST-EVIDENCE
+    - CAP-EVIDENCE-PACK
+    - CAP-GATEKEEPER-MANIFEST
+  experimental_not_activated:
+    - CAP-RUNTIME-HANDOFF
+    - CAP-STRUCTURED-SUBSTRATE
+    - CAP-SOURCE-TEST-GRAPH
+    - CAP-DIGITAL-TWIN-EVALUATION
+
+gate_policy:
+  default_severity: advisory
+  allow_blocking: false
+  require_evidence_pack: false
+  require_exception_approval: false
+  gates:
+    G0: advisory
+    G1: advisory
+    G2: advisory
+    G3: advisory
+    G4: advisory
+    G5: advisory
+    G6: advisory
+    G7: none
+    G8: none
+
+notes: >
+  Quickstart proves installation and introduces the control-plane model. It does
+  not claim assured maturity or complete governance for the adopting project.

@@ -1,0 +1,28 @@
+sequenceDiagram
+    participant User as Human operator
+    participant Prompt as /naos-d-start and /naos-task-start
+    participant Agent as Plan/implement/review agents
+    participant CLI as NAOS evidence commands
+    participant Trace as spec-pack/spec-cascade/module-headers/test-evidence/AC evidence
+    participant Review as Human review
+
+    User->>Prompt: Start session and task
+    Prompt->>Agent: Provide bounded task context
+    Prompt->>Agent: Surface parallel_lane_opportunity / parallel_lane_decision
+    Agent->>CLI: Recommend relevant evidence checks
+    CLI->>Trace: Check requirement, source, and test linkage
+    alt Parallel lanes explicitly declared
+        Agent->>CLI: Fill lane handoff input and run handoff report
+        CLI->>Review: Route handoff HITL reasons through control-plane review
+    else Suggested or deferred lanes
+        Agent->>Review: Keep as planning/scope review; no handoff activation
+    end
+    alt AI/governance instruction surface changed
+        CLI->>Review: Include ai-surface-budget report
+    end
+    alt Session produced reusable lesson
+        CLI->>Review: Include learning-loop-review; candidate remains proposal-only
+    end
+    Trace->>Review: Surface uncovered requirements and untraced source
+    CLI->>Review: Produce reports and dashboard inputs
+    Review->>Agent: Approve next work, request fixes, or defer

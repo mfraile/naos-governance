@@ -1,0 +1,20 @@
+schema: naos.evidence.completion_certificate.v1
+task_id: ""
+profile: quickstart
+completed_by: ""
+completed_at: ""
+evidence_pack:
+  supports:
+    - "governance traceability"
+    - "review and audit/admissibility discussions"
+    - "residual-risk review"
+  does_not_prove:
+    - "legal or regulatory compliance"
+    - "runtime safety"
+    - "complete test coverage unless evidence supports it"
+validator_results: []
+gatekeeper_status: ""
+exceptions_or_waivers: []
+known_gaps: []
+residual_risks: []
+external_references: []

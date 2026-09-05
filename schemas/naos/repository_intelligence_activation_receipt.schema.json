@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_activation_receipt:v1",
+  "title": "NAOS Repository Intelligence Activation Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "recorded_at", "receipt_sha256", "control", "not_claimed"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.activation_receipt.v1"},
+    "status": {"const": "authorized_for_publication"},
+    "recorded_at": {"type": "string"},
+    "receipt_sha256": {"$ref": "#/$defs/sha256"},
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transaction_id", "plan_sha256", "bundle_sha256", "generation_id", "generation_content_sha256", "manifest_file_sha256", "manifest_sha256", "validation_receipt_file_sha256", "validation_receipt_sha256", "provenance_project_id", "provenance_owner_sha3_512", "provenance_scope_sha3_512", "profile", "reviewer", "preapply_revalidation", "postcopy_validation", "previous_generation_id", "active_pointer_publication"],
+      "properties": {
+        "transaction_id": {"$ref": "#/$defs/transaction_id"},
+        "plan_sha256": {"$ref": "#/$defs/sha256"},
+        "bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "generation_id": {"$ref": "#/$defs/generation_id"},
+        "generation_content_sha256": {"$ref": "#/$defs/sha256"},
+        "manifest_file_sha256": {"$ref": "#/$defs/sha256"},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "validation_receipt_file_sha256": {"$ref": "#/$defs/sha256"},
+        "validation_receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "provenance_project_id": {"type": "string", "pattern": "^urn:uuid:[0-9a-f-]{36}$"},
+        "provenance_owner_sha3_512": {"$ref": "#/$defs/sha3"},
+        "provenance_scope_sha3_512": {"$ref": "#/$defs/sha3"},
+        "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+        "reviewer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "reviewer_id", "identity_status", "authentication_status"],
+          "properties": {
+            "required": {"type": "boolean"},
+            "reviewer_id": {"type": ["string", "null"]},
+            "identity_status": {"enum": ["declared_attribution", "not_required"]},
+            "authentication_status": {"const": "not_claimed"}
+          }
+        },
+        "preapply_revalidation": {"const": true},
+        "postcopy_validation": {"const": true},
+        "previous_generation_id": {"oneOf": [{"$ref": "#/$defs/generation_id"}, {"type": "null"}]},
+        "active_pointer_publication": {"const": "pending"}
+      }
+    },
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sha3": {"type": "string", "pattern": "^[0-9a-f]{128}$"},
+    "generation_id": {"type": "string", "pattern": "^RI-[0-9a-f]{24}$"},
+    "transaction_id": {"type": "string", "pattern": "^RIT-[0-9a-f]{24}$"}
+  }
+}

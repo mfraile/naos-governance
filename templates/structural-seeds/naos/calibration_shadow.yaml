@@ -1,0 +1,82 @@
+schema: naos.calibration_shadow.v1
+profile: quickstart
+updated_at: null
+description: >
+  Local deterministic calibration-shadow expectations for NAOS report shape,
+  status, and finding-category stability. This is not model calibration and
+  not behavioral correctness proof.
+enabled: true
+mode: deterministic_shadow
+baseline_policy:
+  allow_missing_optional_reports: true
+  review_required_on_schema_mismatch: true
+  review_required_on_status_regression: true
+  review_required_on_unexpected_source_change: true
+expected_reports:
+  - report_id: session_identity
+    path: naos/reports/session_identity.json
+    required: false
+    expected_schema_prefix: naos.session_identity
+    expected_statuses:
+      - ready
+      - advisory
+      - session_created
+      - session_reused
+      - review_required
+      - unknown
+  - report_id: operator_attribution
+    path: naos/reports/operator_attribution.json
+    required: false
+    expected_schema_prefix: naos.operator_attribution
+    expected_statuses:
+      - ready
+      - advisory
+      - review_required
+      - unknown
+  - report_id: agentic_workflow_review
+    path: naos/reports/agentic_workflow_review.json
+    required: false
+    expected_schema_prefix: naos.agentic_workflow_review
+    expected_statuses:
+      - ready
+      - advisory
+      - review_required
+      - not_configured
+      - missing_config
+      - invalid_config
+      - missing_artifacts
+      - blocked
+      - unknown
+  - report_id: pre_implementation_alignment_review
+    path: naos/reports/pre_implementation_alignment_review.json
+    required: false
+    expected_schema_prefix: naos.pre_implementation_alignment_review
+    expected_statuses:
+      - ready
+      - advisory
+      - review_required
+      - missing_alignment
+      - invalid_alignment
+      - missing_required_questions
+      - unknown
+comparison_rules:
+  compare_schema: true
+  compare_status: true
+  compare_finding_ids: true
+  compare_source_categories: true
+  compare_summary_counts: true
+  ignore_fields:
+    - generated_at
+    - session_id
+    - operator_id
+    - run_id
+    - absolute_paths
+not_claimed:
+  - model behavior calibration
+  - behavioral correctness proof
+  - semantic correctness proof
+  - compliance proof
+  - approval
+  - release authorization
+  - human review replacement
+human_review_required: true

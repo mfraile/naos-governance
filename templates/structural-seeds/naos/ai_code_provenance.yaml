@@ -1,0 +1,49 @@
+schema: naos.ai_code_provenance_manifest.v1
+updated_at: null
+status: draft
+description: >
+  Project-local declaration surface for AI-assisted code provenance review.
+  This file records adopter-declared references and limitations only. It is
+  not legal advice, authorship proof, ownership proof, infringement clearance,
+  proof of copyright compliance, release approval, or publication authorization.
+provenance_scope:
+  summary: "Describe the reviewed code scope."
+  code_paths: []
+  evidence_refs:
+    - naos/reports/ai_artifact_inventory.json
+    - naos/reports/ai_artifact_reconciliation.json
+  no_ai_assisted_code: false
+ai_use_declarations:
+  - declaration_id: AI-USE-001
+    status: draft
+    tool_or_provider: unknown
+    code_paths: []
+    artifact_refs: []
+    prompt_provenance_refs: []
+    ai_contribution_summary: ""
+    human_contribution_summary: ""
+    reviewer: ""
+    reviewed_at: null
+license_lineage:
+  evidence_refs: []
+  unresolved_questions: []
+ownership_limitations:
+  acknowledged: false
+  notes: >
+    Acknowledge that NAOS records review evidence only and does not determine
+    authorship, ownership, copyrightability, infringement, or license clearance.
+unresolved_questions: []
+human_review_required: true
+not_claimed:
+  - legal opinion
+  - authorship proof
+  - ownership proof
+  - infringement clearance
+  - proof of copyright compliance
+  - AI-output detection
+  - line-level author attribution
+  - signing
+  - approval
+  - certification
+  - publication authorization
+  - release authorization

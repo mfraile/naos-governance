@@ -1,0 +1,80 @@
+name: NAOS Control-Plane Readiness
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  NAOS_PROFILE: lite
+  NAOS_ROOT: naos
+
+jobs:
+  naos-readiness:
+    name: NAOS deterministic readiness
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install NAOS CLI
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install naos-governance
+
+      - name: Run NAOS control-plane readiness chain
+        run: |
+          naos claims --profile "$NAOS_PROFILE"
+          naos setup-recommendations --profile "$NAOS_PROFILE"
+          naos governance-bypass-posture --profile "$NAOS_PROFILE"
+          naos external-evidence-ingest --profile "$NAOS_PROFILE"
+          naos memory-readiness --profile "$NAOS_PROFILE"
+          naos learning-loop-review --profile "$NAOS_PROFILE"
+          naos context-index --profile "$NAOS_PROFILE"
+          naos context-query --query "governance" --profile "$NAOS_PROFILE"
+          naos semantic-candidates --profile "$NAOS_PROFILE"
+          naos graph-context --profile "$NAOS_PROFILE"
+          naos evidence-attestation --profile "$NAOS_PROFILE"
+          naos capability-maturity --profile "$NAOS_PROFILE"
+          naos systemic-impact --profile "$NAOS_PROFILE"
+          naos module-headers --profile "$NAOS_PROFILE"
+          naos spec-pack-contract --profile "$NAOS_PROFILE"
+          naos spec-pack-materialize . --profile "$NAOS_PROFILE" --dry-run
+          naos spec-assembly-worksheet . --profile "$NAOS_PROFILE"
+          naos spec-cascade --profile "$NAOS_PROFILE"
+          naos control-plane-review --profile "$NAOS_PROFILE"
+          naos ai-surface-budget --profile "$NAOS_PROFILE"
+          naos self-check --profile "$NAOS_PROFILE"
+          naos roadmap-crosswalk --profile "$NAOS_PROFILE"
+          naos function-index-health --profile "$NAOS_PROFILE"
+          naos test-evidence-map --profile "$NAOS_PROFILE"
+          naos test-evidence --profile "$NAOS_PROFILE"
+          naos secure-coding-controls --profile "$NAOS_PROFILE"
+          naos gate-status --profile "$NAOS_PROFILE"
+          naos gate-evaluate --profile "$NAOS_PROFILE"
+          naos evidence-pack --profile "$NAOS_PROFILE"
+          naos dashboard --profile "$NAOS_PROFILE" --json
+          naos secure-coding-reporting \
+            --profile "$NAOS_PROFILE" \
+            --refresh-sources \
+            --project
+
+      - name: Check generated evidence paths
+        run: |
+          test -d "$NAOS_ROOT"
+          test -f "$NAOS_ROOT/reports/dashboard_summary.json"
+          test -f "$NAOS_ROOT/reports/secure_coding_reporting.json"
+          test -f "$NAOS_ROOT/evidence/evidence_pack.json"
+          grep -q 'secure_coding_reporting' "$NAOS_ROOT/reports/dashboard_summary.json"
+          grep -q 'secure_coding_reporting' "$NAOS_ROOT/evidence/evidence_pack.json"

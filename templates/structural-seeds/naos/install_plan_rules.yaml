@@ -1,0 +1,29 @@
+schema: naos.install_plan_rules.v1
+profile: quickstart
+updated_at: null
+description: >
+  Rules for deterministic install-plan reports. Plans remain review evidence
+  and must not silently activate hooks, CI, providers, memory writes, or project
+  file changes.
+required_inputs:
+  - preflight_report
+  - intake_report
+  - existing_resource_inventory
+  - ai_artifact_inventory
+  - memory_resource_inventory
+  - mcp_resource_inventory
+activation_posture:
+  preview_first: true
+  explicit_human_activation_required: true
+  silent_overwrite_allowed: false
+  hooks_auto_enabled: false
+  provider_api_enabled: false
+  memory_write_back_enabled: false
+not_claimed:
+  - automatic approval
+  - legal or regulatory compliance conclusion
+  - certification
+  - requirements completeness proof
+  - runtime safety proof
+  - human review replacement
+human_review_required: true

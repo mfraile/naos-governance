@@ -1,0 +1,93 @@
+version: "1.0"
+semantics:
+  rules: "Project configuration for source-module header traceability; not proof by itself."
+  report: "NAOS evaluates configured source files and reports missing, legacy, stale, or duplicate header evidence."
+  governance_decision: "Human/project governance decides remediation, waiver, and maturity movement."
+  not_claimed:
+    - "complete code correctness"
+    - "complete source traceability proof"
+    - "automatic source remediation"
+
+enabled: true
+file_types:
+  - python
+include_patterns:
+  - "src/**/*.py"
+  - "app/**/*.py"
+exclude_patterns:
+  - "**/__pycache__/**"
+  - "**/.venv/**"
+  - "**/venv/**"
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/migrations/**"
+  - "**/alembic/**"
+  - "**/*_pb2.py"
+  - "**/*_pb2_grpc.py"
+  - "**/__init__.py"
+
+required_sections:
+  - Module
+  - Purpose
+  - Implements
+  - Tasks
+  - Specs
+  - Rationale
+optional_sections:
+  - Design notes
+
+allowed_requirement_id_patterns:
+  - "^(FR|NFR)-[A-Z0-9-]+$"
+allowed_task_id_patterns:
+  - "^((?:[A-Z0-9]+-)*T-[0-9]{3,}|GOV-[A-Z0-9-]+|P[0-9]+-[A-Z0-9-]+)$"
+allowed_spec_reference_patterns:
+  - "^specs/[A-Za-z0-9_.\\-/]+\\.md(#[A-Za-z0-9_.\\-]+)?$"
+
+legacy_header_handling:
+  enabled: true
+  report_legacy_task_label: true
+  report_inline_sections: true
+  status: legacy
+
+stale_module_path_behavior:
+  enabled: true
+  status: stale
+
+duplicate_header_behavior:
+  enabled: true
+  status: duplicate
+
+cross_checks:
+  requirements:
+    enabled: true
+    spec_paths:
+      - "specs/03-requirements.md"
+  tasks:
+    enabled: true
+    registry_paths:
+      - "naos/TASK_REGISTRY.yaml"
+      - "TASK_REGISTRY.yaml"
+  specs:
+    enabled: true
+
+profile_severity_behavior:
+  quickstart: advisory
+  lite: warning
+  standard: required
+  assured: blocking
+
+human_review_required:
+  missing_header: true
+  missing_required_section: true
+  duplicate_header: true
+  stale_module_path: true
+  legacy_header: false
+
+waivers: []
+
+limitations:
+  - "Python source modules are the default scope for Group 14."
+  - "Non-Python language adapters are future or project-configured."
+  - "The report does not prove code correctness or complete source traceability."
+  - "Rationale quality requires human review."

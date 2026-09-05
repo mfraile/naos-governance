@@ -1,0 +1,164 @@
+version: 1
+enabled: false
+ui_quality_declared: false
+design_stage: concept_exploration
+runtime_enabled: false
+mcp_allowed: false
+figma_api_allowed: false
+browser_automation_allowed: false
+design_tool_calls_allowed: false
+external_generator_authority: false
+model_judgement_authority: false
+tool_mutation_allowed: false
+capability_maturity: L1
+
+profile_posture:
+  quickstart:
+    state: optional
+    severity: advisory
+    notes: "Optional UI quality evidence hints only."
+  lite:
+    state: optional
+    severity: warning
+    notes: "Warn when configured UI quality evidence is missing."
+  standard:
+    state: optional
+    severity: required
+    notes: "Route configured UI quality evidence gaps to human review."
+  assured:
+    state: optional
+    severity: required
+    notes: "First implementation slice remains required review only; blocking requires future validated L3+ maturity and gate wiring."
+
+# Enable only for projects that want local UI/UX quality evidence review.
+# This file is a declaration and evidence index, not a design judge.
+screens: []
+
+# Example screen shape. Keep commented until adapted.
+# screens:
+#   - object_id: "screen.checkout.payment"
+#     design_stage: implementation_ready_design
+#     user_goal: "Let a buyer complete payment with clear trust and recovery states."
+#     primary_user_scenarios:
+#       - "Buyer pays successfully with a saved card."
+#       - "Buyer sees a recoverable validation error."
+#     design_quality_brief_ref: "docs/ui/screens/checkout-payment-quality-brief.md"
+#     fr_refs:
+#       - "FR-XXX"
+#     nfr_refs:
+#       - "NFR-XXX"
+#     task_refs:
+#       - "T-XXX"
+#     acceptance_criteria_refs:
+#       - "AC-XXX-1"
+#     dependency_refs:
+#       - "specs/03-requirements.md#fr-xxx"
+#     data_model_refs:
+#       - "specs/04-architecture.md#payment-model"
+#     api_contract_refs:
+#       - "specs/05-api.md#post-payments"
+#     state_model_refs:
+#       - "docs/ui/screens/checkout-payment-states.md"
+#     open_dependency_questions: []
+#     design_traceability_refs:
+#       - "screen.checkout.payment"
+#     screen_spec_refs:
+#       - "docs/ui/screens/checkout-payment-spec.md"
+#     token_refs:
+#       - "frontend/styles/tokens.css"
+#     component_library_refs:
+#       - "frontend/components/ui"
+#     typography_refs:
+#       - "docs/ui/typography.md"
+#     spacing_refs:
+#       - "docs/ui/spacing.md"
+#     layout_review_refs:
+#       - "docs/ui/reviews/checkout-layout-review.md"
+#     content_review_refs:
+#       - "docs/ui/reviews/checkout-copy-review.md"
+#     privacy_evidence_refs:
+#       - "docs/privacy/payment-screen.md"
+#     screenshot_sets:
+#       - path: "docs/ui/screenshots/checkout-payment-desktop.png"
+#         viewport: "desktop"
+#         state: "success"
+#         reviewed: true
+#     state_coverage:
+#       - "loading"
+#       - "empty"
+#       - "error"
+#       - "success"
+#       - "disabled"
+#       - "focus"
+#     responsive_breakpoints:
+#       - "mobile"
+#       - "tablet"
+#       - "desktop"
+#     accessibility_evidence_refs:
+#       - "naos/evidence/ui/checkout-axe.md"
+#     visual_regression_refs:
+#       - "naos/evidence/ui/checkout-visual-diff.md"
+#     lighthouse_or_performance_refs:
+#       - "naos/evidence/ui/checkout-lighthouse.md"
+#     storybook_refs:
+#       - "frontend/components/checkout/PaymentForm.stories.tsx"
+#     motion_evidence_refs: []
+#     reduced_motion_evidence_refs: []
+#     brand_review_refs:
+#       - "docs/ui/reviews/checkout-brand-review.md"
+#     inspiration_refs:
+#       - ref: "docs/ui/inspiration/checkout.md"
+#         reuse_boundary: "reference only"
+#         reviewed: true
+#     external_generator_refs:
+#       - ref: "docs/ui/generator-prompts/checkout-v0.md"
+#         tool: "v0"
+#         prompt_log_ref: "docs/ui/generator-prompts/checkout-v0.md"
+#         reviewed: true
+#         reuse_boundary: "human-reviewed inspiration only"
+#     advisory_ai_critique_refs:
+#       - ref: "docs/ui/reviews/checkout-ai-critique.md"
+#         provider_role: "ui_advisory"
+#         data_exposure: "synthetic screenshots only"
+#         human_disposition: "accepted_selected_findings"
+#     human_design_review:
+#       required: true
+#       reviewer: "[ADAPT: reviewer or role]"
+#       disposition: "[ADAPT: approved_for_implementation / changes_requested / deferred]"
+#       review_refs:
+#         - "docs/ui/reviews/checkout-human-review.md"
+#     user_validation_refs: []
+#     review_disposition: "[ADAPT: review_ready / changes_requested / deferred]"
+#     residual_risks:
+#       - "User validation not completed."
+#     non_claims:
+#       - "design quality proof"
+#       - "accessibility compliance proof"
+
+known_gaps:
+  - "disabled_until_project_declares_ui_quality_evidence"
+residual_risks: []
+not_claimed:
+  - "Figma MCP replacement"
+  - "automatic code-to-design synchronization"
+  - "automatic design-to-code synchronization"
+  - "Figma availability"
+  - "Figma API access"
+  - "MCP activation"
+  - "design quality proof"
+  - "user delight proof"
+  - "brand approval"
+  - "accessibility compliance proof"
+  - "privacy compliance proof"
+  - "legal or regulatory sufficiency"
+  - "approval"
+  - "merge approval"
+  - "release authority"
+  - "publication authority"
+  - "certification"
+  - "attestation"
+  - "compliance proof"
+  - "runtime orchestration"
+  - "provider calls"
+  - "model calls"
+  - "memory activation"

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:sarif_export:v1",
+  "title": "NAOS SARIF Export Summary",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "output_path",
+    "sarif_version",
+    "input_reports",
+    "deterministic_findings_count",
+    "advisory_findings_count",
+    "skipped_sources",
+    "unsupported_sources",
+    "rules_count",
+    "results_count",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"type": "string"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string"},
+    "output_path": {"type": ["string", "null"]},
+    "sarif_version": {"type": "string", "const": "2.1.0"},
+    "input_reports": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "deterministic_findings_count": {"type": "integer", "minimum": 0},
+    "advisory_findings_count": {"type": "integer", "minimum": 0},
+    "skipped_sources": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "unsupported_sources": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "rules_count": {"type": "integer", "minimum": 0},
+    "results_count": {"type": "integer", "minimum": 0},
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object"}
+  }
+}

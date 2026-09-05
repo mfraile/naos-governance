@@ -1,0 +1,20 @@
+{
+  "schema": "naos.evidence.test_evidence.v1",
+  "profile": "quickstart",
+  "source_to_test_map": "",
+  "test_evidence_health": "",
+  "evidence_types": {
+    "unit": [],
+    "integration": [],
+    "acceptance": [],
+    "security": [],
+    "coverage": []
+  },
+  "coverage_semantics": {
+    "complete_coverage_claimed": false,
+    "coverage_supports_source": "unknown"
+  },
+  "known_gaps": [],
+  "residual_risks": [],
+  "external_references": []
+}

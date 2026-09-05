@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:failure_mode_posture:v1",
+  "title": "NAOS Failure-Mode Posture Report",
+  "description": "Deterministic local review evidence for declared failure-mode posture across the 21 NAOS failure modes. It is not hallucination prevention, failure prevention, behavioral safety proof, runtime monitoring, runtime orchestration, provider/model/API/network access, MCP activation, memory activation, automatic approval, automatic blocking, certification, attestation, release authority, publication authority, or compliance proof.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "deterministic",
+    "taxonomy_path",
+    "taxonomy_source",
+    "enabled",
+    "failure_mode_posture_declared",
+    "runtime_enabled",
+    "provider_calls_allowed",
+    "model_calls_allowed",
+    "mcp_allowed",
+    "memory_allowed",
+    "api_calls_allowed",
+    "browser_automation_allowed",
+    "network_calls_allowed",
+    "tool_mutation_allowed",
+    "capability_maturity",
+    "canonical_modes",
+    "modes",
+    "coverage_counts",
+    "family_coverage_counts",
+    "mode_finding_counts",
+    "family_finding_counts",
+    "findings",
+    "reason_code_counts",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "generated_by",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.failure_mode_posture.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["pass", "advisory", "warning", "required_missing", "blocked", "not_configured", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "taxonomy_path": {"type": "string"},
+    "taxonomy_source": {"type": "string", "enum": ["project", "template", "explicit"]},
+    "taxonomy_hash": {"type": ["string", "null"]},
+    "enabled": {"type": "boolean"},
+    "failure_mode_posture_declared": {"type": "boolean"},
+    "runtime_enabled": {"const": false},
+    "provider_calls_allowed": {"const": false},
+    "model_calls_allowed": {"const": false},
+    "mcp_allowed": {"const": false},
+    "memory_allowed": {"const": false},
+    "api_calls_allowed": {"const": false},
+    "browser_automation_allowed": {"const": false},
+    "network_calls_allowed": {"const": false},
+    "tool_mutation_allowed": {"const": false},
+    "declared_authority_attempts": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "capability_maturity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["current", "assured_blocking_enabled", "blocking_requires_l3_plus_and_gate_wiring"],
+      "properties": {
+        "current": {"type": "string"},
+        "assured_blocking_enabled": {"const": false},
+        "blocking_requires_l3_plus_and_gate_wiring": {"const": true}
+      }
+    },
+    "profile_posture": {"type": "object"},
+    "canonical_modes": {
+      "type": "array",
+      "minItems": 21,
+      "items": {
+        "type": "object",
+        "required": ["mode_id", "family", "name"],
+        "properties": {
+          "mode_id": {"type": "string"},
+          "family": {"type": "string"},
+          "name": {"type": "string"}
+        }
+      }
+    },
+    "modes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "mode_id",
+          "family",
+          "name",
+          "coverage",
+          "control_refs",
+          "evidence_refs",
+          "missing_evidence_refs",
+          "known_gaps",
+          "residual_risks",
+          "human_review_required"
+        ],
+        "properties": {
+          "index": {"type": "integer", "minimum": 1},
+          "mode_id": {"type": "string"},
+          "family": {"type": "string", "enum": ["factual", "structural", "behavioral", "drift", "multi_agent", "unknown"]},
+          "name": {"type": "string"},
+          "coverage": {
+            "type": "string",
+            "enum": ["strong", "partial", "weak_partial", "gap", "complementary", "out_of_scope"]
+          },
+          "control_refs": {"type": "array", "items": {"type": "string"}},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}},
+          "evidence_ref_status": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+          "missing_evidence_refs": {"type": "array", "items": {"type": "string"}},
+          "known_gaps": {"type": "array", "items": {"type": "string"}},
+          "residual_risks": {"type": "array", "items": {"type": "string"}},
+          "human_review_required": {"type": "boolean"},
+          "human_review_declared": {"type": "boolean"}
+        }
+      }
+    },
+    "coverage_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "family_coverage_counts": {"type": "object", "additionalProperties": {"type": "object"}},
+    "mode_finding_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "family_finding_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "severity", "status", "reason_code", "gate", "message", "human_review_required"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+          "status": {"type": "string"},
+          "reason_code": {"type": "string"},
+          "mode_id": {"type": "string"},
+          "family": {"type": "string"},
+          "related_gates": {"type": "array", "items": {"type": "string"}},
+          "gate": {"type": "string"},
+          "message": {"type": "string"},
+          "human_review_required": {"type": "boolean"}
+        }
+      }
+    },
+    "reason_code_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"},
+      "allOf": [
+        {"contains": {"const": "hallucination prevention"}},
+        {"contains": {"const": "failure prevention"}},
+        {"contains": {"const": "behavioral safety proof"}},
+        {"contains": {"const": "runtime monitoring"}},
+        {"contains": {"const": "runtime orchestration"}},
+        {"contains": {"const": "provider call"}},
+        {"contains": {"const": "model call"}},
+        {"contains": {"const": "MCP activation"}},
+        {"contains": {"const": "memory activation"}},
+        {"contains": {"const": "automatic approval"}},
+        {"contains": {"const": "automatic blocking"}},
+        {"contains": {"const": "release authority"}},
+        {"contains": {"const": "publication authority"}},
+        {"contains": {"const": "certification"}},
+        {"contains": {"const": "attestation"}},
+        {"contains": {"const": "compliance proof"}}
+      ]
+    },
+    "human_review_required": {"type": "boolean"},
+    "generated_by": {"type": "object", "additionalProperties": true},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "modes": {"type": "integer", "minimum": 0},
+        "expected_modes": {"const": 21},
+        "taxonomy_records": {"type": "integer", "minimum": 0},
+        "taxonomy_count": {"type": "integer", "minimum": 0},
+        "modes_with_findings": {"type": "integer", "minimum": 0},
+        "mode_finding_counts": {"type": "object"},
+        "family_finding_counts": {"type": "object"},
+        "coverage_counts": {"type": "object"},
+        "runtime_authority_findings": {"type": "integer", "minimum": 0},
+        "assured_blocking_enabled": {"const": false},
+        "runtime_enabled": {"const": false},
+        "provider_calls_allowed": {"const": false},
+        "model_calls_allowed": {"const": false}
+      }
+    }
+  }
+}

@@ -1,0 +1,109 @@
+id: CAP-CROSS-HARNESS-REVIEW-READINESS
+name: Cross-Harness Review Readiness
+description: >
+  Provides readiness-only governance checks for future cross-harness review and
+  DSSE-style attestation planning. The capability records declared trust
+  boundaries, harness metadata, evidence expectations, and adopter-owned
+  signing responsibilities without executing harnesses or signing artifacts.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Missing readiness configuration is advisory."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Supports future-review planning without enabling external execution."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Unsafe runtime, provider, signing, or key-custody flags require human review."
+  assured:
+    target_maturity: L3
+    enforcement: required
+    notes: "Missing readiness requirements and unsafe flags require explicit human review under adopter policy."
+authority:
+  may_read:
+    - "naos/cross_harness_review_readiness.yaml"
+    - "naos/sessions_index.json"
+  may_write:
+    - "naos/reports/cross_harness_review_readiness.json"
+    - "naos/sessions/<session_id>/reports/cross_harness_review_readiness.json"
+  may_block:
+    - "only through configured profile gate policy and human review"
+allowed_resources:
+  - "repo-local readiness configuration"
+  - "repo-local schemas and policy"
+prohibited_resources:
+  - "external harness execution"
+  - "LLM, provider, model, API, SaaS, or network calls"
+  - "cryptographic signing or signature verification"
+  - "key custody or private-key access"
+  - "attestation authority"
+  - "automatic approval"
+  - "memory write-back"
+constraints:
+  - "Must remain readiness/configuration/reporting only."
+  - "Must not execute harnesses, call providers, sign artifacts, verify signatures, read keys, or create attestations."
+  - "Must surface unsafe runtime/signing/provider flags as review findings."
+  - "Must keep deterministic controls and human review primary."
+required_evidence:
+  - "schemas/naos/cross_harness_review_readiness.schema.json"
+  - "schemas/naos/cross_harness_review_readiness_report.schema.json"
+  - "templates/structural-seeds/naos/cross_harness_review_readiness.yaml"
+  - "scripts/naos_cross_harness_review_readiness.py"
+  - "naos/reports/cross_harness_review_readiness.json"
+validators:
+  - id: cross_harness_review_readiness
+    script: scripts/naos_cross_harness_review_readiness.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+  - G8
+dashboard_signals:
+  - "cross_harness_review_readiness.status"
+  - "cross_harness_review_readiness.declared_harness_count"
+  - "cross_harness_review_readiness.readiness_score"
+  - "cross_harness_review_readiness.human_review_required"
+maturity_path:
+  L0: "Capability contract, schema, seed, and readiness script exist."
+  L1: "Generated projects receive cross_harness_review_readiness.yaml and can produce a report."
+  L2: "Harness inventory, trust boundaries, evidence expectations, and human-review boundaries are declared."
+  L3: "Unsafe runtime/signing/provider flags are reviewed before relying on cross-harness or attestation plans."
+  L4: "Readiness output is considered alongside evidence pack, audit logs, SARIF, gate evaluation, and dashboard."
+  L5: "Teams maintain adopter-owned attestation planning without treating NAOS as signer, verifier, or authority."
+known_limitations:
+  - "Readiness metadata does not prove independent review occurred."
+  - "The core kit does not execute harnesses, call providers, sign artifacts, verify signatures, or custody keys."
+  - "SHA-256 digests are not signatures."
+residual_risks:
+  - "A declared harness inventory can become stale as tools and review workflows change."
+  - "Adopters must separately design, approve, and operate key custody, signing, and verification policies."
+  - "Future cross-harness execution can expose private data if trust boundaries are not reviewed."
+not_claimed:
+  - "cross-harness execution"
+  - "DSSE signing"
+  - "signature verification"
+  - "key custody"
+  - "signed attestation"
+  - "attestation authority"
+  - "compliance proof"
+  - "approval"
+  - "certification"
+  - "behavioral correctness proof"
+  - "human review replacement"
+human_review_required: true
+related_docs:
+  - docs/CROSS_HARNESS_REVIEW_READINESS.md
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/NAOS_THREAT_MODEL.md
+  - templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md
+related_scripts:
+  - scripts/naos_cross_harness_review_readiness.py

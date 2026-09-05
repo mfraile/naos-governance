@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:aivss-arithmetic-verification-report:v1",
+  "title": "NAOS AIVSS-Agentic v0.8 Arithmetic Verification Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "generator_version",
+    "profile",
+    "status",
+    "naos_root",
+    "configured",
+    "enabled",
+    "format",
+    "rubric",
+    "decision_supported",
+    "authority",
+    "input",
+    "provenance",
+    "assessments",
+    "reason_code_counts",
+    "report_digest",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.aivss_arithmetic_verification_report.v1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "generator_version": {"type": "string", "minLength": 1},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["pass", "review_required", "not_configured"]},
+    "naos_root": {"type": "string", "minLength": 1},
+    "configured": {"type": "boolean"},
+    "enabled": {"type": "boolean"},
+    "format": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "kind"],
+      "properties": {
+        "id": {"const": "aivss_arithmetic_verification.v1"},
+        "version": {"const": 1},
+        "kind": {"const": "offline_arithmetic_verification"}
+      }
+    },
+    "rubric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "normative_pdf_url",
+        "normative_pdf_sha256",
+        "normative_scope"
+      ],
+      "properties": {
+        "id": {"const": "AIVSS-Agentic"},
+        "version": {"const": "0.8"},
+        "normative_pdf_url": {
+          "const": "https://aivss.owasp.org/assets/publications/AIVSS%20Scoring%20System%20For%20OWASP%20Agentic%20AI%20Core%20Security%20Risks%20v0.8.pdf"
+        },
+        "normative_pdf_sha256": {
+          "const": "a2abbd215f0d7790d273c30a893a09c0dc37a6c109765eb0363c01af897fd9af"
+        },
+        "normative_scope": {"const": "published_v0.8_pdf_only"}
+      }
+    },
+    "decision_supported": {"type": "string", "minLength": 1},
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "consumer",
+        "target_gates",
+        "prompt_bands",
+        "behavior",
+        "may_approve",
+        "may_block",
+        "may_prioritize",
+        "may_merge",
+        "may_release",
+        "may_accept_risk"
+      ],
+      "properties": {
+        "consumer": {"const": "scripts/naos_control_plane_review.py"},
+        "target_gates": {"const": ["G2", "G6"]},
+        "prompt_bands": {"const": ["high", "critical"]},
+        "behavior": {"const": "human_review_prompt_only"},
+        "may_approve": {"const": false},
+        "may_block": {"const": false},
+        "may_prioritize": {"const": false},
+        "may_merge": {"const": false},
+        "may_release": {"const": false},
+        "may_accept_risk": {"const": false}
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "source",
+        "sha256",
+        "schema_valid",
+        "schema_error_count"
+      ],
+      "properties": {
+        "path": {"type": "string"},
+        "source": {"type": "string"},
+        "sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "schema_valid": {"type": "boolean"},
+        "schema_error_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basis", "inputs", "input_set_digest"],
+      "properties": {
+        "basis": {"const": "repo_local_assessor_supplied_values"},
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "role", "sha256"],
+            "properties": {
+              "path": {"type": "string"},
+              "role": {"type": "string"},
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        },
+        "input_set_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "assessments": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {"$ref": "#/$defs/assessment_result"}
+    },
+    "reason_code_counts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "report_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "status", "reason_code", "message"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"const": "advisory"},
+          "status": {"const": "review_required"},
+          "reason_code": {
+            "enum": [
+              "input_config_parse_error",
+              "input_schema_invalid",
+              "duplicate_assessment_id",
+              "arithmetic_mismatch",
+              "high_or_critical_review"
+            ]
+          },
+          "message": {"type": "string"}
+        }
+      }
+    },
+    "known_gaps": {"type": "array", "maxItems": 64, "items": {"type": "string", "maxLength": 512}},
+    "residual_risks": {"type": "array", "maxItems": 64, "items": {"type": "string", "maxLength": 512}},
+    "limitations": {"type": "array", "maxItems": 64, "items": {"type": "string", "maxLength": 1024}},
+    "not_claimed": {"type": "array", "maxItems": 64, "items": {"type": "string", "maxLength": 256}},
+    "human_review_required": {"type": "boolean"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blocking",
+        "required",
+        "warnings",
+        "advisory",
+        "total_findings",
+        "assessments",
+        "verified",
+        "mismatches",
+        "high",
+        "critical",
+        "review_prompts",
+        "unbanded_zero_scores",
+        "inputs"
+      ],
+      "properties": {
+        "blocking": {"const": 0},
+        "required": {"const": 0},
+        "warnings": {"const": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "assessments": {"type": "integer", "minimum": 0},
+        "verified": {"type": "integer", "minimum": 0},
+        "mismatches": {"type": "integer", "minimum": 0},
+        "high": {"type": "integer", "minimum": 0},
+        "critical": {"type": "integer", "minimum": 0},
+        "review_prompts": {"type": "integer", "minimum": 0},
+        "unbanded_zero_scores": {"type": "integer", "minimum": 0},
+        "inputs": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "$defs": {
+    "decimal": {"type": "string", "maxLength": 128, "pattern": "^[0-9]+(?:\\.[0-9]+)?$"},
+    "computed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "risk_gap",
+        "factor_sum",
+        "factor_fraction",
+        "threat_multiplier",
+        "mitigation_factor",
+        "aars",
+        "raw_score",
+        "score",
+        "severity_band",
+        "band_defined_by_v0_8"
+      ],
+      "properties": {
+        "risk_gap": {"$ref": "#/$defs/decimal"},
+        "factor_sum": {"$ref": "#/$defs/decimal"},
+        "factor_fraction": {"$ref": "#/$defs/decimal"},
+        "threat_multiplier": {"$ref": "#/$defs/decimal"},
+        "mitigation_factor": {"$ref": "#/$defs/decimal"},
+        "aars": {"$ref": "#/$defs/decimal"},
+        "raw_score": {"$ref": "#/$defs/decimal"},
+        "score": {"$ref": "#/$defs/decimal"},
+        "severity_band": {
+          "type": ["string", "null"],
+          "enum": [null, "low", "medium", "high", "critical"]
+        },
+        "band_defined_by_v0_8": {"type": "boolean"}
+      }
+    },
+    "assessment_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessment_id",
+        "finding_ref",
+        "assessor_ref",
+        "assessed_at",
+        "system_scope_ref",
+        "cvss_version",
+        "cvss_vector",
+        "cvss_base_score",
+        "verification_status",
+        "mismatch_fields",
+        "computed",
+        "review_prompt_required",
+        "related_gates"
+      ],
+      "properties": {
+        "assessment_id": {"type": "string"},
+        "finding_ref": {"type": "string"},
+        "assessor_ref": {"type": "string"},
+        "assessed_at": {"type": "string", "format": "date-time"},
+        "system_scope_ref": {"type": "string"},
+        "cvss_version": {"const": "4.0"},
+        "cvss_vector": {"type": "string"},
+        "cvss_base_score": {"$ref": "#/$defs/decimal"},
+        "verification_status": {"enum": ["verified", "mismatch"]},
+        "mismatch_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "risk_gap",
+              "factor_sum",
+              "aars",
+              "raw_score",
+              "score",
+              "severity_band"
+            ]
+          }
+        },
+        "computed": {"$ref": "#/$defs/computed"},
+        "review_prompt_required": {"type": "boolean"},
+        "related_gates": {
+          "type": "array",
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {"enum": ["G2", "G6"]}
+        }
+      }
+    }
+  }
+}

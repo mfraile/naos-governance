@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:agent_orchestration_request:v1",
+  "title": "NAOS deterministic agent orchestration proposal request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "enabled",
+    "run_id",
+    "project_id",
+    "requested_by",
+    "requested_at",
+    "expected_branch",
+    "max_parallel",
+    "decision_ref",
+    "model_policy_ref",
+    "task_registry_ref",
+    "lanes"
+  ],
+  "properties": {
+    "schema": {"const": "naos.agent_orchestration_request.v1"},
+    "version": {"const": 1},
+    "enabled": {"type": "boolean"},
+    "run_id": {"type": "string", "pattern": "^RUN-[A-Z0-9-]+$"},
+    "project_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$"},
+    "requested_by": {"type": "string", "minLength": 2, "maxLength": 128},
+    "requested_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "expected_branch": {"type": "string", "pattern": "^(?!-)(?!.*\\.\\.)(?!.*[~^:?*\\[\\]\\\\])[^\\s]+$"},
+    "max_parallel": {"type": "integer", "minimum": 1, "maximum": 8},
+    "decision_ref": {"type": "string", "pattern": "^naos/human_decisions/DECISION-RUN-[A-Z0-9-]+\\.yaml$"},
+    "model_policy_ref": {"type": "string", "pattern": "^naos/model_provider_policy\\.yaml$"},
+    "task_registry_ref": {"type": "string", "pattern": "^(?:naos/)?TASK_REGISTRY\\.yaml$"},
+    "lanes": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/lane"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"enabled": {"const": true}}, "required": ["enabled"]},
+      "then": {"properties": {"lanes": {"minItems": 1}}}
+    }
+  ],
+  "$defs": {
+    "safe_path_pattern": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000-\\u001f]+$"
+    },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane_id",
+        "task_id",
+        "role",
+        "client",
+        "agent_name",
+        "objective",
+        "read_only",
+        "permitted_paths",
+        "excluded_paths",
+        "required_outputs"
+      ],
+      "properties": {
+        "lane_id": {"type": "string", "pattern": "^LANE-[A-Z0-9-]+$"},
+        "task_id": {"type": "string", "pattern": "^(?:[A-Z0-9]+-)*T-[0-9]{3,}$"},
+        "role": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$"},
+        "client": {"enum": ["codex", "claude_code", "cursor", "github_copilot_cli", "opencode"]},
+        "agent_name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"},
+        "objective": {"type": "string", "minLength": 10, "maxLength": 2000},
+        "read_only": {"type": "boolean"},
+        "permitted_paths": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/safe_path_pattern"},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "excluded_paths": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/safe_path_pattern"},
+          "uniqueItems": true
+        },
+        "required_outputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^naos/(?:lane_handoffs/[A-Za-z0-9._-]+\\.yaml|reports/parallel_lane_handoff/[A-Za-z0-9._-]+\\.json)$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

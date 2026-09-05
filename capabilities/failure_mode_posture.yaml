@@ -1,0 +1,115 @@
+id: CAP-FAILURE-MODE-POSTURE
+name: Failure-Mode Posture
+description: >
+  Provides deterministic local review evidence for the declared posture of
+  NAOS's 21 failure modes across factual, structural, behavioral, drift, and
+  multi-agent families. The report records coverage values, mode-level finding
+  counts, family-level finding counts, evidence gaps, residual risks, and
+  review-required reason codes without granting runtime, provider, memory, MCP,
+  approval, blocking, certification, attestation, release, publication, or
+  compliance-proof authority.
+status: active
+default_maturity: L1
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Optional failure-mode posture hints only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warn when configured posture evidence is missing, stale, conflicting, or overclaimed."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Route configured failure-mode posture gaps to human review."
+  assured:
+    target_maturity: L1
+    enforcement: required
+    notes: "First implementation slice remains required review only; blocking requires future validated L3+ maturity and explicit gate wiring."
+authority:
+  may_read:
+    - naos/failure_mode_taxonomy.yaml
+    - repo-local control references declared in the taxonomy
+    - repo-local evidence references declared in the taxonomy
+  may_write:
+    - naos/reports/failure_mode_posture.json
+  may_block:
+    - "none in this implementation slice; findings are review evidence only"
+allowed_resources:
+  - "repo-local failure-mode taxonomy declarations"
+  - "repo-local YAML declarations, control refs, and evidence refs explicitly declared by the project"
+  - "local control-plane review routing from naos/reports/failure_mode_posture.json"
+prohibited_resources:
+  - "provider SDKs, provider credentials, model calls, API calls, MCP calls, memory tools, browser automation, network access, hooks, local server startup, runtime orchestration, tool mutation, IDE/tool configuration mutation, behavioral battery execution, or OpenCode runtime enablement"
+  - "automatic learning promotion, prompt mutation, memory write-back, provider/model selection, task approval, task closure, merge approval, release authority, publication authority, certification, attestation, or compliance proof"
+constraints:
+  - "Must remain optional, disabled by default, deterministic, and local-file-first."
+  - "Must keep all runtime/provider/model/MCP/memory/API/browser/network/tool-mutation authority flags false in generated reports."
+  - "Must treat coverage values as declared review posture, not proof that a failure mode is prevented, fixed, fully mitigated, or safe."
+  - "Must not duplicate behavioral-governance readiness authority; behavioral readiness remains a separate capability."
+  - "Must not convert per-mode or family statistics into automatic approval, blocking, learning promotion, or model/provider routing."
+  - "Must not claim hallucination prevention, failure prevention, behavioral safety proof, legal/regulatory assurance, approval, certification, attestation, release authority, publication authority, or compliance proof."
+required_evidence:
+  - naos/failure_mode_taxonomy.yaml
+  - naos/reports/failure_mode_posture.json
+validators:
+  - id: naos_failure_mode_posture
+    script: scripts/naos_failure_mode_posture.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals: []
+maturity_path:
+  L0: "Candidate design card and challenge exist."
+  L1: "Disabled-by-default local seed, schema, script, capability contract, setup module, CLI/Make dispatch, generated-adopter packaging, focused tests, and bounded control-plane route exist."
+  L2: "Projects may link each failure mode to local controls, evidence refs, known gaps, and residual risks as review evidence."
+  L3: "Adopter pilots show per-mode statistics and review routes help prioritize controls without creating false proof or hidden automation authority."
+  L4: "Broader evidence consumers may be considered only after adopter evidence, privacy review, learning-loop review, and claim-control review."
+  L5: "Any future learning-loop, autoresearch, behavioral battery, MCP, memory, provider/model, dashboard, SARIF, or gate-blocking integration remains separately approved and non-authoritative by default."
+known_limitations:
+  - "The report does not prove that a failure mode is prevented, fully mitigated, or safe."
+  - "The report does not run behavioral tests, LLM judges, runtime monitors, provider calls, model calls, MCP, memory tools, browser automation, hooks, networks, or local servers."
+  - "Mode and family statistics count declared findings and coverage posture; they are not a risk score, approval rule, learning authority, or certification basis."
+  - "Declared coverage can be stale, incomplete, manually summarized, or unsupported by local evidence."
+  - "Path existence and local record shape do not prove evidence quality, control effectiveness, regulatory adequacy, privacy safety, legality, or release readiness."
+not_claimed:
+  - "hallucination prevention"
+  - "failure prevention"
+  - "fully mitigated failure modes"
+  - "behavioral safety proof"
+  - "runtime monitoring"
+  - "runtime orchestration"
+  - "provider call"
+  - "model call"
+  - "API call"
+  - "network access"
+  - "MCP activation"
+  - "memory activation"
+  - "browser automation"
+  - "hook activation"
+  - "automatic learning promotion"
+  - "automatic approval"
+  - "automatic blocking"
+  - "merge approval"
+  - "release authority"
+  - "publication authority"
+  - "certification"
+  - "attestation"
+  - "legal or regulatory assurance"
+  - "compliance proof"
+related_docs:
+  - README.md
+  - NAOS_CATALOG.md
+  - docs/CONTROL_PLANE.md
+  - docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
+related_scripts:
+  - scripts/naos_failure_mode_posture.py
+  - scripts/naos_control_plane_review.py
+related_schemas:
+  - schemas/naos/failure_mode_posture.schema.json
+  - schemas/naos/control_plane_review.schema.json

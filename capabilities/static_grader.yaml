@@ -1,0 +1,123 @@
+id: CAP-STATIC-GRADER
+name: StaticGrader Foundation
+description: >
+  Provides the deterministic BaseGrader protocol and StaticGrader reference
+  implementation plus deterministic audit/drift/assess assessment reports for
+  structural behavioral/conformance readiness checks. StaticGrader grades
+  declared trace metadata and deterministic evidence structure only; grader
+  assessment summarizes deterministic posture only. Neither runs an LLMGrader,
+  calls providers, executes trace commands, or judges semantic behavior.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "StaticGrader reports low-noise readiness posture and missing optional inputs."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Deterministic structural grading can run without LLM, provider, model, or network dependencies."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Trace schema, source references, evidence references, and non-claim boundaries should be reviewed."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Invalid traces, protected-payload findings, and overclaims can block until human review resolves them."
+authority:
+  may_read:
+    - naos/reports/agent_trace_validation.json
+    - naos/agent_trace_events.yaml
+    - naos/reports/*.json
+  may_write:
+    - naos/reports/static_grader_report.json
+    - naos/reports/grader_assessment.json
+  may_block:
+    - "only through configured deterministic gate policy and human review for invalid trace structure, protected payloads, or authority overclaims"
+allowed_resources:
+  - "repo-local agent trace validation reports"
+  - "repo-local declared trace event metadata"
+  - "repo-local deterministic report metadata"
+prohibited_resources:
+  - "LLMGrader runtime, model calls, API calls, provider credentials, or external network calls"
+  - "Engram, MCP, memory tools, private memory payload reads, or memory write-back"
+  - "runtime trace capture, runtime audit-event capture, or automatic context injection"
+  - "sqlite-vec, NetworkX, graph runtime, semantic runtime, or command execution from trace events"
+constraints:
+  - "Must remain deterministic and structural only."
+  - "Must keep advisory/future behavioral dimensions not_evaluated or readiness_only."
+  - "Must report cost_usd: 0.0 and no external API/model/provider dependency."
+  - "Audit/drift/assess modes must remain review inputs, not audit approval, semantic drift proof, assessment certification, attestation, compliance determination, or maturity promotion."
+  - "Must include residual risks, limitations, not_claimed, and human-review boundaries."
+  - "Must not claim behavioral safety, semantic correctness, legal/compliance/regulatory assurance, approval, maturity promotion, runtime behavior proof, or hallucination prevention."
+required_evidence:
+  - naos/reports/static_grader_report.json
+  - naos/reports/grader_assessment.json
+validators:
+  - id: naos_static_grader
+    script: scripts/naos_static_grader.py
+    status: available
+  - id: naos_grader_assessment
+    script: scripts/naos_grader_assessment.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - static_grader.status
+  - static_grader.dimension_summary
+  - static_grader.summary.total_findings
+  - static_grader.cost_posture.cost_usd
+  - grader_assessment.status
+  - grader_assessment.mode
+  - grader_assessment.cost_budget_posture.cost_usd
+maturity_path:
+  L0: "StaticGrader script and report schema exist; missing trace inputs remain advisory in quickstart."
+  L1: "StaticGrader can evaluate declared trace events and deterministic report presence without LLM/provider runtime."
+  L2: "StaticGrader findings are visible in self-check, gates, evidence, dashboard, SARIF export, systemic impact, and control-plane routing."
+  L3: "Assured projects route invalid traces, protected payloads, missing non-claims, and overclaim findings to human review."
+  L4: "Trace and evidence linkage quality is routinely reviewed through deterministic audit/drift/assess reports."
+  L5: "StaticGrader acts as the deterministic baseline for future advisory graders without letting advisory outputs replace it."
+known_limitations:
+  - "StaticGrader evaluates deterministic structure and declared metadata only."
+  - "StaticGrader does not evaluate semantic behavior, fairness, alignment, robustness, safety, explainability, accountability, or compliance posture."
+  - "Trace events are declared records and can be incomplete, stale, or inaccurate."
+  - "LLMGrader readiness/runtime remains future work; audit/drift/assess modes use deterministic StaticGrader posture only."
+  - "Drift mode compares deterministic report baselines and does not infer semantic drift."
+  - "Pattern-based payload signals are lightweight and not a full secret scan."
+not_claimed:
+  - "LLMGrader runtime"
+  - "model/API/provider dependency"
+  - "behavioral safety proof"
+  - "semantic correctness proof"
+  - "legal/compliance/regulatory conclusion"
+  - "hallucination prevention"
+  - "approval"
+  - "maturity promotion by itself"
+  - "runtime behavior proof"
+  - "audit approval"
+  - "assessment certification"
+  - "semantic drift inference"
+  - "attestation"
+  - "Engram, MCP, or memory write-back"
+  - "command execution from trace events"
+related_docs:
+  - README.md
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - NAOS_CATALOG.md
+  - KNOWN_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_grader_assessment.py
+  - scripts/naos_static_grader.py
+  - scripts/naos_agent_trace_validate.py
+related_schemas:
+  - schemas/naos/grader_assessment.schema.json
+  - schemas/naos/static_grader_report.schema.json
+  - schemas/naos/agent_trace_validation.schema.json
+  - schemas/naos/agent_trace_event.schema.json

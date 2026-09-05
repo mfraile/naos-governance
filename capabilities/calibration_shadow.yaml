@@ -1,0 +1,106 @@
+id: CAP-CALIBRATION-SHADOW
+name: Calibration Shadow
+description: >
+  Provides deterministic, local calibration-shadow review for NAOS report shape,
+  status, finding-id, source-category, and summary-count stability. The
+  capability compares a small adopter-local expectation file against current
+  generated reports and surfaces drift for review.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Missing calibration-shadow config is advisory."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Supports local deterministic regression discipline without becoming a release gate by itself."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Invalid config or deterministic drift should be reviewed before relying on changed report signals."
+  assured:
+    target_maturity: L3
+    enforcement: required
+    notes: "Drift and invalid config require explicit human review under adopter policy."
+authority:
+  may_read:
+    - "naos/calibration_shadow.yaml"
+    - "naos/reports/*.json"
+    - "naos/sessions_index.json"
+  may_write:
+    - "naos/reports/calibration_shadow_report.json"
+    - "naos/sessions/<session_id>/reports/calibration_shadow_report.json"
+  may_block:
+    - "only through configured profile gate policy and human review"
+allowed_resources:
+  - "repo-local calibration-shadow config"
+  - "repo-local deterministic NAOS reports"
+  - "repo-local schemas and policy"
+prohibited_resources:
+  - "LLM, provider, model, API, SaaS, or network calls"
+  - "model behavior calibration"
+  - "runtime behavior checks"
+  - "memory write-back"
+  - "automatic approval"
+  - "release authorization"
+constraints:
+  - "Must compare deterministic metadata only."
+  - "Must ignore volatile fields such as timestamps, session IDs, operator IDs, run IDs, and absolute paths."
+  - "Must surface drift as review findings, not adjudication."
+  - "Must not infer behavioral, semantic, compliance, safety, or release correctness."
+required_evidence:
+  - "schemas/naos/calibration_shadow.schema.json"
+  - "schemas/naos/calibration_shadow_report.schema.json"
+  - "templates/structural-seeds/naos/calibration_shadow.yaml"
+  - "scripts/naos_calibration_shadow.py"
+  - "naos/reports/calibration_shadow_report.json"
+validators:
+  - id: calibration_shadow
+    script: scripts/naos_calibration_shadow.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+  - G8
+dashboard_signals:
+  - "calibration_shadow_report.status"
+  - "calibration_shadow_report.drift_count"
+  - "calibration_shadow_report.reports_missing"
+  - "calibration_shadow_report.human_review_required"
+maturity_path:
+  L0: "Capability contract, schema, seed, and review script exist."
+  L1: "Generated projects receive calibration_shadow.yaml and can produce a report."
+  L2: "Expected report metadata is populated for project-critical deterministic reports."
+  L3: "Drift is reviewed and explained before project governance relies on changed report posture."
+  L4: "Calibration-shadow results are considered alongside evidence pack, dashboard, and PR governance summaries."
+  L5: "Teams maintain deterministic drift history without treating it as behavior proof or release approval."
+known_limitations:
+  - "Calibration shadow checks report metadata stability only."
+  - "It does not calibrate models, grade model behavior, or evaluate semantic correctness."
+  - "A stable report shape does not prove evidence sufficiency or compliance."
+residual_risks:
+  - "A frozen expectation can become stale as legitimate report schemas evolve."
+  - "Small representative baselines can miss drift in reports not listed by the project."
+  - "Human reviewers must decide whether drift is acceptable."
+not_claimed:
+  - "model behavior calibration"
+  - "behavioral correctness proof"
+  - "semantic correctness proof"
+  - "truth proof"
+  - "compliance proof"
+  - "approval"
+  - "release authorization"
+  - "human review replacement"
+human_review_required: true
+related_docs:
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/BEHAVIORAL_AUDIT_ENABLEMENT.md
+  - templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md
+related_scripts:
+  - scripts/naos_calibration_shadow.py

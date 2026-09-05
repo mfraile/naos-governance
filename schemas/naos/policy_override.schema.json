@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:policy_override:v1",
+  "title": "NAOS Static Policy Override",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "overrides"],
+  "properties": {
+    "version": {"type": ["string", "number"]},
+    "description": {"type": "string"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      }
+    },
+    "merge_strategy": {
+      "type": "string",
+      "enum": ["naos_static_v1"]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope_type": {"type": "string", "enum": ["global", "team", "operator"]},
+        "team_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "operator_overlay_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "note": {"type": "string"}
+      }
+    },
+    "overrides": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

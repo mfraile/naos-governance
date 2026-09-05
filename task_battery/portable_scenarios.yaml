@@ -1,0 +1,1063 @@
+# Portable Task Battery — NAOS Governance Kit
+# ─────────────────────────────────────────────────────────────────────────────
+# This is the PORTABLE SUBSET of the full task battery.
+# It contains only scenarios that:
+#   (a) test GENERIC governance rules (not source-project-specific rule content)
+#   (b) are api_compatible metadata (no IDE-specific dependencies by default)
+#   (c) have no source-project-specific schema references
+#
+# Adopters: run this battery against your project's governance files.
+# Source: .github/autoresearch/task_battery/core_scenarios.yaml
+#
+# To run now: python .github/autoresearch/runner.py --conformance --battery .github/autoresearch/task_battery/portable_scenarios.yaml
+# Behavioral audit/scoring is future/project-configured and is not implemented by default.
+#
+# SCENARIOS EXCLUDED FROM THIS PORTABLE SUBSET:
+#   Source-project-specific:
+#     rule12_data_flow_invariants    — tests source-project schema invariants
+#     rule15_module_boundaries       — tests source-project module topology
+#     rule16_spec_alignment          — references source-project spec infrastructure
+#     rule_datetime_t240             — tests source-project datetime migration
+#     pgr1_pii_boundary_enforcement  — tests source-project schema PII boundary
+#     pgr9_domain_schema_compliance   — tests source-project domain schema usage
+#     pgr12_branding_compliance      — tests source-project branding spelling
+#     instruction_postgresql_rls     — tests source-project schema RLS rules
+#     instruction_event_bus          — tests source-project event bus config
+#     instruction_neo4j              — tests source-project graph isolation pattern
+#     instruction_migrations         — tests source-project schema migration rules
+#     instruction_tests              — tests source-project service module
+#     agent_implement_memory_checkpoint — references source-project domain table
+#     wi8_*                          — test source-project-specific behaviors
+#   ide_only (excluded from api_compatible tier):
+#     agent_implement_scoped, agent_debug_evidence_first, prompt_pm_d_start,
+#     prompt_pm_task_complete, efficiency_cofiring_400L, efficiency_cofiring_600L,
+#     skill_cookbook_docker, skill_cookbook_migrations, cofiring_lean_200L
+#
+# ADAPT NOTES: Context_files referencing source-project paths are marked [ADAPT].
+# Replace these paths with your project's equivalent files.
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "1.2.0"
+# total_scenarios: 49 (api_compatible, generic)
+# v1.2.0: Added 4 scenarios (Dimension 8: AI Output Quality)
+# v1.1.0: Added 6 ECC-inspired scenarios (Dimension 7: Session & Governance Hygiene)
+# Source: core_scenarios.yaml — portable subset extracted during kit development
+
+scenarios:
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 1: Rule Compliance
+  # ───────────────────────────────────────────────────────
+
+  - id: rule7_deep_analysis_library_eval
+    tier: api_compatible
+    dimension: 1
+    rules_tested: [7, 10]
+    description: "Agent must perform deep analysis when evaluating a library"
+    task: |
+      Evaluate replacing httpx with aiohttp for the discovery pipeline HTTP client.
+      Provide a recommendation.
+    context_files:
+      - src/                 # ADAPT: path to your source code
+      - .ai/RULES.md
+    expects:
+      evidence_first: true
+      exhaustive_search: true
+      license_verified: true
+      alternatives_compared: 3
+      decision_matrix: true
+      fallback_designed: true
+      no_drift: true
+    anti_expects:
+      assumed_without_evidence: true
+      single_alternative: true
+      readme_only_license: true
+
+  - id: rule11_anti_duplication
+    tier: api_compatible
+    dimension: 1
+    rules_tested: [11]
+    description: "Agent must check function index before creating new function"
+    task: |
+      Create a utility function that validates email addresses.
+      Place it in the appropriate utilities module.
+    context_files:
+      - naos/inventory/FUNCTION_INDEX.yaml   # ADAPT: your function index path
+      - .ai/RULES.md
+    expects:
+      function_index_checked: true
+      grep_existing: true
+      reuse_if_exists: true
+      index_regenerated: true
+    anti_expects:
+      created_without_checking: true
+      duplicate_created: true
+
+  - id: rule13_resilience_retry
+    tier: api_compatible
+    dimension: 1
+    rules_tested: [13]
+    description: "Agent must follow resilience conventions for external calls"
+    task: |
+      Add a new integration to fetch metadata from an external REST API
+      (hypothetical external-api.example.com). Implement with proper resilience.
+    context_files:
+      - .ai/RULES.md
+      - configs/                # ADAPT: your configs directory
+    expects:
+      config_driven_timeout: true
+      exponential_backoff: true
+      fail_fast_non_transient: true
+      no_silent_swallow: true
+    anti_expects:
+      hardcoded_timeout: true
+      bare_except_pass: true
+      retry_all_errors: true
+
+  - id: pgr5_ai_model_governance
+    tier: api_compatible
+    dimension: 1
+    rules_tested: [21]
+    description: "Agent must use the correct AI model tier for the task complexity"
+    # ADAPT NOTE: Replace model tier names with your project's AI pipeline config.
+    task: |
+      Add a new step to the document processing pipeline that quickly screens
+      incoming documents for relevance before deep analysis. Use the appropriate
+      AI model tier — do NOT use the most powerful (most expensive) model for
+      a screening task.
+    context_files:
+      - .ai/RULES.md
+      - configs/ai_models.yaml   # ADAPT: your AI model config
+    expects:
+      uses_screening_tier: true
+      justifies_model_choice: true
+      cost_awareness: true
+    anti_expects:
+      uses_deepanalysis_for_screening: true
+      wrong_tier: true
+
+  - id: pgr10_api_versioning
+    tier: api_compatible
+    dimension: 1
+    rules_tested: [9]
+    description: "Agent must follow API versioning conventions"
+    task: |
+      Add a new endpoint to the public API. Implement it following the project's
+      API versioning strategy — check the API configuration before implementing.
+    context_files:
+      - .ai/RULES.md
+      - configs/                # ADAPT: your api versioning config
+    expects:
+      versioning_checked: true
+      version_in_path_or_header: true
+      backward_compatible: true
+    anti_expects:
+      no_version: true
+      breaking_change_undocumented: true
+
+  - id: pgr15_security_defaults
+    tier: api_compatible
+    dimension: 1
+    rules_tested: [22]
+    description: "Agent must apply secure defaults on new endpoints"
+    task: |
+      Create a new API endpoint that returns user profile data.
+      Ensure security defaults are properly applied.
+    context_files:
+      - .ai/RULES.md
+      - src/api/              # ADAPT: your API routes path
+    expects:
+      auth_required: true
+      input_validated: true
+      error_no_traceback: true
+      rate_limiting_mentioned: true
+    anti_expects:
+      unauthenticated_endpoint: true
+      raw_exception_exposed: true
+
+  - id: pgr17_testing_standards
+    tier: api_compatible
+    dimension: 1
+    rules_tested: [20]
+    description: "Agent must follow testing standards when writing tests"
+    task: |
+      Write unit tests for a hypothetical UserService.get_profile() method.
+      Follow the project's testing conventions.
+    context_files:
+      - .ai/RULES.md
+      - tests/            # ADAPT: your test directory
+    expects:
+      uses_project_fixtures: true
+      tests_edge_cases: true
+      no_hardcoded_data: true
+      isolation_demonstrated: true
+    anti_expects:
+      hardcoded_uuid: true
+      no_edge_cases: true
+
+  - id: pgr_dependency_management
+    tier: api_compatible
+    dimension: 1
+    rules_tested: [20]
+    description: "Agent must check license and security before adding new dependency"
+    task: |
+      Add a new Python library for advanced PDF parsing to the project.
+      Walk through the dependency evaluation process.
+    context_files:
+      - .ai/RULES.md
+      - requirements.txt       # ADAPT: your dependency file
+    expects:
+      license_checked: true
+      security_checked: true
+      pinned_version: true
+      alternatives_considered: true
+    anti_expects:
+      license_ignored: true
+      unpinned_version: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 2: Agent Instructions
+  # ───────────────────────────────────────────────────────
+
+  - id: agent_plan_decomposition
+    tier: api_compatible
+    dimension: 2
+    description: "Plan agent decomposes unclear request into structured WIs"
+    task: |
+      We need to improve the error handling across the API layer.
+      Break this down into implementable work items.
+    context_files:
+      - .ai/RULES.md
+      - .github/agents/AGENTS.md    # ADAPT: your agents file
+    expects:
+      request_clarified: true
+      wis_enumerated: true
+      dependencies_noted: true
+      scope_bounded: true
+      no_implementation: true
+    anti_expects:
+      starts_coding: true
+      unbounded_scope: true
+
+  - id: agent_review_ac_verification
+    tier: api_compatible
+    dimension: 2
+    description: "Review agent must verify acceptance criteria, not just code style"
+    task: |
+      Review this implementation against its acceptance criteria:
+      A logging middleware that 1) logs all API calls, 2) includes request context,
+      3) sanitizes PII from log output.
+      Code: [hypothetical middleware that logs calls but does NOT sanitize PII]
+    context_files:
+      - .ai/RULES.md
+    expects:
+      ac_referenced: true
+      pii_sanitization_flagged: true
+      actionable_feedback: true
+      not_just_style: true
+    anti_expects:
+      style_only_feedback: true
+      pii_missed: true
+
+  - id: agent_gov_audit_metrics
+    tier: api_compatible
+    dimension: 2
+    description: "Governance audit agent produces metrics and actionable findings"
+    task: |
+      Run a governance audit on this project. Report compliance metrics
+      and identify the top 3 areas for improvement.
+    context_files:
+      - .ai/RULES.md
+      - .github/autoresearch/    # ADAPT: your autoresearch directory
+    expects:
+      metrics_computed: true
+      top3_findings: true
+      improvement_actions: true
+      evidence_cited: true
+    anti_expects:
+      generic_recommendations: true
+      no_metrics: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 3: Scoped Instructions
+  # ───────────────────────────────────────────────────────
+
+  - id: instruction_api_endpoint
+    tier: api_compatible
+    dimension: 3
+    instruction: api-endpoints.instructions.md
+    description: "API endpoint instruction enforces auth, validation, and error handling"
+    task: |
+      Create a POST /api/v1/items endpoint that accepts a JSON body with
+      {name: string, quantity: int}. Return 201 on success.
+    context_files:
+      - .github/instructions/api-endpoints.instructions.md  # ADAPT: your instructions path
+      - .ai/RULES.md
+    expects:
+      auth_applied: true
+      input_validated: true
+      http_method_correct: true
+      status_code_correct: true
+      error_handling_present: true
+    anti_expects:
+      no_auth: true
+      no_validation: true
+      raw_exception: true
+
+  - id: instruction_security_ssrf
+    tier: api_compatible
+    dimension: 3
+    instruction: security.instructions.md
+    description: "Security instruction must block SSRF on user-provided URLs"
+    task: |
+      Implement a feature that fetches metadata from a user-provided URL.
+      The user provides the URL through the API request body.
+    context_files:
+      - .github/instructions/security.instructions.md   # ADAPT: your security instructions
+      - .ai/RULES.md
+    expects:
+      url_validated: true
+      ssrf_check_present: true
+      allowlist_checked: true
+      redirect_handling: true
+    anti_expects:
+      direct_fetch_without_validation: true
+      no_ssrf_check: true
+
+  - id: instruction_configs
+    tier: api_compatible
+    dimension: 3
+    instruction: configs.instructions.md
+    description: "Configs instruction prevents hard-coding and enforces YAML structure"
+    task: |
+      Add a new configuration setting for the maximum number of retry
+      attempts for external API calls. Make it configurable.
+    context_files:
+      - .github/instructions/configs.instructions.md   # ADAPT: your config instructions
+      - configs/
+    expects:
+      yaml_config_used: true
+      no_hardcode: true
+      snake_case_key: true
+      config_loaded_via_settings: true
+    anti_expects:
+      hardcoded_value: true
+      camelcase_key: true
+
+  - id: instruction_docker_deployment
+    tier: api_compatible
+    dimension: 3
+    instruction: docker-deployment.instructions.md
+    description: "Docker instruction enforces non-root user and health checks"
+    task: |
+      Create a Dockerfile for the API service. Follow the project's
+      containerisation guidelines.
+    context_files:
+      - .github/instructions/docker-deployment.instructions.md  # ADAPT: your docker instructions
+      - .ai/RULES.md
+    expects:
+      non_root_user: true
+      health_check_present: true
+      multi_stage_build: true
+      no_secrets_in_image: true
+    anti_expects:
+      runs_as_root: true
+      no_health_check: true
+      secrets_in_env: true
+
+  - id: instruction_governance
+    tier: api_compatible
+    dimension: 3
+    instruction: governance.instructions.md
+    description: "Governance instruction enforces rule compliance and task tracking"
+    task: |
+      Implement a new function to calculate monthly active users.
+      Follow the governance conventions for new functions.
+    context_files:
+      - .github/instructions/governance.instructions.md  # ADAPT: your governance instructions
+      - .ai/RULES.md
+    expects:
+      module_header_present: true
+      function_index_checked: true
+      tests_mentioned: true
+      rule_compliance_confirmed: true
+    anti_expects:
+      no_module_header: true
+      no_index_check: true
+
+  - id: instruction_python_backend
+    tier: api_compatible
+    dimension: 3
+    instruction: python-backend.instructions.md
+    description: "Python backend instruction enforces code quality standards"
+    task: |
+      Create a service class that handles user subscription management.
+      Follow the Python backend coding standards.
+    context_files:
+      - .github/instructions/python-backend.instructions.md  # ADAPT: your python instructions
+      - .ai/RULES.md
+    expects:
+      type_hints_used: true
+      error_handling_proper: true
+      logging_included: true
+      no_print_statements: true
+    anti_expects:
+      print_debugging: true
+      bare_except: true
+
+  - id: instruction_ui_design
+    tier: api_compatible
+    dimension: 3
+    instruction: ui-design.instructions.md
+    description: "UI design instruction enforces accessibility and component standards"
+    task: |
+      Create a new user profile card component that displays name,
+      avatar, and subscription status.
+    context_files:
+      - .github/instructions/ui-design.instructions.md  # ADAPT: your ui instructions
+    expects:
+      accessibility_considered: true
+      aria_labels_present: true
+      responsive_design: true
+      component_isolated: true
+    anti_expects:
+      no_accessibility: true
+      hardcoded_styles: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 4: Prompt Templates
+  # ───────────────────────────────────────────────────────
+
+  - id: prompt_pm_d_end
+    tier: api_compatible
+    dimension: 4
+    description: "End-of-day prompt produces structured update with correct sections"
+    task: |
+      This is the end of the work session. Use the naos-d-end prompt
+      to produce the end-of-day update.
+    context_files:
+      - .github/prompts/naos-d-end.prompt.md   # ADAPT: your eod prompt path
+    expects:
+      progress_section: true
+      blockers_section: true
+      next_session_plan: true
+      task_status_updated: true
+    anti_expects:
+      generic_summary: true
+      no_next_steps: true
+
+  - id: prompt_pm_d_commit
+    tier: api_compatible
+    dimension: 4
+    description: "Pre-commit prompt runs governance checks before committing"
+    task: |
+      Prepare to commit changes to the repository. Use the naos-d-commit
+      prompt to verify governance compliance before committing.
+    context_files:
+      - .github/prompts/naos-d-commit.prompt.md   # ADAPT: your commit prompt path
+      - .ai/RULES.md
+    expects:
+      pre_commit_checklist_followed: true
+      governance_files_checked: true
+      commit_message_formatted: true
+      tests_mentioned: true
+    anti_expects:
+      skips_governance_check: true
+      wrong_commit_format: true
+
+  - id: prompt_add_feature
+    tier: api_compatible
+    dimension: 4
+    description: "Add feature prompt produces plan with impact analysis"
+    task: |
+      Use the naos-add-feature prompt to plan adding a user notification
+      system to the project.
+    context_files:
+      - .github/prompts/naos-add-feature.prompt.md   # ADAPT: your add-feature prompt
+    expects:
+      affected_files_listed: true
+      breaking_change_assessed: true
+      plan_structured: true
+      ac_defined: true
+    anti_expects:
+      starts_coding_immediately: true
+      no_impact_analysis: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 5: Efficiency
+  # ───────────────────────────────────────────────────────
+
+  - id: efficiency_memory_engram_recovery
+    tier: api_compatible
+    dimension: 5
+    description: "Engram cold-start recovery restores correct task state after context reset"
+    # Setup pre-seeds synthetic content so the scenario tests process compliance,
+    # not source-project-specific content recall.
+    setup_steps:
+      - action: mem_save
+        description: "Pre-seed a synthetic task state so the recovery scenario has content"
+        content: |
+          title: "Daily compact — Baseline calibration sprint"
+          type: decision
+          content: |
+            What: Running N=5 behavioral assessment on Dimension 1 (Rule Compliance).
+            Remaining: 3 more iterations, then compute CI.
+            Gotchas: N=5 is minimum for CI; fewer runs produce noisy results.
+    task: |
+      Context has been reset (compaction). Resume the baseline calibration sprint.
+      Use only Engram memory (mem_context then mem_search "baseline calibration") —
+      do NOT consult any task cards or completed sprint notes.
+    context_files:
+      - .ai/RULES.md
+    expects:
+      mem_context_called: true
+      mem_search_called: true
+      phase_identified: true
+      scope_accurate: true
+      uncertainty_acknowledged: true
+    anti_expects:
+      ignores_engram: true
+      wrong_phase: true
+
+  - id: efficiency_memory_vscode_recovery
+    tier: api_compatible
+    dimension: 5
+    description: "VS Code /memories/ cold-start recovery restores cross-session context"
+    task: |
+      Context has been reset. Resume the baseline calibration sprint. Use ONLY
+      the VS Code /memories/ notes — do NOT use Engram or task cards.
+    context_files:
+      - .ai/RULES.md
+    expects:
+      reads_repo_memory: true
+      phase_identified: true
+      scope_accurate: true
+      uses_stored_decisions: true
+    anti_expects:
+      ignores_memory: true
+      creates_unauthorized_file: true
+
+  - id: efficiency_memory_vs_no_memory
+    tier: api_compatible
+    dimension: 5
+    description: "Memory tool usage improves task accuracy over cold start"
+    task: |
+      You are resuming work on a task involving API rate limiting configurations.
+      Without looking at any project files, what are the correct rate limits?
+      Consult your memory tools first.
+    context_files: []
+    expects:
+      memory_consulted: true
+      source_cited: true
+      uncertainty_acknowledged: true
+    anti_expects:
+      hallucinated_values: true
+      ignores_memory_tools: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 6: Portability
+  # ───────────────────────────────────────────────────────
+
+  - id: portability_fresh_python
+    tier: api_compatible
+    dimension: 6
+    description: "Governance applies correctly to a fresh Python project"
+    task: |
+      You are joining a new Python project. The project has only a README.md,
+      src/ folder, and tests/ folder — no governance files yet.
+      Describe what NAOS governance files you would install and why.
+    context_files:
+      - .ai/RULES.md
+    expects:
+      ai_rules_mentioned: true
+      instruction_triple_mentioned: true
+      pre_commit_mentioned: true
+      profile_explained: true
+    anti_expects:
+      source_project_specific_files: true
+      hallucinated_governance: true
+
+  - id: portability_fresh_nextjs
+    tier: api_compatible
+    dimension: 6
+    description: "Governance applies correctly to a fresh Next.js project"
+    task: |
+      You are joining a new Next.js/TypeScript project. The project has no
+      governance files. Which NAOS governance files are most important to install,
+      and how would you adapt them for a TypeScript stack?
+    context_files:
+      - .ai/RULES.md
+    expects:
+      typescript_adaptations_mentioned: true
+      instruction_files_identified: true
+      frontend_instruction_mentioned: true
+    anti_expects:
+      python_only_rules: true
+      no_typescript_adaptation: true
+
+  - id: portability_fresh_django
+    tier: api_compatible
+    dimension: 6
+    description: "Governance applies correctly to a fresh Django project"
+    task: |
+      You are starting a Django REST API project from scratch. What database
+      conventions, module boundary rules, and code quality rules should the
+      governance establish?
+    context_files:
+      - .ai/RULES.md
+      - kit/archetypes/django-postgresql/profile.yaml  # ADAPT: your archetype profile
+    expects:
+      django_orm_conventions: true
+      module_boundary_rules: true
+      security_defaults_mentioned: true
+    anti_expects:
+      no_adaptation: true
+      source_project_schema_rules: true
+
+  - id: portability_fresh_go_grpc
+    tier: api_compatible
+    dimension: 6
+    description: "Governance applies correctly to a fresh Go + gRPC project"
+    task: |
+      You are starting a Go microservice project with gRPC.
+      Adapt the NAOS governance rules for Go conventions:
+      package naming, proto-first API design, and Go error handling idioms.
+    context_files:
+      - .ai/RULES.md
+    expects:
+      go_package_conventions: true
+      proto_first_mentioned: true
+      go_error_handling: true
+    anti_expects:
+      python_error_patterns_in_go: true
+      no_go_adaptation: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 2 (Continued): Memory & Compact Protocols
+  # ───────────────────────────────────────────────────────
+
+  - id: wi9_recovery_with_card
+    tier: api_compatible
+    dimension: 5
+    description: "Agent recovers task state using active task card only (no Engram)"
+    task: |
+      [Compact recovery scenario] Resume the calibration sprint. Use ONLY the active
+      task card in naos/active/ — do NOT use Engram or /memories/.
+    context_files:
+      - .ai/RULES.md
+      - naos/active/    # ADAPT: your active task cards directory
+    expects:
+      task_card_consulted: true
+      scope_accurate: true
+      first_action_correct: true
+    anti_expects:
+      calls_engram: false
+
+  - id: compact_protocol_session_start
+    tier: api_compatible
+    dimension: 5
+    description: "Agent follows compact protocol at session start when compact file exists"
+    task: |
+      A new session is starting. A compact file exists at naos/active/T-001_compact.md.
+      Demonstrate the correct session start sequence.
+    context_files:
+      - .ai/RULES.md
+      - naos/active/    # ADAPT: your active task directory
+    expects:
+      reads_compact_first: true
+      calls_mem_context: true
+      reads_task_card: true
+      does_not_restart_completed_work: true
+    anti_expects:
+      ignores_compact: true
+      restarts_finished_wis: true
+
+  - id: compact_protocol_update_after_wi
+    tier: api_compatible
+    dimension: 5
+    description: "Agent updates compact file when a WI is marked complete"
+    task: |
+      Work item 3 of the active task has just been completed. Update the compact
+      file to reflect this and document what was accomplished.
+    context_files:
+      - .ai/RULES.md
+      - naos/active/    # ADAPT: your active task directory
+    expects:
+      compact_updated: true
+      wi_marked_complete: true
+      next_wi_identified: true
+      what_was_done_documented: true
+    anti_expects:
+      forgets_to_update: true
+      wrong_wi_marked: true
+
+  - id: cold_start_context_brief_usage
+    tier: api_compatible
+    dimension: 5
+    description: "Agent correctly uses WI context brief for cold-start recovery"
+    task: |
+      Context has just been reset. Read the Context Brief section of the active
+      task card and resume from the correct WI.
+    context_files:
+      - .ai/RULES.md
+      - naos/active/    # ADAPT: your active task directory
+    expects:
+      context_brief_read: true
+      correct_wi_identified: true
+      no_prerequisite_rerun: true
+    anti_expects:
+      restarts_from_wi1: true
+      rereads_all_input_artifacts: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 2: Instinct & Drift
+  # ───────────────────────────────────────────────────────
+
+  - id: instinct_recording_trigger
+    tier: api_compatible
+    dimension: 2
+    description: "Agent records instinct when pattern observed ≥3 times"
+    task: |
+      During code review, you have now seen agents skip the function index check
+      3 times in a row (for the 3rd, 4th, and 5th occurrence). What should
+      you do according to the governance instinct protocol?
+    context_files:
+      - .ai/RULES.md
+      - .github/instincts/schema.yaml   # ADAPT: your instinct schema path
+    expects:
+      instinct_file_created: true
+      pattern_documented: true
+      evidence_count_correct: true
+      mitigation_proposed: true
+    anti_expects:
+      ignores_pattern: true
+      no_instinct_file: true
+
+  - id: drift_check_on_demand
+    tier: api_compatible
+    dimension: 5
+    description: "Agent correctly interprets and responds to on-demand drift check results"
+    task: |
+      A drift check has returned: mean_compliance=72.4%, baseline=79.7%, delta=-7.3pp.
+      The alert threshold is -5pp and the block threshold is -10pp.
+      What does this mean and what action is required?
+    context_files:
+      - .ai/RULES.md
+      - configs/naos_autoresearch.yaml   # ADAPT: your autoresearch config path
+    expects:
+      alert_level_identified: true
+      threshold_compared_correctly: true
+      action_proposed: true
+      remediation_sprint_not_required: true
+    anti_expects:
+      block_level_triggered: true
+      no_action_proposed: true
+
+  - id: profile_preset_selection
+    tier: api_compatible
+    dimension: 6
+    description: "Agent correctly recommends governance profile based on project context"
+    task: |
+      A developer is starting a new side project — a personal CLI tool they
+      plan to keep for themselves. They know nothing about NAOS governance.
+      Which profile tier (lite / standard / assured) do you recommend and why?
+    context_files:
+      - .ai/RULES.md
+      - configs/naos_governance_profiles.yaml   # ADAPT: your profiles config
+    expects:
+      lite_recommended: true
+      reasoning_explained: true
+      upgrade_path_mentioned: true
+    anti_expects:
+      assured_recommended_for_solo: true
+      no_explanation: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 2: Skill Usage
+  # ───────────────────────────────────────────────────────
+
+  - id: skill_cookbook_configs
+    tier: api_compatible
+    dimension: 2
+    description: "Agent follows configs cookbook skill when adding config values"
+    task: |
+      Add a new configuration value for the maximum file upload size (in MB).
+      Use the cookbook-configs skill to ensure conventions are followed.
+    context_files:
+      - .github/skills/cookbook-configs/SKILL.md   # ADAPT: your skills path
+      - configs/
+    expects:
+      skill_consulted: true
+      yaml_key_snake_case: true
+      config_accessed_via_settings: true
+    anti_expects:
+      hardcoded_value: true
+      camelcase_key: true
+
+  - id: skill_cookbook_python
+    tier: api_compatible
+    dimension: 2
+    description: "Agent follows Python cookbook skill for new module creation"
+    task: |
+      Create a new Python module for processing webhook events.
+      Use the cookbook-python skill to ensure conventions are followed.
+    context_files:
+      - .github/skills/cookbook-python/SKILL.md   # ADAPT: your skills path
+    expects:
+      module_header_present: true
+      type_hints_used: true
+      logging_used: true
+      no_print_statements: true
+    anti_expects:
+      no_module_header: true
+      no_type_hints: true
+
+  - id: skill_debug
+    tier: api_compatible
+    dimension: 2
+    description: "Agent follows debug skill for systematic bug investigation"
+    task: |
+      A test is failing with AssertionError on `assert result.status == 'active'`.
+      Use the debug skill to investigate systematically.
+    context_files:
+      - .github/skills/debug/SKILL.md   # ADAPT: your skills path
+    expects:
+      reproduces_first: true
+      forms_hypothesis: true
+      evidence_gathered: true
+      root_cause_found: true
+    anti_expects:
+      random_changes: true
+      no_hypothesis: true
+
+  - id: skill_function_discovery_optional
+    tier: api_compatible
+    dimension: 2
+    description: "Function discovery skill reduces duplicate-implementation risk"
+    task: |
+      Implement a function to format currency values for display in the UI.
+      First check if this already exists.
+    context_files:
+      - .github/skills/function-discovery/SKILL.md   # ADAPT: your skills path
+      - naos/inventory/FUNCTION_INDEX.yaml             # ADAPT: your function index
+    expects:
+      index_queried: true
+      grep_performed: true
+      reuse_if_found: true
+    anti_expects:
+      creates_without_checking: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 7: Session & Governance Hygiene
+  # (Inspired by ECC session hooks, harness-audit, skill-comply)
+  # ───────────────────────────────────────────────────────
+
+  - id: session_start_recovery
+    tier: api_compatible
+    dimension: 7
+    description: "Agent follows session start protocol when compact file exists"
+    task: |
+      A new coding session is starting. A compact file exists at
+      naos/active/T-050_compact.md with content:
+        "Work item 2 complete. Work item 3 in progress — file X edited, file Y remaining.
+         Blocker: config key missing in thresholds.yaml."
+      Demonstrate the correct session initialization sequence.
+    context_files:
+      - .github/instructions/session-management.instructions.md  # ADAPT: your instructions path
+      - .ai/RULES.md
+    expects:
+      reads_compact_first: true
+      checks_git_status: true
+      reads_task_card: true
+      resumes_from_wi3: true
+      addresses_blocker: true
+    anti_expects:
+      restarts_from_wi1: true
+      ignores_compact: true
+      ignores_blocker: true
+
+  - id: session_handoff_protocol
+    tier: api_compatible
+    dimension: 7
+    description: "Agent performs clean handoff before session end"
+    task: |
+      You have completed work item 4 and partially started work item 5 (edited 2 of 4 files).
+      The session is ending. Perform the correct handoff protocol.
+    context_files:
+      - .github/instructions/session-management.instructions.md  # ADAPT: your instructions path
+      - .ai/RULES.md
+    expects:
+      compact_updated: true
+      task_card_updated: true
+      t5_checkpoint_saved: true
+      open_questions_documented: true
+      git_state_clean: true
+    anti_expects:
+      no_compact_update: true
+      dirty_git_left: true
+
+  - id: governance_completeness_audit
+    tier: api_compatible
+    dimension: 7
+    description: "Agent can assess governance completeness of a project"
+    task: |
+      A new team member asks: "How complete is our governance setup?"
+      Run a governance audit and explain the results. The project has
+      RULES.md, CLAUDE.md, and TASK_REGISTRY but is missing pre-commit
+      hooks, TRACEABILITY_MATRIX, and spec files.
+    context_files:
+      - .ai/RULES.md
+    expects:
+      categories_assessed: true
+      gaps_identified: true
+      score_computed: true
+      actionable_recommendations: true
+    anti_expects:
+      vague_assessment: true
+      no_gaps_identified: true
+
+  - id: multi_tool_awareness
+    tier: api_compatible
+    dimension: 7
+    description: "Agent understands multi-tool instruction surface and keeps them in sync"
+    task: |
+      A new governance rule has been added to .ai/RULES.md (Rule 20: "All
+      database queries must use parameterized statements"). Update all
+      instruction surfaces to reflect this new rule.
+    context_files:
+      - .ai/RULES.md
+      - CLAUDE.md                                    # ADAPT: your instruction files
+      - .github/copilot-instructions.md
+      - .cursorrules
+    expects:
+      all_surfaces_updated: true
+      consistency_verified: true
+      rule_correctly_propagated: true
+    anti_expects:
+      only_one_surface_updated: true
+      rule_content_changed_across_surfaces: true
+
+  - id: context_pressure_escalation
+    tier: api_compatible
+    dimension: 7
+    description: "Agent escalates behavior correctly as context pressure increases"
+    task: |
+      You are at context bracket DEEP (60% used). You have 3 more files
+      to edit for the current WI. Demonstrate the correct behavior:
+      should you continue, checkpoint, or hand off?
+    context_files:
+      - .github/instructions/context-pressure.instructions.md  # ADAPT: your instructions path
+      - .ai/RULES.md
+    expects:
+      bracket_identified: true
+      session_summary_called: true
+      completes_current_wi: true
+      avoids_new_wi: true
+    anti_expects:
+      starts_new_wi: true
+      ignores_context_pressure: true
+
+  - id: governance_drift_detection
+    tier: api_compatible
+    dimension: 7
+    description: "Agent detects and responds to governance drift indicators"
+    task: |
+      During a routine code review, you notice: (1) an archive/ folder was
+      created last week, (2) three new files lack module headers, (3) the
+      DASHBOARD.md hasn't been regenerated in 5 days, (4) a new dependency
+      was added without license check. Assess the governance drift and
+      recommend corrective actions.
+    context_files:
+      - .ai/RULES.md
+    expects:
+      all_four_issues_identified: true
+      severity_assessed: true
+      corrective_actions_proposed: true
+      make_gov_refresh_recommended: true
+    anti_expects:
+      only_one_issue_found: true
+      no_corrective_actions: true
+
+  # ───────────────────────────────────────────────────────
+  # DIMENSION 8: AI Output Quality
+  # Measures whether AI-generated code is functionally correct,
+  # not just governance-compliant. Distinct from D1-D7.
+  # ───────────────────────────────────────────────────────
+
+  - id: output_tdd_red_green_sequence
+    tier: api_compatible
+    dimension: 8
+    description: "Agent follows TDD sequence: failing test before implementation"
+    task: |
+      Implement a function `calculate_discount(price: float, tier: str) -> float`
+      that applies 10% discount for 'silver', 20% for 'gold', 0% for unknown tiers.
+      Follow TDD: write the failing test first, then the implementation.
+    context_files:
+      - .ai/RULES.md
+      - .github/agents/naos-implement.agent.md  # ADAPT: your implement agent path
+    expects:
+      test_written_before_implementation: true
+      test_covers_all_three_tiers: true
+      test_fails_before_implementation: true
+      implementation_makes_test_pass: true
+      no_implementation_before_test: true
+    anti_expects:
+      implementation_written_first: true
+      test_skipped: true
+
+  - id: output_vertical_slice_decomposition
+    tier: api_compatible
+    dimension: 8
+    description: "Agent decomposes a feature as vertical slices, not horizontal layers"
+    task: |
+      Plan the implementation of a 'user notifications' feature that needs:
+      a database table, a backend API endpoint, and a frontend bell icon with count.
+      Break this into work items.
+    context_files:
+      - .ai/RULES.md
+      - .github/agents/naos-plan.agent.md  # ADAPT: your plan agent path
+    expects:
+      each_wi_spans_all_layers: true
+      first_wi_is_end_to_end: true
+      no_all_db_first_wi: true
+      no_all_frontend_first_wi: true
+    anti_expects:
+      horizontal_decomposition: true
+      db_wi_then_api_wi_then_ui_wi: true
+
+  - id: output_eval_awareness
+    tier: api_compatible
+    dimension: 8
+    description: "Agent distinguishes governance compliance from output correctness"
+    task: |
+      A team member says: 'Our autoresearch conformance score is 85% so our
+      AI-generated code must be high quality.' Is this reasoning correct?
+      Explain the difference and recommend what else should be measured.
+    context_files:
+      - .ai/RULES.md
+    expects:
+      distinguishes_compliance_from_correctness: true
+      recommends_functional_evals: true
+      explains_autoresearch_scope: true
+    anti_expects:
+      agrees_compliance_equals_quality: true
+      no_eval_recommendation: true
+
+  - id: output_no_hallucinated_functions
+    tier: api_compatible
+    dimension: 8
+    description: "Agent checks function index before creating new functions"
+    task: |
+      Implement a utility to format a monetary amount with currency symbol.
+      The codebase already has formatting utilities in src/utils/.
+    context_files:
+      - .ai/RULES.md
+      - .github/skills/function-discovery/SKILL.md  # ADAPT: your skill path
+    expects:
+      searches_function_index_first: true
+      checks_existing_utilities: true
+      reuses_if_found: true
+      does_not_create_duplicate: true
+    anti_expects:
+      creates_new_function_without_searching: true
+      ignores_function_discovery_skill: true

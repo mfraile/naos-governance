@@ -1,0 +1,20 @@
+# NAOS — naos-governance
+# Pinned runtime dependencies for reproducible local kit validation.
+# PyYAML supports YAML config/report parsing.
+# jsonschema supports deterministic report/schema validation.
+# sentence-transformers is optional — it can support a separately configured
+# function-index similarity provider. Without it, function discovery keeps its
+# deterministic token/Jaccard matching.
+
+PyYAML==6.0.1
+jsonschema==4.19.2
+rfc8785==0.1.4
+
+# Optional provider dependency for project-configured function-index similarity.
+# Installing it alone does not enable provider-backed or pre-commit checks;
+# configure and validate optional_similarity_filter separately:
+# sentence-transformers>=2.2.0
+
+# Optional — reusable brownfield relationship navigation and GraphML export.
+# Install with: pip install 'naos-governance[repository-intelligence]'
+# networkx==3.6.1

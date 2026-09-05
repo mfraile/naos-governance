@@ -1,0 +1,1284 @@
+schema: urn:naos-governance:regulatory-claim-source-matrix:v1
+matrix_id: NAOS-Q1-Q2-PRIMARY-SOURCE-MATRIX
+version: 1
+access_date: '2026-08-22'
+
+baseline:
+  method: current_public_document_sha256
+  history_distributed: false
+  documents:
+  - path: docs/DORA_MAPPING.md
+    sha256: 7452721e1680d2b338e1e1915a0951c7054edaf12442a3cbb1126f92a34c99aa
+    frozen_claim_locations:
+    - lines 11-15 executive scope and ISO/NIST crosswalk claim
+    - lines 27-31 exact article, control, requirement, percentage, and overlap figures
+    - lines 33-43 seven-row chapter table
+    - lines 51-62 DORA-to-control and NAOS evidence rows
+    - lines 72-76 known-gap article ranges and 24/7 wording
+    - lines 94-97 profile recommendations
+  - path: docs/OSFI_E23_MAPPING.md
+    sha256: ada284c0136e8b772a21f73cb2de75252a7fcbad5d0e25d8dc7160f5001d4979
+    frozen_claim_locations:
+    - lines 9-13 scope and vendor-cascade framing
+    - lines 23-29 lifecycle coverage and profile claims
+    - lines 37-45 lifecycle-to-NAOS mappings
+    - lines 51-61 vendor-cascade boundary
+    - lines 69-72 profile recommendations
+    - lines 82-88 claimed E-23 gaps
+
+claim_boundary:
+  proves:
+  - current public mapping-document identity by SHA-256 without requiring private Git history
+  - row-level inventory identity, source metadata, locators, bounded interpretations, dispositions, and deterministic arithmetic
+  - exact one-to-one coverage between current document claim identifiers and matrix rows
+  - official-source freshness as observed on the recorded access date
+  does_not_prove:
+  - legal applicability, legal interpretation, legal compliance, certification, or professional assurance
+  - implementation, control satisfaction, conformance, or operating effectiveness
+  - semantic completeness of either authority or suitability of NAOS evidence for a particular institution
+  numeric_scope: Numerator, denominator, inclusion, exclusion, and rounding apply to reported counts, ratios, and percentages; dates, legal identifiers, article numbers, section numbers, and version labels are locators rather than measurements.
+
+source_register:
+  DORA: &dora_source
+    issuing_authority: European Parliament and Council of the European Union
+    official_title: Regulation (EU) 2022/2554 on digital operational resilience for the financial sector
+    official_url: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32022R2554
+    document_identifier: CELEX 32022R2554; ELI http://data.europa.eu/eli/reg/2022/2554/oj
+    version: Original English legal act shown by EUR-Lex as in force; no English consolidated amendment displayed on access date
+    publication_date: '2022-12-27'
+    effective_date: '2023-01-16'
+    application_date: '2025-01-17'
+    access_date: '2026-08-22'
+  DORA_CORRIGENDA:
+    issuing_authority: European Parliament and Council of the European Union
+    official_title: EUR-Lex document information and corrigendum register for Regulation (EU) 2022/2554
+    official_url: https://eur-lex.europa.eu/eli/reg/2022/2554/oj
+    document_identifier: CELEX 32022R2554 and listed corrigenda R(01)-R(09)
+    access_date: '2026-08-22'
+    finding: EUR-Lex listed language-specific corrigenda through R(09); its English document information identified none as concerning the English version, so none altered the English locators used by this matrix.
+  OSFI_E23: &osfi_source
+    issuing_authority: Office of the Superintendent of Financial Institutions Canada
+    official_title: Guideline E-23 - Model Risk Management (2027)
+    official_url: https://www.osfi-bsif.gc.ca/en/guidance/guidance-library/guideline-e-23-model-risk-management-2027
+    document_identifier: OSFI Guideline E-23 final guideline
+    version: Final guideline published 2025-09-11; current but not yet effective on access date
+    publication_date: '2025-09-11'
+    effective_date: '2027-05-01'
+    application_date: '2027-05-01'
+    access_date: '2026-08-22'
+  OSFI_E23_LETTER:
+    issuing_authority: Office of the Superintendent of Financial Institutions Canada
+    official_title: Final Guideline E-23 - Model Risk Management letter
+    official_url: https://www.osfi-bsif.gc.ca/en/guidance/guidance-library/guideline-e-23-model-risk-management-2027-letter
+    document_identifier: OSFI final-guideline letter for E-23
+    access_date: '2026-08-22'
+    finding: The letter identifies the 2023 publication as a draft, records publication of the final guideline on 2025-09-11, and gives 2027-05-01 as the revised effective date.
+
+inventory:
+  total_claim_rows: 58
+  rows_by_document:
+    docs/DORA_MAPPING.md: 29
+    docs/OSFI_E23_MAPPING.md: 29
+  rows_by_status:
+    verified: 36
+    unsupported: 22
+  document_claim_rule: Every DORA-* or E23-* claim identifier in either governed mapping must occur exactly once in this matrix and exactly once in its assigned document; the validator rejects omissions, duplicates, cross-document rows, unsupported rows treated as results, and undeclared numeric derivations.
+
+review_template: &independent_review
+  status: pass
+  reviewer: Independent exact-diff reviewer
+  review_scope: Row identity, official-source metadata, locator fidelity, bounded interpretation, numeric derivation, document disposition, and reviewed integration
+  receipt: Independent exact-diff review passed on 2026-08-22; the row-level review scope is recorded in this matrix.
+
+claims:
+- id: DORA-SOURCE-001
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 1, paragraph DORA-SOURCE-001
+  frozen_original_location: lines 11-15
+  original_claim: DORA scope was described broadly, including relevant ICT third-party providers, without version, application date, or access-date metadata.
+  current_claim: CELEX 32022R2554 is the current English authority used, applies from 2025-01-17, and uses the statutory critical-provider boundary.
+  source:
+    <<: *dora_source
+    locator: Title, Article 1(1), Article 31, Article 64, and EUR-Lex document information
+  paraphrase: DORA covers specified digital-operational-resilience duties for in-scope financial entities and oversight of critical ICT third-party service providers; Article 64 sets application from 2025-01-17.
+  mapping_interpretation: Source identity and applicability metadata only; entity applicability is not decided here.
+  bounded_rationale: The act and EUR-Lex status fields support identity and dates, while a repository cannot classify a particular adopter.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: authority_fact
+  numeric_derivations:
+  - name: numbered articles in the act
+    kind: count
+    reported_value: 64 articles
+    unit: numbered articles
+    numerator: 64
+    denominator: 64
+    inputs: [inclusive integer identifiers 1 through 64]
+    inclusion_rule: Include each uniquely numbered Article from 1 through 64 once.
+    exclusion_rule: Exclude recitals, chapter headings, paragraphs, subparagraphs, annex material, and amended-instrument provisions as separate count units.
+    rounding_rule: none; exact integer count
+    computed_result: 64 articles
+    derivation_supported: true
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-SOURCE-001 --json
+  falsifier: EUR-Lex shows a newer English consolidated act, an English-applicable amendment or corrigendum that changes these locators, or a different application date.
+  independent_review: *independent_review
+
+- id: DORA-STRUCTURE-001
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 1, structure table
+  frozen_original_location: lines 33-43
+  original_claim: The former table claimed seven chapters, treated Articles 45-56 as Chapter VI, and treated Articles 57-64 as Chapter VII.
+  current_claim: The English act has Chapters I-IX with ranges I 1-4, II 5-16, III 17-23, IV 24-27, V 28-44, VI 45, VII 46-56, VIII 57, and IX 58-64.
+  source:
+    <<: *dora_source
+    locator: Chapter headings I-IX and Articles 1-64
+  paraphrase: DORA's English structure contains nine chapters; information sharing is Chapter VI, competent authorities Chapter VII, delegated acts Chapter VIII, and transitional and final provisions Chapter IX.
+  mapping_interpretation: Direct structural transcription without a NAOS satisfaction claim.
+  bounded_rationale: Chapter headings and article ranges are explicit in the legal act.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: authority_fact
+  numeric_derivations:
+  - name: chapter count
+    kind: count
+    reported_value: 9 chapters
+    unit: chapters
+    numerator: 9
+    denominator: 9
+    inputs: [I, II, III, IV, V, VI, VII, VIII, IX]
+    inclusion_rule: Include each explicit chapter heading in the English act once.
+    exclusion_rule: Exclude sections, articles, recitals, and titles of instruments amended by Articles 59-63.
+    rounding_rule: none; exact integer count
+    computed_result: 9 chapters
+    derivation_supported: true
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-STRUCTURE-001 --json
+  falsifier: Current EUR-Lex English text displays a different chapter heading or article range.
+  independent_review: *independent_review
+
+- id: DORA-MAP-001
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-001
+  frozen_original_location: line 51
+  original_claim: Articles 5-6 were mapped to ISO A.5.1/A.5.4, NIST GV.PO/GV.RR/GV.RM, and NAOS governance artifacts as supporting evidence.
+  current_claim: Articles 5-6 are relevant to governance and the ICT risk-management framework; NAOS governance records may explain only development-process decisions.
+  source: {<<: *dora_source, locator: Articles 5-6}
+  paraphrase: Articles 5-6 address governance and the ICT risk-management framework.
+  mapping_interpretation: NAOS governance artifacts can be discussion inputs but cannot establish the entity-wide framework or management-body duties.
+  bounded_rationale: The artifact relationship is functional relevance, not an authority-issued crosswalk or satisfaction conclusion.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-001 --json
+  falsifier: The cited articles no longer address these areas, or NAOS documentation asserts entity-wide operation or satisfaction.
+  independent_review: *independent_review
+
+- id: DORA-MAP-002
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-002
+  frozen_original_location: line 52
+  original_claim: Articles 7-8 were mapped to ISO A.5.9/A.5.12, NIST ID.AM, and project inventories without distinguishing project scope from entity scope.
+  current_claim: Project indexes and inventories may describe the project but are not the financial entity's complete ICT and information-asset inventory.
+  source: {<<: *dora_source, locator: Articles 7-8}
+  paraphrase: Articles 7-8 address ICT systems, protocols and tools, identification, inventories, dependencies, and review.
+  mapping_interpretation: Project records are potentially relevant, scope-limited inputs.
+  bounded_rationale: A project repository cannot demonstrate the entity-wide inventory and dependency universe.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-002 --json
+  falsifier: The article scope changes or the mapping ceases to state the project/entity boundary.
+  independent_review: *independent_review
+
+- id: DORA-MAP-003
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-003
+  frozen_original_location: line 53
+  original_claim: Article 9, ISO A.8 controls, NIST PR, and NAOS security/pre-commit artifacts were presented as supporting evidence.
+  current_claim: Development-time security artifacts may be relevant but cannot prove deployed protection or continuous control operation.
+  source: {<<: *dora_source, locator: Article 9}
+  paraphrase: Article 9 addresses ICT protection and prevention.
+  mapping_interpretation: Static development artifacts have limited relevance to design evidence only.
+  bounded_rationale: Operational safeguards and their effectiveness require runtime and entity evidence.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-003 --json
+  falsifier: The document represents repository checks as deployed or continuously operating protections.
+  independent_review: *independent_review
+
+- id: DORA-MAP-004
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-004
+  frozen_original_location: line 54
+  original_claim: Article 10, ISO monitoring controls, NIST DE, and NAOS validators were described as substantial static evidence.
+  current_claim: Validators may find bounded source defects but do not prove operational anomaly detection, monitoring, thresholds, or response.
+  source: {<<: *dora_source, locator: Article 10}
+  paraphrase: Article 10 addresses detection mechanisms, anomalies, tests, alerts, and related capability.
+  mapping_interpretation: Source validators are development evidence, not operational detection controls.
+  bounded_rationale: The former strength adjective overstated what static repository evidence proves.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-004 --json
+  falsifier: Runtime evidence demonstrates an exact governed integration, or the document again equates static checks with operational detection.
+  independent_review: *independent_review
+
+- id: DORA-MAP-005
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-005
+  frozen_original_location: line 55
+  original_claim: Article 11, ISO incident/continuity controls, NIST RS/RC, and NAOS specifications were presented as limited SDLC evidence.
+  current_claim: Requirements and runbooks may record intended recovery behavior but cannot prove the entity's continuity framework or execution.
+  source: {<<: *dora_source, locator: Article 11}
+  paraphrase: Article 11 addresses response, recovery, continuity policies, plans, business-impact analysis, and testing.
+  mapping_interpretation: NAOS may hold documentation inputs only.
+  bounded_rationale: Repository documents are not operating evidence for continuity and recovery.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-005 --json
+  falsifier: The mapping claims that plans or requirements prove operational continuity.
+  independent_review: *independent_review
+
+- id: DORA-MAP-006
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-006
+  frozen_original_location: line 56
+  original_claim: Article 12, ISO A.8.13/A.8.14, NIST PR.DS/RC, and project NFRs were mapped to backup and resilience.
+  current_claim: Architecture and NFRs may specify backup or recovery intent; NAOS does not operate backups or prove recovery.
+  source: {<<: *dora_source, locator: Article 12}
+  paraphrase: Article 12 addresses backup policies, restoration, segregation, redundancy, and recovery objectives.
+  mapping_interpretation: Project specifications are design evidence only.
+  bounded_rationale: Execution and recovery performance require adopter-owned operational evidence.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-006 --json
+  falsifier: The mapping asserts that NFR text satisfies backup or restoration duties.
+  independent_review: *independent_review
+
+- id: DORA-MAP-007
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-007
+  frozen_original_location: line 57
+  original_claim: Article 13, ISO continual improvement, NIST GV.RM, and governance refreshes were presented as supporting evidence.
+  current_claim: Project closeouts may document local lessons but not entity-wide intelligence, capability, training, or monitoring.
+  source: {<<: *dora_source, locator: Article 13}
+  paraphrase: Article 13 addresses learning and evolving from incident, vulnerability, threat, and technology information.
+  mapping_interpretation: Repository learning records have narrow project relevance.
+  bounded_rationale: The authority area includes operational and organizational capabilities beyond project closeout.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-007 --json
+  falsifier: The mapping represents refresh commands as the entity's continual operational capability.
+  independent_review: *independent_review
+
+- id: DORA-MAP-008
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-008
+  frozen_original_location: line 58
+  original_claim: Article 14, ISO communication controls, NIST RS.CO, and project handoffs were presented as limited evidence.
+  current_claim: Project handoffs may document development communication but not crisis plans, designated functions, or external communications.
+  source: {<<: *dora_source, locator: Article 14}
+  paraphrase: Article 14 addresses ICT-related crisis communication plans and internal and external communication arrangements.
+  mapping_interpretation: Project artifacts have only bounded documentary relevance.
+  bounded_rationale: Entity-level plans and accountable communication functions are operational responsibilities.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-008 --json
+  falsifier: The mapping equates handoffs or PR artifacts with required crisis communication.
+  independent_review: *independent_review
+
+- id: DORA-MAP-009
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-009
+  frozen_original_location: line 59
+  original_claim: Articles 17-23 were mapped to project security and runbook requirements with an operational limitation.
+  current_claim: Project requirements may define interfaces, but NAOS does not classify or report a financial entity's live incidents.
+  source: {<<: *dora_source, locator: Articles 17-23}
+  paraphrase: Articles 17-23 cover ICT-related incident management, classification, and reporting.
+  mapping_interpretation: The mapping is a negative operational boundary with possible specification relevance.
+  bounded_rationale: Only the financial entity and its governed processes can execute these duties.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-009 --json
+  falsifier: NAOS gains an explicitly governed operational incident role or the article range changes.
+  independent_review: *independent_review
+
+- id: DORA-MAP-010
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-010
+  frozen_original_location: line 60
+  original_claim: Articles 24-27 were mapped to NAOS test plans, acceptance criteria, and conformance outputs as supporting evidence.
+  current_claim: Development test artifacts may be relevant but do not establish the resilience-testing programme or TLPT.
+  source: {<<: *dora_source, locator: Articles 24-27}
+  paraphrase: Articles 24-27 address digital operational resilience testing, including TLPT for eligible entities.
+  mapping_interpretation: Development artifacts are bounded inputs, not the regulatory testing programme.
+  bounded_rationale: Scope validation, independence, production coordination, and regulatory framework sit outside NAOS.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-010 --json
+  falsifier: The mapping claims every NAOS test is DORA resilience testing or TLPT.
+  independent_review: *independent_review
+
+- id: DORA-MAP-011
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-011
+  frozen_original_location: line 61
+  original_claim: Articles 28-44 were mapped to compliance mappings, admissibility evidence, and vendor-cascade artifacts.
+  current_claim: NAOS documents may support a vendor discussion but not registers, contracts, monitoring, exit plans, designation, or oversight.
+  source: {<<: *dora_source, locator: Articles 28-44}
+  paraphrase: Chapter V addresses management of ICT third-party risk and critical-provider oversight.
+  mapping_interpretation: Documentation can be an input without satisfying entity or authority functions.
+  bounded_rationale: The former vendor-cascade wording risked implying a prescribed or sufficient route.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-011 --json
+  falsifier: The mapping represents the evidence pack as a third-party register, contract, or oversight control.
+  independent_review: *independent_review
+
+- id: DORA-MAP-012
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 2 table row DORA-MAP-012
+  frozen_original_location: line 62
+  original_claim: Articles 45-56 were collectively described as information sharing.
+  current_claim: Article 45 addresses information-sharing arrangements; Articles 46-56 address competent authorities, with no NAOS operational role.
+  source: {<<: *dora_source, locator: Article 45 and Articles 46-56}
+  paraphrase: The former range combined two different chapters and authority subjects.
+  mapping_interpretation: Project documentation may state interfaces but does not operate sharing or authority functions.
+  bounded_rationale: The legal structure directly separates the two areas.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-MAP-012 --json
+  falsifier: Current English chapter headings or article subjects differ from the cited structure.
+  independent_review: *independent_review
+
+- id: DORA-GAP-001
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 3 table row DORA-GAP-001
+  frozen_original_location: line 72
+  original_claim: Article 18(3) was said to contain client impact, geographic spread, financial impact, and operational impact factors.
+  current_claim: The relevant factors are in Article 18(1)(a), (c), (e), and (f); Article 18(3) mandates draft regulatory technical standards.
+  source: {<<: *dora_source, locator: 'Article 18(1)(a), (c), (e), (f), and Article 18(3)'}
+  paraphrase: Major-incident assessment factors include affected counterparties or clients, geographic spread, criticality of affected services, and economic impact.
+  mapping_interpretation: These live classification functions remain outside NAOS.
+  bounded_rationale: The old paragraph locator was directly contradicted by the act.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-GAP-001 --json
+  falsifier: Current English Article 18 relocates or materially changes the listed factors.
+  independent_review: *independent_review
+
+- id: DORA-GAP-002
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 3 table row DORA-GAP-002
+  frozen_original_location: line 73
+  original_claim: Article 26 TLPT was described as requiring regulator-facing testing programmes, independent testers, and production coordination in all cases.
+  current_claim: TLPT eligibility and scope are conditional; scope validation, independent testers, production coordination, and third-party participation remain outside NAOS.
+  source: {<<: *dora_source, locator: Article 26}
+  paraphrase: Article 26 governs TLPT for eligible entities and includes competent-authority and TIBER-EU-aligned elements.
+  mapping_interpretation: NAOS development tests do not become TLPT.
+  bounded_rationale: The correction avoids implying that every test or every entity follows an identical regulator-facing path.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-GAP-002 --json
+  falsifier: The authority removes the eligibility/scope conditions or NAOS obtains a separately governed TLPT role.
+  independent_review: *independent_review
+
+- id: DORA-GAP-003
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 3 table row DORA-GAP-003
+  frozen_original_location: line 74
+  original_claim: Articles 28-31 were collectively cited for the register, pre-contract assessment, contractual clauses, and register of information.
+  current_claim: Articles 28(3)-(4) and 30 support the listed entity duties; Article 31 begins critical-provider designation and oversight.
+  source: {<<: *dora_source, locator: 'Articles 28-31, especially Articles 28(3)-(4), 30, and 31'}
+  paraphrase: Entity third-party-risk duties and contractual provisions precede the separate critical-provider oversight section.
+  mapping_interpretation: The doc now uses Articles 28-30 for the entity gap and treats Article 31 separately.
+  bounded_rationale: The old range blurred entity duties and authority oversight.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-GAP-003 --json
+  falsifier: The relevant current English article allocation changes.
+  independent_review: *independent_review
+
+- id: DORA-GAP-004
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 3 table row DORA-GAP-004
+  frozen_original_location: line 75
+  original_claim: Articles 32-44 were called the oversight framework.
+  current_claim: The oversight framework is Articles 31-43; Article 44 concerns international cooperation.
+  source: {<<: *dora_source, locator: 'Chapter V Section II, Articles 31-44'}
+  paraphrase: Critical-provider designation and oversight run from Articles 31-43, followed by international cooperation in Article 44.
+  mapping_interpretation: The corrected range preserves the authority/NAOS boundary.
+  bounded_rationale: The former range omitted the initiating provision and overincluded Article 44.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-GAP-004 --json
+  falsifier: Current English Chapter V Section II uses a different range.
+  independent_review: *independent_review
+
+- id: DORA-GAP-005
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 3 table row DORA-GAP-005
+  frozen_original_location: line 76
+  original_claim: Operational resilience execution was summarized as 24/7 monitoring, response, recovery, communications, and reporting.
+  current_claim: The relevant functions are cited without attributing a standalone 24/7 phrase to DORA.
+  source: {<<: *dora_source, locator: Articles 10-14 and 17-23}
+  paraphrase: DORA specifies monitoring, response, recovery, communication, and reporting functions, but the former standalone 24/7 wording is not supplied by these provisions.
+  mapping_interpretation: All cited operational functions remain adopter-owned.
+  bounded_rationale: Removing an unsourced intensity phrase prevents false precision.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-GAP-005 --json
+  falsifier: A current directly applicable English DORA provision supplies the exact 24/7 requirement for this combined set.
+  independent_review: *independent_review
+
+- id: DORA-METRIC-001
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 4 table row DORA-METRIC-001
+  frozen_original_location: line 27
+  original_claim: 64 DORA articles mapped.
+  current_claim: Withdrawn as a mapping result; the act has Articles 1-64, but the current document makes a bounded area mapping rather than a 64-row article mapping.
+  source: {<<: *dora_source, locator: Articles 1-64; no authority locator for the word mapped}
+  paraphrase: Article numbering is verifiable; completeness of a NAOS mapping is not supplied by the authority.
+  mapping_interpretation: Preserve the former number as unsupported negative evidence.
+  bounded_rationale: No former one-row-per-article corpus or inclusion rule existed.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations:
+  - name: former mapped-article count
+    kind: count
+    reported_value: 64 articles mapped
+    unit: purported mapped articles
+    numerator: 64
+    denominator: 64
+    inputs: [former reported result, legal article identifiers 1 through 64]
+    inclusion_rule: Former mapping did not declare what constituted a mapped article.
+    exclusion_rule: Former mapping did not declare treatment of recitals, partial mappings, amendment provisions, or unmapped subparagraphs.
+    rounding_rule: none stated
+    computed_result: 64 of 64 purportedly mapped
+    derivation_supported: false
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-METRIC-001 --json
+  falsifier: A frozen 64-row article crosswalk with declared inclusion and exclusion rules independently verifies every row.
+  independent_review: *independent_review
+
+- id: DORA-METRIC-002
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 4 table row DORA-METRIC-002
+  frozen_original_location: line 28
+  original_claim: 78 of 93 ISO/IEC 27001:2022 controls, reported as 84 percent.
+  current_claim: Withdrawn because no permitted official ISO corpus, row-level crosswalk, inclusion rule, or de-duplication rule supported the numerator.
+  source: {<<: *dora_source, locator: Entire act; DORA supplies no ISO/IEC 27001 crosswalk}
+  paraphrase: The displayed division rounds to 84 percent, but source selection and mapping coverage are unsupported.
+  mapping_interpretation: Arithmetic reproducibility is not mapping validity.
+  bounded_rationale: A denominator and quotient cannot substitute for a licensed/frozen framework corpus and reviewed row mappings.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations:
+  - name: former ISO coverage percentage
+    kind: ratio_percentage
+    reported_value: 78 / 93 (84%)
+    unit: ISO controls and percent
+    numerator: 78
+    denominator: 93
+    inputs: [former displayed numerator 78, former displayed denominator 93]
+    inclusion_rule: Not declared; no row-level control selection was present.
+    exclusion_rule: Not declared; no edition-corpus exclusions or de-duplication rule was present.
+    rounding_rule: Divide 78 by 93, multiply by 100, and round half up to a whole percent for arithmetic comparison only.
+    computed_result: 84%
+    derivation_supported: false
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-METRIC-002 --json
+  falsifier: A lawfully usable frozen ISO/IEC 27001:2022 control corpus and independently reviewed row crosswalk derive the same numerator under declared rules.
+  independent_review: *independent_review
+
+- id: DORA-METRIC-003
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 4 table row DORA-METRIC-003
+  frozen_original_location: line 29
+  original_claim: 89 of 106 NIST CSF 2.0 subcategories, reported as 84 percent.
+  current_claim: Withdrawn because no frozen official NIST corpus, row-level crosswalk, inclusion rule, or de-duplication rule supported the numerator.
+  source: {<<: *dora_source, locator: Entire act; DORA supplies no NIST CSF crosswalk}
+  paraphrase: The displayed division rounds to 84 percent, but source selection and mapping coverage are unsupported.
+  mapping_interpretation: Arithmetic reproducibility is not mapping validity.
+  bounded_rationale: Official framework inputs and reviewed mappings are necessary for a coverage result.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations:
+  - name: former NIST coverage percentage
+    kind: ratio_percentage
+    reported_value: 89 / 106 (84%)
+    unit: NIST subcategories and percent
+    numerator: 89
+    denominator: 106
+    inputs: [former displayed numerator 89, former displayed denominator 106]
+    inclusion_rule: Not declared; no row-level subcategory selection was present.
+    exclusion_rule: Not declared; no corpus exclusions or de-duplication rule was present.
+    rounding_rule: Divide 89 by 106, multiply by 100, and round half up to a whole percent for arithmetic comparison only.
+    computed_result: 84%
+    derivation_supported: false
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-METRIC-003 --json
+  falsifier: A frozen official NIST CSF 2.0 subcategory corpus and independently reviewed row crosswalk derive the same numerator under declared rules.
+  independent_review: *independent_review
+
+- id: DORA-METRIC-004
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 4 table row DORA-METRIC-004
+  frozen_original_location: line 30
+  original_claim: 15 unique financial-sector-specific DORA requirements.
+  current_claim: Withdrawn because requirement, uniqueness, and the obligation corpus were undefined.
+  source: {<<: *dora_source, locator: Entire act; no authority category named unique financial-sector-specific requirements}
+  paraphrase: The act contains obligations, but the former bespoke category and count were not derivable.
+  mapping_interpretation: Preserve the number only as unsupported negative evidence.
+  bounded_rationale: A count needs an enumerated unit of analysis and de-duplication rules.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations:
+  - name: former unique-requirement count
+    kind: count
+    reported_value: 15 requirements
+    unit: purported unique requirements
+    numerator: 15
+    denominator: not declared
+    inputs: [former displayed count 15]
+    inclusion_rule: Not declared; requirement and financial-sector-specific were undefined.
+    exclusion_rule: Not declared; enabling powers, exemptions, conditions, amendments, and repeated duties had no treatment.
+    rounding_rule: none stated
+    computed_result: 15 reported, not derivable
+    derivation_supported: false
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-METRIC-004 --json
+  falsifier: An enumerated obligation corpus with definitions, inclusion/exclusion rules, and independent de-duplication derives 15.
+  independent_review: *independent_review
+
+- id: DORA-METRIC-005
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 4 table row DORA-METRIC-005
+  frozen_original_location: line 31
+  original_claim: 71 percent ISO/NIST overlap for DORA.
+  current_claim: Withdrawn because the comparison universe, intersection, numerator, denominator, and overlap rule were absent.
+  source: {<<: *dora_source, locator: Entire act; DORA supplies no ISO/NIST overlap metric}
+  paraphrase: No official authority or repository matrix supports the former overlap percentage.
+  mapping_interpretation: Preserve the figure only as unsupported negative evidence.
+  bounded_rationale: Overlap is undefined without two frozen mapped sets and a declared comparison formula.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations:
+  - name: former ISO/NIST overlap percentage
+    kind: percentage
+    reported_value: 71%
+    unit: percent overlap
+    numerator: null
+    denominator: null
+    inputs: [former displayed percentage 71]
+    inclusion_rule: Not declared; no mapped-set universe was present.
+    exclusion_rule: Not declared; no treatment of duplicates, one-to-many mappings, or semantic equivalence was present.
+    rounding_rule: not declared
+    computed_result: null
+    derivation_supported: false
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-METRIC-005 --json
+  falsifier: Frozen ISO and NIST mapped sets plus a declared intersection/union or other overlap formula independently derive 71 percent.
+  independent_review: *independent_review
+
+- id: DORA-CROSSWALK-001
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 4 table row DORA-CROSSWALK-001
+  frozen_original_location: line 15 and lines 51-58
+  original_claim: The document claimed a DORA-to-ISO/IEC 27001:2022 Annex A and NIST CSF 2.0 control mapping and embedded exact framework identifiers in its rows.
+  current_claim: Withdrawn because DORA provides no such crosswalk and the repository contained no canonical reproducible one.
+  source: {<<: *dora_source, locator: Entire act; no ISO/IEC 27001 or NIST CSF crosswalk provision identified}
+  paraphrase: The legal act does not issue the former third-party framework crosswalk.
+  mapping_interpretation: Future crosswalk work requires separately frozen official framework sources and reviewed row-level rationale.
+  bounded_rationale: Framework-name similarity cannot establish control equivalence or satisfaction.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-CROSSWALK-001 --json
+  falsifier: Current official authority publishes the crosswalk or a separately governed NAOS matrix lawfully freezes both framework corpora and independently verifies every mapping.
+  independent_review: *independent_review
+
+- id: DORA-PROFILE-001
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 5 table row DORA-PROFILE-001
+  frozen_original_location: line 94
+  original_claim: quickstart was recommended for DORA evaluation only and called insufficient for regulated ICT evidence packages.
+  current_claim: Withdrawn as a DORA mapping; quickstart is an internal NAOS posture only.
+  source: {<<: *dora_source, locator: Article 4 proportionality; no NAOS profile taxonomy}
+  paraphrase: DORA has proportionality considerations but no quickstart profile or NAOS adequacy threshold.
+  mapping_interpretation: Do not infer regulatory suitability from a NAOS profile.
+  bounded_rationale: The former recommendation lacked authority or institution-specific assessment.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-PROFILE-001 --json
+  falsifier: Current DORA authority adopts the named NAOS profile or a separately authorized professional assessment supports the exact recommendation.
+  independent_review: *independent_review
+
+- id: DORA-PROFILE-002
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 5 table row DORA-PROFILE-002
+  frozen_original_location: line 95
+  original_claim: lite was recommended for early discovery or low-assurance DORA planning.
+  current_claim: Withdrawn as a DORA mapping; lite is an internal NAOS posture only.
+  source: {<<: *dora_source, locator: Article 4 proportionality; no NAOS profile taxonomy}
+  paraphrase: DORA does not classify work with the lite label.
+  mapping_interpretation: Profile choice cannot establish DORA applicability or adequacy.
+  bounded_rationale: The former recommendation lacked primary-authority support.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-PROFILE-002 --json
+  falsifier: Current DORA authority adopts the profile or a separately authorized professional assessment supports the exact recommendation.
+  independent_review: *independent_review
+
+- id: DORA-PROFILE-003
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 5 table row DORA-PROFILE-003
+  frozen_original_location: line 96
+  original_claim: standard was recommended as a good default for DORA-adjacent production SDLC evidence.
+  current_claim: Withdrawn as an authority-backed recommendation.
+  source: {<<: *dora_source, locator: Article 4 proportionality; no NAOS profile taxonomy}
+  paraphrase: DORA does not designate standard as a default evidence posture.
+  mapping_interpretation: Internal controls may be described without attributing adequacy to DORA.
+  bounded_rationale: An entity-specific control assessment is required.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-PROFILE-003 --json
+  falsifier: Current DORA authority adopts the profile or a separately authorized professional assessment supports the exact recommendation.
+  independent_review: *independent_review
+
+- id: DORA-PROFILE-004
+  framework: DORA
+  document_path: docs/DORA_MAPPING.md
+  document_location: Section 5 table row DORA-PROFILE-004
+  frozen_original_location: line 97
+  original_claim: assured was recommended as the strongest DORA-adjacent profile because all rules block and HITL gates are mandatory.
+  current_claim: Withdrawn as an authority-backed recommendation and not evidence of DORA adequacy.
+  source: {<<: *dora_source, locator: Article 4 proportionality; no NAOS profile taxonomy}
+  paraphrase: DORA does not define assured, blocking-rule sufficiency, or NAOS HITL adequacy.
+  mapping_interpretation: Internal enforcement intensity remains distinct from regulatory satisfaction.
+  bounded_rationale: Deterministic internal controls do not create a legal conclusion.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim DORA-PROFILE-004 --json
+  falsifier: Current DORA authority adopts the profile or a separately authorized professional assessment supports the exact recommendation.
+  independent_review: *independent_review
+
+- id: E23-SOURCE-001
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 1, paragraph E23-SOURCE-001
+  frozen_original_location: lines 9-13
+  original_claim: The former document cited E-23 without identifying the final 2025 guideline, its 2027 effective date, or the superseded 2023 draft status.
+  current_claim: The source is OSFI's final E-23 published 2025-09-11 and effective 2027-05-01; it is current but not yet effective on 2026-08-22.
+  source:
+    <<: *osfi_source
+    locator: Guideline publication metadata and final-guideline letter publication and implementation sections
+  paraphrase: OSFI published the final guideline on 2025-09-11 with a revised effective date of 2027-05-01, replacing the earlier draft posture.
+  mapping_interpretation: Source identity and lifecycle metadata only.
+  bounded_rationale: Current-versus-effective status materially changes how the mapping must be described.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: authority_fact
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-SOURCE-001 --json
+  falsifier: OSFI publishes a newer final E-23 version or changes the effective date.
+  independent_review: *independent_review
+
+- id: E23-SCOPE-001
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 1, paragraph E23-SCOPE-001
+  frozen_original_location: lines 3-13 and line 37
+  original_claim: The former scope broadly related E-23 to AI-assisted software delivery and model or system scope.
+  current_claim: The mapping applies only where the institution determines that the relevant component meets E-23's model definition and is in scope.
+  source: {<<: *osfi_source, locator: 'Sections A.1-A.5, especially A.3 Application (proportional implementation) and A.4 model definition'}
+  paraphrase: E-23 is a model-risk-management guideline; AI terminology or generic software delivery does not by itself establish model status.
+  mapping_interpretation: Institution-owned applicability and identification decisions precede use of the mapping.
+  bounded_rationale: The authority's defined scope is narrower than generic AI-assisted development.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: authority_fact
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-SCOPE-001 --json
+  falsifier: OSFI changes the model definition or expressly applies E-23 to the generic delivery process described here.
+  independent_review: *independent_review
+
+- id: E23-AREA-001
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 2 table row E23-AREA-001
+  frozen_original_location: line 23
+  original_claim: Governance and accountability were mapped to supporting standard-to-assured NAOS evidence, with board and model-risk ownership as gaps.
+  current_claim: Project governance records may explain development decisions but cannot establish the institution's MRM framework, resourcing, reporting, or accountability.
+  source: {<<: *osfi_source, locator: 'Sections B.1-B.2, Principles 1.1-1.2'}
+  paraphrase: Institutions establish organizational enablement and an MRM framework aligned to risk appetite and enterprise governance.
+  mapping_interpretation: NAOS artifacts are possible documentary inputs only.
+  bounded_rationale: The institution owns enterprise governance; NAOS profile recommendations are removed.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-AREA-001 --json
+  falsifier: The mapping claims project governance establishes institution-level MRM or the cited sections change.
+  independent_review: *independent_review
+
+- id: E23-AREA-002
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 2 table row E23-AREA-002
+  frozen_original_location: lines 23 and 82-83
+  original_claim: Model inventory and materiality classification were described as institution-owned, while project tracking artifacts were presented as related evidence.
+  current_claim: The institution identifies models, maintains the model inventory, assigns model risk ratings, and applies proportional MRM; project inventories are candidate inputs only.
+  source: {<<: *osfi_source, locator: 'Sections C.1-C.3, Principles 2.1-2.3, and Appendix 1'}
+  paraphrase: E-23 uses model identification, inventory, and model risk ratings to support proportional governance.
+  mapping_interpretation: Project records do not become the institution's model inventory or risk rating.
+  bounded_rationale: The current terminology corrects materiality classification to model risk rating.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-AREA-002 --json
+  falsifier: OSFI changes the inventory/rating terminology or the mapping equates task records with the institution inventory.
+  independent_review: *independent_review
+
+- id: E23-AREA-003
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 2 table row E23-AREA-003
+  frozen_original_location: lines 24-25 and 37-38
+  original_claim: Model or system development controls and data governance were mapped to substantial standard-to-assured NAOS evidence.
+  current_claim: Specifications, data records, tests, and limitations may be relevant where the component is a model, but the institution determines adequacy and accepted use.
+  source: {<<: *osfi_source, locator: 'Section D.2, Model rationale, Principles 3.2-3.3, Model data, and Model development'}
+  paraphrase: E-23 addresses model rationale, suitable data, development standards, documentation, and developer analyses and tests.
+  mapping_interpretation: NAOS artifacts may evidence development activity without proving fitness, data governance, or methodological soundness.
+  bounded_rationale: Strength labels and generic system scope were removed.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-AREA-003 --json
+  falsifier: The mapping asserts generic system coverage or treats documentation as proof of institution acceptance.
+  independent_review: *independent_review
+
+- id: E23-AREA-004
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 2 table row E23-AREA-004
+  frozen_original_location: line 26
+  original_claim: Independent validation and testing were mapped to supporting assured-profile evidence.
+  current_claim: NAOS review records may be inputs, but NAOS does not perform or sign off the institution's independent model review.
+  source: {<<: *osfi_source, locator: 'Section D.2, Principle 3.4 Model review'}
+  paraphrase: Institutions have an independent process to assess model conceptual soundness and performance.
+  mapping_interpretation: Review evidence is not independent model-review satisfaction.
+  bounded_rationale: The assured profile is not an OSFI classification and does not confer reviewer independence.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-AREA-004 --json
+  falsifier: NAOS receives separately governed independent-review authority or the document equates internal gates with Principle 3.4.
+  independent_review: *independent_review
+
+- id: E23-AREA-005
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 2 table row E23-AREA-005
+  frozen_original_location: line 27
+  original_claim: Change management was mapped to substantial evidence in all profiles, strongest in standard-to-assured.
+  current_claim: Change records and tests may document development decisions; production approval, deployment, exception handling, and operational risk remain institution-owned.
+  source: {<<: *osfi_source, locator: 'Section D.2, Principle 3.5 Model deployment'}
+  paraphrase: E-23 expects model deployment in an environment with quality and change-control processes.
+  mapping_interpretation: Internal development controls are possible evidence inputs, not authority-backed profile adequacy.
+  bounded_rationale: The former all-profiles strength claim was unsupported.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-AREA-005 --json
+  falsifier: The mapping again attributes profile-level adequacy or production approval to NAOS.
+  independent_review: *independent_review
+
+- id: E23-AREA-006
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 2 table row E23-AREA-006
+  frozen_original_location: line 28
+  original_claim: Ongoing monitoring was mapped to standard-to-assured development-time evidence with runtime monitoring as a gap.
+  current_claim: Monitoring requirements may be documented, but NAOS does not operate performance, drift, breach, contingency, or decommissioning processes.
+  source: {<<: *osfi_source, locator: 'Section D.2, Principle 3.6 Model monitoring and Model decommission'}
+  paraphrase: E-23 expects defined monitoring and decommissioning standards, criteria, thresholds, contingencies, escalation, and disciplined retirement.
+  mapping_interpretation: NAOS has only requirements/handoff relevance unless separate runtime evidence exists.
+  bounded_rationale: This preserves the operating-effectiveness boundary.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-AREA-006 --json
+  falsifier: The mapping claims repository artifacts demonstrate live monitoring or decommissioning.
+  independent_review: *independent_review
+
+- id: E23-AREA-007
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 2 table row E23-AREA-007
+  frozen_original_location: line 29
+  original_claim: Vendor management and handoff were mapped to supporting standard-to-assured vendor-cascade evidence.
+  current_claim: A team may supply provenance, limitations, tests, and review records, but the institution governs external models and data within its MRM and third-party-risk framework.
+  source: {<<: *osfi_source, locator: 'Section B.2, Section C.1, Principle 3.4, and Appendix 1'}
+  paraphrase: E-23 includes external/vendor models and data in institution-owned identification, governance, and review.
+  mapping_interpretation: Evidence handoff is institution-specific, not an OSFI-defined cascade or certification route.
+  bounded_rationale: The former term could be mistaken for an authority-created duty.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: mapping_interpretation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-AREA-007 --json
+  falsifier: OSFI expressly creates the named NAOS route or the mapping implies vendor evidence transfers institution responsibility.
+  independent_review: *independent_review
+
+- id: E23-BOUNDARY-001
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 3, paragraph E23-BOUNDARY-001
+  frozen_original_location: lines 51-61
+  original_claim: A vendor-cascade joint was described as the place where controlled NAOS evidence passes to a regulated principal.
+  current_claim: E-23 requires institution coverage of externally sourced models and data but does not prescribe a NAOS pack or transfer responsibility.
+  source: {<<: *osfi_source, locator: 'Section B.2, Section C.1, Principle 3.4, and Appendix 1'}
+  paraphrase: External-model evidence can be requested and assessed, but responsibility stays with the institution.
+  mapping_interpretation: The section is an evidence-transfer boundary, not an OSFI-defined conformance route.
+  bounded_rationale: Contract-specific handoff practices must not be attributed to the guideline.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-BOUNDARY-001 --json
+  falsifier: OSFI publishes a directly applicable prescribed NAOS-like evidence handoff or the document implies transferred accountability.
+  independent_review: *independent_review
+
+- id: E23-GAP-001
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 4 table row E23-GAP-001
+  frozen_original_location: line 82
+  original_claim: NAOS does not provide institution-level model-risk governance.
+  current_claim: NAOS does not provide institution MRM governance, resourcing, risk appetite, or accountability.
+  source: {<<: *osfi_source, locator: Sections B.1-B.3}
+  paraphrase: Organizational model-risk governance belongs to the institution.
+  mapping_interpretation: Retained as a negative boundary.
+  bounded_rationale: Repository artifacts cannot prove enterprise governance operation.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-GAP-001 --json
+  falsifier: NAOS receives separately governed institution-level authority and operating evidence.
+  independent_review: *independent_review
+
+- id: E23-GAP-002
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 4 table row E23-GAP-002
+  frozen_original_location: line 83
+  original_claim: NAOS does not own model inventory or materiality classification.
+  current_claim: NAOS does not own model identification, inventory, model risk rating, or proportionality decisions.
+  source: {<<: *osfi_source, locator: Sections C.1-C.3 and Appendix 1}
+  paraphrase: E-23 uses institution-owned model inventories and model risk ratings.
+  mapping_interpretation: Corrects terminology and retains the boundary.
+  bounded_rationale: Project inventories and materiality wording are not equivalent to the authority construct.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-GAP-002 --json
+  falsifier: OSFI changes the constructs or the institution delegates them under separately governed authority.
+  independent_review: *independent_review
+
+- id: E23-GAP-003
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 4 table row E23-GAP-003
+  frozen_original_location: line 84
+  original_claim: NAOS does not provide independent validation sign-off.
+  current_claim: NAOS does not provide independent model-review sign-off.
+  source: {<<: *osfi_source, locator: Principle 3.4 Model review}
+  paraphrase: Independent conceptual-soundness and performance assessment remains institution-owned.
+  mapping_interpretation: Uses the final guideline's model-review terminology.
+  bounded_rationale: Internal review gates cannot establish independence or formal approval.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-GAP-003 --json
+  falsifier: NAOS is separately appointed and evidenced as an independent reviewer for a specific model.
+  independent_review: *independent_review
+
+- id: E23-GAP-004
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 4 table row E23-GAP-004
+  frozen_original_location: line 85
+  original_claim: NAOS does not provide production monitoring, incident escalation, or model performance surveillance.
+  current_claim: NAOS does not approve deployment or operate performance, drift, breach, contingency, or decommissioning processes.
+  source: {<<: *osfi_source, locator: Principles 3.5-3.6 and Model decommission}
+  paraphrase: Deployment, monitoring, escalation, contingency, and decommissioning require institution processes and operating evidence.
+  mapping_interpretation: Retained and made more exact.
+  bounded_rationale: Static development evidence cannot prove runtime operation.
+  status: verified
+  document_action: corrected_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-GAP-004 --json
+  falsifier: Separately governed live integrations and evidence give NAOS those functions.
+  independent_review: *independent_review
+
+- id: E23-GAP-005
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 4 table row E23-GAP-005
+  frozen_original_location: line 86
+  original_claim: NAOS does not provide board or senior-management accountability evidence.
+  current_claim: NAOS does not provide board, senior-management, model-owner, model-approver, or production accountability beyond bounded project records.
+  source: {<<: *osfi_source, locator: Section B.1 and Principle 3.5}
+  paraphrase: Institution stakeholders own governance and approval accountability.
+  mapping_interpretation: Project records may be evidence inputs but not the accountable function itself.
+  bounded_rationale: The distinction separates documentation from responsibility and operation.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-GAP-005 --json
+  falsifier: A specific institution's governed records appoint NAOS to an accountable role and demonstrate that role.
+  independent_review: *independent_review
+
+- id: E23-GAP-006
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 4 table row E23-GAP-006
+  frozen_original_location: line 87
+  original_claim: NAOS does not provide third-party contract management or vendor-risk acceptance.
+  current_claim: NAOS does not perform contract management, external-model risk acceptance, or institutional vendor oversight.
+  source: {<<: *osfi_source, locator: 'Section B.2, Section C.1, and Principle 3.4'}
+  paraphrase: Institution MRM covers external models and data; evidence from a vendor does not transfer institutional responsibility.
+  mapping_interpretation: Retained as a negative boundary without importing separate B-10 requirements.
+  bounded_rationale: This bounded matrix does not map other OSFI guidelines or contract law.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-GAP-006 --json
+  falsifier: Separately governed authority and evidence assign those functions to NAOS.
+  independent_review: *independent_review
+
+- id: E23-GAP-007
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 4 table row E23-GAP-007
+  frozen_original_location: line 88
+  original_claim: NAOS does not provide legal, regulatory, or auditor approval.
+  current_claim: NAOS does not provide OSFI, legal-professional, regulatory, or auditor approval.
+  source: {<<: *osfi_source, locator: Entire guideline; no NAOS approval mechanism}
+  paraphrase: Repository evidence does not create approval or professional assurance.
+  mapping_interpretation: Retained as a safety boundary.
+  bounded_rationale: Approval authority cannot be inferred from tool output.
+  status: verified
+  document_action: qualified_and_retained
+  claim_effect: limitation
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-GAP-007 --json
+  falsifier: An authorized regulator, professional, or auditor issues a specific approval under its own authority.
+  independent_review: *independent_review
+
+- id: E23-WITHDRAWN-001
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 5 table row E23-WITHDRAWN-001
+  frozen_original_location: line 39
+  original_claim: Requirements-to-code-to-test traceability was presented as substantial E-23 evidence.
+  current_claim: Withdrawn as an E-23 expectation; it remains an internal development mechanism only.
+  source: {<<: *osfi_source, locator: Principle 3.3 Model development; no prescribed NAOS traceability mechanism}
+  paraphrase: E-23 requires development standards and documentation but does not prescribe NAOS traceability fields.
+  mapping_interpretation: Do not attribute internal traceability mechanics to OSFI.
+  bounded_rationale: Functional usefulness is not authority support.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-WITHDRAWN-001 --json
+  falsifier: OSFI expressly prescribes the same requirements-to-code-to-test mechanism.
+  independent_review: *independent_review
+
+- id: E23-WITHDRAWN-002
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 5 table row E23-WITHDRAWN-002
+  frozen_original_location: line 40
+  original_claim: NAOS profile tiers and tier-gated pre-commit controls were presented as E-23 governance controls.
+  current_claim: Withdrawn; E-23 uses institution-assigned model risk ratings, not NAOS profiles.
+  source: {<<: *osfi_source, locator: Sections C.2-C.3 and Principle 3.1}
+  paraphrase: Proportional MRM follows model risk, not a NAOS profile taxonomy.
+  mapping_interpretation: Internal tiering cannot be represented as authority-defined governance.
+  bounded_rationale: The two classification systems have different owners and purposes.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-WITHDRAWN-002 --json
+  falsifier: OSFI adopts the NAOS profile taxonomy or an authorized institution-specific crosswalk is independently validated.
+  independent_review: *independent_review
+
+- id: E23-WITHDRAWN-003
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 5 table row E23-WITHDRAWN-003
+  frozen_original_location: line 41
+  original_claim: Assured-profile HITL gates and reviewer attestations were presented as partial independent-review evidence.
+  current_claim: Withdrawn as an authority-backed claim; NAOS HITL does not replace independent model review.
+  source: {<<: *osfi_source, locator: Principle 3.4 Model review}
+  paraphrase: Reviewer independence and review scope are institution-governed.
+  mapping_interpretation: Internal human review may be useful but is not E-23 satisfaction.
+  bounded_rationale: Human involvement alone does not establish independence or conceptual-soundness review.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-WITHDRAWN-003 --json
+  falsifier: A specific governed review proves that the NAOS gate meets the institution's Principle 3.4 process.
+  independent_review: *independent_review
+
+- id: E23-WITHDRAWN-004
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 5 table row E23-WITHDRAWN-004
+  frozen_original_location: line 42
+  original_claim: Pre-commit validation, validate-all, conformance, and acceptance-criteria reference checks were presented as E-23 expectations.
+  current_claim: Withdrawn as an authority-backed claim; these remain internal development controls.
+  source: {<<: *osfi_source, locator: 'Principles 3.1, 3.3, and 3.5; no pre-commit prescription'}
+  paraphrase: E-23 requires robust lifecycle controls but does not prescribe NAOS commands or hooks.
+  mapping_interpretation: Internal controls can be described without claiming OSFI provenance.
+  bounded_rationale: Specific tool mechanics are not in the primary authority.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-WITHDRAWN-004 --json
+  falsifier: OSFI expressly prescribes the same mechanisms or an institution-specific control design separately adopts them.
+  independent_review: *independent_review
+
+- id: E23-WITHDRAWN-005
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 5 table row E23-WITHDRAWN-005
+  frozen_original_location: line 43
+  original_claim: Task ownership and delivery status records were presented as E-23 lifecycle evidence.
+  current_claim: Withdrawn where it implied model inventory; project task records are not the institution's model inventory.
+  source: {<<: *osfi_source, locator: Section C.1 and Appendix 1}
+  paraphrase: Model inventory fields and task-delivery records serve different purposes.
+  mapping_interpretation: A task registry may be project evidence only.
+  bounded_rationale: Conflating the records would overstate coverage.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-WITHDRAWN-005 --json
+  falsifier: An institution's governed model inventory explicitly and sufficiently incorporates the cited task records.
+  independent_review: *independent_review
+
+- id: E23-WITHDRAWN-006
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 5 table row E23-WITHDRAWN-006
+  frozen_original_location: line 44
+  original_claim: Cross-session handoffs, cognitive checkpoints, and session summaries were presented as E-23 lifecycle expectations.
+  current_claim: Withdrawn as an authority-backed claim.
+  source: {<<: *osfi_source, locator: Entire guideline; no cross-session or cognitive-checkpoint prescription}
+  paraphrase: E-23 does not prescribe NAOS session-management artifacts.
+  mapping_interpretation: They remain internal continuity aids only.
+  bounded_rationale: No primary locator supports the former attribution.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-WITHDRAWN-006 --json
+  falsifier: OSFI expressly prescribes the same session-management artifacts.
+  independent_review: *independent_review
+
+- id: E23-WITHDRAWN-007
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 5 table row E23-WITHDRAWN-007
+  frozen_original_location: line 45 and lines 96-107
+  original_claim: Compliance mappings, conformance reports, dashboards, traceability, and the admissibility pack were presented as evidence for an E-23 vendor review.
+  current_claim: Withdrawn as an E-23 requirement; an admissibility pack may be an optional institution-assessed bundle only.
+  source: {<<: *osfi_source, locator: Section B.2 and Principle 3.4; no prescribed evidence pack}
+  paraphrase: E-23 does not define or approve a NAOS evidence pack.
+  mapping_interpretation: The pack's contents retain only their artifact-specific evidentiary meaning.
+  bounded_rationale: Packaging does not create completeness, independence, or approval.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-WITHDRAWN-007 --json
+  falsifier: OSFI or a separately authorized institution-specific control design prescribes and validates this exact pack.
+  independent_review: *independent_review
+
+- id: E23-WITHDRAWN-008
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 5 table row E23-WITHDRAWN-008
+  frozen_original_location: lines 11-13 and lines 51-61
+  original_claim: The vendor-cascade joint was presented as the E-23 handoff point for controlled delivery evidence.
+  current_claim: Withdrawn as an E-23-defined term or route.
+  source: {<<: *osfi_source, locator: 'Section B.2, Section C.1, and Principle 3.4; no vendor-cascade term'}
+  paraphrase: E-23 brings external models and data within institution MRM but does not name a vendor-cascade joint.
+  mapping_interpretation: Evidence handoff may exist contractually without authority attribution.
+  bounded_rationale: The former coined term could be read as an official construct.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-WITHDRAWN-008 --json
+  falsifier: OSFI adopts the term or prescribes the exact route.
+  independent_review: *independent_review
+
+- id: E23-PROFILE-001
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 6 table row E23-PROFILE-001
+  frozen_original_location: line 69
+  original_claim: quickstart was recommended for familiarisation and not regulated evidence packages.
+  current_claim: Withdrawn as an E-23 mapping; quickstart is an internal NAOS posture only.
+  source: {<<: *osfi_source, locator: Sections C.2-C.3; no NAOS profile taxonomy}
+  paraphrase: E-23 does not classify evidence with the quickstart label.
+  mapping_interpretation: Profile choice cannot establish model risk or adequacy.
+  bounded_rationale: The former recommendation lacked authority support.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-PROFILE-001 --json
+  falsifier: OSFI adopts the profile or an authorized institution-specific assessment supports the exact recommendation.
+  independent_review: *independent_review
+
+- id: E23-PROFILE-002
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 6 table row E23-PROFILE-002
+  frozen_original_location: line 70
+  original_claim: lite was recommended for early discovery or low-assurance E-23-adjacent work.
+  current_claim: Withdrawn as an authority-backed recommendation.
+  source: {<<: *osfi_source, locator: Sections C.2-C.3; no NAOS profile taxonomy}
+  paraphrase: E-23 does not define a lite evidence posture.
+  mapping_interpretation: Internal profile decisions remain separate from model risk ratings.
+  bounded_rationale: The former recommendation lacked institution-specific evidence.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-PROFILE-002 --json
+  falsifier: OSFI adopts the profile or an authorized institution-specific assessment supports the exact recommendation.
+  independent_review: *independent_review
+
+- id: E23-PROFILE-003
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 6 table row E23-PROFILE-003
+  frozen_original_location: line 71
+  original_claim: standard was recommended as a production SDLC evidence default for E-23-adjacent work.
+  current_claim: Withdrawn as an authority-backed recommendation.
+  source: {<<: *osfi_source, locator: Sections C.2-C.3; no NAOS profile taxonomy}
+  paraphrase: E-23 does not designate standard as an evidence default.
+  mapping_interpretation: Internal controls may be described without an OSFI adequacy claim.
+  bounded_rationale: The institution must set model-risk-proportionate requirements.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-PROFILE-003 --json
+  falsifier: OSFI adopts the profile or an authorized institution-specific assessment supports the exact recommendation.
+  independent_review: *independent_review
+
+- id: E23-PROFILE-004
+  framework: OSFI_E23
+  document_path: docs/OSFI_E23_MAPPING.md
+  document_location: Section 6 table row E23-PROFILE-004
+  frozen_original_location: line 72
+  original_claim: assured was recommended as the strongest regulated-delivery/vendor-cascade evidence profile because all rules block and HITL gates are mandatory.
+  current_claim: Withdrawn as an authority-backed recommendation and not evidence of E-23 adequacy.
+  source: {<<: *osfi_source, locator: Sections C.2-C.3 and Principle 3.4; no NAOS profile taxonomy}
+  paraphrase: E-23 does not define assured, all-rules-block sufficiency, or NAOS HITL adequacy.
+  mapping_interpretation: Internal enforcement intensity does not establish independent review or regulatory adequacy.
+  bounded_rationale: The former superlative could be mistaken for authority endorsement.
+  status: unsupported
+  document_action: withdrawn_as_result
+  claim_effect: negative_evidence
+  numeric_derivations: []
+  reproduction_command: python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim E23-PROFILE-004 --json
+  falsifier: OSFI adopts the profile or an authorized institution-specific assessment supports the exact recommendation.
+  independent_review: *independent_review

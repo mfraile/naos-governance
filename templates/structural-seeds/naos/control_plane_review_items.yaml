@@ -1,0 +1,10 @@
+version: "1.0"
+semantics:
+  items: "Structured review and routing declarations. They are not proof by themselves."
+  report: "Run naos control-plane-review to evaluate routing status."
+  human_decision: "Humans approve disposition, remediation, waiver, and residual-risk treatment."
+
+items: []
+known_gaps: []
+residual_risks: []
+waivers: []

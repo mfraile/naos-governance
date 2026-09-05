@@ -1,0 +1,43 @@
+# NAOS Instinct Seed — INS-007
+# Tier 1 seed — stripped of source-project evidence for kit distribution.
+# Set evidence_count ≥ 1 and add your source_sessions as you observe this pattern.
+---
+
+id: INS-007
+title: "Agent loops on quota-failure (4xx) without circuit breaker"
+status: hypothesis
+tier: 1
+
+observed_pattern: >
+  After exhausting API quota, the runner returned all-SKIP results.
+  The agent re-invoked the same command multiple times in rapid succession
+  without any progressive backoff or stop condition. Each re-invocation was
+  identical — same command, same quota wall, same SKIP result.
+  The agent received clear 4xx (quota) errors but did not stop and report.
+  The runner itself does not loop on 4xx (returns None immediately), but the
+  AI agent driving it re-invoked the CLI repeatedly.
+
+context: >
+  Applies whenever: (a) a CLI invocation returns all-SKIP results, OR
+  (b) the runner output contains "quota", "limit", "429", "400", or error codes,
+  OR (c) two consecutive invocations return identical all-SKIP output.
+  All-SKIP results are not a retry-able condition — they are a quota signal.
+
+mitigation: >
+  On first all-SKIP result or 4xx error from the behavioral runner:
+  STOP immediately. Do NOT retry the same command.
+  Report to user: "Runner returned all-SKIP (quota exhausted).
+  Cannot proceed with behavioral runs until quota resets.
+  Quota resets at: [date if known]. Awaiting instructions."
+  Circuit breaker rule: if run N and run N+1 both produce all-SKIP, treat
+  as hard stop — not a transient failure.
+
+evidence_count: 0
+first_observed: null
+last_confirmed: null
+source_sessions: []
+
+confidence: 0.0   # evidence_count = 0 → seed only
+tags: [circuit-breaker, quota, api-error, behavioral-runner, retry-loop]
+promoted_to_rule: null
+dismissed: false

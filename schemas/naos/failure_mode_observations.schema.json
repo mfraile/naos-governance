@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:failure_mode_observations:v1",
+  "title": "NAOS Failure-Mode Observations Report",
+  "description": "Deterministic local aggregation of configured report findings into canonical failure-mode observation statistics. It is not a numeric risk score authority, automatic learning, MCP/Engram activation, provider/model access, runtime orchestration, approval, certification, attestation, release authority, publication authority, or proof of compliance.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "deterministic",
+    "declaration_path",
+    "declaration_source",
+    "enabled",
+    "failure_mode_observations_declared",
+    "runtime_enabled",
+    "provider_calls_allowed",
+    "model_calls_allowed",
+    "mcp_allowed",
+    "memory_allowed",
+    "network_calls_allowed",
+    "hook_activation_allowed",
+    "tool_mutation_allowed",
+    "automatic_learning_allowed",
+    "control_plane_review_input_allowed",
+    "canonical_modes",
+    "source_reports",
+    "observations",
+    "mode_observation_counts",
+    "family_observation_counts",
+    "source_report_counts",
+    "observation_reason_code_counts",
+    "severity_counts",
+    "related_gate_counts",
+    "mapping_basis_counts",
+    "findings",
+    "reason_code_counts",
+    "review_opportunities",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "generated_by",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.failure_mode_observations.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["pass", "advisory", "warning", "required_missing", "blocked", "not_configured", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "declaration_path": {"type": "string"},
+    "declaration_source": {"type": "string", "enum": ["project", "template", "explicit"]},
+    "declaration_hash": {"type": ["string", "null"]},
+    "enabled": {"type": "boolean"},
+    "failure_mode_observations_declared": {"type": "boolean"},
+    "runtime_enabled": {"const": false},
+    "provider_calls_allowed": {"const": false},
+    "model_calls_allowed": {"const": false},
+    "mcp_allowed": {"const": false},
+    "memory_allowed": {"const": false},
+    "network_calls_allowed": {"const": false},
+    "hook_activation_allowed": {"const": false},
+    "tool_mutation_allowed": {"const": false},
+    "automatic_learning_allowed": {"const": false},
+    "control_plane_review_input_allowed": {"const": false},
+    "profile_posture": {"type": "object"},
+    "canonical_modes": {
+      "type": "array",
+      "minItems": 21,
+      "items": {
+        "type": "object",
+        "required": ["mode_id", "family", "name"],
+        "properties": {
+          "mode_id": {"type": "string"},
+          "family": {"type": "string"},
+          "name": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "source_reports": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": true}
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "source_id",
+          "source_type",
+          "source_ref",
+          "reason_code",
+          "source_severity",
+          "mode_ids",
+          "mapping_basis",
+          "mapped",
+          "human_review_required"
+        ],
+        "properties": {
+          "id": {"type": "string"},
+          "source_id": {"type": "string"},
+          "source_type": {"type": "string"},
+          "source_ref": {"type": "string"},
+          "source_finding_id": {"type": ["string", "null"]},
+          "reason_code": {"type": "string"},
+          "source_severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+          "mode_ids": {"type": "array", "items": {"type": "string"}},
+          "families": {"type": "array", "items": {"type": "string"}},
+          "mapping_basis": {
+            "type": "string",
+            "enum": ["explicit_mode", "reason_code_mapping", "source_default_mapping", "unmapped"]
+          },
+          "mapped": {"type": "boolean"},
+          "human_review_required": {"type": "boolean"},
+          "related_gates": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "mode_observation_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "family_observation_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "source_report_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "observation_reason_code_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "severity_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "related_gate_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "mapping_basis_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "severity", "status", "reason_code", "gate", "message", "human_review_required"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+          "status": {"type": "string"},
+          "reason_code": {"type": "string"},
+          "related_gates": {"type": "array", "items": {"type": "string"}},
+          "gate": {"type": "string"},
+          "message": {"type": "string"},
+          "human_review_required": {"type": "boolean"}
+        }
+      }
+    },
+    "reason_code_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "review_opportunities": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": true}
+    },
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"},
+      "allOf": [
+        {"contains": {"const": "automatic learning promotion"}},
+        {"contains": {"const": "provider call"}},
+        {"contains": {"const": "model call"}},
+        {"contains": {"const": "MCP activation"}},
+        {"contains": {"const": "Engram activation"}},
+        {"contains": {"const": "memory activation"}},
+        {"contains": {"const": "runtime orchestration"}},
+        {"contains": {"const": "numeric risk score authority"}},
+        {"contains": {"const": "approval"}},
+        {"contains": {"const": "certification"}},
+        {"contains": {"const": "attestation"}},
+        {"contains": {"const": "compliance proof"}}
+      ]
+    },
+    "human_review_required": {"type": "boolean"},
+    "generated_by": {"type": "object", "additionalProperties": true},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "total_findings",
+        "observations",
+        "mapped_observations",
+        "unmapped_observations",
+        "mode_observation_counts",
+        "family_observation_counts",
+        "source_report_counts",
+        "observation_reason_code_counts",
+        "reason_code_counts",
+        "assured_blocking_enabled",
+        "runtime_enabled",
+        "provider_calls_allowed",
+        "model_calls_allowed",
+        "automatic_learning_allowed"
+      ],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "observations": {"type": "integer", "minimum": 0},
+        "mapped_observations": {"type": "integer", "minimum": 0},
+        "unmapped_observations": {"type": "integer", "minimum": 0},
+        "human_review_observations": {"type": "integer", "minimum": 0},
+        "high_severity_observations": {"type": "integer", "minimum": 0},
+        "mode_observation_counts": {"type": "object"},
+        "family_observation_counts": {"type": "object"},
+        "source_report_counts": {"type": "object"},
+        "observation_reason_code_counts": {"type": "object"},
+        "reason_code_counts": {"type": "object"},
+        "assured_blocking_enabled": {"const": false},
+        "runtime_enabled": {"const": false},
+        "provider_calls_allowed": {"const": false},
+        "model_calls_allowed": {"const": false},
+        "automatic_learning_allowed": {"const": false}
+      }
+    }
+  }
+}

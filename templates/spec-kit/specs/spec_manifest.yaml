@@ -1,0 +1,309 @@
+schema: naos.spec_pack_manifest.v1
+version: "1.1"
+description: >
+  Canonical NAOS spec-pack contract. This manifest declares required
+  filenames, sections, anchors, and sync markers for deterministic structural
+  conformance checks. It does not approve, complete, implement, test, evidence,
+  or accept project specifications.
+
+profiles:
+  quickstart:
+    required_files: []
+  lite:
+    required_files:
+      - README.md
+      - spec_manifest.yaml
+      - 01-problem.md
+      - 02-solution.md
+      - 03-requirements.md
+  standard:
+    required_files:
+      - README.md
+      - spec_manifest.yaml
+      - 01-problem.md
+      - 02-solution.md
+      - 03-requirements.md
+      - 04-architecture.md
+      - 05-api.md
+      - 06-acceptance.md
+      - 07-cost-analysis.md
+      - 08-market-analysis.md
+      - 09-integration-contract.md
+      - 10-execution.md
+  assured:
+    inherits: standard
+
+traceability_codes:
+  - id: PAIN
+    description: Problem anchors defined in 01-problem.md and referenced by downstream specs.
+    required_profiles: [lite, standard, assured]
+    defined_in: [01-problem.md]
+    definition_patterns:
+      - "\\{#(PAIN-[0-9]+\\.[0-9]+)\\}"
+    reference_files: [02-solution.md, 03-requirements.md, 08-market-analysis.md]
+    reference_patterns:
+      - "\\b(PAIN-[0-9]+\\.[0-9]+)\\b"
+  - id: SOL
+    description: Solution capability anchors defined in 02-solution.md.
+    required_profiles: [lite, standard, assured]
+    defined_in: [02-solution.md]
+    definition_patterns:
+      - "\\{#(SOL-[0-9]+\\.[0-9]+)\\}"
+    reference_files: [03-requirements.md]
+    reference_patterns:
+      - "\\b(SOL-[0-9]+\\.[0-9]+)\\b"
+  - id: FR_NFR
+    description: Functional and non-functional requirement IDs defined in 03-requirements.md.
+    required_profiles: [lite, standard, assured]
+    definition_source: requirement_headers
+    defined_in: [03-requirements.md]
+    reference_files: [04-architecture.md, 05-api.md, 06-acceptance.md, 10-execution.md]
+    reference_patterns:
+      - "\\b((?:FR|NFR)-[A-Z0-9][A-Z0-9_-]*)\\b"
+  - id: AC
+    description: Acceptance-criteria IDs defined in 03-requirements.md.
+    required_profiles: [lite, standard, assured]
+    defined_in: [03-requirements.md]
+    definition_patterns:
+      - "\\b(AC-[0-9]{3}-[0-9]+)\\b"
+  - id: ARCH
+    description: Architecture component anchors defined in 04-architecture.md.
+    required_profiles: [standard, assured]
+    defined_in: [04-architecture.md]
+    definition_patterns:
+      - "\\{#((?:ARCH|arch)-[0-9]+)\\}"
+    reference_files: [03-requirements.md]
+    reference_patterns:
+      - "\\b(ARCH-[0-9]+)\\b"
+  - id: API
+    description: API endpoint anchors defined in 05-api.md.
+    required_profiles: [standard, assured]
+    defined_in: [05-api.md]
+    definition_patterns:
+      - "\\{#(API-[A-Z0-9.]+)\\}"
+  - id: SCEN
+    description: Acceptance scenario anchors defined in 06-acceptance.md.
+    required_profiles: [standard, assured]
+    defined_in: [06-acceptance.md]
+    definition_patterns:
+      - "\\{#(SCEN-[A-Z0-9.]+)\\}"
+    reference_files: [03-requirements.md]
+    reference_patterns:
+      - "\\b(SCEN-[A-Z0-9.]+)\\b"
+  - id: COST
+    description: Cost-analysis anchors defined in 07-cost-analysis.md.
+    required_profiles: [standard, assured]
+    defined_in: [07-cost-analysis.md]
+    definition_patterns:
+      - "\\{#(COST-[0-9]+)\\}"
+  - id: MKT
+    description: Market-analysis anchors defined in 08-market-analysis.md.
+    required_profiles: [standard, assured]
+    defined_in: [08-market-analysis.md]
+    definition_patterns:
+      - "\\{#(MKT-[0-9]+)\\}"
+  - id: INT
+    description: Integration-contract anchors defined in 09-integration-contract.md.
+    required_profiles: [standard, assured]
+    defined_in: [09-integration-contract.md]
+    definition_patterns:
+      - "\\{#(INT-[0-9]+(?:\\.[A-Z]+)?)\\}"
+  - id: EXEC
+    description: Execution-plan anchors defined in 10-execution.md.
+    required_profiles: [standard, assured]
+    defined_in: [10-execution.md]
+    definition_patterns:
+      - "\\{#(EXEC-[A-Z0-9]+)\\}"
+  - id: TASK
+    description: Task IDs defined in TASK_REGISTRY.yaml and referenced by requirement/execution specs.
+    required_profiles: [lite, standard, assured]
+    definition_source: task_registry
+    reference_files: [03-requirements.md, 10-execution.md]
+    reference_patterns:
+      - "\\b(T-[0-9]{3})\\b"
+
+files:
+  - id: "01"
+    path: 01-problem.md
+    title: Problem Statement
+    required_profiles: [lite, standard, assured]
+    required_sections:
+      - "# 01 - Problem Statement"
+      - "## Risk Register"
+    required_patterns:
+      - id: pain_anchor
+        pattern: "\\{#PAIN-[0-9]+\\.[0-9]+\\}"
+        description: "At least one PAIN-1.N anchor is declared."
+  - id: "02"
+    path: 02-solution.md
+    title: Solution Overview
+    required_profiles: [lite, standard, assured]
+    required_sections:
+      - "# 02 - Solution Overview"
+      - "## Core Capabilities"
+    required_patterns:
+      - id: capability_pain_link
+        pattern: "PAIN-[0-9]+\\.[0-9]+"
+        description: "Capabilities map back to PAIN anchors."
+      - id: solution_anchor
+        pattern: "\\{#SOL-[0-9]+\\.[0-9]+\\}"
+        description: "Core capabilities declare SOL anchors."
+  - id: "03"
+    path: 03-requirements.md
+    title: Requirements Specification
+    required_profiles: [lite, standard, assured]
+    required_sections:
+      - "# 03 - Requirements Specification"
+      - "### FR-001:"
+      - "**Linked To**:"
+      - "#### Systemic Impacts"
+    required_patterns:
+      - id: requirement_header
+        pattern: "^#{2,3}\\s+(?:FR|NFR)-[0-9]{3}:"
+        flags: [multiline]
+        description: "At least one FR/NFR requirement header is declared."
+      - id: requirement_pain_link
+        pattern: "\\bPAIN-[0-9]+\\.[0-9]+\\b"
+        description: "Requirements link to PAIN anchors."
+      - id: requirement_solution_link
+        pattern: "\\bSOL-[0-9]+\\.[0-9]+\\b"
+        description: "Requirements link to SOL anchors."
+      - id: requirement_arch_link
+        pattern: "\\bARCH-[0-9]+\\b"
+        description: "Requirements identify affected ARCH components."
+      - id: acceptance_criterion_id
+        pattern: "\\bAC-[0-9]{3}-[0-9]+\\b"
+        description: "Requirements include AC ids."
+      - id: requirement_task_link
+        pattern: "\\bT-[0-9]{3}\\b"
+        description: "Requirements link to task ids when tasks are available."
+  - id: "04"
+    path: 04-architecture.md
+    title: Architecture
+    required_profiles: [standard, assured]
+    required_sections:
+      - "# 04 - Architecture"
+      - "## Architecture Overview"
+      - "## Decision Context"
+      - "### Material Constraints"
+      - "| Constraint | Kind | Source | Pass condition | Result |"
+      - "## Architectural Decisions"
+      - "| Decision/option | Identity | Version | Source | Checked date | Constraint result | Trade-offs | Uncertainty | Counterargument | FR/NFR |"
+      - "## Brownfield Reconciliation"
+      - "| Current boundary | Disposition/target | Compatibility | Migration/coexistence | Rollback | Regression | Decommission |"
+      - "## Known Gaps, Residual Risks, and Non-Claims"
+    required_patterns:
+      - id: arch_anchor
+        pattern: "\\{#(?:ARCH|arch)-[0-9]+\\}"
+      - id: project_mode
+        pattern: '(?m)^\*\*Project mode\*\*:[ \t]+(?:\[ADAPT:[^\r\n]*(?:greenfield|brownfield)[^\r\n]*\]|(?:greenfield|brownfield))[ \t]*$'
+      - id: decision_owner
+        pattern: '(?m)^\*\*Decision owner\*\*:[ \t]+[^ \t\r\n][^\r\n]*$'
+      - id: decision_scope
+        pattern: '(?m)^\*\*Decision scope\*\*:[ \t]+[^ \t\r\n][^\r\n]*$'
+      - id: supported_result
+        pattern: '(?m)^\*\*Supported result\*\*:[ \t]+[^ \t\r\n][^\r\n]*$'
+      - id: inputs_reviewed
+        pattern: '(?m)^\*\*Inputs reviewed\*\*:[ \t]+[^ \t\r\n][^\r\n]*$'
+      - id: hard_constraint
+        pattern: '(?m)^\|[ \t]*CON-[0-9]{3}[ \t]*\|[ \t]*(?:hard|soft|\[ADAPT:[^|\r\n]*\])[ \t]*\|[ \t]*[^| \t\r\n][^|\r\n]*\|[ \t]*[^| \t\r\n][^|\r\n]*\|[ \t]*[^| \t\r\n][^|\r\n]*\|[ \t]*$'
+      - id: candidate_option
+        pattern: '(?m)^\|[^|\r\n]*\bOPT-[0-9]{3}\b[^|\r\n]*\|(?:[ \t]*[^| \t\r\n][^|\r\n]*\|){9}[ \t]*$'
+      - id: human_outcome
+        pattern: '(?m)^\*\*Human outcome\*\*:[ \t]+(?:\[ADAPT:[^\r\n]*(?:selected|rejected|deferred|review_required)[^\r\n]*\]|(?:selected|rejected|deferred|review_required))[ \t]*$'
+      - id: outcome_rationale
+        pattern: '(?m)^\*\*Outcome rationale\*\*:[ \t]+[^ \t\r\n][^\r\n]*$'
+      - id: brownfield_disposition
+        pattern: '(?m)^\*\*Brownfield disposition\*\*:[ \t]+(?:\[ADAPT:[^\r\n]*(?:keep|merge|replace|quarantine|create|review_required|not_applicable)[^\r\n]*\]|(?:(?:keep|merge|replace|quarantine|create|review_required)(?:[ \t]+(?:—|-)[ \t]*[^ \t\r\n][^\r\n]*)?|not_applicable[ \t]+(?:—|-)[ \t]*[^ \t\r\n][^\r\n]*))[ \t]*$'
+      - id: brownfield_transition
+        pattern: '(?ms)^## Brownfield Reconciliation[^\r\n]*\r?\n(?:(?!^## ).)*?^\|[ \t]*(?!Current boundary[ \t]*\|)(?![-:]+[ \t]*\|)[^| \t\r\n][^|\r\n]*\|(?:[ \t]*[^| \t\r\n][^|\r\n]*\|){6}[ \t]*$'
+  - id: "05"
+    path: 05-api.md
+    title: API Specification
+    required_profiles: [standard, assured]
+    required_sections:
+      - "# 05 - API Specification"
+    required_patterns:
+      - id: api_anchor
+        pattern: "\\{#API-[A-Z0-9.]+\\}"
+        description: "API sections include API anchors."
+      - id: api_requirement_link
+        pattern: "\\bFR-[0-9]{3}\\b"
+        description: "API endpoints link to requirements."
+  - id: "06"
+    path: 06-acceptance.md
+    title: Acceptance Criteria & Test Scenarios
+    required_profiles: [standard, assured]
+    required_sections:
+      - "# 06 - Acceptance Criteria & Test Scenarios"
+    required_patterns:
+      - id: scen_anchor
+        pattern: "\\{#SCEN-[A-Z0-9.]+\\}"
+        description: "Acceptance scenarios include SCEN anchors."
+      - id: scenario_requirement_link
+        pattern: "\\b(?:FR|NFR)-[0-9]{3}\\b"
+        description: "Acceptance scenarios link to FR/NFR requirements."
+  - id: "07"
+    path: 07-cost-analysis.md
+    title: Cost Analysis
+    required_profiles: [standard, assured]
+    required_sections:
+      - "# 07 - Cost Analysis"
+    required_patterns:
+      - id: cost_anchor
+        pattern: "\\{#COST-[0-9]+\\}"
+        description: "Cost-analysis sections include COST anchors."
+  - id: "08"
+    path: 08-market-analysis.md
+    title: Market Analysis
+    required_profiles: [standard, assured]
+    required_sections:
+      - "# 08 - Market Analysis"
+    required_patterns:
+      - id: market_anchor
+        pattern: "\\{#MKT-[0-9]+\\}"
+        description: "Market-analysis sections include MKT anchors."
+  - id: "09"
+    path: 09-integration-contract.md
+    title: Integration Contracts
+    required_profiles: [standard, assured]
+    required_sections:
+      - "# 09 - Integration Contracts"
+      - "## Integration Inventory"
+    required_patterns:
+      - id: integration_anchor
+        pattern: "\\{#INT-[0-9]+\\}"
+        description: "Integration detail sections include INT anchors."
+  - id: "10"
+    path: 10-execution.md
+    title: Execution & Delivery Plan
+    required_profiles: [standard, assured]
+    required_sections:
+      - "# 10 - Execution & Delivery Plan"
+    required_markers:
+      - "<!-- BEGIN TASK_MATRIX -->"
+      - "<!-- END TASK_MATRIX -->"
+    required_patterns:
+      - id: execution_anchor
+        pattern: "\\{#EXEC-[A-Z0-9]+\\}"
+        description: "Execution sections include EXEC anchors."
+      - id: execution_task_link
+        pattern: "\\bT-[0-9]{3}\\b"
+        description: "Execution plan references task ids."
+      - id: execution_requirement_link
+        pattern: "\\b(?:FR|NFR)-[0-9]{3}\\b"
+        description: "Execution phases link to requirements."
+
+limitations:
+  - "Spec-pack contract validation is deterministic structural review evidence only."
+  - "It does not verify requirement correctness, implementation coverage, test behavior, runtime behavior, approval, certification, or compliance."
+  - "Filled mode reports unresolved placeholders but still requires human review for durable acceptance."
+
+not_claimed:
+  - "approved specifications"
+  - "complete requirements"
+  - "correct architecture"
+  - "implemented behavior"
+  - "passing tests"
+  - "evidence-backed acceptance"
+  - "compliance proof"

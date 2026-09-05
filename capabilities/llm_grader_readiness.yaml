@@ -1,0 +1,106 @@
+id: CAP-LLM-GRADER-READINESS
+name: LLMGrader Readiness
+description: >
+  Provides a readiness-only governance posture for any future model-based
+  grader. It validates configuration boundaries, cost posture, data exposure
+  review, residual risks, and advisory limits without running model-based
+  grading or adding provider dependencies.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Readiness stays disabled and low-noise; StaticGrader remains primary."
+  lite:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Readiness posture can be inspected without provider, model, network, or cost behavior."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Future enablement requests require review of budget, data exposure, model identity, prompt/rubric version, and residual risks."
+  assured:
+    target_maturity: L1
+    enforcement: blocking
+    notes: "Future enablement requests require human review before any cost-bearing or advisory model posture is considered."
+authority:
+  may_read:
+    - naos/llm_grader_readiness_rules.yaml
+    - naos/reports/grader_assessment.json
+    - naos/reports/static_grader_report.json
+  may_write:
+    - naos/reports/llm_grader_readiness.json
+  may_block:
+    - "only through configured deterministic gate policy and human review when readiness rules attempt runtime, provider, cost, approval, certification, or authority escalation"
+allowed_resources:
+  - "repo-local readiness rules"
+  - "repo-local deterministic grader metadata"
+  - "repo-local policy metadata"
+prohibited_resources:
+  - "model calls, provider SDKs, provider credentials, external network calls, or API credentials"
+  - "Engram, MCP, memory tools, private memory payload reads, or memory write-back"
+  - "runtime trace capture, runtime audit-event capture, automatic context injection, or command execution"
+constraints:
+  - "Must remain readiness-only and disabled by default."
+  - "Must not run model-based grading or add provider dependencies."
+  - "Must report cost_usd: 0.0 by default and require human approval before any future cost."
+  - "Must require future provider/model/version, prompt/rubric version, cost budget, data exposure classification, residual risks, and human-review boundary."
+  - "Must keep StaticGrader and deterministic evidence primary."
+  - "Must keep future model-based output advisory only; it may challenge deterministic controls but may not replace them."
+  - "Must not claim behavioral safety, semantic correctness, legal/compliance/regulatory assurance, approval, certification, attestation, maturity promotion, or hallucination prevention."
+required_evidence:
+  - naos/llm_grader_readiness_rules.yaml
+  - naos/reports/llm_grader_readiness.json
+validators:
+  - id: naos_llm_grader_readiness
+    script: scripts/naos_llm_grader_readiness.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - llm_grader_readiness.status
+  - llm_grader_readiness.runtime_enabled
+  - llm_grader_readiness.cost_posture.cost_usd
+  - llm_grader_readiness.human_review_required
+maturity_path:
+  L0: "Readiness rules, schema, and report runner exist; runtime remains disabled."
+  L1: "Readiness report surfaces cost, data exposure, bias/variance, residual-risk, and advisory-boundary posture."
+  L2: "Readiness findings are visible in self-check, gates, evidence, dashboard, SARIF, systemic impact, and control-plane routing."
+  L3: "Future enablement requests route to human review with deterministic baseline and cost/data controls."
+  L4: "Projects maintain reviewed prompt/rubric/model/version/cost/data exposure metadata before any advisory second-opinion design."
+  L5: "Future advisory model-based grading can challenge deterministic controls only under enforced residual-risk and human-review boundaries."
+known_limitations:
+  - "Readiness reporting does not grade anything with a model."
+  - "Future model-based judging may incur cost, expose data, drift across versions, and produce biased or inconsistent outputs."
+  - "Readiness findings do not approve work or promote maturity."
+  - "StaticGrader and deterministic evidence remain primary."
+not_claimed:
+  - "LLMGrader runtime"
+  - "model/API/provider dependency"
+  - "provider credential handling"
+  - "behavioral safety proof"
+  - "semantic correctness proof"
+  - "legal/compliance/regulatory conclusion"
+  - "certification"
+  - "approval"
+  - "attestation"
+  - "maturity promotion"
+  - "hallucination prevention"
+related_docs:
+  - README.md
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - NAOS_CATALOG.md
+  - KNOWN_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_llm_grader_readiness.py
+  - scripts/naos_grader_assessment.py
+  - scripts/naos_static_grader.py
+related_schemas:
+  - schemas/naos/llm_grader_readiness.schema.json
+  - schemas/naos/grader_assessment.schema.json

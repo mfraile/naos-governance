@@ -1,0 +1,55 @@
+schema: naos.agent_sponsor_registry.v1
+format:
+  id: agent_sponsor_registry.v1
+  version: 1
+  kind: build_time_declared_posture
+enabled: true
+decision_supported: >-
+  Whether every currently declared repository agent has one current,
+  project-owned sponsor and credential-posture declaration suitable for G2/G6
+  human review.
+registry_owner_ref: role:project-governance-reviewer
+credential_policy:
+  repository_secret_values_allowed: false
+  credential_validation_performed: false
+  accepted_postures:
+    - no_credentials_declared
+    - external_short_lived_declared
+    - external_exception_declared
+records: []
+routing:
+  consumer: scripts/naos_control_plane_review.py
+  source_type: agent_sponsor_registry_finding
+  target_gates: [G2, G6]
+non_claims:
+  - sponsor identity verification
+  - sponsor approval
+  - authentication
+  - authorization
+  - delegation authority
+  - separation of duties
+  - credential existence
+  - credential validation
+  - credential lifetime verification
+  - credential issuance
+  - credential rotation
+  - credential revocation
+  - runtime identity
+  - runtime enforcement
+  - SPIFFE or SPIRE integration
+  - OAuth or on-behalf-of integration
+  - mTLS integration
+  - signing
+  - attestation
+  - compliance approval
+  - release authority
+  - publication authority
+
+# This opt-in seed deliberately contains no sponsor assignment. After a reviewed
+# setup-module install, copy current CAP-A-* ids from `naos agent-sponsor-registry`
+# output or the AI-surface catalogue and add one record per current agent.
+# Sponsor and owner references use role:, team:, or group: prefixes; external
+# control references use control: or policy:. They are categorized opaque
+# project-local identifiers, not names, email addresses, or verified identities.
+# Never place names, email addresses, tokens, keys, certificates, endpoints, or
+# other credential values in this file.

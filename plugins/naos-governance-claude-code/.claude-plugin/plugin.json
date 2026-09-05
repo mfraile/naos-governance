@@ -1,0 +1,16 @@
+{
+  "name": "naos-governance-claude-code",
+  "version": "0.1.0",
+  "description": "Claude Code operator adapter for projects that already have the NAOS-Governance kit installed.",
+  "author": {
+    "name": "NAOS-Governance maintainers"
+  },
+  "skills": "./skills/",
+  "keywords": [
+    "naos",
+    "governance",
+    "sdlc",
+    "audit",
+    "adapter"
+  ]
+}

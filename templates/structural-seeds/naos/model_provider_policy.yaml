@@ -1,0 +1,404 @@
+version: 1
+enabled: true
+runtime_enabled: false
+provider_calls_allowed: false
+credentials_allowed_in_repo: false
+can_approve: false
+can_certify: false
+can_prove_compliance: false
+can_promote_maturity: false
+runtime_routing_authority: false
+model_quality_authority: false
+
+profile_posture:
+  quickstart:
+    state: optional
+    severity: advisory
+    human_review_required: false
+    notes: "Optional declaration review only; no provider/model runtime is enabled."
+  lite:
+    state: optional
+    severity: warning
+    human_review_required: false
+    notes: "Warn when declarations drift, but keep model governance lightweight."
+  standard:
+    state: expected
+    severity: required
+    human_review_required: true
+    notes: "Review central role declarations before relying on model-backed or provider-specific posture."
+  assured:
+    state: expected
+    severity: required
+    human_review_required: true
+    notes: "Review central role declarations; blocking posture is reserved for unsafe declaration states."
+
+default_alias_policy:
+  quickstart: allow_with_warning
+  lite: allow_with_warning
+  standard: review_required
+  assured: pinned_required
+
+allowed_provider_kinds:
+  - declarative_only
+  - cloud_api
+  - local_api
+  - managed_platform
+  - proxy
+
+data_policy:
+  allowed_data_exposure_levels:
+    - none
+    - repo_metadata_only
+    - repo_metadata_or_code
+    - project_configured
+  prohibited_data_classes:
+    - secrets
+    - credentials
+    - tokens
+    - passwords
+    - private keys
+    - certificates
+    - connection strings
+    - customer data
+    - tenant data
+    - regulated data
+    - private memory payloads
+
+cost_policy:
+  allowed_cost_tiers:
+    - low
+    - medium
+    - high
+    - premium
+    - unknown
+  notes: "Cost tiers are local planning metadata only; this seed does not maintain provider pricing or recommend models."
+
+tool_binding_policy:
+  mutation_allowed: false
+  require_role_reference: true
+  require_cost_tier: true
+  require_data_exposure_level: true
+  cross_tool_drift_review_required: true
+  unknown_tool_review_required: true
+  allowed_tools:
+    - claude_code
+    - codex
+    - cursor
+    - gemini_cli
+    - github_copilot_cli
+    - opencode
+    - vscode_copilot
+    - openrouter
+    - other
+  allowed_cost_tiers:
+    - low
+    - medium
+    - high
+    - premium
+    - unknown
+  notes: "Tool bindings centralize declared model choices across IDE/CLI assistants. They do not rewrite tool config, call providers, validate credentials, or route runtime model use."
+
+roles:
+  planning:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: false
+    cost_tier: medium
+    data_exposure_level: repo_metadata_only
+    allowed_data_classes: []
+    prohibited_data_classes:
+      - secrets
+      - credentials
+      - private memory payloads
+    notes: "Optional role for planning agents. Fill only after project review."
+  implementation:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: false
+    cost_tier: medium
+    data_exposure_level: repo_metadata_or_code
+    allowed_data_classes: []
+    prohibited_data_classes:
+      - secrets
+      - credentials
+      - private memory payloads
+    notes: "Optional role for implementation agents. Keep host-tool model strings in agent frontmatter."
+  review:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: true
+    cost_tier: high
+    data_exposure_level: repo_metadata_or_code
+    allowed_data_classes: []
+    prohibited_data_classes:
+      - secrets
+      - credentials
+      - private memory payloads
+    notes: "Optional role for review/audit agents. Standard/assured projects should pin provider/model details before runtime use."
+  conformance:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: true
+    cost_tier: high
+    data_exposure_level: repo_metadata_or_code
+    allowed_data_classes: []
+    prohibited_data_classes:
+      - secrets
+      - credentials
+      - private memory payloads
+      - regulated data
+    notes: "Optional role for conformance/governance audit agents. Keep authority advisory unless a later design approves runtime behavior."
+  research:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: false
+    cost_tier: medium
+    data_exposure_level: repo_metadata_only
+    allowed_data_classes: []
+    prohibited_data_classes:
+      - secrets
+      - credentials
+      - private memory payloads
+    notes: "Optional role for research agents. Prefer read-only, bounded context before unclear or high-risk work."
+  debug:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: false
+    cost_tier: medium
+    data_exposure_level: repo_metadata_or_code
+    allowed_data_classes: []
+    prohibited_data_classes:
+      - secrets
+      - credentials
+      - private memory payloads
+    notes: "Optional role for evidence-first debugging agents. Keep fixes scoped and human-reviewed."
+  triage:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: false
+    cost_tier: low
+    data_exposure_level: repo_metadata_only
+    allowed_data_classes: []
+    prohibited_data_classes:
+      - secrets
+      - credentials
+      - private memory payloads
+    notes: "Optional role for issue/task triage agents. Keep model posture inexpensive unless the project declares otherwise."
+  llm_judge:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: true
+    cost_tier: high
+    data_exposure_level: none
+    future_enablement_requires:
+      - provider
+      - model
+      - model_version
+      - prompt_version
+      - rubric_version
+      - max_cost_usd
+      - data_exposure_level
+      - approval_owner
+      - residual_risks
+    notes: "Future LLM-as-judge role only; disabled by default."
+  autoresearch_grader:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: true
+    cost_tier: high
+    data_exposure_level: none
+    future_enablement_requires:
+      - provider
+      - model
+      - model_version
+      - max_cost_usd
+      - data_exposure_level
+      - approval_owner
+      - residual_risks
+    notes: "Future autoresearch provider-grader role only; disabled by default."
+  semantic_evidence:
+    enabled: false
+    provider_kind: declarative_only
+    provider: null
+    model: null
+    model_version: null
+    reasoning_effort: null
+    alias_allowed: false
+    runtime_enabled: false
+    provider_calls_allowed: false
+    advisory_only: true
+    human_review_required: true
+    cost_tier: medium
+    data_exposure_level: none
+    notes: "Future semantic/vector evidence role only; disabled by default."
+
+tool_model_bindings:
+  claude_code:
+    enabled: false
+    tool_family: claude_code
+    config_owner: adopter
+    mutation_allowed: false
+    human_review_required: true
+    roles: {}
+  codex:
+    enabled: false
+    tool_family: codex
+    config_owner: adopter
+    mutation_allowed: false
+    human_review_required: true
+    roles: {}
+  cursor:
+    enabled: false
+    tool_family: cursor
+    config_owner: adopter
+    mutation_allowed: false
+    human_review_required: true
+    roles: {}
+  gemini_cli:
+    enabled: false
+    tool_family: gemini_cli
+    config_owner: adopter
+    mutation_allowed: false
+    human_review_required: true
+    roles: {}
+  github_copilot_cli:
+    enabled: false
+    tool_family: github_copilot_cli
+    config_owner: adopter
+    mutation_allowed: false
+    human_review_required: true
+    roles: {}
+  opencode:
+    enabled: false
+    tool_family: opencode
+    config_owner: adopter
+    mutation_allowed: false
+    human_review_required: true
+    roles: {}
+  vscode_copilot:
+    enabled: false
+    tool_family: vscode_copilot
+    config_owner: adopter
+    mutation_allowed: false
+    human_review_required: true
+    roles: {}
+  openrouter:
+    enabled: false
+    tool_family: openrouter
+    config_owner: adopter
+    mutation_allowed: false
+    human_review_required: true
+    roles: {}
+  other:
+    enabled: false
+    tool_family: other
+    config_owner: adopter
+    mutation_allowed: false
+    human_review_required: true
+    roles: {}
+
+advisory_boundary:
+  declaration_only: true
+  can_call_provider: false
+  can_start_local_model: false
+  can_route_runtime: false
+  can_validate_credentials: false
+  can_approve: false
+  can_certify: false
+  can_prove_compliance: false
+  can_promote_maturity: false
+  can_replace_deterministic_controls: false
+  can_replace_human_review: false
+
+not_claimed:
+  - provider call
+  - local model call
+  - cloud API call
+  - SDK dependency
+  - networking
+  - proxy startup
+  - credential validation
+  - runtime model routing
+  - model quality guarantee
+  - LLMGrader runtime
+  - autoresearch provider grading
+  - behavioral scoring
+  - semantic drift inference
+  - approval
+  - certification
+  - attestation
+  - compliance proof
+  - release authority
+  - publication authority

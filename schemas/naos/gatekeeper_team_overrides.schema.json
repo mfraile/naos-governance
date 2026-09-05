@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:gatekeeper_team_overrides:v1",
+  "title": "NAOS Gatekeeper Team Overrides",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "team_overrides": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+      },
+      "additionalProperties": {"$ref": "#/$defs/team_override"}
+    }
+  },
+  "$defs": {
+    "team_override": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "severity": {"$ref": "#/$defs/severity"},
+        "rationale": {"type": "string"},
+        "profile_scope": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["quickstart", "lite", "standard", "assured"]
+          }
+        },
+        "review_required": {"type": "boolean"},
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["none", "advisory", "warning", "required", "blocking"]
+    }
+  }
+}

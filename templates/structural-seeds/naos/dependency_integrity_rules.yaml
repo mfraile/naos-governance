@@ -1,0 +1,22 @@
+schema: naos.dependency_integrity_rules.v1
+mode: deterministic_local
+scan_roots:
+  - src
+  - app
+  - tests
+exclude_dirs:
+  - dev
+  - dist
+  - build
+  - __pycache__
+exclude_globs: []
+allowed_imports: []
+online_registry_lookup_allowed: false
+human_review_required: true
+not_claimed:
+  - package supply-chain safety proof
+  - malware detection
+  - vulnerability scanning
+  - dependency freshness proof
+  - approval
+  - human review replacement

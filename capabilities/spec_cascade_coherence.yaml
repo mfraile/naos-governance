@@ -1,0 +1,104 @@
+id: CAP-SPEC-CASCADE-COHERENCE
+name: Spec Cascade Coherence
+description: >
+  Evaluates requirement-header parsing, task-to-spec status cascade, code-to-spec
+  references, spec-to-code coverage, unresolved source-level spec references,
+  and untraced source visibility so projects can review whether the NAOS spec
+  cascade is structurally coherent.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Reports cascade gaps without blocking onboarding."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns when configured specs/source show cascade gaps."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires generated spec-cascade evidence for normal governed SDLC work."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Can block when configured spec-cascade evidence is missing or materially incoherent."
+authority:
+  may_read:
+    - "specs/03-requirements.md"
+    - "AC/SCEN ids under specs/"
+    - "naos/TASK_REGISTRY.yaml"
+    - "configured source roots"
+    - "scripts/workflows/sync_spec_statuses.py"
+    - "scripts/workflows/generate_traceability_matrix.py"
+  may_write:
+    - "naos/reports/spec_cascade_coherence.json"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "repo-local Python source files"
+  - "repo-local specs, tasks, scripts, YAML, JSON, and Markdown artifacts"
+prohibited_resources:
+  - "automatic source rewrites"
+  - "automatic requirement rewrites"
+  - "mandatory semantic model"
+  - "mandatory external service"
+  - "runtime gateway"
+constraints:
+  - "Must not claim complete source traceability."
+  - "Must not claim code correctness, runtime correctness, compliance proof, certification, or approval."
+  - "Must keep untraced source and uncovered requirements visible as review findings."
+  - "Must keep unresolved source-level FR/NFR/AC/SCEN references visible as review findings when definitions exist."
+  - "Must preserve H2/H3 requirement-header tolerance while keeping the shipped H3 template canonical."
+  - "Advisory output requires human review before durable decisions, waivers, maturity changes, approvals, or blocking escalation."
+required_evidence:
+  - "naos/reports/spec_cascade_coherence.json"
+  - "specs/03-requirements.md"
+validators:
+  - id: spec_cascade_coherence
+    script: scripts/naos_detect_spec_drift.py
+    status: available
+gatekeepers:
+  - G4
+  - G6
+dashboard_signals:
+  - "spec_cascade_coherence.status"
+  - "spec_cascade_coherence.orphan_headers"
+  - "spec_cascade_coherence.uncovered_requirements"
+  - "spec_cascade_coherence.untraced_sources"
+  - "spec_cascade_coherence.unresolved_source_references"
+  - "spec_cascade_coherence.stale_statuses"
+maturity_path:
+  L0: "Capability contract, shared parser, report schema, and validator script exist in the kit."
+  L1: "Project runs the validator and records cascade gaps as bounded review evidence."
+  L2: "Self-check, gates, evidence pack, dashboard, SARIF, Make, and CI can consume the report."
+  L3: "Profile policy can require or block on material cascade incoherence."
+  L4: "Dashboard tracks cascade trends, gaps, waivers, and review obligations."
+  L5: "Evidence is complete enough to support governed review of spec-cascade decisions."
+known_limitations:
+  - "Does not prove code correctness."
+  - "Does not prove complete source traceability."
+  - "Does not verify runtime behavior or semantic requirement satisfaction."
+  - "Depends on project-maintained Implements:/FR references and configured source roots."
+  - "Unresolved source-reference checks are regex/file-first and limited to configured source roots."
+  - "Non-Python language coverage is future or project-configured."
+not_claimed:
+  - "complete code correctness"
+  - "complete traceability proof"
+  - "runtime behavior proof"
+  - "automatic approval"
+  - "certification or compliance proof"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/SYSTEMIC_CAPABILITY_WIRING.md
+related_scripts:
+  - scripts/spec_header.py
+  - scripts/naos_detect_spec_drift.py
+  - scripts/workflows/sync_spec_statuses.py
+  - scripts/workflows/generate_traceability_matrix.py
+  - scripts/validators/validate_specs.py

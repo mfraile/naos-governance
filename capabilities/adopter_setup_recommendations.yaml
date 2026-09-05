@@ -1,0 +1,96 @@
+id: CAP-ADOPTER-SETUP-RECOMMENDATIONS
+name: Adopter Setup Recommendations
+description: >
+  Produces deterministic, file-first setup recommendations that help adopters
+  decide which NAOS modules to enable, defer, or keep optional based on profile
+  and simple project signals. The capability explains rationale, benefits,
+  warnings, consequences, prerequisites, evidence outputs, commands, and human
+  review boundaries without automatically enabling modules or approving maturity.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Provides low-noise orientation and keeps advanced modules optional or deferred."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Recommends read-only CI readiness and deterministic readiness-chain modules without blocking setup."
+  standard:
+    target_maturity: L2
+    enforcement: advisory
+    notes: "Recommends evidence, dashboard, gates, maturity, systemic impact, module headers, control-plane review, and test-evidence modules."
+  assured:
+    target_maturity: L2
+    enforcement: advisory
+    notes: "Recommends stricter evidence and human-review posture while keeping advanced engines optional/readiness-only unless implemented."
+authority:
+  may_read:
+    - "naos/setup_module_catalog.yaml"
+    - "profile selection"
+    - "simple project-local file signals"
+  may_write:
+    - "naos/reports/setup_recommendations.json"
+  may_block:
+    - "none by default; recommendations are advisory setup guidance"
+allowed_resources:
+  - "repo-local files and directories"
+  - "file-first YAML, JSON, and Markdown governance artifacts"
+prohibited_resources:
+  - "automatic module enablement"
+  - "automatic profile selection approval"
+  - "mandatory model, API, network, database, daemon, or scheduler dependency"
+  - "automatic maturity promotion"
+constraints:
+  - "Must remain deterministic and file-first."
+  - "Must not install, enable, or mutate advanced modules."
+  - "Must not make setup recommendations blocking by default."
+  - "Must explain choice, rationale, benefit, warning, consequence, and next action."
+  - "Must not claim approval, certification, compliance, or guaranteed maturity."
+required_evidence:
+  - "naos/setup_module_catalog.yaml"
+  - "naos/reports/setup_recommendations.json"
+validators:
+  - id: setup_recommendations
+    script: scripts/naos_setup_recommendations.py
+    status: available
+gatekeepers:
+  - G0
+  - G2
+  - G6
+dashboard_signals:
+  - "setup_recommendations.status"
+  - "setup_recommendations.recommended_modules"
+  - "setup_recommendations.optional_modules"
+  - "setup_recommendations.deferred_modules"
+  - "setup_recommendations.human_review_required"
+maturity_path:
+  L0: "Capability contract, catalog schema, report schema, and seed catalog exist in the kit."
+  L1: "Project receives or configures a setup module catalog and runs the recommendation report."
+  L2: "Recommendations are reflected in onboarding decisions, evidence outputs, dashboard, and review notes."
+  L3: "Project governance reviews recommendation consequences before enabling stricter or advanced modules."
+  L4: "Recommendation history supports planned maturity and onboarding improvements."
+  L5: "Setup decisions are governed with explicit owner review, residual-risk treatment, and evidence-backed module adoption."
+known_limitations:
+  - "Recommendations are guidance and orientation, not automatic setup."
+  - "Simple project signals may miss project-specific context."
+  - "Advanced modules remain optional, experimental, or readiness-only unless separately implemented and configured."
+  - "Human/project governance decides which modules to enable or defer."
+not_claimed:
+  - "automatic profile selection"
+  - "automatic setup approval"
+  - "maturity certification"
+  - "legal or regulatory compliance"
+  - "complete project-readiness proof"
+related_docs:
+  - README.md
+  - INSTALLATION_MANUAL.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/CONTROL_PLANE.md
+  - NAOS_CATALOG.md
+related_scripts:
+  - scripts/naos_setup_recommendations.py

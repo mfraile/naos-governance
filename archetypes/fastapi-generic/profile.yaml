@@ -1,0 +1,13 @@
+id: fastapi-generic
+name: FastAPI Generic
+language: python
+framework: fastapi
+recommended_tier: lite
+description: Generic FastAPI service archetype for projects that have not chosen a database profile yet.
+signals:
+  has_api: true
+  is_python: true
+instructions:
+  - python-backend.instructions.md
+  - api-endpoints.instructions.md
+  - security.instructions.md

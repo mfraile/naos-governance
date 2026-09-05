@@ -1,0 +1,39 @@
+# naos_duplicate_allowlist.yaml — NAOS Anti-Duplication Allowlist
+# Functions and classes explicitly permitted to have similar names/signatures.
+# Exemptions here prevent false-positive duplicate warnings from:
+#   scripts/naos_code_quality_audit.py --check-duplicates
+#
+# Entry format:
+#   id: unique exemption ID (DEDUP-NNN)
+#   pattern: function/class name or regex pattern
+#   locations: list of allowed locations
+#   reason: why duplication is acceptable
+#   approved_by: who approved the exemption
+#   date: YYYY-MM-DD
+
+version: 1.0
+allowlist: []  # No exemptions by default — add as needed
+
+# ─── Usage Guide ─────────────────────────────────────────────────────────────
+#
+# When is duplication acceptable?
+#   - Protocol/interface implementations (same method name across classes)
+#   - Test fixtures vs production code
+#   - Per-module utilities that happen to have the same name (e.g., format_date)
+#
+# When is it NOT acceptable?
+#   - Identical business logic in two service files
+#   - Copy-pasted DB queries with minor variations
+#   - Same validation function in multiple places
+#
+# To add an exemption:
+#
+# allowlist:
+#   - id: DEDUP-001
+#     pattern: "format_date"
+#     locations:
+#       - "src/reporting/utils.py"
+#       - "src/export/utils.py"
+#     reason: "Module-scoped utility — different formatting requirements per module"
+#     approved_by: "[your name]"
+#     date: "YYYY-MM-DD"

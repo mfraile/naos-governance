@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:model_telemetry_evidence:v1",
+  "title": "NAOS Model Telemetry Evidence Report",
+  "description": "Deterministic local review evidence for optional model telemetry declarations. It is not LiteLLM integration, provider gateway availability, a provider/model/API call, network access, MCP activation, memory activation, credential validation, runtime model routing, route enforcement, complete cost accounting, payload safety proof, route correctness proof, policy compliance proof, approval, certification, attestation, release authority, or publication authority.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "deterministic",
+    "declaration_path",
+    "declaration_source",
+    "enabled",
+    "telemetry_declared",
+    "runtime_enabled",
+    "provider_calls_allowed",
+    "gateway_calls_allowed",
+    "mcp_allowed",
+    "memory_allowed",
+    "payload_capture_allowed",
+    "credential_capture_allowed",
+    "tool_mutation_allowed",
+    "capability_maturity",
+    "telemetry_sources",
+    "records",
+    "evidence_refs",
+    "findings",
+    "reason_code_counts",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "generated_by",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.model_telemetry_evidence.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["pass", "advisory", "warning", "required_missing", "blocked", "not_configured", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "declaration_path": {"type": "string"},
+    "declaration_source": {"type": "string", "enum": ["project", "template", "explicit"]},
+    "declaration_hash": {"type": ["string", "null"]},
+    "enabled": {"type": "boolean"},
+    "telemetry_declared": {"type": "boolean"},
+    "runtime_enabled": {"const": false},
+    "provider_calls_allowed": {"const": false},
+    "gateway_calls_allowed": {"const": false},
+    "mcp_allowed": {"const": false},
+    "memory_allowed": {"const": false},
+    "payload_capture_allowed": {"const": false},
+    "credential_capture_allowed": {"const": false},
+    "tool_mutation_allowed": {"const": false},
+    "capability_maturity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["current", "assured_blocking_enabled", "blocking_requires_l3_plus_and_gate_wiring"],
+      "properties": {
+        "current": {"type": "string"},
+        "assured_blocking_enabled": {"const": false},
+        "blocking_requires_l3_plus_and_gate_wiring": {"const": true}
+      }
+    },
+    "profile_posture": {"type": "object"},
+    "thresholds": {"type": "object"},
+    "telemetry_sources": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": true}
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "index",
+          "record_id",
+          "model_ref_declared",
+          "policy_exception_declared",
+          "payload_fields_present",
+          "credential_fields_present"
+        ],
+        "properties": {
+          "index": {"type": "integer", "minimum": 1},
+          "record_id": {"type": "string"},
+          "source_ref": {"type": ["string", "null"]},
+          "source_index": {"type": ["integer", "null"]},
+          "timestamp": {},
+          "session_id": {},
+          "task_id": {},
+          "tool": {},
+          "model_role": {},
+          "provider_kind": {},
+          "provider": {},
+          "model_ref_declared": {"type": "boolean"},
+          "route_class": {},
+          "data_class": {},
+          "cost_usd": {"type": ["number", "null"]},
+          "latency_ms": {"type": ["number", "null"]},
+          "policy_ref": {},
+          "action_receipt_ref": {},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}},
+          "policy_exception_declared": {"type": "boolean"},
+          "payload_fields_present": {"type": "array", "items": {"type": "string"}},
+          "credential_fields_present": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "evidence_refs": {"type": "array", "items": {"type": "object"}},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "severity", "status", "reason_code", "gate", "message", "human_review_required"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+          "status": {"type": "string"},
+          "reason_code": {"type": "string"},
+          "related_gates": {"type": "array", "items": {"type": "string"}},
+          "gate": {"type": "string"},
+          "message": {"type": "string"},
+          "human_review_required": {"type": "boolean"}
+        }
+      }
+    },
+    "reason_code_counts": {"type": "object"},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"},
+      "allOf": [
+        {"contains": {"const": "provider call"}},
+        {"contains": {"const": "model call"}},
+        {"contains": {"const": "network access"}},
+        {"contains": {"const": "MCP activation"}},
+        {"contains": {"const": "memory activation"}},
+        {"contains": {"const": "credential validation"}},
+        {"contains": {"const": "runtime model routing"}},
+        {"contains": {"const": "complete cost accounting"}},
+        {"contains": {"const": "route correctness proof"}},
+        {"contains": {"const": "policy compliance proof"}},
+        {"contains": {"const": "approval"}},
+        {"contains": {"const": "certification"}},
+        {"contains": {"const": "attestation"}},
+        {"contains": {"const": "release authority"}},
+        {"contains": {"const": "publication authority"}}
+      ]
+    },
+    "human_review_required": {"type": "boolean"},
+    "generated_by": {"type": "object", "additionalProperties": true},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "records": {"type": "integer", "minimum": 0},
+        "telemetry_sources": {"type": "integer", "minimum": 0},
+        "telemetry_sources_unreadable": {"type": "integer", "minimum": 0},
+        "runtime_authority_findings": {"type": "integer", "minimum": 0},
+        "provider_calls_allowed": {"const": false},
+        "runtime_enabled": {"const": false}
+      }
+    }
+  }
+}

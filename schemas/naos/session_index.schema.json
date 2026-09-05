@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:session_index:v1",
+  "title": "NAOS Session Index",
+  "description": "Index of generated NAOS session records. It supports session report namespacing and local operator attribution signals, but is not a locking mechanism, audit log, approval record, authentication system, authorization system, or separation-of-duties control.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "sessions",
+    "active_session_ids",
+    "closed_session_ids",
+    "latest_session_id",
+    "limitations",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"type": "string", "const": "naos.session_index.v1"},
+    "generated_at": {"type": "string"},
+    "sessions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/session_record"}
+    },
+    "active_session_ids": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "closed_session_ids": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "latest_session_id": {"type": ["string", "null"]},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "session_record": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "session_id",
+        "created_at",
+        "updated_at",
+        "status",
+        "profile",
+        "report_root",
+        "latest_reports",
+        "operator_id",
+        "limitations",
+        "not_claimed"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"
+        },
+        "created_at": {"type": "string"},
+        "updated_at": {"type": "string"},
+        "status": {"type": "string", "enum": ["active", "closed", "unknown"]},
+        "task_id": {"type": ["string", "null"]},
+        "profile": {"type": "string"},
+        "report_root": {"type": "string"},
+        "latest_reports": {"type": "object"},
+        "operator_id": {"type": ["string", "null"]},
+        "operator_source": {"type": ["string", "null"], "enum": ["env", "git_email", "git_name", "os_user", "unknown", null]},
+        "operator_attribution_status": {"type": ["string", "null"], "enum": ["resolved", "unknown", "conflicting", "not_configured", null]},
+        "limitations": {"type": "array", "items": {"type": "string"}},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

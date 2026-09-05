@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:systemic_impact_review:v1",
+  "title": "NAOS Systemic Impact Review Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "naos_root",
+    "project_root",
+    "summary",
+    "artifact_families",
+    "findings",
+    "limitations"
+  ],
+  "properties": {
+    "schema": {"const": "naos.systemic_impact_review.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "status": {
+      "type": "string",
+      "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]
+    },
+    "summary": {"type": "object"},
+    "artifact_families": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/family_result"}
+    },
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "changed_path_review": {
+      "$ref": "#/$defs/changed_path_review"
+    }
+  },
+  "$defs": {
+    "changed_path_review": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "mode",
+        "repository_role",
+        "closure_status",
+        "changed_paths",
+        "obligations",
+        "summary",
+        "integrity",
+        "limitations"
+      ],
+      "properties": {
+        "mode": {"const": "explicit_changed_paths"},
+        "repository_role": {
+          "type": "string",
+          "enum": ["kit_source", "adopter_project"]
+        },
+        "closure_status": {
+          "type": "string",
+          "enum": ["resolved", "unresolved"]
+        },
+        "changed_paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "path",
+              "classification",
+              "matched_artifact_families",
+              "matched_routing_families",
+              "review_triggers",
+              "obligations"
+            ],
+            "properties": {
+              "path": {"type": "string"},
+              "classification": {
+                "type": "string",
+                "enum": ["governed", "excluded", "unclassified"]
+              },
+              "matched_artifact_families": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "matched_routing_families": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "review_triggers": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "obligations": {
+                "type": "array",
+                "items": {"$ref": "#/$defs/changed_path_obligation"}
+              }
+            }
+          }
+        },
+        "obligations": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/changed_path_obligation"}
+        },
+        "summary": {"type": "object"},
+        "integrity": {"type": "object"},
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "changed_path_obligation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "obligation_id",
+        "target_kind",
+        "target_id",
+        "disposition",
+        "rationale",
+        "evidence_refs"
+      ],
+      "properties": {
+        "obligation_id": {"type": "string"},
+        "target_kind": {
+          "type": "string",
+          "enum": ["artifact_family", "review_surface", "declared_artifact"]
+        },
+        "target_id": {"type": "string"},
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "updated",
+            "reviewed_no_change",
+            "not_applicable",
+            "update_required",
+            "unresolved"
+          ]
+        },
+        "rationale": {"type": "string"},
+        "evidence_refs": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "family_result": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "family_id",
+        "enabled",
+        "configured",
+        "files_found",
+        "missing_expected",
+        "related_families",
+        "review_obligations",
+        "evaluated_status",
+        "human_review_required",
+        "limitations"
+      ],
+      "properties": {
+        "family_id": {"type": "string"},
+        "enabled": {"type": "boolean"},
+        "configured": {"type": "boolean"},
+        "files_found": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "missing_expected": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "related_families": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "review_obligations": {
+          "type": "array",
+          "items": {"type": "object"}
+        },
+        "evaluated_status": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "review_required",
+            "blocked",
+            "advisory",
+            "not_configured",
+            "disabled",
+            "unknown"
+          ]
+        },
+        "human_review_required": {"type": "boolean"},
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "family_id", "message", "required_next_actions"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {
+          "type": "string",
+          "enum": ["none", "advisory", "warning", "required", "blocking"]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "review_required",
+            "blocked",
+            "advisory",
+            "not_configured",
+            "disabled",
+            "unknown",
+            "missing_link",
+            "stale_link",
+            "missing_expected",
+            "review_surface_review",
+            "waiver_visible"
+          ]
+        },
+        "family_id": {"type": "string"},
+        "message": {"type": "string"},
+        "related_families": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "required_next_actions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

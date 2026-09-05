@@ -1,0 +1,4890 @@
+{
+  "archive_root": "naos-governance-1.1.0",
+  "candidate_version": "1.1.0",
+  "files": [
+    {
+      "bytes": 2036,
+      "mode": "0644",
+      "path": ".github/CODEOWNERS",
+      "sha256": "ee3d34b04270a7070b3f8ef43972858f9124704e67d74b75c19ad28bf85a61ab"
+    },
+    {
+      "bytes": 279,
+      "mode": "0644",
+      "path": ".github/FUNDING.yml",
+      "sha256": "ec9fb1919234860fa469188ee7a4497b8f0db20c1c3cb8dba934c6a82b70c774"
+    },
+    {
+      "bytes": 1685,
+      "mode": "0644",
+      "path": ".github/ISSUE_TEMPLATE/audit-playbook.yml",
+      "sha256": "847d07de2672aa733604b844095bc7ae504358f9309a2a3122fd764ac99d67d4"
+    },
+    {
+      "bytes": 1627,
+      "mode": "0644",
+      "path": ".github/ISSUE_TEMPLATE/bug-report.yml",
+      "sha256": "01a21646bcbcac62891e925807c33585467948a81b1f3975a5dbfa50f7a07fa2"
+    },
+    {
+      "bytes": 253,
+      "mode": "0644",
+      "path": ".github/ISSUE_TEMPLATE/config.yml",
+      "sha256": "87f34a196e5940e970a24fc09416c9b9a6dbd8912675e02cd7ff9db337e34ba6"
+    },
+    {
+      "bytes": 1795,
+      "mode": "0644",
+      "path": ".github/ISSUE_TEMPLATE/roadmap-decision.yml",
+      "sha256": "e55adf50f4ff971b82a47eee51338551b1ca272c1b15031ee0e36a9675df3ada"
+    },
+    {
+      "bytes": 2501,
+      "mode": "0644",
+      "path": ".github/ISSUE_TEMPLATE/threat-model.yml",
+      "sha256": "b634516810d22c2a5c6d49909f5cd07b60d805a7e9bbf723b3d261af082cc8cd"
+    },
+    {
+      "bytes": 639,
+      "mode": "0644",
+      "path": ".gitignore",
+      "sha256": "803b6c44203152418dcd6e458e4198033724473959091a29907b1f6c62adb533"
+    },
+    {
+      "bytes": 11133,
+      "mode": "0644",
+      "path": "CHANGELOG.md",
+      "sha256": "a9b7447e4ec6c706e24f0e6d834db895a174541d4d7bb0e6b08475729ee65da5"
+    },
+    {
+      "bytes": 6590,
+      "mode": "0644",
+      "path": "CONTRIBUTING.md",
+      "sha256": "6e4dacbac6b62458aebdce6ec3be5a2b644093a0d168a3b88e2953d2c47481e9"
+    },
+    {
+      "bytes": 74521,
+      "mode": "0644",
+      "path": "INSTALLATION_MANUAL.md",
+      "sha256": "c8eb87357483a8a6ccc28b44b9ef6c41c1d08514eb97b876674286d66fb22783"
+    },
+    {
+      "bytes": 22765,
+      "mode": "0644",
+      "path": "KNOWN_LIMITATIONS.md",
+      "sha256": "9fbc10b16bdac85ec0726f0533fa9f91ca4f1acc6256ae22c6f590e24affde1d"
+    },
+    {
+      "bytes": 11285,
+      "mode": "0644",
+      "path": "LICENSE",
+      "sha256": "26e368a565c19debf3908e39cad8aafae0f7928450986b86020bfa418ff27802"
+    },
+    {
+      "bytes": 25592,
+      "mode": "0644",
+      "path": "MAINTENANCE_PLAYBOOK.md",
+      "sha256": "238c1bbc2f38961fba77f0d7ef5af2e6ce774939a586eca4f6be1503210ef8fd"
+    },
+    {
+      "bytes": 1313,
+      "mode": "0644",
+      "path": "MANIFEST.in",
+      "sha256": "97d88f6a328f9237284e91b452f8e37ed5aa5b78067c144384c974c67c679823"
+    },
+    {
+      "bytes": 73716,
+      "mode": "0644",
+      "path": "NAOS_CATALOG.md",
+      "sha256": "2107c5af35ac443132eb78d064dc64a0f82630ccb5769c2a871a7c4cd7d02cec"
+    },
+    {
+      "bytes": 4239,
+      "mode": "0644",
+      "path": "NOTICE",
+      "sha256": "26cc5e90b85d7b36a882b0eab42e4c28a89e1c101b0ca20a26e8256e9c1a8811"
+    },
+    {
+      "bytes": 54325,
+      "mode": "0644",
+      "path": "README.md",
+      "sha256": "cb2874908a80eb7de83088f282e8e8ddf6765b1fbbc7cefe4e2fa5a9a39502d6"
+    },
+    {
+      "bytes": 9194,
+      "mode": "0644",
+      "path": "RELEASE_NOTES.md",
+      "sha256": "dca440cc517254e1aac4a9b4e13d860a637ebedd35aada4955aaf7daadba236f"
+    },
+    {
+      "bytes": 9573,
+      "mode": "0644",
+      "path": "ROADMAP.md",
+      "sha256": "dd7b9e88533e4f9d10de147d0469d91c5e8b5290c51d551dcf27d70653739802"
+    },
+    {
+      "bytes": 6139,
+      "mode": "0644",
+      "path": "SECURITY.md",
+      "sha256": "c01f1af5a1887573b1e3551e4b23a2506ed2e6c0e4ff7039b17d8084a64125b0"
+    },
+    {
+      "bytes": 106,
+      "mode": "0644",
+      "path": "__init__.py",
+      "sha256": "2839e35a43a8d69865e8d84d5a4fc0b4c87294c5404bdbcc00618349f6c0ee02"
+    },
+    {
+      "bytes": 102,
+      "mode": "0644",
+      "path": "__main__.py",
+      "sha256": "941c877983006d3d632b22fd6a061f195faab15eda03d5ae82b966de13fa7f13"
+    },
+    {
+      "bytes": 4605,
+      "mode": "0644",
+      "path": "archetypes/django-postgresql/profile.yaml",
+      "sha256": "cae90ee7d64545d03cc96497252297a6773e3e156c349697e75ca815cc4308e9"
+    },
+    {
+      "bytes": 6919,
+      "mode": "0644",
+      "path": "archetypes/django-postgresql/project-context.md",
+      "sha256": "2c4bb9cf413b08485032e3b696f5132449c9204e8257278ea265aa40fd960cd8"
+    },
+    {
+      "bytes": 361,
+      "mode": "0644",
+      "path": "archetypes/fastapi-generic/profile.yaml",
+      "sha256": "fa3d480265d067f86aaf8998aa6e7a8bfaa56ca00a8fa6e391cb827a8aefde61"
+    },
+    {
+      "bytes": 673,
+      "mode": "0644",
+      "path": "archetypes/fastapi-generic/project-context.md",
+      "sha256": "ff983b7ee572b71a325f7522b66533c4bab35790b1b49b9fa0bcb987683ae2b7"
+    },
+    {
+      "bytes": 3405,
+      "mode": "0644",
+      "path": "archetypes/go-grpc/profile.yaml",
+      "sha256": "6271938b575cf5fae00fe58f79a219df432b5fd7915a9a13c0b252b197ca8669"
+    },
+    {
+      "bytes": 6293,
+      "mode": "0644",
+      "path": "archetypes/go-grpc/project-context.md",
+      "sha256": "b3ebfb2d6da03b95189438353cd663ad65026959a2e3476de37b33181fb7bf65"
+    },
+    {
+      "bytes": 3507,
+      "mode": "0644",
+      "path": "archetypes/nextjs-supabase/profile.yaml",
+      "sha256": "5b6a5654a7058c092de83d99f7cd0968297688104d29305a40b10c5f22b55563"
+    },
+    {
+      "bytes": 6107,
+      "mode": "0644",
+      "path": "archetypes/nextjs-supabase/project-context.md",
+      "sha256": "d84612086fcb0a6575de1a32968a1e2b5153341e7d626a2ee1ad61f9b157beb5"
+    },
+    {
+      "bytes": 3863,
+      "mode": "0644",
+      "path": "archetypes/springboot-kafka/profile.yaml",
+      "sha256": "f5607e510c77036b95d5c3fb6cc7507ac659081c718849f036d49cbfb0730fa2"
+    },
+    {
+      "bytes": 7093,
+      "mode": "0644",
+      "path": "archetypes/springboot-kafka/project-context.md",
+      "sha256": "bb02e56f46392a6b55a89eb772fe4d9514d7ad2e293a35a14854a01441bd028f"
+    },
+    {
+      "bytes": 335,
+      "mode": "0644",
+      "path": "autoresearch/__init__.py",
+      "sha256": "b1c2d7ff2484ef438714fc210304328a7eb4dd9a9e4094147776342264f3e5b3"
+    },
+    {
+      "bytes": 562,
+      "mode": "0644",
+      "path": "autoresearch/graders/__init__.py",
+      "sha256": "1043506b82c3dbf5f47784ae163294465bcfa85971ca3ad93e84b0e83863bc72"
+    },
+    {
+      "bytes": 947,
+      "mode": "0644",
+      "path": "autoresearch/graders/base.py",
+      "sha256": "4d0ffc0293bd1041b2765cf484207b3d8c434d8db4ed155d757e38a0e6157beb"
+    },
+    {
+      "bytes": 26380,
+      "mode": "0644",
+      "path": "autoresearch/graders/static.py",
+      "sha256": "749935d41737648f182478bd44918ca476a1f13d05f2b07e99f036615e5155eb"
+    },
+    {
+      "bytes": 20127,
+      "mode": "0644",
+      "path": "autoresearch/runner.py",
+      "sha256": "0536ef35b2e69954da5c94a055e28714d80a6e60334ea59a331057a038e0f2dd"
+    },
+    {
+      "bytes": 5080595,
+      "mode": "0644",
+      "path": "baselines/ai_surface_profile_footprint_baseline.json",
+      "sha256": "93ea4174e2a3a87351eff1eb6fafb2611fea7c8da9e4fec72c7d07b6e9c41a2b"
+    },
+    {
+      "bytes": 3135,
+      "mode": "0644",
+      "path": "capabilities/README.md",
+      "sha256": "462ea0a42263265fbd74778cf6afa02a0bca3914e3177436c704ed70a55eabe8"
+    },
+    {
+      "bytes": 1908,
+      "mode": "0644",
+      "path": "capabilities/_TEMPLATE.yaml",
+      "sha256": "b0778011d5294ce4f7dc324ea7693193aaa3199b47c8100b4457ee3e200587d6"
+    },
+    {
+      "bytes": 6810,
+      "mode": "0644",
+      "path": "capabilities/ac_completion_evidence.yaml",
+      "sha256": "00b56fba6a6fa3087cf81c43a8eeed8ee9cb1de5b0417d188b9e2fd8d8eb68ab"
+    },
+    {
+      "bytes": 4389,
+      "mode": "0644",
+      "path": "capabilities/adapter_coherence.yaml",
+      "sha256": "50c16435433692ab5eba431d6b3b6eb9e058dcd39b41f883e470fefccd4a67e2"
+    },
+    {
+      "bytes": 4165,
+      "mode": "0644",
+      "path": "capabilities/adopter_setup_recommendations.yaml",
+      "sha256": "faef786a9b0ecb35907db6017ad78d0c82ad8be6f777a8d4dd597f29dcc79529"
+    },
+    {
+      "bytes": 5436,
+      "mode": "0644",
+      "path": "capabilities/agent_trace_event_schema.yaml",
+      "sha256": "a522fd4c75c6150c795fc9e79060ed5c8e6ec46dc13d6bc3540deefe576779b5"
+    },
+    {
+      "bytes": 4103,
+      "mode": "0644",
+      "path": "capabilities/ai_component_inventory.yaml",
+      "sha256": "17b655bd84eb898dd60646c646ac76cd5df1d9e5d087a94f04ca093d30e7382c"
+    },
+    {
+      "bytes": 7541,
+      "mode": "0644",
+      "path": "capabilities/ai_context_continuity_memory.yaml",
+      "sha256": "3902fdb454af28648b676a04e8c4f5c87ad9dde240de64361070e44b8e765de7"
+    },
+    {
+      "bytes": 5098,
+      "mode": "0644",
+      "path": "capabilities/ai_surface_health.yaml",
+      "sha256": "f0a4999884215bc24f80aa3cad2ea2f29f2cb5713d41571108c3fe58305a0568"
+    },
+    {
+      "bytes": 4060,
+      "mode": "0644",
+      "path": "capabilities/api_symbol_reality.yaml",
+      "sha256": "3c9157dfd97f985b1b4b4947621a9c96f8f314aa70801c6097e0cf84e9a2a7fe"
+    },
+    {
+      "bytes": 5895,
+      "mode": "0644",
+      "path": "capabilities/behavioral_governance_readiness.yaml",
+      "sha256": "90a690219a75b2a823188eb75ae2af6f902a33274c4e3a5e4a788b932e07aeeb"
+    },
+    {
+      "bytes": 4295,
+      "mode": "0644",
+      "path": "capabilities/calibration_shadow.yaml",
+      "sha256": "e40fdb8f0bd0660d976db226cdd140a5ed8a60c039c7c44ffc5a153b49feca60"
+    },
+    {
+      "bytes": 4059,
+      "mode": "0644",
+      "path": "capabilities/claims_validation.yaml",
+      "sha256": "3859084efe51294a014a9269af1f6450443f73a605dcc6fd7f2527428ca5cdf9"
+    },
+    {
+      "bytes": 5245,
+      "mode": "0644",
+      "path": "capabilities/control_plane_review_routing.yaml",
+      "sha256": "3db50a7d54d11d31b2b31c2105dfa29cbae0125d32ab58bfcc2ae8d09dc49fb8"
+    },
+    {
+      "bytes": 4658,
+      "mode": "0644",
+      "path": "capabilities/cross_harness_review_readiness.yaml",
+      "sha256": "2359bd10baecc8f5acfe85403addd0cd796cad1cd04deec8556251127413838f"
+    },
+    {
+      "bytes": 2640,
+      "mode": "0644",
+      "path": "capabilities/dependency_integrity.yaml",
+      "sha256": "2449ff5a391f9bab8b18b879319b92241167b0c21a0992d8051ce57e1727de14"
+    },
+    {
+      "bytes": 5367,
+      "mode": "0644",
+      "path": "capabilities/design_traceability.yaml",
+      "sha256": "cf895689ad8c2535eca918cd687a1e0d20a3d5e2fc99029438f4e673b756b785"
+    },
+    {
+      "bytes": 4133,
+      "mode": "0644",
+      "path": "capabilities/deterministic_conformance_review.yaml",
+      "sha256": "b8fd30969b83eeb74516a663de273ff0c5da35fe5a02d5266335b8066dff7dd3"
+    },
+    {
+      "bytes": 2531,
+      "mode": "0644",
+      "path": "capabilities/digital_twin_evaluation.yaml",
+      "sha256": "d765e0a2536239bdaf575c1bc9c699244585b7d9bc834c090705476894d32cfe"
+    },
+    {
+      "bytes": 2646,
+      "mode": "0644",
+      "path": "capabilities/duplicate_function_hygiene.yaml",
+      "sha256": "1dfa57777e8df80925b08305af6b0a7cd766e33f15651fa0fa887a331bf1136a"
+    },
+    {
+      "bytes": 4267,
+      "mode": "0644",
+      "path": "capabilities/evidence_classification.yaml",
+      "sha256": "025863464e162d6e406de39cda0624ae655a687e3308373482f6b582537b5174"
+    },
+    {
+      "bytes": 4642,
+      "mode": "0644",
+      "path": "capabilities/evidence_integrity_attestation.yaml",
+      "sha256": "701dd7de7a7a179a0ccb88fac4a8330249ff9ed500b8b7a3c0cbcb1f8b3d6aae"
+    },
+    {
+      "bytes": 2413,
+      "mode": "0644",
+      "path": "capabilities/evidence_pack.yaml",
+      "sha256": "6466372afa1ddd860301ef428748a3318a40df3c475e30983134c120f5496002"
+    },
+    {
+      "bytes": 3481,
+      "mode": "0644",
+      "path": "capabilities/external_evidence_ingest.yaml",
+      "sha256": "10aa9706c7c03e8b1d2238930c59c963d82a60ef5a06b70f999abc4e140df90d"
+    },
+    {
+      "bytes": 5647,
+      "mode": "0644",
+      "path": "capabilities/failure_mode_observations.yaml",
+      "sha256": "bf851ceb472c9f24eba9613c7223e1675f866d437566b8d6f9865ab8aeb80a8a"
+    },
+    {
+      "bytes": 6141,
+      "mode": "0644",
+      "path": "capabilities/failure_mode_posture.yaml",
+      "sha256": "0fad130d7ff67dcb39da7c1c285b854eb76600f4fad68bb86fd5125e707dc7d7"
+    },
+    {
+      "bytes": 2579,
+      "mode": "0644",
+      "path": "capabilities/function_index_health.yaml",
+      "sha256": "0d05de395f7715138c1a197435f5b177b9b7be1b79b3f1064c7eeb0106b44825"
+    },
+    {
+      "bytes": 2434,
+      "mode": "0644",
+      "path": "capabilities/gatekeeper_manifest.yaml",
+      "sha256": "e3b7a0f8fd3a5b1429a127cb4612f1280cd1f983ad158d2a903e87a4d4fe0cfd"
+    },
+    {
+      "bytes": 2727,
+      "mode": "0644",
+      "path": "capabilities/governance_bypass_posture.yaml",
+      "sha256": "a4bcfc0e7c1f98ad7074d1e466b5b95288b7bda2fed50a0a225513c1aa366c83"
+    },
+    {
+      "bytes": 9612,
+      "mode": "0644",
+      "path": "capabilities/governed_agentic_coding_workflow.yaml",
+      "sha256": "7a39acf3238af74c3777e69cac110e87019210991a203e60921de6e6583a87d1"
+    },
+    {
+      "bytes": 5547,
+      "mode": "0644",
+      "path": "capabilities/governed_debug_escalation.yaml",
+      "sha256": "53ececcb3f0f5b089af548d8b7c879f85e1994a447a532ac9e1ece71bf1d1b26"
+    },
+    {
+      "bytes": 5396,
+      "mode": "0644",
+      "path": "capabilities/governed_learning_lifecycle.yaml",
+      "sha256": "8d8ee0786b136abd5073775b5eea8a19f3eaaccb3c3108cf4b2df9c979556794"
+    },
+    {
+      "bytes": 4345,
+      "mode": "0644",
+      "path": "capabilities/harness_trace_import.yaml",
+      "sha256": "2132e8591e70ae930756bfa2a0481b656a53293369b6a642ae820beefeedce79"
+    },
+    {
+      "bytes": 4988,
+      "mode": "0644",
+      "path": "capabilities/llm_grader_readiness.yaml",
+      "sha256": "a9813c556546bf34424fdfa69b65e4e2b549c86a61e1ff278820833ae4e729a6"
+    },
+    {
+      "bytes": 12075,
+      "mode": "0644",
+      "path": "capabilities/local_context_index.yaml",
+      "sha256": "a7e60f0df9f5cec5a5f7d9bd3de6586847d3454198c24978e8ee4c5a87860fe6"
+    },
+    {
+      "bytes": 7167,
+      "mode": "0644",
+      "path": "capabilities/model_provider_policy.yaml",
+      "sha256": "26517a47c1676265ca9e961e52f68be5238b6d357fd6a1e427c140bd98a43d49"
+    },
+    {
+      "bytes": 6065,
+      "mode": "0644",
+      "path": "capabilities/model_telemetry_evidence.yaml",
+      "sha256": "6787235befb9650e46c4633daa5de1fdadba5ac4ffb0037d88abad40ea1389ae"
+    },
+    {
+      "bytes": 3687,
+      "mode": "0644",
+      "path": "capabilities/module_header_traceability.yaml",
+      "sha256": "48e98e235b97e1598f1379643b340413bb5a3dfbde092aa6265d66205f70d556"
+    },
+    {
+      "bytes": 5208,
+      "mode": "0644",
+      "path": "capabilities/opencode_config_hygiene.yaml",
+      "sha256": "716bbfb9021f9dfb09996194000859d6fb9453f0572afc0601bcabbb2b8f677a"
+    },
+    {
+      "bytes": 4779,
+      "mode": "0644",
+      "path": "capabilities/package_reality.yaml",
+      "sha256": "21beae3fbc963a7308fb7ff74d1422b58764814da3d1f12b5f7c7f122106d1ae"
+    },
+    {
+      "bytes": 3848,
+      "mode": "0644",
+      "path": "capabilities/pr_risk_classification.yaml",
+      "sha256": "e3dec1072286e17000abc84bf4b4d25a863000faa2a678596fe2c59f94497860"
+    },
+    {
+      "bytes": 2313,
+      "mode": "0644",
+      "path": "capabilities/roadmap_crosswalk_validation.yaml",
+      "sha256": "6e20520087117eda6c9e454fb2adf9d9e1bb6dad6def465c82a896397a6e8771"
+    },
+    {
+      "bytes": 2187,
+      "mode": "0644",
+      "path": "capabilities/runtime_handoff.yaml",
+      "sha256": "8108fa8a5b93203d7b9ccc7b1c35b30107522349c2a456437155755d0c2ac2b4"
+    },
+    {
+      "bytes": 2488,
+      "mode": "0644",
+      "path": "capabilities/secret_hygiene.yaml",
+      "sha256": "fc16d5b7032693049be0878afd000214e7342bebfe0f4cfdc0e49c82b0ca83a4"
+    },
+    {
+      "bytes": 4367,
+      "mode": "0644",
+      "path": "capabilities/secure_coding_controls.yaml",
+      "sha256": "25f7d1dcebaa499cbe58719b4b117132928387516d3c47f03a7ab5402e8dc212"
+    },
+    {
+      "bytes": 4171,
+      "mode": "0644",
+      "path": "capabilities/secure_coding_reporting.yaml",
+      "sha256": "3b2b55c48b114f77e851dd22f63d00b2c2acbb8fd1f1c1cbc155523178cf017b"
+    },
+    {
+      "bytes": 2430,
+      "mode": "0644",
+      "path": "capabilities/self_conformance.yaml",
+      "sha256": "dff3372f60c8f39fffb05d4e1296ca262321d067e3148294ff8e6b9e5ad0ac4c"
+    },
+    {
+      "bytes": 2015,
+      "mode": "0644",
+      "path": "capabilities/source_test_graph.yaml",
+      "sha256": "a560f2392004a8358fd7f5ac13cbcd00f12a7849301df0349a4d4d65581a57a9"
+    },
+    {
+      "bytes": 3943,
+      "mode": "0644",
+      "path": "capabilities/spec_assembly_worksheet.yaml",
+      "sha256": "7cde92dc0860c04af309f32b85bbdcc10e6164fa00b1fe3b7daaa9a24a396146"
+    },
+    {
+      "bytes": 4373,
+      "mode": "0644",
+      "path": "capabilities/spec_cascade_coherence.yaml",
+      "sha256": "4ba355dc2cd101b41ec9f521296342f7810ae0f65199c9e250777b6d4ab3c205"
+    },
+    {
+      "bytes": 5005,
+      "mode": "0644",
+      "path": "capabilities/spec_pack_contract.yaml",
+      "sha256": "dc8033f332abc81cbdfb42e6f4f8a742136d7125917a2cc50357697d66a1534f"
+    },
+    {
+      "bytes": 7838,
+      "mode": "0644",
+      "path": "capabilities/spec_pack_materialization.yaml",
+      "sha256": "d78c2eeddc692c764627693905012b9a0cb1ff885402253f74b0f92ea11c69e2"
+    },
+    {
+      "bytes": 4965,
+      "mode": "0644",
+      "path": "capabilities/static_customization_hooks.yaml",
+      "sha256": "e82b4cc79f40ba055bfc773832f9adc1c521a44911181b572db3dd2db6ff465c"
+    },
+    {
+      "bytes": 5902,
+      "mode": "0644",
+      "path": "capabilities/static_grader.yaml",
+      "sha256": "3aacf777915ab618599157ef9978890ebbf920b7299e733653dd8201d06f21de"
+    },
+    {
+      "bytes": 2105,
+      "mode": "0644",
+      "path": "capabilities/structured_substrate.yaml",
+      "sha256": "b697b20624f9fcbf40a65ad94c02fcd7c1137724ba01cf798cd49617ffe4d915"
+    },
+    {
+      "bytes": 3979,
+      "mode": "0644",
+      "path": "capabilities/systemic_impact_review.yaml",
+      "sha256": "c800a486fbbda72193db34959b16eb502b8e031aa95e27329762455ffdbab73c"
+    },
+    {
+      "bytes": 5133,
+      "mode": "0644",
+      "path": "capabilities/task_context_pack.yaml",
+      "sha256": "7f127997a31870a84149f65d8c1912afde906039bb5984d52967165c9e1f598e"
+    },
+    {
+      "bytes": 2620,
+      "mode": "0644",
+      "path": "capabilities/test_evidence.yaml",
+      "sha256": "6056b94c596620a5c80c41dbd462d478ed67c610196929639e51fb45ee25a51c"
+    },
+    {
+      "bytes": 2447,
+      "mode": "0644",
+      "path": "capabilities/test_quality_hygiene.yaml",
+      "sha256": "68fdac40bfb17e496ae0c2288dafac4d179534717cfe9eccbfdb14c74c740ac4"
+    },
+    {
+      "bytes": 5748,
+      "mode": "0644",
+      "path": "capabilities/ui_experience_quality.yaml",
+      "sha256": "5c9cc1e5114a9500b80f8fdd735a4f82965828923ada7de70f45e21fddee3e25"
+    },
+    {
+      "bytes": 53382,
+      "mode": "0644",
+      "path": "cli.py",
+      "sha256": "7d5f1ea69edbb6a6ddbb777ab4ec2db17a58e70e3e2e2f5697e863a4217e054a"
+    },
+    {
+      "bytes": 137,
+      "mode": "0644",
+      "path": "configs/features.yaml",
+      "sha256": "f7a98a1a37a37b5bd1f016ae5674554efb901507eea3d1c414072442b7d763c6"
+    },
+    {
+      "bytes": 23365,
+      "mode": "0644",
+      "path": "configs/naos_ai_surface_catalogue.yaml",
+      "sha256": "e9cb24d760be7e1e21e0f19ae380530426b9fdbbbfbf736bf9565f0698b732ca"
+    },
+    {
+      "bytes": 1464,
+      "mode": "0644",
+      "path": "configs/naos_memory.yaml",
+      "sha256": "db1757701ae622a5dea005da475484e92937a79c021285a6c8d59f0b1f6f5431"
+    },
+    {
+      "bytes": 6044,
+      "mode": "0644",
+      "path": ".github/workflows/ci.yml",
+      "sha256": "842da24e4a9986d7426634405fe5933a0537c9bbcb5228f5f45469f913b45bb4"
+    },
+    {
+      "bytes": 8523,
+      "mode": "0644",
+      "path": "configs/profile_generated_surface_contract.json",
+      "sha256": "e3828a66442b91cdbe5d41a06ff0b74e30d8dcfb71717b7bf739f99f79145174"
+    },
+    {
+      "bytes": 48434,
+      "mode": "0644",
+      "path": "configs/profile_rules_source.yaml",
+      "sha256": "63a8dc36361aada7247f73477f9fb062756431b7326942119f8352d3bff2019b"
+    },
+    {
+      "bytes": 15925,
+      "mode": "0644",
+      "path": "configs/secure_coding_control_register.sample.yaml",
+      "sha256": "b8474aa214d796898a38bac137f3b9aa5c699c00ae705382f206805690eaed39"
+    },
+    {
+      "bytes": 18648,
+      "mode": "0644",
+      "path": "configs/secure_coding_control_register.yaml",
+      "sha256": "f338b7b7de5f92742a521c0edab951475411168dab6fe1f6f1b6a568bb56c33e"
+    },
+    {
+      "bytes": 1377,
+      "mode": "0644",
+      "path": "configs/secure_coding_control_render_manifest.yaml",
+      "sha256": "8828c335bfc1fa3841e3aee7b0110e5dd7555e5fd86924a591fd9bb35509fab3"
+    },
+    {
+      "bytes": 3606,
+      "mode": "0644",
+      "path": "configs/upgrade_source_policy.yaml",
+      "sha256": "152080bb159a9a444873cdd64272506c55486dce172fac5d16aea8d2d61df3d4"
+    },
+    {
+      "bytes": 11598,
+      "mode": "0644",
+      "path": "docs/ADMISSIBILITY.md",
+      "sha256": "d52211c6f2d23295a28651d3a16c74c3173cace12c6b7f6e6027baee4aa66403"
+    },
+    {
+      "bytes": 54590,
+      "mode": "0644",
+      "path": "docs/ADOPTION_GUIDE.md",
+      "sha256": "8f3ade094e4f76c57465a029182a00c00d4be4cef9488c8a487f46b49437be39"
+    },
+    {
+      "bytes": 21994,
+      "mode": "0644",
+      "path": "docs/ASI_AICM_MAPPING.md",
+      "sha256": "bae45fbee05b527107b10af88bd2298355c4ca0b84fcaedbb61c69a0ab64de5b"
+    },
+    {
+      "bytes": 5299,
+      "mode": "0644",
+      "path": "docs/ASSURED_PROFILE_ACTIVATION.md",
+      "sha256": "7043f2de2997cca1f8439e9922fa0439e3b1e0bbb7654bc7126b9ed727871983"
+    },
+    {
+      "bytes": 12870,
+      "mode": "0644",
+      "path": "docs/AUDIT_PLAYBOOK.md",
+      "sha256": "978dd0019f388a83fdbf078cb0eb1c35d31d593701bfb0e8642c2154d962dd91"
+    },
+    {
+      "bytes": 4786,
+      "mode": "0644",
+      "path": "docs/BEHAVIORAL_AUDIT_ENABLEMENT.md",
+      "sha256": "6771414ece92dc03dc46739ddace5eadbdb0d11d535d571ce4b4d9267b23a34d"
+    },
+    {
+      "bytes": 18736,
+      "mode": "0644",
+      "path": "docs/CLAIMS_AND_LIMITATIONS.md",
+      "sha256": "a3028dba98c48546e10b60427d9bf30baa1aab47d503d0192b491b4aed60a423"
+    },
+    {
+      "bytes": 5436,
+      "mode": "0644",
+      "path": "docs/CODEX_PLUGIN_AND_MCP.md",
+      "sha256": "eae799b7d6aa1ef6c4a875b124a60599b2f50abab181a12641138173c951418e"
+    },
+    {
+      "bytes": 13882,
+      "mode": "0644",
+      "path": "docs/COMPLIANCE_MAPPING.md",
+      "sha256": "f8530c808995765139f29f4877b917a837a3838af1e597f017267762db5a8f07"
+    },
+    {
+      "bytes": 122502,
+      "mode": "0644",
+      "path": "docs/CONTROL_PLANE.md",
+      "sha256": "742c7b24f8011317175fa972f5a0c6c3568e27abfa9f04b8c263ba23bd1c6e6a"
+    },
+    {
+      "bytes": 3453,
+      "mode": "0644",
+      "path": "docs/CROSS_HARNESS_REVIEW_READINESS.md",
+      "sha256": "50bd9bf049be239a4191aab4dd11d3f76d89e7d1c171bae773630811a664374c"
+    },
+    {
+      "bytes": 12272,
+      "mode": "0644",
+      "path": "docs/DORA_MAPPING.md",
+      "sha256": "7452721e1680d2b338e1e1915a0951c7054edaf12442a3cbb1126f92a34c99aa"
+    },
+    {
+      "bytes": 11830,
+      "mode": "0644",
+      "path": "docs/ENGRAM_SETUP.md",
+      "sha256": "c24be27fac5e14cc79646e0625c8cd9cb6aff102cecab1b1f6ef8b969df7ae00"
+    },
+    {
+      "bytes": 2522,
+      "mode": "0644",
+      "path": "docs/FRONTMATTER_CONFORMANCE.md",
+      "sha256": "ca4c60e87df7806a89ddc10ce833af1359b22c9a0cc4001f9c320238059d343b"
+    },
+    {
+      "bytes": 25531,
+      "mode": "0644",
+      "path": "docs/GLOSSARY.md",
+      "sha256": "2bd1df0c262211ebd220f3b10774b95f8e84d80e0cb197a6138c31ab986904d2"
+    },
+    {
+      "bytes": 18697,
+      "mode": "0644",
+      "path": "docs/INDEX.md",
+      "sha256": "cea50765305f85e53d1bcaa144a41bbe456b6fdd21344705c9b66be91d69c605"
+    },
+    {
+      "bytes": 8518,
+      "mode": "0644",
+      "path": "docs/NAOS_THREAT_MODEL.md",
+      "sha256": "84d5f0ce8669d7db232942e2182549ab2ba959491b27c396df294b8373e7105d"
+    },
+    {
+      "bytes": 11385,
+      "mode": "0644",
+      "path": "docs/OSFI_E23_MAPPING.md",
+      "sha256": "ada284c0136e8b772a21f73cb2de75252a7fcbad5d0e25d8dc7160f5001d4979"
+    },
+    {
+      "bytes": 79447,
+      "mode": "0644",
+      "path": "docs/REGULATORY_CLAIM_SOURCE_MATRIX.yaml",
+      "sha256": "e499b6f3773a690341f05779193e7cdda178c8bd4724dbcf537474debbc5490a"
+    },
+    {
+      "bytes": 17522,
+      "mode": "0644",
+      "path": "docs/SECURE_CODING_CONTROL_MODEL.md",
+      "sha256": "c93a66858849343f10f0eaddb62d3b476ccf7c947eff454b5af4e6e96e89acae"
+    },
+    {
+      "bytes": 4054,
+      "mode": "0644",
+      "path": "docs/SECURE_CODING_P3_REPORTING.md",
+      "sha256": "31bcc27ab0dcb5d222eafb423beda7e4127b039b93dfbd0cec2ad49ef2bebc29"
+    },
+    {
+      "bytes": 4622,
+      "mode": "0644",
+      "path": "docs/SYSTEMIC_CAPABILITY_WIRING.md",
+      "sha256": "ac39aa26fb1a50607c9e7d7f2b41cae6131e9fa7eaec0e16e851a5378951cbe9"
+    },
+    {
+      "bytes": 10784,
+      "mode": "0644",
+      "path": "docs/TOOL_NEUTRAL_USAGE.md",
+      "sha256": "2e629c14f117f5ed65c0e1c2a26b55c1e7096c1b98814029efa039e3ab66aa1f"
+    },
+    {
+      "bytes": 1539,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0001-default-to-deterministic-workflows.md",
+      "sha256": "afbfebc57f736861dec85b1980a063f5c23647cce7e228634b30c84de4530cc5"
+    },
+    {
+      "bytes": 1434,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0002-file-first-portable-architecture.md",
+      "sha256": "1167274bd1cc30d9de8712f80cd5c3aa531d881f14f76d38ce7ea9b62e51b333"
+    },
+    {
+      "bytes": 1407,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0003-reject-neo4j-for-the-kit.md",
+      "sha256": "deabea83aa48f7cad64ece715cb42f4335b69dffd6e52b80977c92f170bd6caa"
+    },
+    {
+      "bytes": 1929,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0004-sqlite-sqlitevec-networkx-graphml-stack.md",
+      "sha256": "7b3727b0adc17035c2b3fa1d51f4aae0a1b668f34a657cfb9f1247f3f641d91e"
+    },
+    {
+      "bytes": 1452,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0005-never-auto-promote-instincts.md",
+      "sha256": "4ce3941dabfbf61bc65f2267459253701d93f5ab30a9762fcfdbd6e85b4095ec"
+    },
+    {
+      "bytes": 1412,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0006-conformance-returns-null-for-behavioral-dimensions.md",
+      "sha256": "89a756e8f98de01bbe8087077070e694fc8d37d4f0aa8e4d3fc9540c19e7191e"
+    },
+    {
+      "bytes": 1407,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0007-ai-policy-defaults-to-static-only.md",
+      "sha256": "661b76de49d8c24129c9baaac73f9b2166a038fa58a45f82da70b8cbe9948196"
+    },
+    {
+      "bytes": 1482,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0008-advisory-capability-enablements-not-release-commitments.md",
+      "sha256": "f5f7c55eaa7c05b4528f0ab0a77b58e7b25b943e3f1f5dca8d80a479363abfb3"
+    },
+    {
+      "bytes": 1519,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0009-license-selection-apache-2.md",
+      "sha256": "5b7b8765fd9db1d38ec2ae0d30362dd54039a707b3a950c546eb98ad885a586f"
+    },
+    {
+      "bytes": 11915,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0010-control-plane-advisory-boundaries.md",
+      "sha256": "bae9c7da1a775bb8839402bf4ae0a18bc492b3f2e1ff543aa205913f240b917b"
+    },
+    {
+      "bytes": 2810,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0011-deterministic-hygiene-controls.md",
+      "sha256": "d2e51158dd63bd688b0dce2ac2d23d5b45f970ef75490be73387575a0a53877e"
+    },
+    {
+      "bytes": 9086,
+      "mode": "0644",
+      "path": "docs/decisions/ADR-0012-secure-and-agentic-coding-control-register.md",
+      "sha256": "16a69a62d344ccaef3ee9016b5d16b6209db8563601a909d418668d956f16264"
+    },
+    {
+      "bytes": 2201,
+      "mode": "0644",
+      "path": "docs/decisions/README.md",
+      "sha256": "e0ed06f7fccdc09929ca0d0523834093cff2f319a71c90b688bd11441c3d6a9d"
+    },
+    {
+      "bytes": 4505,
+      "mode": "0644",
+      "path": "docs/diagrams/brownfield-adoption-sequence.mmd",
+      "sha256": "de6c7fe21f8350d61e8c9f38b62c993f78ede7a047eafa35ea6b986ac1f3ac28"
+    },
+    {
+      "bytes": 1374,
+      "mode": "0644",
+      "path": "docs/diagrams/daily-task-sequence.mmd",
+      "sha256": "44d5a7346225d2d263194e435ce418f2a69b6cf5adfbfbfe538ee4b1b380e1d9"
+    },
+    {
+      "bytes": 882,
+      "mode": "0644",
+      "path": "docs/diagrams/deck-auditor.md",
+      "sha256": "ec36841f4e153d479b79b2e43624d8d4520c993199afc5b0b9b48c87ae39e0a3"
+    },
+    {
+      "bytes": 1215,
+      "mode": "0644",
+      "path": "docs/diagrams/deck-devlead.md",
+      "sha256": "522b5321bc55132a222d2721b27735ec7af73d15fbe23e7b7215bec53fa3a734"
+    },
+    {
+      "bytes": 947,
+      "mode": "0644",
+      "path": "docs/diagrams/deck-exec.md",
+      "sha256": "9d83690ff2c91cc8c17b8d5648f70d544ef80236863508f18c6aef9b51236f3a"
+    },
+    {
+      "bytes": 1461,
+      "mode": "0644",
+      "path": "docs/diagrams/evidence-boundary-lifecycle.mmd",
+      "sha256": "516a2b97affb8496cbe894931fd734ff977a4f683a519a17a7aaa0e553648fd4"
+    },
+    {
+      "bytes": 1086,
+      "mode": "0644",
+      "path": "docs/diagrams/governance-surface-change-sequence.mmd",
+      "sha256": "55fde650cf2e6d9d23115d281cfbc1f1bee3e70adc40e54d87f311a15bb447d3"
+    },
+    {
+      "bytes": 3141,
+      "mode": "0644",
+      "path": "docs/diagrams/governed-learning-lifecycle-architecture.mmd",
+      "sha256": "d9ce1a5d763c93c932d7f1825f502f6e40e10b2cc5ddb5f2d1031cf93336bc83"
+    },
+    {
+      "bytes": 1293,
+      "mode": "0644",
+      "path": "docs/diagrams/greenfield-adoption-sequence.mmd",
+      "sha256": "ba8d83d6aac15a99718a4e5ec4bd167082042605e1636859f32a0cd1c1f07d7a"
+    },
+    {
+      "bytes": 1884,
+      "mode": "0644",
+      "path": "docs/diagrams/naos-plugin-adapter-architecture.mmd",
+      "sha256": "ed37e7f4b435f708b0bb2400dbbf46ec5cab5e481329065e613453259b6e4828"
+    },
+    {
+      "bytes": 983,
+      "mode": "0644",
+      "path": "docs/diagrams/naos-scope-and-human-decision-boundary.mmd",
+      "sha256": "dd583aa38d9eabe6ef6e92a2cbb35731da3f7e223ec3f44e78fcd6e5bd2158be"
+    },
+    {
+      "bytes": 1106,
+      "mode": "0644",
+      "path": "docs/diagrams/natural-language-router-sequence.mmd",
+      "sha256": "8d837010093dee5aa07964cb0a27b178a6f43276449300d7e5a7a4d261237526"
+    },
+    {
+      "bytes": 823,
+      "mode": "0644",
+      "path": "docs/diagrams/parallel-lane-opportunity-sequence.mmd",
+      "sha256": "8be8028de2b1ba0a7444e5f4085e6f326c5588f237910a245dbd38dcf59e8def"
+    },
+    {
+      "bytes": 789,
+      "mode": "0644",
+      "path": "docs/diagrams/pr-evidence-sequence.mmd",
+      "sha256": "69f823cb1b71c20d8208edc449d7567486680126fed2cf6237865abdda756758"
+    },
+    {
+      "bytes": 2262,
+      "mode": "0644",
+      "path": "docs/diagrams/professional-adoption-engine.mmd",
+      "sha256": "966242188b89ba951757a7ca5535c32ab80aef177c7df0c2ee25d50bc6cf4faf"
+    },
+    {
+      "bytes": 2346,
+      "mode": "0644",
+      "path": "docs/diagrams/systemic-control-plane.mmd",
+      "sha256": "129da125ce8c13a014a273cc3f319ad7ccd4388ac54abbc1e28619494f22dffc"
+    },
+    {
+      "bytes": 11901,
+      "mode": "0644",
+      "path": "docs/tutorials/INTEGRAL_TUTORIAL_LITE_FROM_SCRATCH.md",
+      "sha256": "3fb09612a4193e13d226867b8a0d0e5fd1a39184259da8d5bd16d5525c672c43"
+    },
+    {
+      "bytes": 3674,
+      "mode": "0644",
+      "path": "docs/tutorials/INTEGRAL_TUTORIAL_QUICKSTART_FROM_SCRATCH.md",
+      "sha256": "f5bc078e08a497292a97c8246cc56c7069dac1970b7446297472c109b598bf5f"
+    },
+    {
+      "bytes": 13642,
+      "mode": "0644",
+      "path": "docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md",
+      "sha256": "20ddeb004fb3e4996e7bb20f877b94d0b1f98c73b8dd83d165cdeb9410c182ae"
+    },
+    {
+      "bytes": 13868,
+      "mode": "0644",
+      "path": "docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_TO_ASSURED.md",
+      "sha256": "045cf5912cf5c6c605101f4b4536df4d7de7831a1e219cbbc1e29157d7e6b0f4"
+    },
+    {
+      "bytes": 5663,
+      "mode": "0644",
+      "path": "docs/tutorials/IS_NAOS_RIGHT_FOR_MY_PROJECT.md",
+      "sha256": "29106ea6f8802574fd3e443d6803c0ac8f3bd876b20c8761c1e5e5a6eee642c1"
+    },
+    {
+      "bytes": 5758,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_10_NAOS_D_START.md",
+      "sha256": "4226a6d62fb3dc25787d028c995b720c0b2db062cd17d611bd5abbc232a54fba"
+    },
+    {
+      "bytes": 5840,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_11_NAOS_TASK_START.md",
+      "sha256": "f1726148c1a9f9d4770b20eedb3f79b6fde31a9bf6751b1a53fecfcba7aa93fe"
+    },
+    {
+      "bytes": 7522,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_12_NAOS_IMPLEMENT_IN_PRACTICE.md",
+      "sha256": "5569b4e91ad215bffd757060fdada22bcc194f22aad850c21238dfa9571dad77"
+    },
+    {
+      "bytes": 6902,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_13_NAOS_REVIEW_IN_PRACTICE.md",
+      "sha256": "921fd3c220feb4b7ac510d394988eb8386474fa65ee4bd3806b644a6cda49eb8"
+    },
+    {
+      "bytes": 3963,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_14_NAOS_TASK_COMPLETE_WITH_CONFORMANCE.md",
+      "sha256": "4ba073d58c78fc65fba97b398f56a6e527825e6ec6b18a866ccbf4a01648068a"
+    },
+    {
+      "bytes": 6622,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_15_NAOS_D_END.md",
+      "sha256": "fe8b80c6c72f54a332a42f118795e072e4fd12bf90a871be23fe6cde9e9248ca"
+    },
+    {
+      "bytes": 5155,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_20_NAOS_W_CADENCE.md",
+      "sha256": "da4d2ea7ad8ea07e283728261b3539d8f48f2b04438a359cda0d6ad5446f9022"
+    },
+    {
+      "bytes": 6288,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_21_NAOS_M_CADENCE.md",
+      "sha256": "6d0c35c9d7775042762345a7ba5d7027c470a35242e570542ed3d016d122ca3e"
+    },
+    {
+      "bytes": 6850,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_30_TEST_HALLUCINATION.md",
+      "sha256": "311a4a2914e785f6b8401eb83ea908d067cc1a5d745079df61a4d2cd12940e20"
+    },
+    {
+      "bytes": 4719,
+      "mode": "0644",
+      "path": "docs/tutorials/MICRO_TUTORIAL_31_PAUL_RUNTIME_GUARD.md",
+      "sha256": "91755a24b2a8e2933c72c0f9e7fb4a497af30ffddbeb80b5cd6e04575d9c6902"
+    },
+    {
+      "bytes": 8872,
+      "mode": "0644",
+      "path": "docs/tutorials/PROFESSIONAL_ADOPTION_ENGINE.md",
+      "sha256": "794d1ae45ebb7fe0f0eba079b88cd0a57ad0096a85b109c2cbbcedcf4bbf8472"
+    },
+    {
+      "bytes": 25340,
+      "mode": "0644",
+      "path": "docs/tutorials/README.md",
+      "sha256": "cd0b16fe144d7932d964d9aa49b4d1ab97f309b6d5a4aed2578e68d9ab942fe9"
+    },
+    {
+      "bytes": 12498,
+      "mode": "0644",
+      "path": "docs/tutorials/START_HERE_NAOS_OVERVIEW_AND_LEARNING_PATH.md",
+      "sha256": "e75d890e8fbc6259c141d201b167e8ede92488c8eadb19a6418bb5e7f4a6facd"
+    },
+    {
+      "bytes": 10771,
+      "mode": "0644",
+      "path": "docs/tutorials/WHICH_NAOS_PROFILE_SHOULD_I_CHOOSE.md",
+      "sha256": "afec0ff58d7174ca94db2e99dcafb0bd15eb2a7633e3e8cb2a07563fc4307d49"
+    },
+    {
+      "bytes": 104516,
+      "mode": "0644",
+      "path": "naos_add.py",
+      "sha256": "829fbcb6315073d9cf4af55f4e92be6eb8fc138266c9d2c6a7994131f72c9b20"
+    },
+    {
+      "bytes": 527,
+      "mode": "0644",
+      "path": "naos_governance/__init__.py",
+      "sha256": "fe4cd0e552cd2c3b669cc3ca7c8b67778a380dfbe19543c584bc32f52aa39937"
+    },
+    {
+      "bytes": 178479,
+      "mode": "0644",
+      "path": "naos_init.py",
+      "sha256": "8e15715f2c0f18b033acf270e5e8b6421a08029c897a0c8c03c879a44a052c76"
+    },
+    {
+      "bytes": 31415,
+      "mode": "0644",
+      "path": "naos_memory.py",
+      "sha256": "d31c55d21e1adb680f46ed369d71f1feec04c4bf9b4ed98653ee19fca0c75937"
+    },
+    {
+      "bytes": 24870,
+      "mode": "0644",
+      "path": "naos_profile_rules.py",
+      "sha256": "dd411272c8f01c87fec01c0311cf1bc7d3428cbf33e99cf6affcf3a2f221d435"
+    },
+    {
+      "bytes": 27361,
+      "mode": "0644",
+      "path": "naos_upgrade.py",
+      "sha256": "9ee97674c16b8c1932023b51bca79ee94ad7a2993b17a86be778038e69df2637"
+    },
+    {
+      "bytes": 357,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/.claude-plugin/plugin.json",
+      "sha256": "006fe3ea06a20784a6c91b54ac199657c7db0d3e13c45d64750af57cfa2420f1"
+    },
+    {
+      "bytes": 2477,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/README.md",
+      "sha256": "945f32f24011e2c63831fdb1472d258c954d611a3d384003e87ceb628c019387"
+    },
+    {
+      "bytes": 592,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/references/adapter-coherence.md",
+      "sha256": "96e3d3c630aee2a7a0b8292fd82ff9c4c0016d7432e79a071ac02337f0769a7f"
+    },
+    {
+      "bytes": 1048,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/references/boundaries.md",
+      "sha256": "564fe65bf0c7c64607715f662b6bdb2aea4512939c4d33959a5e374e4aa86936"
+    },
+    {
+      "bytes": 764,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/references/claude-code-hooks.md",
+      "sha256": "13b90019fac3e1bf9d23072e7c85f8143b1cf445cce8782aa11730da3cf007c2"
+    },
+    {
+      "bytes": 3133,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/references/command-map.md",
+      "sha256": "92debe9f29549fcea0ae152f0548ac475cf116795c7c092c20cd5426c68bd8bb"
+    },
+    {
+      "bytes": 1069,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/references/governed-learning.md",
+      "sha256": "631dc8ffc62e404ed6c6dc5f9b9cfec349e1a5fe775f2028db02770db4e21875"
+    },
+    {
+      "bytes": 4516,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/references/greenfield-brownfield.md",
+      "sha256": "e74d6c7097250e4b211608b46a34d9f3638928342ed35c4b2bed70c2178af44c"
+    },
+    {
+      "bytes": 898,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/skills/naos-adapter-coexistence/SKILL.md",
+      "sha256": "8fa1735e4bc88887a465a0558e2ab0f10b3961dced13cfd892667e1c4149e020"
+    },
+    {
+      "bytes": 4973,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/skills/naos-adoption-readiness/SKILL.md",
+      "sha256": "8d6362402d6724403692f2232226b80a399afcb0bdeb5e560504fde95d9bd5a6"
+    },
+    {
+      "bytes": 1294,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/skills/naos-ai-surface-health/SKILL.md",
+      "sha256": "9b659dff5383bd2d7d6f1305ea243e29d9498060046b92150a8ad4d7c71b4fda"
+    },
+    {
+      "bytes": 8710,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/skills/naos-control-plane-evidence/SKILL.md",
+      "sha256": "a9b46d40daef22f6c4a8d7e0072896f6ef92334f7d9e2ba9130edefe9025cf4a"
+    },
+    {
+      "bytes": 1923,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/skills/naos-forensic-review/SKILL.md",
+      "sha256": "5a85311c52409a55465fc4e400339ad62f4d2c85c9f657577385fccb567ddeeb"
+    },
+    {
+      "bytes": 1399,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/skills/naos-governed-learning/SKILL.md",
+      "sha256": "1f6efcb06746c0ed4097d8826da420f5f8e7c321f10aeab79cc445ef9ed047a7"
+    },
+    {
+      "bytes": 10483,
+      "mode": "0644",
+      "path": "plugins/naos-governance-claude-code/skills/naos-systemic-wiring/SKILL.md",
+      "sha256": "1c12ec84532421404d7c8d9c72bfe0d93de6db7efd7a0ac2d9256715bf36ec5b"
+    },
+    {
+      "bytes": 1207,
+      "mode": "0644",
+      "path": "plugins/naos-governance/.codex-plugin/plugin.json",
+      "sha256": "4f57b863c9bc86df702e880abd7a51f7c7e9a0e1438e75c9cbe0d2b618101bd7"
+    },
+    {
+      "bytes": 1696,
+      "mode": "0644",
+      "path": "plugins/naos-governance/README.md",
+      "sha256": "528f2df042a8d591195862106788011b524a279358d557d84430718c344bce53"
+    },
+    {
+      "bytes": 730,
+      "mode": "0644",
+      "path": "plugins/naos-governance/references/adapter-coherence.md",
+      "sha256": "5da00c11ef497d21332636b775881ce5c5694e1b18268a127588820b640ed1cf"
+    },
+    {
+      "bytes": 1099,
+      "mode": "0644",
+      "path": "plugins/naos-governance/references/boundaries.md",
+      "sha256": "fbe2241e729bd863c23fbd0b8658f66fa52550cc6b3324b6014dd82a4a78bb87"
+    },
+    {
+      "bytes": 4573,
+      "mode": "0644",
+      "path": "plugins/naos-governance/references/command-map.md",
+      "sha256": "440759f9fceb759d1a1013c7f4990c77fa136b8017d8eb681746a7114a193a42"
+    },
+    {
+      "bytes": 5253,
+      "mode": "0644",
+      "path": "plugins/naos-governance/references/greenfield-brownfield.md",
+      "sha256": "4d05af9e8cf71072329c3f8d3dad0181f285cb7eacead2feb086346ee4e948d1"
+    },
+    {
+      "bytes": 808,
+      "mode": "0644",
+      "path": "plugins/naos-governance/references/mcp-roadmap.md",
+      "sha256": "a8b4573fa8f3b5e84e3f802153a53332297ea5f0cb80c6967c7a6d737162b3a6"
+    },
+    {
+      "bytes": 1111,
+      "mode": "0644",
+      "path": "plugins/naos-governance/skills/naos-adapter-coexistence/SKILL.md",
+      "sha256": "a005e4cd304ff2470c64190173a148d7a3a3c8623abefed8233b08a3b983ddcc"
+    },
+    {
+      "bytes": 7818,
+      "mode": "0644",
+      "path": "plugins/naos-governance/skills/naos-adoption-readiness/SKILL.md",
+      "sha256": "a24ac70ba45cce2dee180169540bd4dbd79f60fbc4bc69fb15c625f56ba015de"
+    },
+    {
+      "bytes": 1208,
+      "mode": "0644",
+      "path": "plugins/naos-governance/skills/naos-ai-surface-health/SKILL.md",
+      "sha256": "77d11df5d3d80019ed07a89aa6fe58b93b5b5f0664a527f9fb0fe0099d04596d"
+    },
+    {
+      "bytes": 8975,
+      "mode": "0644",
+      "path": "plugins/naos-governance/skills/naos-control-plane-evidence/SKILL.md",
+      "sha256": "bce8d554e66737aaeca6f82fd29fa6469dfd4859d1b2098f6dfa53a609d11571"
+    },
+    {
+      "bytes": 2106,
+      "mode": "0644",
+      "path": "plugins/naos-governance/skills/naos-forensic-review/SKILL.md",
+      "sha256": "7c974f87a6e05cc35e119a276c6f7ee5070bda6f322eccadcfaaeb314a818eb9"
+    },
+    {
+      "bytes": 1536,
+      "mode": "0644",
+      "path": "plugins/naos-governance/skills/naos-governed-learning/SKILL.md",
+      "sha256": "8c83d9729ced5aae99264491947c231fcd68dadce9435eb1a2cc627f8a3cb43a"
+    },
+    {
+      "bytes": 10483,
+      "mode": "0644",
+      "path": "plugins/naos-governance/skills/naos-systemic-wiring/SKILL.md",
+      "sha256": "1c12ec84532421404d7c8d9c72bfe0d93de6db7efd7a0ac2d9256715bf36ec5b"
+    },
+    {
+      "bytes": 15445,
+      "mode": "0644",
+      "path": "policies/default_policy.yaml",
+      "sha256": "e2c1fd36edfb5298346ec3e07782dec239fab74e335349c52a076b86d6664075"
+    },
+    {
+      "bytes": 15194,
+      "mode": "0644",
+      "path": "profiles/governance-assured/.ai/RULES.md",
+      "sha256": "8b182ab37351c63c2b615546d7652d16e9551b7f192d68556e4e82b90df083ce"
+    },
+    {
+      "bytes": 5183,
+      "mode": "0644",
+      "path": "profiles/governance-lite/.ai/RULES.md",
+      "sha256": "6d5e217be3e503e6dd3077efe90983950e11786d27387f2203943f6b39a54f03"
+    },
+    {
+      "bytes": 7175,
+      "mode": "0644",
+      "path": "profiles/governance-quickstart/.ai/RULES.md",
+      "sha256": "de852d83f8b962327e8ff72f8c07572d13aff1aad179ab4e45bbcc715acaeee8"
+    },
+    {
+      "bytes": 10714,
+      "mode": "0644",
+      "path": "profiles/governance-standard/.ai/RULES.md",
+      "sha256": "5ccdd424c2b647c5acedf05376d2ccd7db4c6060a28a4612544d2b5852f6b67d"
+    },
+    {
+      "bytes": 9287,
+      "mode": "0644",
+      "path": "public_tests/test_public_candidate.py",
+      "sha256": "3b401f10de88f75913924800a5b19dc0f6ab9c2042b86236a0e9013cd9c6f2af"
+    },
+    {
+      "bytes": 4544,
+      "mode": "0644",
+      "path": "pyproject.toml",
+      "sha256": "4b53321ae69a177e62890db741e631be91a6099588bfe443dfce1ef6be47158d"
+    },
+    {
+      "bytes": 873,
+      "mode": "0644",
+      "path": "requirements.txt",
+      "sha256": "b7496aaeefd1aac81bfede44140cd090dd723847c9ada800136a7d343005fc68"
+    },
+    {
+      "bytes": 4901,
+      "mode": "0644",
+      "path": "schemas/README.md",
+      "sha256": "3e39ac65565699f3235d0d1ccc253e590d21b2d6af4b1b06531e3f5287b463aa"
+    },
+    {
+      "bytes": 11285,
+      "mode": "0644",
+      "path": "schemas/naos/ac_completion_evidence.schema.json",
+      "sha256": "b107f6b6f3c864fea0c92106573a696febed6197cba916afc8858818d41c8656"
+    },
+    {
+      "bytes": 3224,
+      "mode": "0644",
+      "path": "schemas/naos/ac_completion_evidence_manifest.schema.json",
+      "sha256": "f36e41a12b387a2f93dea6b18174549f2bc36fcea7d22b3d7403b1c4be6122f4"
+    },
+    {
+      "bytes": 2693,
+      "mode": "0644",
+      "path": "schemas/naos/adapter_coherence_report.schema.json",
+      "sha256": "1a12ce1fa0c28a9b03243f35766b01e3d9d35f0cfd82dafb5b4988545f0b0c41"
+    },
+    {
+      "bytes": 1663,
+      "mode": "0644",
+      "path": "schemas/naos/adapter_coherence_rules.schema.json",
+      "sha256": "7bdbd8590eb5d492ec8dd0cdb41ba018ce2676d401164a246f769fb000c86b0c"
+    },
+    {
+      "bytes": 1465,
+      "mode": "0644",
+      "path": "schemas/naos/adapter_propagation_state.schema.json",
+      "sha256": "93d3773d1257442ae1be59547d4ce0826309f65604eb2b4b9b1ec3ad04b5f645"
+    },
+    {
+      "bytes": 7981,
+      "mode": "0644",
+      "path": "schemas/naos/adoption_summary.schema.json",
+      "sha256": "5a5d3cc8d63bd0445ee79316ca5f1e874b336463913f819909327cc0069eea9b"
+    },
+    {
+      "bytes": 10482,
+      "mode": "0644",
+      "path": "schemas/naos/agent_orchestration_plan.schema.json",
+      "sha256": "9f438218b182804d34c685b62620c672018776f8253abddfe1297d1cea958364"
+    },
+    {
+      "bytes": 4623,
+      "mode": "0644",
+      "path": "schemas/naos/agent_orchestration_policy.schema.json",
+      "sha256": "7e3837cb58d88cfa2a12ee5942313a0d8c576bad58848ed14549e9e89fb7f54c"
+    },
+    {
+      "bytes": 3544,
+      "mode": "0644",
+      "path": "schemas/naos/agent_orchestration_request.schema.json",
+      "sha256": "4a6fc845d080c5401443a66e99ec53715fdaae1a99b173c5a4e04a74cc1384df"
+    },
+    {
+      "bytes": 5536,
+      "mode": "0644",
+      "path": "schemas/naos/agent_sponsor_registry.schema.json",
+      "sha256": "17339ff8c20184fff01a493e93abeb7ed466cf462c5bcd33bf984b96850a7e56"
+    },
+    {
+      "bytes": 5726,
+      "mode": "0644",
+      "path": "schemas/naos/agent_sponsor_registry_report.schema.json",
+      "sha256": "ac2c4db593313bf412c8ff30eaf3e861548f5d1c960212628989484bafc6688c"
+    },
+    {
+      "bytes": 6371,
+      "mode": "0644",
+      "path": "schemas/naos/agent_trace_event.schema.json",
+      "sha256": "effc3cc9b42da1ddb76377a06c2bb978d5eacc11b1b1cda914e86ff808f18fbf"
+    },
+    {
+      "bytes": 4449,
+      "mode": "0644",
+      "path": "schemas/naos/agent_trace_validation.schema.json",
+      "sha256": "f6c5742d54f93094dbbf96b7330955421bc3250ea5562dc183bbcc551629526e"
+    },
+    {
+      "bytes": 9098,
+      "mode": "0644",
+      "path": "schemas/naos/agentic_workflow.schema.json",
+      "sha256": "654f14868c892cc28d432675019857ae2054fd0d135789872246597866daa72b"
+    },
+    {
+      "bytes": 2503,
+      "mode": "0644",
+      "path": "schemas/naos/agentic_workflow_review.schema.json",
+      "sha256": "d3d7cfcfc3869ddd6b7c72b689591cdd2852f926acc7c25f4e8bbca6c23c6f6a"
+    },
+    {
+      "bytes": 3323,
+      "mode": "0644",
+      "path": "schemas/naos/ai_artifact_inventory.schema.json",
+      "sha256": "0b262f2db36e61677c174d589523d1356dbac5b63a54eae01183a5cbd5ee6e44"
+    },
+    {
+      "bytes": 3213,
+      "mode": "0644",
+      "path": "schemas/naos/ai_artifact_reconciliation.schema.json",
+      "sha256": "059b648e421783360187808747ee2a11533a9ca9d7b49b8cd0b5e26baabbdd86"
+    },
+    {
+      "bytes": 2253,
+      "mode": "0644",
+      "path": "schemas/naos/ai_code_provenance.schema.json",
+      "sha256": "843a65f1c1236acf5416a019382ca6fbf652ecd9c6c7844def3fd67ee2229310"
+    },
+    {
+      "bytes": 6527,
+      "mode": "0644",
+      "path": "schemas/naos/ai_component_inventory.schema.json",
+      "sha256": "967702f36f6ba6ceb27139c1e66398cfab45177079b8521c7949d3735ff91486"
+    },
+    {
+      "bytes": 4888,
+      "mode": "0644",
+      "path": "schemas/naos/ai_component_inventory_rules.schema.json",
+      "sha256": "a9ae719527c5877bd77a3818349cc5efec8bfe455e5a0b6c311275a79fccdfd7"
+    },
+    {
+      "bytes": 3783,
+      "mode": "0644",
+      "path": "schemas/naos/ai_surface_context_budget.schema.json",
+      "sha256": "f5af14a6f59bb4881df544a1f75afd0becc710bf85b4a1ec31f22ddb2653659c"
+    },
+    {
+      "bytes": 23548,
+      "mode": "0644",
+      "path": "schemas/naos/ai_surface_profile_footprint_baseline.schema.json",
+      "sha256": "a1f9c18ae60497ab4b4104e71fa41606736600db13b213e669038616e9a01ef6"
+    },
+    {
+      "bytes": 9736,
+      "mode": "0644",
+      "path": "schemas/naos/aivss_arithmetic_verification_report.schema.json",
+      "sha256": "1df934e0edd71516bb271cc02c6150a6611cc5e4580005e00f3d2a615404b4e7"
+    },
+    {
+      "bytes": 7102,
+      "mode": "0644",
+      "path": "schemas/naos/aivss_assessments.schema.json",
+      "sha256": "2b176d5158242f88a7c114391bf1cf28827f161af5bf7c1b0383c66d83da18f8"
+    },
+    {
+      "bytes": 4423,
+      "mode": "0644",
+      "path": "schemas/naos/api_symbol_reality.schema.json",
+      "sha256": "542f0035c96594df15c22f7343d929af43f7af1a93e3db873dec779716380a4c"
+    },
+    {
+      "bytes": 1458,
+      "mode": "0644",
+      "path": "schemas/naos/api_symbol_reality_manifest.schema.json",
+      "sha256": "897d605162c6307ff2c644cf51ab54039e3c0af270f1edf38468a0075199d68c"
+    },
+    {
+      "bytes": 2945,
+      "mode": "0644",
+      "path": "schemas/naos/audit_log_event.schema.json",
+      "sha256": "275b4f958a709a8a219627c1866775c5df258250b148052ade08cd633d10e07a"
+    },
+    {
+      "bytes": 2636,
+      "mode": "0644",
+      "path": "schemas/naos/audit_log_summary.schema.json",
+      "sha256": "558b7c2747681415e8cc037da38a9d363274c5c0c4598e6883992b2b378386f6"
+    },
+    {
+      "bytes": 2805,
+      "mode": "0644",
+      "path": "schemas/naos/behavioral_governance_readiness.schema.json",
+      "sha256": "f305b2a9e61714351aad67b4904bf0ff7fffb4b2611cb5569fffbb9be8427d97"
+    },
+    {
+      "bytes": 1394,
+      "mode": "0644",
+      "path": "schemas/naos/brownfield_baseline.schema.json",
+      "sha256": "9aa020ef208dc338336ad5fbde14470a16781cb4bbbc6dbd818d01a83c727978"
+    },
+    {
+      "bytes": 3149,
+      "mode": "0644",
+      "path": "schemas/naos/calibration_shadow.schema.json",
+      "sha256": "1ff0adefa271f365d1c21779e23822d872468be59ffeaa6313a4dbd4485a6c36"
+    },
+    {
+      "bytes": 2593,
+      "mode": "0644",
+      "path": "schemas/naos/calibration_shadow_report.schema.json",
+      "sha256": "c93cccf850bceebbccc167b9a0374e5a91d97611f4c9e036ce5ff712e3a754cc"
+    },
+    {
+      "bytes": 3127,
+      "mode": "0644",
+      "path": "schemas/naos/candidate_requirements.schema.json",
+      "sha256": "d432b82ac71e970cbab18338e4de0ce0d606b9639ea634b0bea02ba186fb4eec"
+    },
+    {
+      "bytes": 4513,
+      "mode": "0644",
+      "path": "schemas/naos/capability.schema.json",
+      "sha256": "d9482051a8a970c7eb2a92b87fbbf5faed483cc49cb1314b8558e9096e41955e"
+    },
+    {
+      "bytes": 1765,
+      "mode": "0644",
+      "path": "schemas/naos/capability_maturity.schema.json",
+      "sha256": "861f419a654beb13760559d4639c84d465039035863a46773a8d359eee64dc7c"
+    },
+    {
+      "bytes": 4013,
+      "mode": "0644",
+      "path": "schemas/naos/capability_maturity_report.schema.json",
+      "sha256": "3dfa06cdf5b67360ca87829da6c78aab7fbe794e18766e5b6a62a81db17fb49f"
+    },
+    {
+      "bytes": 3268,
+      "mode": "0644",
+      "path": "schemas/naos/capability_state.schema.json",
+      "sha256": "abb2c8800a15c8b97fb063d861b98857f558e0f6f554db43f7952b8b2d25cef3"
+    },
+    {
+      "bytes": 2845,
+      "mode": "0644",
+      "path": "schemas/naos/claims_validation.schema.json",
+      "sha256": "3d91f104afa563558ca3049e552c9366f36345468252929abf9caa6fdd582c0a"
+    },
+    {
+      "bytes": 6673,
+      "mode": "0644",
+      "path": "schemas/naos/completed_task_history.schema.json",
+      "sha256": "470cb42af682517a8372dad9359f5c9dc7db0a4109fdaa0e179c22ab8de9052a"
+    },
+    {
+      "bytes": 2231,
+      "mode": "0644",
+      "path": "schemas/naos/compliance_posture.schema.json",
+      "sha256": "d8db529d7c8ce4ab3f0d98937b181fa8be34888fd25847ebc69a3b6c1adfeaf3"
+    },
+    {
+      "bytes": 9316,
+      "mode": "0644",
+      "path": "schemas/naos/composed_traceability.schema.json",
+      "sha256": "e34747c97268c15801c3e29f14a89322da4f60e06452c9832f49739dbf98378f"
+    },
+    {
+      "bytes": 1412,
+      "mode": "0644",
+      "path": "schemas/naos/context_challenge_report.schema.json",
+      "sha256": "5cd1cd9105ad327fd8009e5ec7b9d75d7cfce89a8c1bf14d5d974d162131ee6c"
+    },
+    {
+      "bytes": 20690,
+      "mode": "0644",
+      "path": "schemas/naos/control_plane_review.schema.json",
+      "sha256": "b5aa0c298c93b1058df1a5abcb4f3a968ede7e02af0a4614e542fc6096519704"
+    },
+    {
+      "bytes": 3446,
+      "mode": "0644",
+      "path": "schemas/naos/control_plane_review_rules.schema.json",
+      "sha256": "4e7dce30f2f334aeddb0f0291c9e1c2aeb4fdfcfb25dd6a2e4eb06d3626f469c"
+    },
+    {
+      "bytes": 4799,
+      "mode": "0644",
+      "path": "schemas/naos/cross_harness_review_readiness.schema.json",
+      "sha256": "8f5d672f0d6c23ebaf17a9e50bcafd8df0adb4fe69d5402f5d77649a8fe10d8e"
+    },
+    {
+      "bytes": 2553,
+      "mode": "0644",
+      "path": "schemas/naos/cross_harness_review_readiness_report.schema.json",
+      "sha256": "2c4e8ff9667ef3aef5c85f4342f15db052e573caac1dbb18a16bab1589e249ec"
+    },
+    {
+      "bytes": 6182,
+      "mode": "0644",
+      "path": "schemas/naos/dashboard_summary.schema.json",
+      "sha256": "b12ed2fddd4efd9a34a7f6a818f0c28cf4ebb0e5894f6eb5dac4eb72d7535f63"
+    },
+    {
+      "bytes": 1400,
+      "mode": "0644",
+      "path": "schemas/naos/decision_probe_report.schema.json",
+      "sha256": "3150445071934b8bba688980e720ce2fde3a51b416a509a140d64cff1bf8445e"
+    },
+    {
+      "bytes": 3084,
+      "mode": "0644",
+      "path": "schemas/naos/dependency_integrity.schema.json",
+      "sha256": "862224add69563d8dd1c99c3f32da1fc02025b05365162210acae3221b8bcdcf"
+    },
+    {
+      "bytes": 6975,
+      "mode": "0644",
+      "path": "schemas/naos/design_traceability.schema.json",
+      "sha256": "20165684dab006c690bf0b78ed80725daf9985642a23d7f25fe3e5af962bab11"
+    },
+    {
+      "bytes": 3097,
+      "mode": "0644",
+      "path": "schemas/naos/duplicate_function_hygiene.schema.json",
+      "sha256": "9aa04a7805966583187f38a790510bf734de90294eeca336c878c00d189fa68b"
+    },
+    {
+      "bytes": 5033,
+      "mode": "0644",
+      "path": "schemas/naos/evidence_attestation.schema.json",
+      "sha256": "16315a90824cadf0d44a3cd2a42d3b8abf035e59654043dff4156aee821260f0"
+    },
+    {
+      "bytes": 3377,
+      "mode": "0644",
+      "path": "schemas/naos/evidence_attestation_rules.schema.json",
+      "sha256": "4eefe6bb1456f08a4efd61552d9cedc397874ebb92b81dd8ac0f1a92d66a64ea"
+    },
+    {
+      "bytes": 1872,
+      "mode": "0644",
+      "path": "schemas/naos/evidence_classification_policy.schema.json",
+      "sha256": "1446d3a2ba7ffe01eca88d4fd3fcad43b8e0e853afecdf6abfea12f8cc46b812"
+    },
+    {
+      "bytes": 2221,
+      "mode": "0644",
+      "path": "schemas/naos/evidence_classification_report.schema.json",
+      "sha256": "dcd5f12d458e9446e1c1695556e4fd1af32326e7bcecfa32da69a5b5f86de410"
+    },
+    {
+      "bytes": 6276,
+      "mode": "0644",
+      "path": "schemas/naos/evidence_conflict_detection.schema.json",
+      "sha256": "31a3589b03896e19709426f80f1021d630830e1f6125e8176269c8efcbea8a04"
+    },
+    {
+      "bytes": 2836,
+      "mode": "0644",
+      "path": "schemas/naos/evidence_envelope.schema.json",
+      "sha256": "460a36cb8480d511c7ebdb96fbb3af36c8608e8dd81dbabaf0e379bbbd45cfb5"
+    },
+    {
+      "bytes": 6533,
+      "mode": "0644",
+      "path": "schemas/naos/evidence_pack.schema.json",
+      "sha256": "b5188e31e8e0569531d7f8f49f470a444cea3b578ca4fdfaae491407584a1cfd"
+    },
+    {
+      "bytes": 2430,
+      "mode": "0644",
+      "path": "schemas/naos/evidence_verification.schema.json",
+      "sha256": "321ae784c03a2a25220db1026f2d7551c5df7a566058f4c061afaf883a0eeaa8"
+    },
+    {
+      "bytes": 1365,
+      "mode": "0644",
+      "path": "schemas/naos/existing_resource_inventory.schema.json",
+      "sha256": "60598b9a89996340624789253737fcffcd58142c227e807348f61b9a91be2b6e"
+    },
+    {
+      "bytes": 4981,
+      "mode": "0644",
+      "path": "schemas/naos/external_evidence_ingest.schema.json",
+      "sha256": "d96e6c9ebce6d9d1720ba4660cd64bc42f8652d9871b9fdeabde358599e3eefb"
+    },
+    {
+      "bytes": 9231,
+      "mode": "0644",
+      "path": "schemas/naos/failure_mode_observations.schema.json",
+      "sha256": "28ba13c54fb3872180b808f5d82561b2c57f167508507b7b63bd206a8f672734"
+    },
+    {
+      "bytes": 8713,
+      "mode": "0644",
+      "path": "schemas/naos/failure_mode_posture.schema.json",
+      "sha256": "8ff5f900ba385c2d6aa2f38fb35b7582c343d52053a5bf217c841f6e5f0c326a"
+    },
+    {
+      "bytes": 5745,
+      "mode": "0644",
+      "path": "schemas/naos/gate_evaluation.schema.json",
+      "sha256": "661b92ef06f401215421463c2fdede8ab5bed05192bd00846fae1d10c5717b47"
+    },
+    {
+      "bytes": 10493,
+      "mode": "0644",
+      "path": "schemas/naos/gate_status.schema.json",
+      "sha256": "1c884873bd531915aeaeba718c6385359eb42e1474bbf5ef4d9ee8c7ab80553a"
+    },
+    {
+      "bytes": 4923,
+      "mode": "0644",
+      "path": "schemas/naos/gatekeeper.schema.json",
+      "sha256": "21c337206ec795f30dbf047d6169dcfbca00ca6f5c114b0499247d826b6b1d3c"
+    },
+    {
+      "bytes": 1196,
+      "mode": "0644",
+      "path": "schemas/naos/gatekeeper_team_overrides.schema.json",
+      "sha256": "7a91f280d840db0b1a1bf0ec303766e5c17542d8788b3a688b84329299858bfd"
+    },
+    {
+      "bytes": 1782,
+      "mode": "0644",
+      "path": "schemas/naos/governance_bypass_posture.schema.json",
+      "sha256": "f9299652921d52bb32b3087578bd577f8618deaef30e03e9a087628aa6bbb299"
+    },
+    {
+      "bytes": 3143,
+      "mode": "0644",
+      "path": "schemas/naos/governed_debug_escalation.schema.json",
+      "sha256": "40aeafea8439f360d6a472a1bf924935881345bbb9ba2d1a8088e42d99b21502"
+    },
+    {
+      "bytes": 7908,
+      "mode": "0644",
+      "path": "schemas/naos/grader_assessment.schema.json",
+      "sha256": "c1bd8cfaab0c7a5913869e0714da3bf39680f1edbfa0dcea3736cd4713975a8b"
+    },
+    {
+      "bytes": 6204,
+      "mode": "0644",
+      "path": "schemas/naos/graph_context_query.schema.json",
+      "sha256": "279c97ea615dbb779060e84db15e36a171048097fe6ec93f5ec424295bcc8394"
+    },
+    {
+      "bytes": 3234,
+      "mode": "0644",
+      "path": "schemas/naos/graph_context_readiness.schema.json",
+      "sha256": "228e5c2750b7ac05fc9dfff33939ffbd8ac775727ee1ab4c245db22919cc3d13"
+    },
+    {
+      "bytes": 2746,
+      "mode": "0644",
+      "path": "schemas/naos/harness_trace_import.schema.json",
+      "sha256": "7b6e3a11c07a6e00a8e535132242fa54f430231e0f9cbd4d6bcdd92cfa5c49a9"
+    },
+    {
+      "bytes": 3084,
+      "mode": "0644",
+      "path": "schemas/naos/human_decision_record.schema.json",
+      "sha256": "da8813bf77ae3a14c9d2df5415bc2a31cb2db89ad8cf7e973cf8f71c7ff023be"
+    },
+    {
+      "bytes": 4369,
+      "mode": "0644",
+      "path": "schemas/naos/install_decision_record.schema.json",
+      "sha256": "85a67e79243f4361438f65ef6a0454525ad53071503979fedafca60f4eed39cd"
+    },
+    {
+      "bytes": 1366,
+      "mode": "0644",
+      "path": "schemas/naos/install_plan.schema.json",
+      "sha256": "ebddc8cbd2bf93d8e9672aa1b9d2f491b3655f9ab858687b24f43c0daf2c09fc"
+    },
+    {
+      "bytes": 1302,
+      "mode": "0644",
+      "path": "schemas/naos/intake_report.schema.json",
+      "sha256": "5301f84d52d82d9c8cbe5ca5a0adc5790f56f2fe9d6dbbea1923284b07799dcd"
+    },
+    {
+      "bytes": 3847,
+      "mode": "0644",
+      "path": "schemas/naos/learning_loop_review.schema.json",
+      "sha256": "93994179f13e5d155e44a944fa50f42534b3ea993cd5fb7532417f877c9d2838"
+    },
+    {
+      "bytes": 1035,
+      "mode": "0644",
+      "path": "schemas/naos/learning_loop_rules.schema.json",
+      "sha256": "12c38dffa09fb8481cac040d0f65659035b0ece81c41f29dd699b5ddb626faf4"
+    },
+    {
+      "bytes": 1975,
+      "mode": "0644",
+      "path": "schemas/naos/learning_record.schema.json",
+      "sha256": "725c2c52ce6aa2a031bde4bd7b76e4c79acf7cb446c89a5ed1de2cbaf73f77ed"
+    },
+    {
+      "bytes": 3702,
+      "mode": "0644",
+      "path": "schemas/naos/llm_grader_readiness.schema.json",
+      "sha256": "aa69e9344e944a0b39247cab1f366ee217c04fb5a6982b072dacd8b842475915"
+    },
+    {
+      "bytes": 2536,
+      "mode": "0644",
+      "path": "schemas/naos/local_context_index.schema.json",
+      "sha256": "e23bfc9777a3883c00769b59e0920dca471decab21245292d2256bfcf7922117"
+    },
+    {
+      "bytes": 4349,
+      "mode": "0644",
+      "path": "schemas/naos/local_context_index_rules.schema.json",
+      "sha256": "bd270ecea24a749e7382fc13879255050fb361b83f9cae9cb3cf6b58433763bd"
+    },
+    {
+      "bytes": 1950,
+      "mode": "0644",
+      "path": "schemas/naos/local_context_query.schema.json",
+      "sha256": "933dee3b4570f9512e8a74ecef6839a1c5448462e23d808c469e629dcceac44c"
+    },
+    {
+      "bytes": 10038,
+      "mode": "0644",
+      "path": "schemas/naos/mcp_resource_inventory.schema.json",
+      "sha256": "ba8a0cef4bb89e85ecf060a2e11297ae020fdf7be2277dea9434c488211cdc1e"
+    },
+    {
+      "bytes": 4694,
+      "mode": "0644",
+      "path": "schemas/naos/memory_context_readiness.schema.json",
+      "sha256": "2b0599d07b7072ce48b5465bd9f37372afd334d6ef84d6c18bc04f2fb2157713"
+    },
+    {
+      "bytes": 5222,
+      "mode": "0644",
+      "path": "schemas/naos/memory_context_rules.schema.json",
+      "sha256": "fc1463ecbeb27f5212f33f790a44cfc27844f1947ca9320d6f8e0c89f46ebdf7"
+    },
+    {
+      "bytes": 7923,
+      "mode": "0644",
+      "path": "schemas/naos/memory_provider_access.schema.json",
+      "sha256": "480b3835ce04fb4671f655a0da2a3767827395cf215733f3ea25a3680ad33479"
+    },
+    {
+      "bytes": 3359,
+      "mode": "0644",
+      "path": "schemas/naos/memory_resource_inventory.schema.json",
+      "sha256": "37eb84d782fae812f6b0e1af5d6de990d8a7d9a14a5a763072ed6c5263564f32"
+    },
+    {
+      "bytes": 4514,
+      "mode": "0644",
+      "path": "schemas/naos/memory_resource_reconciliation.schema.json",
+      "sha256": "6272595f273f16b1e529e4b04cccd8855b0eedefeec16d3d5787d0ca701d161c"
+    },
+    {
+      "bytes": 6873,
+      "mode": "0644",
+      "path": "schemas/naos/memory_use_policy.schema.json",
+      "sha256": "be30bb0b94774e7dbbaefd1bf7f41f7ff0a129a475bca62e43245f393acaf049"
+    },
+    {
+      "bytes": 8107,
+      "mode": "0644",
+      "path": "schemas/naos/model_provider_policy.schema.json",
+      "sha256": "f37dbe3d09ad5d35a954036adc805cb9f6bf74ed973e56317a286be5df10509d"
+    },
+    {
+      "bytes": 7343,
+      "mode": "0644",
+      "path": "schemas/naos/model_telemetry_evidence.schema.json",
+      "sha256": "0b885d5443ead37a80692753414c81f76b028d60aadbeed4cee42b5ae2e4923d"
+    },
+    {
+      "bytes": 3561,
+      "mode": "0644",
+      "path": "schemas/naos/module_header_rules.schema.json",
+      "sha256": "3f5ba4964b09207a2ae9b05873c5cecbeffdead799d10c5d927fdc4df6acaed5"
+    },
+    {
+      "bytes": 3668,
+      "mode": "0644",
+      "path": "schemas/naos/module_header_traceability.schema.json",
+      "sha256": "a3ac4f79c33bfb8dde8c1bcb25baabc9c890b5fe3d50ecde984fa7ce75dcfed7"
+    },
+    {
+      "bytes": 5258,
+      "mode": "0644",
+      "path": "schemas/naos/opencode_config_hygiene.schema.json",
+      "sha256": "ea7eb123103834ee27525f7d17d2a4816ce855a2cf68ccd59e0c472b6c87f54f"
+    },
+    {
+      "bytes": 3036,
+      "mode": "0644",
+      "path": "schemas/naos/operator_attribution.schema.json",
+      "sha256": "44af3d532e02bc5241671ba1413d9a5606bc094555864e9a3433066c078ac649"
+    },
+    {
+      "bytes": 1789,
+      "mode": "0644",
+      "path": "schemas/naos/overlay_coexistence.schema.json",
+      "sha256": "bcf6cba3083caa0bbcf34d7abdc973350c2fe2aab98a1bd14261f59991fee638"
+    },
+    {
+      "bytes": 1436,
+      "mode": "0644",
+      "path": "schemas/naos/overlay_compatibility.schema.json",
+      "sha256": "5537d81c07d237a091ba21056215e147f7a5c24b151a96e3954405305cd5f0eb"
+    },
+    {
+      "bytes": 3634,
+      "mode": "0644",
+      "path": "schemas/naos/package_reality.schema.json",
+      "sha256": "021e2f0f750aed58aad9bcb29ca839cdf92e55f8a4093a5c726309b5f1c8f5c2"
+    },
+    {
+      "bytes": 2150,
+      "mode": "0644",
+      "path": "schemas/naos/package_reality_provenance.schema.json",
+      "sha256": "61f2e1cea96248f0e0f2ead1b4597d6b738dfa3bcc1103879a7a8a7c39dbc4ea"
+    },
+    {
+      "bytes": 8084,
+      "mode": "0644",
+      "path": "schemas/naos/parallel_lane_handoff.schema.json",
+      "sha256": "89af301ea59e2e88bf6d2a43ea39750f6d747cf8070c40bdebe5b6e9a14d509f"
+    },
+    {
+      "bytes": 1400,
+      "mode": "0644",
+      "path": "schemas/naos/plan_challenge_report.schema.json",
+      "sha256": "8a481172432238ca050e8aa179f6e358cdfcdb698ea09826d8eac8e75658c730"
+    },
+    {
+      "bytes": 5399,
+      "mode": "0644",
+      "path": "schemas/naos/plan_coherence.schema.json",
+      "sha256": "f2e012f1025491a4a790ace2c6c63a4e74a2470698e466cfdc7000f26751c208"
+    },
+    {
+      "bytes": 6861,
+      "mode": "0644",
+      "path": "schemas/naos/planning_baselines.schema.json",
+      "sha256": "e02002ea57eeeb3adf2526f9e989651305393868cc8aa88eb0010de2175e8853"
+    },
+    {
+      "bytes": 1424,
+      "mode": "0644",
+      "path": "schemas/naos/planning_gate_review_report.schema.json",
+      "sha256": "e295e794905d84e2357a7316f476f60178c77d77f64b4fea10c368f5e39f39e9"
+    },
+    {
+      "bytes": 13051,
+      "mode": "0644",
+      "path": "schemas/naos/policy.schema.json",
+      "sha256": "82781bc453333bafe8ab6497279a5872514a8e587ef6d07a3e64da3e87e66af5"
+    },
+    {
+      "bytes": 1167,
+      "mode": "0644",
+      "path": "schemas/naos/policy_override.schema.json",
+      "sha256": "fdb5dd109834bdfe9721386eb216c520c683ef870aaeaad7e0c1695c9786fdaf"
+    },
+    {
+      "bytes": 4822,
+      "mode": "0644",
+      "path": "schemas/naos/policy_override_merge.schema.json",
+      "sha256": "488a5c5a8863278abec58f24af387fc6afa1af223fabd2975ddd37f8af26a38f"
+    },
+    {
+      "bytes": 3159,
+      "mode": "0644",
+      "path": "schemas/naos/pr_governance_summary.schema.json",
+      "sha256": "23c2a315f9e065a98dbb7acee03067b5046e92e8922383297c32da2bd4bdca6c"
+    },
+    {
+      "bytes": 5062,
+      "mode": "0644",
+      "path": "schemas/naos/pr_risk_classification.schema.json",
+      "sha256": "a241ae92d0033929a8ab2f5f7393f2bae8d29283a19df828f696311b441f8e02"
+    },
+    {
+      "bytes": 3608,
+      "mode": "0644",
+      "path": "schemas/naos/pre_implementation_alignment.schema.json",
+      "sha256": "af4ccb259594b00421e5a803d6ebd1051614201f05d0f8850acd44867fa65c86"
+    },
+    {
+      "bytes": 2302,
+      "mode": "0644",
+      "path": "schemas/naos/pre_implementation_alignment_review.schema.json",
+      "sha256": "bd82b070801843c754e4d75f5a9661440a0d463b8b8a5c7743777cd51e27352c"
+    },
+    {
+      "bytes": 1307,
+      "mode": "0644",
+      "path": "schemas/naos/preflight_report.schema.json",
+      "sha256": "ca88fb03266bdf3726a4493759f56aeca1c671825995f60f3d142fd88b79aa8f"
+    },
+    {
+      "bytes": 1958,
+      "mode": "0644",
+      "path": "schemas/naos/profile_generated_surface_contract.schema.json",
+      "sha256": "ad76a50657746ae6701286b4a10bb18b41f17b1714beb1896c245c34e0154b8a"
+    },
+    {
+      "bytes": 10171,
+      "mode": "0644",
+      "path": "schemas/naos/regulatory_claim_source_matrix.schema.json",
+      "sha256": "5290ceecfb05863e4030f1d789bca8b6e4279cf7c6b7c30491925c9aab10bf3e"
+    },
+    {
+      "bytes": 1432,
+      "mode": "0644",
+      "path": "schemas/naos/repo_context_challenge_report.schema.json",
+      "sha256": "9e8e44616a6cdb109771dc9f5c3d6b1077e4080386f8994d543e868812bffab4"
+    },
+    {
+      "bytes": 3088,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_activation_receipt.schema.json",
+      "sha256": "a5c4767077ece941fef0325c5b95ebc5708beb58216b0379adb0ad1a68f4df36"
+    },
+    {
+      "bytes": 2989,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_active.schema.json",
+      "sha256": "8118d030a7664d546cf3aa13e2e5bf8870c254c769a34d276671e3853830ed40"
+    },
+    {
+      "bytes": 1779,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_apply_result.schema.json",
+      "sha256": "5394aa796284f94f763cd1a0c4536d999d7d455a2b779b57b27bfa8875596092"
+    },
+    {
+      "bytes": 3284,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_context.schema.json",
+      "sha256": "9e89f9b77c7af07f8e904f9ade279aefe6e4d28d0df6e876e3ab31677b1919bc"
+    },
+    {
+      "bytes": 1885,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_enrollment_result.schema.json",
+      "sha256": "5beef9bfa494cbae2e3ff2197fea24f44dcf2c81f0545cf09313668cfc9b25ca"
+    },
+    {
+      "bytes": 2351,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_inventory.schema.json",
+      "sha256": "9545e92239a7021e6e494eaf0789cc30bc9f6938a337ad02564f3187117039a6"
+    },
+    {
+      "bytes": 2750,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_manifest.schema.json",
+      "sha256": "48b2d48beb051c0b7a9fa2109e503388d906d04be10f4ad800e305ba63fa274a"
+    },
+    {
+      "bytes": 5195,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_plan.schema.json",
+      "sha256": "b6be401e605b90ffcf80fef4a3e6d3f37f2a14f9708a7de3a824fca9ec8ca306"
+    },
+    {
+      "bytes": 2982,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_query.schema.json",
+      "sha256": "a4bdd2e27c8cc7f371d260544dec27d56df832ba1758578bd95caa1515ad8e65"
+    },
+    {
+      "bytes": 1144,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_recovery_result.schema.json",
+      "sha256": "254eaf34d6cd0f761be7cecd0405f2046db1b63e54cc8e03638081a6a79d4af2"
+    },
+    {
+      "bytes": 4615,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_rules.schema.json",
+      "sha256": "92003661ed453b1a229348d8060820a2e9784c000837bbec0d07b10cbb1fcd8f"
+    },
+    {
+      "bytes": 896,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_status.schema.json",
+      "sha256": "d9b7d8c5cbd1be929c1e27b2147acdda20c2921fa8a1fde82f42f98855dc1b3a"
+    },
+    {
+      "bytes": 3278,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_transaction_journal.schema.json",
+      "sha256": "8a50790e91fb53b4b2bfaa07eecd79a8984ca58004fe3255e9b63659960baa4a"
+    },
+    {
+      "bytes": 1875,
+      "mode": "0644",
+      "path": "schemas/naos/repository_intelligence_validation.schema.json",
+      "sha256": "fbd89f17ed0fef16f26d5921d3b96d1b3cb6a6d755fd3493b5bacfa83b580a9f"
+    },
+    {
+      "bytes": 7210,
+      "mode": "0644",
+      "path": "schemas/naos/research_record.schema.json",
+      "sha256": "ea185e7866ead0d47b66c97438e9c0803b9cf6daab131075f6f8a3c1c1e1935a"
+    },
+    {
+      "bytes": 1183,
+      "mode": "0644",
+      "path": "schemas/naos/research_record_validation.schema.json",
+      "sha256": "5fe2b342ecdba06fdc5a70d1fce15b97108cd4db783a99cbe924db6488b4a313"
+    },
+    {
+      "bytes": 1699,
+      "mode": "0644",
+      "path": "schemas/naos/sarif_export.schema.json",
+      "sha256": "56ab81d02bd84338789f19c91ac4a46f6e4fce46a2c898f9119c12ad7ff5ce3a"
+    },
+    {
+      "bytes": 3045,
+      "mode": "0644",
+      "path": "schemas/naos/secret_hygiene.schema.json",
+      "sha256": "f429b384e4bff06e785b79d144e0a93444c6cbc5e04b82bba596ebf0566b6f92"
+    },
+    {
+      "bytes": 3497,
+      "mode": "0644",
+      "path": "schemas/naos/secure_coding_control_evidence_routes.schema.json",
+      "sha256": "9dbbd3c360cb8226bbfb4b3cc5faf137d88ce62eff6b73d294e59e67276b42e2"
+    },
+    {
+      "bytes": 4766,
+      "mode": "0644",
+      "path": "schemas/naos/secure_coding_control_register.schema.json",
+      "sha256": "a07891640b540d9a34b4c60935bdeeff1e1f59565a2abef686a5dc58c7cfdc52"
+    },
+    {
+      "bytes": 5620,
+      "mode": "0644",
+      "path": "schemas/naos/secure_coding_controls.schema.json",
+      "sha256": "b6537ff8111d62458755f4789dfbdb16295933be13c38d3b0285cf0345d95c34"
+    },
+    {
+      "bytes": 6743,
+      "mode": "0644",
+      "path": "schemas/naos/secure_coding_reporting.schema.json",
+      "sha256": "bdee04959e6f1cd804d98ff24ed96bdb93703e2e8aa88eb6762569f776d0cb5a"
+    },
+    {
+      "bytes": 3110,
+      "mode": "0644",
+      "path": "schemas/naos/semantic_candidate_layer.schema.json",
+      "sha256": "908ac4289c273c2b13104078cbd2f2d5234419c6f884376cf9c71011cef8ee0c"
+    },
+    {
+      "bytes": 2347,
+      "mode": "0644",
+      "path": "schemas/naos/session_identity.schema.json",
+      "sha256": "6f40308bb66089d036e437590aa32fdede662c2d811691acc3cec877afe753c5"
+    },
+    {
+      "bytes": 2664,
+      "mode": "0644",
+      "path": "schemas/naos/session_index.schema.json",
+      "sha256": "d0368e2bfc5196da769e1e2b74cd74c26a09047f893426858b0a35959452393b"
+    },
+    {
+      "bytes": 4480,
+      "mode": "0644",
+      "path": "schemas/naos/session_lifecycle.schema.json",
+      "sha256": "9a770deeba9091cfea3d4fea06e87f68b2ce4b1a855768beb921267aade29380"
+    },
+    {
+      "bytes": 1849,
+      "mode": "0644",
+      "path": "schemas/naos/session_record.schema.json",
+      "sha256": "4c08832d68561ec79f838ad32fc251f1f5c8373224b2f5000aa3d6c795c4b397"
+    },
+    {
+      "bytes": 11659,
+      "mode": "0644",
+      "path": "schemas/naos/setup_module_catalog.schema.json",
+      "sha256": "e446e6abbdcea29f90a2822e2b81885cac467a331fd5725f7168c8958d24afa2"
+    },
+    {
+      "bytes": 11494,
+      "mode": "0644",
+      "path": "schemas/naos/setup_recommendations.schema.json",
+      "sha256": "0af565859d49c5e117041c43b36bcfeda79b5e436468cf4204be173c126fbef4"
+    },
+    {
+      "bytes": 4516,
+      "mode": "0644",
+      "path": "schemas/naos/spec_assembly_worksheet.schema.json",
+      "sha256": "e2ebead83b5acec2d1d8c3d3cb73cf8822f96a8521bcc8ab365a1e41237e002d"
+    },
+    {
+      "bytes": 4820,
+      "mode": "0644",
+      "path": "schemas/naos/spec_cascade_coherence.schema.json",
+      "sha256": "ce5d371affe74c0e278704964ab79709e9a9ed9e44033ec758c7ed9d06d78778"
+    },
+    {
+      "bytes": 5540,
+      "mode": "0644",
+      "path": "schemas/naos/spec_pack_contract.schema.json",
+      "sha256": "c4ee747f763053e4012b8a2d9f7b70e354d0d4302d7c4e3a498661d19effa8fb"
+    },
+    {
+      "bytes": 4236,
+      "mode": "0644",
+      "path": "schemas/naos/spec_pack_manifest.schema.json",
+      "sha256": "ec8e6d5304fe5f0f88d85d4db4818ac2353e03f5fc6c7387bc254f684ce6e328"
+    },
+    {
+      "bytes": 6902,
+      "mode": "0644",
+      "path": "schemas/naos/spec_pack_materialization.schema.json",
+      "sha256": "8191d89e819209c91b0bb1b117e19ad86c912bb7ca912038c4a843e73030086a"
+    },
+    {
+      "bytes": 2772,
+      "mode": "0644",
+      "path": "schemas/naos/sqlite_write_coordination.schema.json",
+      "sha256": "5d39bf740fc9125556ac575aedad29f28e981b42dac11ce5c49791fadd1f48ae"
+    },
+    {
+      "bytes": 6198,
+      "mode": "0644",
+      "path": "schemas/naos/static_grader_report.schema.json",
+      "sha256": "e34091bf30fcce2873f0c5b960a1d65346b8e579282068ef6438d66e61bbe7a8"
+    },
+    {
+      "bytes": 2070,
+      "mode": "0644",
+      "path": "schemas/naos/systemic_impact_changed_path_review.schema.json",
+      "sha256": "2601e2ed0fe0959f9966c88c0962a5234c616e71d46b4187909d8a27712ae5c1"
+    },
+    {
+      "bytes": 6691,
+      "mode": "0644",
+      "path": "schemas/naos/systemic_impact_review.schema.json",
+      "sha256": "e13256d707561f03c18d8ef1d92e582d143637a4c7832b0da0cf4abb8e410482"
+    },
+    {
+      "bytes": 6255,
+      "mode": "0644",
+      "path": "schemas/naos/systemic_impact_rules.schema.json",
+      "sha256": "823de7cd58731cc2078b535a3fd5c3e788b996fbd4e6a0763a57b774f5225a0d"
+    },
+    {
+      "bytes": 3018,
+      "mode": "0644",
+      "path": "schemas/naos/task_claim_report.schema.json",
+      "sha256": "48a8d7b0f5631f7fb0069da715b9a3062103c808b436d5a75de0abc505e375fe"
+    },
+    {
+      "bytes": 2064,
+      "mode": "0644",
+      "path": "schemas/naos/task_claims.schema.json",
+      "sha256": "6c8cf8b03cf4d2dd78f11c7cf6cd59a482f6c2a704644131ba5f4f63dca8f68f"
+    },
+    {
+      "bytes": 4523,
+      "mode": "0644",
+      "path": "schemas/naos/task_context_pack.schema.json",
+      "sha256": "ae8c224756f423caad94d3a4a4b6412caa0f1d7a790c918a4d656ba19fb844ea"
+    },
+    {
+      "bytes": 2642,
+      "mode": "0644",
+      "path": "schemas/naos/task_context_pack_rules.schema.json",
+      "sha256": "2f4608a22b28422b22608adcb175f96d72c29d59734d3f9d10ded0c06b017c5b"
+    },
+    {
+      "bytes": 3619,
+      "mode": "0644",
+      "path": "schemas/naos/task_lifecycle.schema.json",
+      "sha256": "4d0194c3fb8ef203e189c66cb3d5e16ae91b584393988be182ed1b814032e8d9"
+    },
+    {
+      "bytes": 1685,
+      "mode": "0644",
+      "path": "schemas/naos/task_lifecycle_contract.schema.json",
+      "sha256": "53c6e4aa325b8ba863f608029c6a432ab2eefe11bd4008aa9cf7b0400202f2ed"
+    },
+    {
+      "bytes": 1837,
+      "mode": "0644",
+      "path": "schemas/naos/team_operator_map.schema.json",
+      "sha256": "926364f0cdab0da5cff788db4ced2f991d6afbf6d2b39451b49f22d059e57936"
+    },
+    {
+      "bytes": 3063,
+      "mode": "0644",
+      "path": "schemas/naos/test_quality_hygiene.schema.json",
+      "sha256": "3b28e99b1bb7928fd2a79c8c128260c5ce6357d18dfa954a0edd4cffa4b4f222"
+    },
+    {
+      "bytes": 1418,
+      "mode": "0644",
+      "path": "schemas/naos/traceability_gap_register.schema.json",
+      "sha256": "18e65b77b88d3d296f17c7fae10e756ec67cfa046c111cd6df52f362818f76df"
+    },
+    {
+      "bytes": 7626,
+      "mode": "0644",
+      "path": "schemas/naos/ui_experience_quality.schema.json",
+      "sha256": "87ab3847fdf3cba119a5e6be5d368f44a8abb4ca98b2ffeb79b7596115190fcb"
+    },
+    {
+      "bytes": 17013,
+      "mode": "0644",
+      "path": "schemas/naos/upgrade_contract.schema.json",
+      "sha256": "3b7e9f768768282decae88a0668b44cd8479dccd0ff4e5df6a7a4fd3d3b7d69c"
+    },
+    {
+      "bytes": 5253,
+      "mode": "0644",
+      "path": "schemas/team_config.schema.yaml",
+      "sha256": "6c4e88d2dfafc3b40d365020931a6807b3ca9c4aed81e51e1a352b142ac19f78"
+    },
+    {
+      "bytes": 52777,
+      "mode": "0644",
+      "path": "scripts/naos_ac_completion_evidence.py",
+      "sha256": "fa9e1594e6ce74dfa19442f1c45d1b3a4c27dac1137b95b015469091be996a32"
+    },
+    {
+      "bytes": 36461,
+      "mode": "0644",
+      "path": "scripts/naos_adapter_coherence.py",
+      "sha256": "6480f543aaea9a41eada5cf4eb1332429abb9ed4cc4a1cc05f23dc4de0cfc9f0"
+    },
+    {
+      "bytes": 447,
+      "mode": "0644",
+      "path": "scripts/naos_adopt.py",
+      "sha256": "a54bdcbe6f14a3a11ce97db84fd8b9df1358e7fa2770c0626953ed111add6ec0"
+    },
+    {
+      "bytes": 180286,
+      "mode": "0644",
+      "path": "scripts/naos_adoption_common.py",
+      "sha256": "fa843bf65a8e8059be4275c0014db2693bc8286047abf738cc43d386efa08477"
+    },
+    {
+      "bytes": 56656,
+      "mode": "0644",
+      "path": "scripts/naos_agent_orchestration_plan.py",
+      "sha256": "858dad6ddf698172030f54014046d18cb050f2d62328526d2ffbfae3b905f5d8"
+    },
+    {
+      "bytes": 30764,
+      "mode": "0644",
+      "path": "scripts/naos_agent_sponsor_registry.py",
+      "sha256": "173b3c1dad78394791fc5b04e8864158b402ddb012095df22a991ae1dae18b09"
+    },
+    {
+      "bytes": 35437,
+      "mode": "0644",
+      "path": "scripts/naos_agent_trace_validate.py",
+      "sha256": "65851a4dc70929c5360fcf90b2240a42ed22264aa46122b1137153005d82e325"
+    },
+    {
+      "bytes": 27773,
+      "mode": "0644",
+      "path": "scripts/naos_agentic_workflow_review.py",
+      "sha256": "d08d1016b461a108e41be9214a34a6a2110f43b1e023cdbf87114657b61dad69"
+    },
+    {
+      "bytes": 468,
+      "mode": "0644",
+      "path": "scripts/naos_ai_artifact_inventory.py",
+      "sha256": "d5ae01ec1c705de056543b65dceecabb61d94a34d3ad22a6a59c9f4551d992d7"
+    },
+    {
+      "bytes": 473,
+      "mode": "0644",
+      "path": "scripts/naos_ai_artifact_reconcile.py",
+      "sha256": "81e00f6d8cb8e3bcf49a3716dd10399dcfa1c2f5d8d25e37203153df3a4cbdd1"
+    },
+    {
+      "bytes": 25893,
+      "mode": "0644",
+      "path": "scripts/naos_ai_code_provenance.py",
+      "sha256": "f0f0370cab1fde82a4e0a5ac5c173b2387245f647668ce2885e468ad98043481"
+    },
+    {
+      "bytes": 30005,
+      "mode": "0644",
+      "path": "scripts/naos_ai_component_inventory.py",
+      "sha256": "e69fbc52d45e80c8cda9d356a0c72f748978d5cfee0b7673fdce7196b0f299b2"
+    },
+    {
+      "bytes": 4401,
+      "mode": "0644",
+      "path": "scripts/naos_ai_precommit.py",
+      "sha256": "fcfc23ae0094afd430b44148a3a5aab87d9cfd03ce1336f4f38c34c1d6deda79"
+    },
+    {
+      "bytes": 84390,
+      "mode": "0644",
+      "path": "scripts/naos_ai_surface_budget.py",
+      "sha256": "f278ab5d201d8b7a0778a8c98823634519064db0e932df0a576dc9cd907da884"
+    },
+    {
+      "bytes": 29585,
+      "mode": "0644",
+      "path": "scripts/naos_aivss_arithmetic_verification.py",
+      "sha256": "6844710359529a33ef2c162c71ac3c7bbaf7055f55b0d47b19a9d7f023006a95"
+    },
+    {
+      "bytes": 19371,
+      "mode": "0644",
+      "path": "scripts/naos_api_symbol_reality.py",
+      "sha256": "4ce39c83f8ed535b22d5504f64e59247dbf1c49843e240f5c4f7f207c26f06a8"
+    },
+    {
+      "bytes": 26829,
+      "mode": "0644",
+      "path": "scripts/naos_audit_log.py",
+      "sha256": "0cd42f66da0beda4fe863a12a77df51e1a991b96ff2839c2bad9a1cf3af80485"
+    },
+    {
+      "bytes": 37383,
+      "mode": "0644",
+      "path": "scripts/naos_behavioral_governance_readiness.py",
+      "sha256": "78ad6515ecd015c59eb1c2bcc2fa2cd4ee1fef76729d8a5944d9e9c8a42279c0"
+    },
+    {
+      "bytes": 464,
+      "mode": "0644",
+      "path": "scripts/naos_brownfield_baseline.py",
+      "sha256": "cbc7cac3d08a359229e8085285b28798c9017db25a2f4cae9f0c49be5584a37c"
+    },
+    {
+      "bytes": 26291,
+      "mode": "0644",
+      "path": "scripts/naos_calibration_shadow.py",
+      "sha256": "64dcdb8ed416e02be3f64d9de7ed3433b45dfc07c9c338e62ccaf4bfdadf2e35"
+    },
+    {
+      "bytes": 72984,
+      "mode": "0644",
+      "path": "scripts/naos_capability_maturity.py",
+      "sha256": "e4d440dc988e0f38e2100ac22450b650d92e3c0886e4a6a057cb2a3b53aaaf38"
+    },
+    {
+      "bytes": 66143,
+      "mode": "0644",
+      "path": "scripts/naos_code_quality_audit.py",
+      "sha256": "2da1d1895ca423cf3268cf16ffcd050a0857f3fd45b203769e1c2865af669f57"
+    },
+    {
+      "bytes": 23816,
+      "mode": "0644",
+      "path": "scripts/naos_compliance_posture.py",
+      "sha256": "5c0889eebbbcfad7bdf3363fbf922faf5a421d043669cf99fc39be4484c8694c"
+    },
+    {
+      "bytes": 22528,
+      "mode": "0644",
+      "path": "scripts/naos_composed_traceability.py",
+      "sha256": "fef6bb14122a7a7904e2538d620225e6c97c87249c77f45ce8ca8934c2c4ee9c"
+    },
+    {
+      "bytes": 460,
+      "mode": "0644",
+      "path": "scripts/naos_context_challenge.py",
+      "sha256": "2d56ad900a930f43c03455b31ff6c33fed6aa00ddbedfc3605075018e70a1c6a"
+    },
+    {
+      "bytes": 199279,
+      "mode": "0644",
+      "path": "scripts/naos_control_plane_review.py",
+      "sha256": "6091a68f6234abb46da473e3cb351d815684a42541fd7f6cc9d6312b157ad7f4"
+    },
+    {
+      "bytes": 18415,
+      "mode": "0644",
+      "path": "scripts/naos_cross_harness_review_readiness.py",
+      "sha256": "37dfa9daa10b8e7d4e567df1eaa5cfde4cf0b6fe68a930825ff750d20f4aafbc"
+    },
+    {
+      "bytes": 454,
+      "mode": "0644",
+      "path": "scripts/naos_decision_probe.py",
+      "sha256": "3f8aa835555e8ee0d0fe91a02d77e8b29e38ef80361facbe858cae113cdcafa3"
+    },
+    {
+      "bytes": 1098,
+      "mode": "0644",
+      "path": "scripts/naos_dependency_integrity.py",
+      "sha256": "74591877261983804097fc8701f3866babd25247e559ad5cee179193d6d2e1fa"
+    },
+    {
+      "bytes": 25417,
+      "mode": "0644",
+      "path": "scripts/naos_design_traceability.py",
+      "sha256": "f19f83f765546f3e24de8a77e2d15de34cbf259083432acfe9afb150de384285"
+    },
+    {
+      "bytes": 35731,
+      "mode": "0644",
+      "path": "scripts/naos_detect_spec_drift.py",
+      "sha256": "dc47cb073076c4862814d27f26775db06593c0c51219701a6b2511db84054a24"
+    },
+    {
+      "bytes": 1152,
+      "mode": "0644",
+      "path": "scripts/naos_duplicate_function_hygiene.py",
+      "sha256": "d54a05c1cd47fada79e8db25878dfb5e54e918a403e5a1bdc4eabda760005383"
+    },
+    {
+      "bytes": 10869,
+      "mode": "0644",
+      "path": "scripts/naos_emit_capabilities.py",
+      "sha256": "551853de7ad313d15d63c68656d799a2e17267e8c063c79b1b5aef410c416dd3"
+    },
+    {
+      "bytes": 26706,
+      "mode": "0644",
+      "path": "scripts/naos_evidence_attestation.py",
+      "sha256": "69bfbd274006c71ab9380061c28f9eec6c17c335b42d75a2fd71ad40928364b8"
+    },
+    {
+      "bytes": 19984,
+      "mode": "0644",
+      "path": "scripts/naos_evidence_classification.py",
+      "sha256": "186eb113951183ce55d01361f964786c2c1fbd000a1d8560e3daeefcdc287a3d"
+    },
+    {
+      "bytes": 37136,
+      "mode": "0644",
+      "path": "scripts/naos_evidence_conflicts.py",
+      "sha256": "dd88915f334613a3691aef17440f25a8c8a0b2fece1e1e56e89a8e46dfbb483c"
+    },
+    {
+      "bytes": 144836,
+      "mode": "0644",
+      "path": "scripts/naos_evidence_export.py",
+      "sha256": "14cf4777ac9e60b4c629a5959e3aecb1c58a3fd92aad63b44ab95d3f82346d86"
+    },
+    {
+      "bytes": 16022,
+      "mode": "0644",
+      "path": "scripts/naos_evidence_signing.py",
+      "sha256": "86bfef2c341a117bd94744012133208e41263b855bd0666b2fa41c9e5744a7e1"
+    },
+    {
+      "bytes": 480,
+      "mode": "0644",
+      "path": "scripts/naos_existing_resource_inventory.py",
+      "sha256": "dfa3a6a23fbddf7ca080ec2bb3f4485e17dddf148d3e618edcbeba78dbf453fd"
+    },
+    {
+      "bytes": 18661,
+      "mode": "0644",
+      "path": "scripts/naos_external_evidence_ingest.py",
+      "sha256": "1fbbc47986ea02b0397f659d0993dabe3112656607e5cdffd31f1675174da003"
+    },
+    {
+      "bytes": 9267,
+      "mode": "0644",
+      "path": "scripts/naos_extract_spec_section.py",
+      "sha256": "7e027e2d8f7fe4e89104e9a0be765dbd2aacabd12504e4d76e778ef543c36c1c"
+    },
+    {
+      "bytes": 33144,
+      "mode": "0644",
+      "path": "scripts/naos_failure_mode_observations.py",
+      "sha256": "edd5512da7c89178fc6b0acd34c8a4f5ab8c416c92c8a49c75e604dd35607df5"
+    },
+    {
+      "bytes": 32628,
+      "mode": "0644",
+      "path": "scripts/naos_failure_mode_posture.py",
+      "sha256": "75de2fe9699112d0de5c5e2643866980487f58d5aa77ff045d63854802dbe2ee"
+    },
+    {
+      "bytes": 8070,
+      "mode": "0644",
+      "path": "scripts/naos_function_index_health.py",
+      "sha256": "5575498063c2182da67ddd6c1d7c07b7b208bf97e194b3a8137a614913b62e2b"
+    },
+    {
+      "bytes": 22325,
+      "mode": "0644",
+      "path": "scripts/naos_function_index_query.py",
+      "sha256": "750c37fc6b67a9c56aa919366e7841eb18fdfe336924f1c2cde2875aaa5f8aed"
+    },
+    {
+      "bytes": 5150,
+      "mode": "0644",
+      "path": "scripts/naos_gate_evaluate.py",
+      "sha256": "b1132630d7fb93f852b572bafdc9dbc9506d9971680d994cf5aaf386fd0ead12"
+    },
+    {
+      "bytes": 120419,
+      "mode": "0644",
+      "path": "scripts/naos_gate_status.py",
+      "sha256": "5fede2addf68ef311a253bd3c75a4500145a699f16e549239463676796cbd1a0"
+    },
+    {
+      "bytes": 17866,
+      "mode": "0644",
+      "path": "scripts/naos_governance_audit.py",
+      "sha256": "b667c35288ca6e59bb86844ea2c543a8f17ed8472f43747046dcd5057bc4274f"
+    },
+    {
+      "bytes": 10313,
+      "mode": "0644",
+      "path": "scripts/naos_governance_bypass_posture.py",
+      "sha256": "41d966dfbc8bf67f38d37a23885d6434e5274b6ed22e106896e9621393983806"
+    },
+    {
+      "bytes": 32731,
+      "mode": "0644",
+      "path": "scripts/naos_grader_assessment.py",
+      "sha256": "bac269696491d8b125c7962eee82748f5f9f25135e1673c04ab7b47f33be918c"
+    },
+    {
+      "bytes": 43905,
+      "mode": "0644",
+      "path": "scripts/naos_graph_context_query.py",
+      "sha256": "e46f05bde0875112f17e28da104d1afae5316fafc80e0b5575f42966b3a38419"
+    },
+    {
+      "bytes": 19205,
+      "mode": "0644",
+      "path": "scripts/naos_graph_context_readiness.py",
+      "sha256": "c0da5ee09f02501b4dd964c0ba4e768706cc5590e873ff3bb9de067340f3d371"
+    },
+    {
+      "bytes": 20329,
+      "mode": "0644",
+      "path": "scripts/naos_harness_trace_import.py",
+      "sha256": "a2967ae4b77b55769f61be245edfea5f9d322225d62e6e5c9e4dcb8da1798dab"
+    },
+    {
+      "bytes": 28531,
+      "mode": "0644",
+      "path": "scripts/naos_hygiene_common.py",
+      "sha256": "711609636cc66efbf029b6310ba017783f13a7768600ca8f539eb2d9302b724c"
+    },
+    {
+      "bytes": 481,
+      "mode": "0644",
+      "path": "scripts/naos_install_decision_record.py",
+      "sha256": "65418c1021e931391f16c78b9446980ffac0998c3cef37392aa0666b2d77dcec"
+    },
+    {
+      "bytes": 464,
+      "mode": "0644",
+      "path": "scripts/naos_install_plan.py",
+      "sha256": "bb7f3cb8ab62e9ce5645932ca6bef2608f9615d9ea5c441993f05824c5488519"
+    },
+    {
+      "bytes": 445,
+      "mode": "0644",
+      "path": "scripts/naos_intake.py",
+      "sha256": "0b6080bc6ea62cf32cb39b90fef653c61eb2661fdf7a8da98f2c898c03b13534"
+    },
+    {
+      "bytes": 35254,
+      "mode": "0644",
+      "path": "scripts/naos_learning_loop_review.py",
+      "sha256": "65a130153194b35e76818ece385b5a23f83f086995231949dec58913ec056d46"
+    },
+    {
+      "bytes": 24908,
+      "mode": "0644",
+      "path": "scripts/naos_llm_grader_readiness.py",
+      "sha256": "7da2df001cd120a9f9495b257fc808642d180e81d53531268b631e567847c2ef"
+    },
+    {
+      "bytes": 88518,
+      "mode": "0644",
+      "path": "scripts/naos_local_context_index.py",
+      "sha256": "b58aea411ec785113930adfbeeda1657600e41c903f5ed711597842152fd46cf"
+    },
+    {
+      "bytes": 38698,
+      "mode": "0644",
+      "path": "scripts/naos_local_context_query.py",
+      "sha256": "354ec60f174940f2eaa7d5804b24969fcb2531c5b1be17207cf8c6e7f7fc555f"
+    },
+    {
+      "bytes": 49749,
+      "mode": "0644",
+      "path": "scripts/naos_mcp_config_registry.py",
+      "sha256": "2bd247b5c2b129a4156fd6ed8ba934c9b4ffb46cb43b9f3fd7bcb361db81cefc"
+    },
+    {
+      "bytes": 470,
+      "mode": "0644",
+      "path": "scripts/naos_mcp_resource_inventory.py",
+      "sha256": "fecb2a28798361d6c0e054f97c7ba3d8406b9b7baaeded0a0541981045f35306"
+    },
+    {
+      "bytes": 35820,
+      "mode": "0644",
+      "path": "scripts/naos_memory_context_readiness.py",
+      "sha256": "aff27e401df61c99736a579da3b32a0bb851730888998bdd65968447e7a483ab"
+    },
+    {
+      "bytes": 48089,
+      "mode": "0644",
+      "path": "scripts/naos_memory_provider_access.py",
+      "sha256": "33baca0797c9060ebf12680d781cd64c9beac0097e10a8705db2637daa1bb338"
+    },
+    {
+      "bytes": 492,
+      "mode": "0644",
+      "path": "scripts/naos_memory_resource_inventory.py",
+      "sha256": "b56b7f2a308d0b483b2dcbf1a86a8e8168c37b8e56eed7564f7650816eb573db"
+    },
+    {
+      "bytes": 497,
+      "mode": "0644",
+      "path": "scripts/naos_memory_resource_reconcile.py",
+      "sha256": "6a98dae342ecda4356098d9620f13dfa6a1aa08b4eeabca71ec68c3c59f19d28"
+    },
+    {
+      "bytes": 68503,
+      "mode": "0644",
+      "path": "scripts/naos_memory_use_policy.py",
+      "sha256": "96bab50783a6d87ff701af18ae8b82e88905bf9a5ba83ef2dcb0a412d51b6bd4"
+    },
+    {
+      "bytes": 50451,
+      "mode": "0644",
+      "path": "scripts/naos_model_provider_policy.py",
+      "sha256": "abe12ad67e78ef29184e0bb21d3c19b9f0a2c2b1a15f149e5e7120758a011285"
+    },
+    {
+      "bytes": 35630,
+      "mode": "0644",
+      "path": "scripts/naos_model_telemetry_evidence.py",
+      "sha256": "d51098fe8fab1c79e7b170d278da3d56290b334f5f33866b2d73ec1f1a410108"
+    },
+    {
+      "bytes": 25275,
+      "mode": "0644",
+      "path": "scripts/naos_module_header_traceability.py",
+      "sha256": "0220c833d9ef4f59cf2f05fb6c51b10b53f73a4872b19092de202d0c593f8376"
+    },
+    {
+      "bytes": 33937,
+      "mode": "0644",
+      "path": "scripts/naos_opencode_config_hygiene.py",
+      "sha256": "34915e0443ffd536ac8a9089e9e52b5624174682f1e1b44ff741769c6ea9ab48"
+    },
+    {
+      "bytes": 11238,
+      "mode": "0644",
+      "path": "scripts/naos_operator_attribution.py",
+      "sha256": "15c3c0737ca8931621f2eb10595b619abdd12402e9d4d8221f67d1660df0af10"
+    },
+    {
+      "bytes": 15397,
+      "mode": "0644",
+      "path": "scripts/naos_overlay_coexistence.py",
+      "sha256": "eb820d3de3092f4fc36866864e71bfee1e8b805ea1dcdfbf490ed76d4eec6cac"
+    },
+    {
+      "bytes": 47837,
+      "mode": "0644",
+      "path": "scripts/naos_package_reality.py",
+      "sha256": "22235f3a064713da2c23e3143a91e5deabf00953c603475006368b443ef41d62"
+    },
+    {
+      "bytes": 28659,
+      "mode": "0644",
+      "path": "scripts/naos_parallel_lane_handoff.py",
+      "sha256": "17093f3a0c90054dc7c709eebe3e94d3415d41f6a43c0880f23302b502fc7366"
+    },
+    {
+      "bytes": 454,
+      "mode": "0644",
+      "path": "scripts/naos_plan_challenge.py",
+      "sha256": "85a4293dd56f2d89c9631f06ab7a62de8087d041a36518448ff98bd05af12391"
+    },
+    {
+      "bytes": 65645,
+      "mode": "0644",
+      "path": "scripts/naos_plan_coherence.py",
+      "sha256": "f1d012b2ac10f3214512de7cf9ef8b9a57f95fcf738ee8ce68a3a9827278e33d"
+    },
+    {
+      "bytes": 466,
+      "mode": "0644",
+      "path": "scripts/naos_planning_gate_review.py",
+      "sha256": "6b9f63d0a4173458358523a469297a3d741a75ef4b5cb1616456819ec5c74516"
+    },
+    {
+      "bytes": 49612,
+      "mode": "0644",
+      "path": "scripts/naos_policy.py",
+      "sha256": "019b9745e785fabb4b5cd7dc2459916d14bf6d10da692b33d23a36c783c91bde"
+    },
+    {
+      "bytes": 51927,
+      "mode": "0644",
+      "path": "scripts/naos_policy_overrides.py",
+      "sha256": "108b9a452dc208aaadba95084679168a7f80b3edac45bc9b97e43e98c97015ec"
+    },
+    {
+      "bytes": 16255,
+      "mode": "0644",
+      "path": "scripts/naos_pr_governance_summary.py",
+      "sha256": "1b900b4ffb7c6a84f141e7b9b6c96d5b33f9eac0c5c020d56f679179d9495e44"
+    },
+    {
+      "bytes": 25302,
+      "mode": "0644",
+      "path": "scripts/naos_pr_risk_classification.py",
+      "sha256": "e9c0b5c54094528073c4a91bb845d38aa31a66ed43adfe36a0fd527b91ad30a8"
+    },
+    {
+      "bytes": 23360,
+      "mode": "0644",
+      "path": "scripts/naos_pre_implementation_alignment_review.py",
+      "sha256": "a0263baf9074833f1be56e246842b9872e43365995c3a3cbb2fcd6e0361dda3c"
+    },
+    {
+      "bytes": 458,
+      "mode": "0644",
+      "path": "scripts/naos_preflight.py",
+      "sha256": "176683e072f90d5b6cf48273359e98c171ebce2aa81a842c89755436fb5f63fa"
+    },
+    {
+      "bytes": 11852,
+      "mode": "0644",
+      "path": "scripts/naos_readiness.py",
+      "sha256": "140406d5e9620b64f6a7051450b184d03383898d2f289483f43fd2a3e366ed07"
+    },
+    {
+      "bytes": 10829,
+      "mode": "0644",
+      "path": "scripts/naos_render_secure_coding_controls.py",
+      "sha256": "266c1e7df3a485bde7349ead940909ec6ab7e86a559ed287e80bf3bc19860f7d"
+    },
+    {
+      "bytes": 476,
+      "mode": "0644",
+      "path": "scripts/naos_repo_context_challenge.py",
+      "sha256": "c43273a86c06e42aff4bc20536c4407fdaea4882b00fac7af3b5172c025de039"
+    },
+    {
+      "bytes": 237925,
+      "mode": "0644",
+      "path": "scripts/naos_repository_intelligence.py",
+      "sha256": "2a1a5e6eb5c09e0489f7e4c4c09f831c8a00f51161f397c284708ac9817d6a3d"
+    },
+    {
+      "bytes": 487,
+      "mode": "0644",
+      "path": "scripts/naos_requirements_reconstruct.py",
+      "sha256": "ef8129dca22d255f59660ce950a71408fa102abad637db7b2cc1278995638ae7"
+    },
+    {
+      "bytes": 13004,
+      "mode": "0644",
+      "path": "scripts/naos_research_record.py",
+      "sha256": "e85a0a7c4a16782d4770ddc9ebf8b47094ae284686945995f9ef8b7de0ec23b9"
+    },
+    {
+      "bytes": 29080,
+      "mode": "0644",
+      "path": "scripts/naos_sarif_export.py",
+      "sha256": "e7ff4cea31ed5a5e2d42d47a4d55d3d4a33ebe80485941db0594f541ece3b4ca"
+    },
+    {
+      "bytes": 5080,
+      "mode": "0644",
+      "path": "scripts/naos_schema_validation.py",
+      "sha256": "a32942ef09afb831c4984723b9895398991d2e101f583854b1d8325c93bcd9f0"
+    },
+    {
+      "bytes": 1213,
+      "mode": "0644",
+      "path": "scripts/naos_secret_hygiene.py",
+      "sha256": "751f44fbe933a9bcf83ab910d161466ebae8df50b7c2acbc442137454cfda736"
+    },
+    {
+      "bytes": 30197,
+      "mode": "0644",
+      "path": "scripts/naos_secure_coding_controls.py",
+      "sha256": "1418fe26ff5af75176d95f8f5305ed098b72186595b0205159621451f629f7aa"
+    },
+    {
+      "bytes": 11389,
+      "mode": "0644",
+      "path": "scripts/naos_secure_coding_reporting.py",
+      "sha256": "df0407cd0865b49055cdf605ed8d340b4035f2a85696951f630e6a45366fc212"
+    },
+    {
+      "bytes": 30055,
+      "mode": "0644",
+      "path": "scripts/naos_self_check.py",
+      "sha256": "b4630303e8ba419cbfecbf6122ab48b1d0658490a5fba02ac165ea7d3433bf83"
+    },
+    {
+      "bytes": 17137,
+      "mode": "0644",
+      "path": "scripts/naos_semantic_candidate_readiness.py",
+      "sha256": "aff6f34b2832c63947c766b74d159d9bb4fbed23c15921ed2231f99e2ee7987f"
+    },
+    {
+      "bytes": 18849,
+      "mode": "0644",
+      "path": "scripts/naos_session_identity.py",
+      "sha256": "05d6ffccafd93b8a643ddab97c57d1bd97160c5edbf5fbfb2835c59e9c56139b"
+    },
+    {
+      "bytes": 45960,
+      "mode": "0644",
+      "path": "scripts/naos_session_lifecycle.py",
+      "sha256": "79b2be726a8ed8130cc66116e6955b12e411e6e0f5f84ed6c7ae752a9831c057"
+    },
+    {
+      "bytes": 48469,
+      "mode": "0644",
+      "path": "scripts/naos_setup_recommendations.py",
+      "sha256": "59dee24eeae6d4640a5680491a0ecca2198aac1e295c6a97a381511d6600681c"
+    },
+    {
+      "bytes": 21688,
+      "mode": "0644",
+      "path": "scripts/naos_spec_assembly_worksheet.py",
+      "sha256": "9ac8bd222beae69b39a0f655367dfd6981791773fc88e52c86e6ccdf1adc356f"
+    },
+    {
+      "bytes": 30990,
+      "mode": "0644",
+      "path": "scripts/naos_spec_pack_contract.py",
+      "sha256": "84e44f969cd1ac8c7f1f31d298c83fbecc0e83d93f5a98594355a72ee07c24cd"
+    },
+    {
+      "bytes": 55541,
+      "mode": "0644",
+      "path": "scripts/naos_spec_pack_materialize.py",
+      "sha256": "95b848eecc6f4aa08e4110853891aac8460c9dece5545caf5b890467fa6e841b"
+    },
+    {
+      "bytes": 7155,
+      "mode": "0644",
+      "path": "scripts/naos_static_grader.py",
+      "sha256": "f46f24501a18e02eb27edee7f2fdf6b1ac74ea9293294f971db8296d4e3529ae"
+    },
+    {
+      "bytes": 74984,
+      "mode": "0644",
+      "path": "scripts/naos_systemic_impact.py",
+      "sha256": "ce734b5c6eed95e960014d531d728e6ed4509097787f8955f41236d1c0eee463"
+    },
+    {
+      "bytes": 32436,
+      "mode": "0644",
+      "path": "scripts/naos_task_claims.py",
+      "sha256": "85fbebcfeba22c85b3bbd1b3f03350455f186c99c7edf636ff7f14d92f27129c"
+    },
+    {
+      "bytes": 61947,
+      "mode": "0644",
+      "path": "scripts/naos_task_context_pack.py",
+      "sha256": "6ac9321718b56c0bb9637c7a1d72cd75deca764dfcff786f32b8c4bc854aeb80"
+    },
+    {
+      "bytes": 58992,
+      "mode": "0644",
+      "path": "scripts/naos_task_lifecycle.py",
+      "sha256": "8809792e7e1674a454eb462a70ad60eb2574810641eca06af2cf30ec54e4617c"
+    },
+    {
+      "bytes": 9171,
+      "mode": "0644",
+      "path": "scripts/naos_test_evidence_map.py",
+      "sha256": "41fd461977080e3d70b208c45893d018b9fba82ab36d9f4e17813a4ad2da9b4d"
+    },
+    {
+      "bytes": 1035,
+      "mode": "0644",
+      "path": "scripts/naos_test_quality_hygiene.py",
+      "sha256": "87037c326ea5a2112b6ee4525aa8f079dd3060d500ed4e6779a1bcd708546cf8"
+    },
+    {
+      "bytes": 476,
+      "mode": "0644",
+      "path": "scripts/naos_traceability_gap_register.py",
+      "sha256": "87103b4de96807e0e343284a5df40e012e37b86eda229f2c23b67b4a4750c70a"
+    },
+    {
+      "bytes": 40605,
+      "mode": "0644",
+      "path": "scripts/naos_ui_experience_quality.py",
+      "sha256": "3d5f1a5ab716c5f084b1283d5716a2a078e2346f7d15e60e6225bcc05a7999c6"
+    },
+    {
+      "bytes": 13790,
+      "mode": "0644",
+      "path": "scripts/naos_validate_claims.py",
+      "sha256": "01b9c01ec6d93cc596f1b3da3db1ef794eebe857202204dfd1afde81e7de7bdc"
+    },
+    {
+      "bytes": 390,
+      "mode": "0644",
+      "path": "scripts/naos_validate_instruction_budget.py",
+      "sha256": "54bf469ee815fc17457f0b7eeda346aad131765f3983d4918ed6be3436462f0d"
+    },
+    {
+      "bytes": 9724,
+      "mode": "0644",
+      "path": "scripts/naos_validate_roadmap_crosswalk.py",
+      "sha256": "0cdd458adb83e5410311cdafeb7e80df21b9176204a0e2141d0e6123573ba113"
+    },
+    {
+      "bytes": 15093,
+      "mode": "0644",
+      "path": "scripts/naos_validate_task_registry.py",
+      "sha256": "f2c10e47091521048effd4c64920bf19ae123a8b6b57da5f4ba3b7e770377e29"
+    },
+    {
+      "bytes": 4985,
+      "mode": "0644",
+      "path": "scripts/naos_validate_test_evidence.py",
+      "sha256": "968bd267e21652df4d7787fdb22a81814d192a8f582abfddfc3b30ebd579a77c"
+    },
+    {
+      "bytes": 10517,
+      "mode": "0644",
+      "path": "scripts/naos_validate_truth.py",
+      "sha256": "ae6ca5c03b9dc2b008dcd08b0d72c177bf75e2a6b3e1c357a114c607a23b30fe"
+    },
+    {
+      "bytes": 277,
+      "mode": "0644",
+      "path": "scripts/secure_coding_reporting/__init__.py",
+      "sha256": "0b364e740edd23967b2cbd644c9d2dc53b4383d38f885fe76d5d6de152c9e7e6"
+    },
+    {
+      "bytes": 17269,
+      "mode": "0644",
+      "path": "scripts/secure_coding_reporting/model.py",
+      "sha256": "43ff3ac94b6dcfe956c80d92ce25fc32571f3e1c5c644d5818de19364a4d4b29"
+    },
+    {
+      "bytes": 9111,
+      "mode": "0644",
+      "path": "scripts/secure_coding_reporting/portable_reference.py",
+      "sha256": "e8e31ebb141eaf501caaefeee78e19ae432c2ff2b52ca8ace641ad401b68c96e"
+    },
+    {
+      "bytes": 6357,
+      "mode": "0644",
+      "path": "scripts/secure_coding_reporting/projection.py",
+      "sha256": "7a10b9dfc39b903c953c96a678ef646cfb977f6183a783f47e554c9ba3b19299"
+    },
+    {
+      "bytes": 2125,
+      "mode": "0644",
+      "path": "scripts/secure_coding_reporting/sources.py",
+      "sha256": "f30998a6338293b27398b236e0ec02e4708d5010c7e970f28ce06937cc70f347"
+    },
+    {
+      "bytes": 2238,
+      "mode": "0644",
+      "path": "scripts/source_roots.py",
+      "sha256": "74972b5d6622fbf5293675f404795b2c9b1ce9f5d26af951b66e9db6dc7dc33b"
+    },
+    {
+      "bytes": 2413,
+      "mode": "0644",
+      "path": "scripts/spec_header.py",
+      "sha256": "ec73971468e513c2c6bc06f8f126ad188971feabc3a5a62ab824bf5e7299242e"
+    },
+    {
+      "bytes": 34,
+      "mode": "0644",
+      "path": "scripts/validators/__init__.py",
+      "sha256": "df2a1b6322a2535bd53960dca5cca444b7026c7c52fad9a93827b341a0efc2ea"
+    },
+    {
+      "bytes": 4218,
+      "mode": "0644",
+      "path": "scripts/validators/frontmatter_utils.py",
+      "sha256": "39bb1757b9eb5b04c4f5cfe5eacaecbfeb58bddf1853c2db54cf77adbddf8e5b"
+    },
+    {
+      "bytes": 8389,
+      "mode": "0644",
+      "path": "scripts/validators/lint_mermaid_diagrams.py",
+      "sha256": "a7fe3afd6ef7b0d44819c7fec12afd00fc02d870767229af23342e50ecda5fab"
+    },
+    {
+      "bytes": 10358,
+      "mode": "0644",
+      "path": "scripts/validators/validate_agents.py",
+      "sha256": "4880912d7a3ebf0ef7b298e034cf8983cbaa134039d226099f9c56d68e1614fd"
+    },
+    {
+      "bytes": 9131,
+      "mode": "0644",
+      "path": "scripts/validators/validate_architecture_coherence.py",
+      "sha256": "341bb81458186e531fa6a188e72f66d68dcdfc08cf26bca4a7f6ee35e3e0d3ae"
+    },
+    {
+      "bytes": 34584,
+      "mode": "0644",
+      "path": "scripts/validators/validate_capability_contracts.py",
+      "sha256": "d77d1171263c0d3b3878fd12ba9ba4ed2fb1a1bcf637a83b6504c52e1068b4bb"
+    },
+    {
+      "bytes": 9746,
+      "mode": "0644",
+      "path": "scripts/validators/validate_configs.py",
+      "sha256": "81560c04e2c31096e00e8653f86804df7701ba554a783e32ab9f185f9e081699"
+    },
+    {
+      "bytes": 12168,
+      "mode": "0644",
+      "path": "scripts/validators/validate_docs_consistency.py",
+      "sha256": "4b45ff8433203e4ca4fc022ca7e8a7c1f1b4cccbc63e80ef51481233d48291f3"
+    },
+    {
+      "bytes": 17786,
+      "mode": "0644",
+      "path": "scripts/validators/validate_governed_debug_escalation.py",
+      "sha256": "f55bf32bc334b03b8f80f385bfcf958e3dd9d2bcfd74fd2723f129bb59a7b7a1"
+    },
+    {
+      "bytes": 9675,
+      "mode": "0644",
+      "path": "scripts/validators/validate_implementation_reality.py",
+      "sha256": "850bd3e244dc4b7f5d5bc38265b9f7c4ded5d3c0e40bf7f5823f939c6dd6bca5"
+    },
+    {
+      "bytes": 2431,
+      "mode": "0644",
+      "path": "scripts/validators/validate_instructions.py",
+      "sha256": "415a6564b7c3c73dde7f814370215057a86db3927befd128e5a81e120400aa87"
+    },
+    {
+      "bytes": 7126,
+      "mode": "0644",
+      "path": "scripts/validators/validate_memory_setup.py",
+      "sha256": "c1d304acf785ea29f175cdf4cec2195e5a595954992418db8c122c76a3e27ee1"
+    },
+    {
+      "bytes": 12282,
+      "mode": "0644",
+      "path": "scripts/validators/validate_metrics_coherence.py",
+      "sha256": "d6eb42b408c947b21b0f4124a00e7e856fbd23e747533d90fee155896f92fa0a"
+    },
+    {
+      "bytes": 42241,
+      "mode": "0644",
+      "path": "scripts/validators/validate_profile_control_coherence.py",
+      "sha256": "57c71c1ad4b798dbe31be258364980d5c6557fe1df11027e78e15708b16180c5"
+    },
+    {
+      "bytes": 21353,
+      "mode": "0644",
+      "path": "scripts/validators/validate_profile_generated_surfaces.py",
+      "sha256": "4adcb976c8a88eaa53465a2327aa3ec54604537c5ab8fd534f3b183f727166df"
+    },
+    {
+      "bytes": 23543,
+      "mode": "0644",
+      "path": "scripts/validators/validate_project_coherence.py",
+      "sha256": "e0b2ccc594cfca4d78a1cb3517172631f800860df38c7bb428f92007a611c917"
+    },
+    {
+      "bytes": 18479,
+      "mode": "0644",
+      "path": "scripts/validators/validate_regulatory_claim_source_matrix.py",
+      "sha256": "4edb4dc075770f87006fbe15c312d2509a7b28448ca7607520fa7e3dffa35714"
+    },
+    {
+      "bytes": 10198,
+      "mode": "0644",
+      "path": "scripts/validators/validate_secure_coding_control_references.py",
+      "sha256": "3bd1fe62c255a34446eb8f178bf39ec80a9f118348769450fe2019d8e502fe73"
+    },
+    {
+      "bytes": 17334,
+      "mode": "0644",
+      "path": "scripts/validators/validate_secure_coding_control_register.py",
+      "sha256": "efe5c816b703b92c5f9862e8d4f0104cd4b0f9c7de5ff3fed3b73f0972e7a580"
+    },
+    {
+      "bytes": 2921,
+      "mode": "0644",
+      "path": "scripts/validators/validate_skills.py",
+      "sha256": "5d9199fd2daa18bd9a44b970a79456dc48dc67ffb89964ef801882a58cfdd880"
+    },
+    {
+      "bytes": 333,
+      "mode": "0644",
+      "path": "scripts/validators/validate_spec_pack_contract.py",
+      "sha256": "ac7839a765c997e7affca545cff1a6b0a4d3a947ea43d259107109dfaddc58cf"
+    },
+    {
+      "bytes": 14376,
+      "mode": "0644",
+      "path": "scripts/validators/validate_specs.py",
+      "sha256": "68d1c3fdac153b1ae141c04bc8fa44c7a6d14a886fe58ba44957138c0695cef0"
+    },
+    {
+      "bytes": 15990,
+      "mode": "0644",
+      "path": "scripts/validators/validate_task_coherence.py",
+      "sha256": "c858c620d1b97a3ea37cc5bbbd5640482c6ffad49e2f25cf0f3ae41488df231a"
+    },
+    {
+      "bytes": 5481,
+      "mode": "0644",
+      "path": "scripts/validators/validate_test_ac_references.py",
+      "sha256": "d324c2a5f2ef001e51ddc95c658f7e37ee05c12fef0620b66b697e5731af8283"
+    },
+    {
+      "bytes": 7615,
+      "mode": "0644",
+      "path": "scripts/validators/validate_traceability_headers.py",
+      "sha256": "b1a9b2f2f3a39197e704a3a3d04556953d30f2f85d357faf540f24da67a568e4"
+    },
+    {
+      "bytes": 6138,
+      "mode": "0644",
+      "path": "scripts/validators/validate_tutorial_consistency.py",
+      "sha256": "4550c1c7d40791bf75a4a3a10588e45e838282a5b663519aadec07f862c4b9b4"
+    },
+    {
+      "bytes": 759,
+      "mode": "0644",
+      "path": "scripts/validators/validator_context.py",
+      "sha256": "79a9e16fc093efe037af1472f21b77f0f2cabc39d6af27dce9f83a2b1c388a18"
+    },
+    {
+      "bytes": 3051,
+      "mode": "0644",
+      "path": "scripts/workflows/generate_backlog.py",
+      "sha256": "de8f84b32933a235471f46c2a7d09d821152d68798e708039f21bf4366c04854"
+    },
+    {
+      "bytes": 345601,
+      "mode": "0644",
+      "path": "scripts/workflows/generate_naos_dashboard.py",
+      "sha256": "8d410ca916771dc6117168c487339af4f63dd1064558d0e23767e97e82053bbc"
+    },
+    {
+      "bytes": 2342,
+      "mode": "0644",
+      "path": "scripts/workflows/generate_release_notes.py",
+      "sha256": "6210b7f1957d020f773cfa1a0a9a6130d491cf66fd2e887af2165793b847eaba"
+    },
+    {
+      "bytes": 21485,
+      "mode": "0644",
+      "path": "scripts/workflows/generate_traceability_matrix.py",
+      "sha256": "337ac8d499000b656da58a1a2d3134889a9defd28ebd53c1ae4d60a9c51af548"
+    },
+    {
+      "bytes": 4762,
+      "mode": "0644",
+      "path": "scripts/workflows/make_admissibility_pack.py",
+      "sha256": "758b23b4133b306ba1321f7051fc36d4698b55444b0af5ca5f6c829b3aeba202"
+    },
+    {
+      "bytes": 7784,
+      "mode": "0644",
+      "path": "scripts/workflows/metrics_snapshot.py",
+      "sha256": "519ac3fdd853298d5938a265b8cfc4109bdde96302cb47ce953ac9423d299a34"
+    },
+    {
+      "bytes": 29498,
+      "mode": "0644",
+      "path": "scripts/workflows/sync_from_registry.py",
+      "sha256": "54bf8ed101b08455db60abd337c729ff3dd325d748f8a12169ca2397088512d0"
+    },
+    {
+      "bytes": 15918,
+      "mode": "0644",
+      "path": "scripts/workflows/sync_spec_statuses.py",
+      "sha256": "1d8205a8a8cd08733fafa5cdc5308571b3ecb7c9a4a857bca8a24fc54d58210a"
+    },
+    {
+      "bytes": 911,
+      "mode": "0644",
+      "path": "secure_coding_reporting_cli.py",
+      "sha256": "6f739f1ffe9c71b100dbc5f83dd1c129efc06a9ba8a8a472b0d63e6529c5b8cb"
+    },
+    {
+      "bytes": 41168,
+      "mode": "0644",
+      "path": "task_battery/portable_scenarios.yaml",
+      "sha256": "c827722c9448deab0a170fafce1152a9540f5b75eed4163f47d139999cf6fff6"
+    },
+    {
+      "bytes": 83911,
+      "mode": "0644",
+      "path": "templates/Makefile.naos",
+      "sha256": "2197c098423242fd024a259d4047eb84b96e1230fd76f5b0293131f2b980cf14"
+    },
+    {
+      "bytes": 19721,
+      "mode": "0644",
+      "path": "templates/agents/AGENTS.md",
+      "sha256": "814c6f8b43ed500a50fd0fc5b3062a158097c68e2ef5037af3f219b1ae04612f"
+    },
+    {
+      "bytes": 2729,
+      "mode": "0644",
+      "path": "templates/agents/_HANDOFF_TEMPLATE.yaml",
+      "sha256": "0a5b699ffcaf5fcaeb528d370ec1e60d23aca235f9f3b9a242f3eaccb5cbe650"
+    },
+    {
+      "bytes": 7690,
+      "mode": "0644",
+      "path": "templates/agents/naos-conformance.agent.md",
+      "sha256": "5185e3a84540b353be56f02520ff01c456bc9f4c7d64ca5a309ceb12e510c416"
+    },
+    {
+      "bytes": 2819,
+      "mode": "0644",
+      "path": "templates/agents/naos-debug.agent.md",
+      "sha256": "5a9d7a9a153cf45ae245eeb3173387cd97fd6e9708bd05cd08573c965f06f248"
+    },
+    {
+      "bytes": 7991,
+      "mode": "0644",
+      "path": "templates/agents/naos-implement.agent.md",
+      "sha256": "6c7756937087d3c345cc797a1c3f4dc38e034bd173840415c3f2aa14aedec824"
+    },
+    {
+      "bytes": 6759,
+      "mode": "0644",
+      "path": "templates/agents/naos-plan.agent.md",
+      "sha256": "9f955760142ee8c2f685da2de0bd1f1ea219187b062b3eddb3a27d148dacca78"
+    },
+    {
+      "bytes": 2041,
+      "mode": "0644",
+      "path": "templates/agents/naos-research.agent.md",
+      "sha256": "15542cc8e178e57d1decbce5f9823257fbc55fd2963f93a5966472fcc4b575b2"
+    },
+    {
+      "bytes": 8032,
+      "mode": "0644",
+      "path": "templates/agents/naos-review.agent.md",
+      "sha256": "45cc779354e238f08fb62c401ad8f9fdfbf2fe529683640a459953e8853441f5"
+    },
+    {
+      "bytes": 2445,
+      "mode": "0644",
+      "path": "templates/agents/naos-triage.agent.md",
+      "sha256": "62652cb5de1477ec2a8262f92a411f5ec421aaa6b8d1b418074e3cfe047ce08e"
+    },
+    {
+      "bytes": 2948,
+      "mode": "0644",
+      "path": "templates/agents/optional/naos-implement-with-debug.agent.md",
+      "sha256": "c215c4a09de2f8cc8a576a1679bd37c865b6dd134b4633f1eea0135eded8a68e"
+    },
+    {
+      "bytes": 4685,
+      "mode": "0644",
+      "path": "templates/cursor-rules/naos-coding-standards.mdc",
+      "sha256": "fc16f5f85e0433e9c3d034722b13c28a1a5108b7654bd680b1a738c12c595ac2"
+    },
+    {
+      "bytes": 16067,
+      "mode": "0644",
+      "path": "templates/cursor-rules/naos-project-governance.mdc",
+      "sha256": "6e224c23b78e242c506e99e23ac367e5b7fa9f1df63d0c616a627461b070d7f9"
+    },
+    {
+      "bytes": 6251,
+      "mode": "0644",
+      "path": "templates/cursor-rules/naos-security-standards.mdc",
+      "sha256": "a7555db15fcee2061cb0dd537333a1e6bed7738fed162fccf4a296e544c32480"
+    },
+    {
+      "bytes": 1883,
+      "mode": "0644",
+      "path": "templates/instincts/INS-001.yaml",
+      "sha256": "c154372cf7abeebf4a9c44062fbabec9b56e65b764449a8bd3bdbde92d7e9873"
+    },
+    {
+      "bytes": 1590,
+      "mode": "0644",
+      "path": "templates/instincts/INS-002.yaml",
+      "sha256": "a4876185fa3fea87f3665c41222879e59e1318c51bfbda9a1561953a35f6b41b"
+    },
+    {
+      "bytes": 2102,
+      "mode": "0644",
+      "path": "templates/instincts/INS-003.yaml",
+      "sha256": "007e946c9e24133b19754c12eb336f13b80350bea2da559149c5c0ccf99286a0"
+    },
+    {
+      "bytes": 1949,
+      "mode": "0644",
+      "path": "templates/instincts/INS-004.yaml",
+      "sha256": "6478879535ff897d8e0757b1db132530b4a43c5aaaa1122696c208fa6c654d20"
+    },
+    {
+      "bytes": 1650,
+      "mode": "0644",
+      "path": "templates/instincts/INS-005.yaml",
+      "sha256": "6ac1524505fd86d769b95f31fc66845615a38d7ba66a2072fceb963ca9618e9c"
+    },
+    {
+      "bytes": 1838,
+      "mode": "0644",
+      "path": "templates/instincts/INS-006.yaml",
+      "sha256": "441155d2ec9a57ac0d9c6ee08641960432d37b97d2b97dc81f726e88593e07b3"
+    },
+    {
+      "bytes": 1810,
+      "mode": "0644",
+      "path": "templates/instincts/INS-007.yaml",
+      "sha256": "9f60d1e28eb4a96c4ee40b77cb3719efdc7c0e09a43953d7e748eff92c7b22db"
+    },
+    {
+      "bytes": 2165,
+      "mode": "0644",
+      "path": "templates/instincts/INS-008.yaml",
+      "sha256": "b2714acbe362e51057d0836f81c1cae55d50890c68d5390b5aacd10b069d333f"
+    },
+    {
+      "bytes": 2466,
+      "mode": "0644",
+      "path": "templates/instincts/INS-009.yaml",
+      "sha256": "be3ee401c3b416c8feb5b0d2e0ce1b3ed81439c85c4e0b593e3591fdf96fa89e"
+    },
+    {
+      "bytes": 3678,
+      "mode": "0644",
+      "path": "templates/instincts/schema.yaml",
+      "sha256": "46fb26e88fad471195140cce7910ba00cb8aae96ef9e4f99adc9b7cf7e03757b"
+    },
+    {
+      "bytes": 21987,
+      "mode": "0644",
+      "path": "templates/instruction-triple/CLAUDE.md",
+      "sha256": "80473443a3a8a66d12bcd5543a4d0d19d5a8871f18a2b7e7700fb1d53884c435"
+    },
+    {
+      "bytes": 19621,
+      "mode": "0644",
+      "path": "templates/instruction-triple/copilot-instructions.md",
+      "sha256": "45cbdaa3a17acd74c3802e58e972f24871ec58a47a25c5c18a0e701ea4e7ab09"
+    },
+    {
+      "bytes": 3868,
+      "mode": "0644",
+      "path": "templates/instruction-triple/project-context.md",
+      "sha256": "983dda90f82c97e5559868ce784b326908a1fe57243d3666554c5fffd69e27bb"
+    },
+    {
+      "bytes": 4546,
+      "mode": "0644",
+      "path": "templates/instructions/ai-pipeline.instructions.md",
+      "sha256": "ac55d16b41058b648c704b1692bdbc504a9e10121978f34ee423f0e68908286b"
+    },
+    {
+      "bytes": 3710,
+      "mode": "0644",
+      "path": "templates/instructions/api-endpoints.instructions.md",
+      "sha256": "66eccf5d8d6f39c7d05e21e53cbcb8e578b80929c9653ec7ca6e9e14139f6b80"
+    },
+    {
+      "bytes": 2202,
+      "mode": "0644",
+      "path": "templates/instructions/configs.instructions.md",
+      "sha256": "7007faf86158836ffcf764ee0633d5143db93e84ebdd38d3b062173b5a61ee9d"
+    },
+    {
+      "bytes": 3485,
+      "mode": "0644",
+      "path": "templates/instructions/context-pressure.instructions.md",
+      "sha256": "2b79c43349451499ed4926682750c32987a45aa61b7e76993a472401a541b96f"
+    },
+    {
+      "bytes": 3683,
+      "mode": "0644",
+      "path": "templates/instructions/database.instructions.md",
+      "sha256": "db847c865cf899b97f638c45d23f09f3f02713606d445d121e79dd23da820da3"
+    },
+    {
+      "bytes": 2371,
+      "mode": "0644",
+      "path": "templates/instructions/docker-deployment.instructions.md",
+      "sha256": "bbf220f03ef3c3ed3a2c04cc333f8b3043941cddd766d9310b4374ec3856b770"
+    },
+    {
+      "bytes": 3253,
+      "mode": "0644",
+      "path": "templates/instructions/event-bus.instructions.md",
+      "sha256": "d313bcd49ef38b826e9ef2b43d2ddda1bf3c3cbc6c1145b28d7edb0942963f51"
+    },
+    {
+      "bytes": 1794,
+      "mode": "0644",
+      "path": "templates/instructions/frontend.instructions.md",
+      "sha256": "3d9ae7316167c3a5322a298545cdbaf59539518fdd0fe661460e4fb55ad5a7d1"
+    },
+    {
+      "bytes": 3995,
+      "mode": "0644",
+      "path": "templates/instructions/function-discovery.instructions.md",
+      "sha256": "1719215835a6d0c25a022caea7453241046da44f3f2654df6f3ff32d003b7db5"
+    },
+    {
+      "bytes": 15018,
+      "mode": "0644",
+      "path": "templates/instructions/governance.instructions.md",
+      "sha256": "f9fc83c2658719e3b21f46199b906ac6de223901416119112f72a6e5510ed7c7"
+    },
+    {
+      "bytes": 2710,
+      "mode": "0644",
+      "path": "templates/instructions/graph-database.instructions.md",
+      "sha256": "6e7fc7f2e496cf8e519f33f1d02fc7977a7ec1398d8ea6c676d891ff78d0b129"
+    },
+    {
+      "bytes": 2962,
+      "mode": "0644",
+      "path": "templates/instructions/migrations.instructions.md",
+      "sha256": "a5ab7661bd2fadabdf0ccea490f5e4b9f9ecab6e49986a1cb5a65582ddb5d7c5"
+    },
+    {
+      "bytes": 3705,
+      "mode": "0644",
+      "path": "templates/instructions/python-backend.instructions.md",
+      "sha256": "569ad64178b63df4c4b2958b08b4f36cfa1d1f8457228c60e9463a4e8b51dbb9"
+    },
+    {
+      "bytes": 6623,
+      "mode": "0644",
+      "path": "templates/instructions/security.instructions.md",
+      "sha256": "36e328ba6ada8f02ffa769ca8a1368ae55afe552f872d581f29b9329f16061fc"
+    },
+    {
+      "bytes": 7366,
+      "mode": "0644",
+      "path": "templates/instructions/session-management.instructions.md",
+      "sha256": "d6fb700c973c2d32c91bdab1f41f4c454a1278e7f7ff5b3f80ac2d8f16ef3b68"
+    },
+    {
+      "bytes": 1790,
+      "mode": "0644",
+      "path": "templates/instructions/tests.instructions.md",
+      "sha256": "f95b1a25cf7ef32020bf8fc8c361a588669b508f415b032757315dd4967b22a3"
+    },
+    {
+      "bytes": 3578,
+      "mode": "0644",
+      "path": "templates/instructions/ui-design.instructions.md",
+      "sha256": "da4a9e3d6cd029e83f642a18a8d57138deece2356ca372fe7dbcce107a6e64d4"
+    },
+    {
+      "bytes": 3143,
+      "mode": "0644",
+      "path": "templates/integrations/agent-orchestration-plan/agent_orchestration_policy.yaml",
+      "sha256": "a2145a500c9fd1837eaf79d02113b07f4be3dede37f8a760772e56f82435e3f7"
+    },
+    {
+      "bytes": 696,
+      "mode": "0644",
+      "path": "templates/integrations/agent-orchestration-plan/agent_orchestration_request.yaml",
+      "sha256": "7fdce7b347ba2fbd1d45e4b7708a8440437c4e3ffa4c93e82162b5a3ea5fecd5"
+    },
+    {
+      "bytes": 4487,
+      "mode": "0644",
+      "path": "templates/integrations/claude-code-plugin/README.md",
+      "sha256": "87e3421d292e6af91a14ad083afcdbd096fae0c53cb1d8ae8ad0ce861f780204"
+    },
+    {
+      "bytes": 587,
+      "mode": "0644",
+      "path": "templates/integrations/claude-code-plugin/integration-manifest.json",
+      "sha256": "84d75290f6d4cd898b35ff67a5d7060aec12f9441ad85e4ac42f0af2792d7b51"
+    },
+    {
+      "bytes": 3411,
+      "mode": "0644",
+      "path": "templates/integrations/claude-code/README.md",
+      "sha256": "1c3cca47b1901475afadef4540f3863c0c6636b8198142c66b39c8ddc1f7f0d3"
+    },
+    {
+      "bytes": 487,
+      "mode": "0755",
+      "path": "templates/integrations/claude-code/hooks/post-tool-write.sh",
+      "sha256": "88c682ff5338a490874a3a39fa1908a33e58d811b3a002a1ea816735c84b884b"
+    },
+    {
+      "bytes": 706,
+      "mode": "0755",
+      "path": "templates/integrations/claude-code/hooks/pre-compact.sh",
+      "sha256": "8872512df3bed99ab04d9523e94451b3a1ba86e3efea9091d3172c6fd3e831fb"
+    },
+    {
+      "bytes": 659,
+      "mode": "0755",
+      "path": "templates/integrations/claude-code/hooks/pre-session.sh",
+      "sha256": "2714efbecb1a4c57befc31260891f9e27b6fa4363c9899559804ca8eebfc7f35"
+    },
+    {
+      "bytes": 563,
+      "mode": "0755",
+      "path": "templates/integrations/claude-code/hooks/pre-tool-bash.sh",
+      "sha256": "df471988c45ea8e4b8b2d70090f80123af39778f69ccacc617a3b4bafae12365"
+    },
+    {
+      "bytes": 502,
+      "mode": "0755",
+      "path": "templates/integrations/claude-code/hooks/pre-tool-edit.sh",
+      "sha256": "141e3c07ee6033b1c93bd34fa5d0d04e302b77be2f1a53c5d5dd98d28e214100"
+    },
+    {
+      "bytes": 674,
+      "mode": "0755",
+      "path": "templates/integrations/claude-code/hooks/stop.sh",
+      "sha256": "d2d2aec5a01471bcd781a1af9164979d625ad3b99d6dba9845cd5ca140c82418"
+    },
+    {
+      "bytes": 1465,
+      "mode": "0644",
+      "path": "templates/integrations/claude-code/settings.assured.template.json",
+      "sha256": "4b708910e1e86a5e2e16e3bea3b38ea99feb8df1741287dc6427ed27ba3c1a44"
+    },
+    {
+      "bytes": 1294,
+      "mode": "0644",
+      "path": "templates/integrations/claude-code/settings.template.json",
+      "sha256": "386de01fb29d2d0894ac6a7562aef97c5b18a3e4f25075fe93737389971c0e27"
+    },
+    {
+      "bytes": 4045,
+      "mode": "0644",
+      "path": "templates/integrations/codex-plugin/README.md",
+      "sha256": "9d761f3fa36539356390218cce55eeb6fcd26e9929e8da854533ba091ac411a3"
+    },
+    {
+      "bytes": 1048,
+      "mode": "0644",
+      "path": "templates/integrations/codex-plugin/integration-manifest.json",
+      "sha256": "ecedc121e5f5e406faa5a05ad3faca5c7eccc1fbb60eb4e473f6a68c7835743b"
+    },
+    {
+      "bytes": 3914,
+      "mode": "0644",
+      "path": "templates/integrations/spec-kit/README.md",
+      "sha256": "10e6031f744a946e6ef39d8d65fc6807ddb7d350d00b85a1db16a904e254d05e"
+    },
+    {
+      "bytes": 1227,
+      "mode": "0644",
+      "path": "templates/integrations/spec-kit/examples/basic-mapping.md",
+      "sha256": "ee2feaa91fa9ceea9f1a287df13611b1f58f2ba3e46c6c0fe07f10cc89e41ad4"
+    },
+    {
+      "bytes": 1487,
+      "mode": "0644",
+      "path": "templates/integrations/spec-kit/examples/regulated-mapping.md",
+      "sha256": "cf90f9503217b20e116f83ba6520e5970a6f700c521b054615dcba7ea1c1d106"
+    },
+    {
+      "bytes": 1050,
+      "mode": "0644",
+      "path": "templates/integrations/spec-kit/extension-manifest.json",
+      "sha256": "215b2244596b5ba505b037017581cb8195d660984c98fbe96594a5fb76b97d1e"
+    },
+    {
+      "bytes": 4270,
+      "mode": "0755",
+      "path": "templates/integrations/spec-kit/speckit_adapter.py",
+      "sha256": "75b56f06517232a142f858bb7b72bf0f9db11e3fa95d5793bdeba809c10f9bde"
+    },
+    {
+      "bytes": 12534,
+      "mode": "0644",
+      "path": "templates/profiles/governance-assured.yaml",
+      "sha256": "215637c20ef3c0333dd8a4e3b1a6df6f4a6f6691680dfa11f3250bc75498a9a2"
+    },
+    {
+      "bytes": 8803,
+      "mode": "0644",
+      "path": "templates/profiles/governance-lite.yaml",
+      "sha256": "4fe06fddea8f8c05ebe8e473483af2d67e861e4cd0b4956ddf0e770b082f5159"
+    },
+    {
+      "bytes": 3614,
+      "mode": "0644",
+      "path": "templates/profiles/governance-quickstart.yaml",
+      "sha256": "170e180549c5936a35c417341ea9b6b585f6ea75d6807ffe98e0d991d2fccf62"
+    },
+    {
+      "bytes": 10948,
+      "mode": "0644",
+      "path": "templates/profiles/governance-standard.yaml",
+      "sha256": "e4a8f8be55a0e70c6be60243feafa8c88744a17e4d090d874e0545c6ee0f6a01"
+    },
+    {
+      "bytes": 4064,
+      "mode": "0644",
+      "path": "templates/profiles/schema.yaml",
+      "sha256": "ac72bf82dc481836088bab07c505b7b35f5a38c5b2c713aa99f2beb2d0120077"
+    },
+    {
+      "bytes": 2714,
+      "mode": "0644",
+      "path": "templates/prompts/naos-GOVERNANCE_BOOTSTRAP-lean.prompt.md",
+      "sha256": "c1ccc5f2f2a3c5cfbd8ddf90d906afe28514bb8a51cc949394b7f44b0198db19"
+    },
+    {
+      "bytes": 19997,
+      "mode": "0644",
+      "path": "templates/prompts/naos-GOVERNANCE_BOOTSTRAP.prompt.md",
+      "sha256": "144abbc4a6eaa6d8403de5b12fd5379e4d7c08eddb13df22b0513142ef9a5247"
+    },
+    {
+      "bytes": 4472,
+      "mode": "0644",
+      "path": "templates/prompts/naos-add-feature.prompt.md",
+      "sha256": "1f6194d60ca3f07f420e4a71893c8293284e9e749dbc8a1f23e606b572349d29"
+    },
+    {
+      "bytes": 2872,
+      "mode": "0644",
+      "path": "templates/prompts/naos-d-commit.prompt.md",
+      "sha256": "3702b43436b1273577bb6a17eea47ade6aad3e0b43c68ac6ab85b411d20f4179"
+    },
+    {
+      "bytes": 6703,
+      "mode": "0644",
+      "path": "templates/prompts/naos-d-end.prompt.md",
+      "sha256": "72ca80a4f65df0103418b0fda088f1f6011d42eef6dcb3ef0e8b0fddc16783bf"
+    },
+    {
+      "bytes": 8598,
+      "mode": "0644",
+      "path": "templates/prompts/naos-d-start.prompt.md",
+      "sha256": "79ad872932ebf9b0cd2ff218f71a58bc611ef32535f105bb257104fb171172ea"
+    },
+    {
+      "bytes": 19676,
+      "mode": "0644",
+      "path": "templates/prompts/naos-design.prompt.md",
+      "sha256": "dcc0ad78e9af4184c0b09ae85c39a4c512a1dfb4561ed22ed4bba4dad1f13cb4"
+    },
+    {
+      "bytes": 4596,
+      "mode": "0644",
+      "path": "templates/prompts/naos-m-review.prompt.md",
+      "sha256": "dfbe1bb432020d8c082c99de63f1bce176eae63687880aad155f9de9f83542ff"
+    },
+    {
+      "bytes": 7191,
+      "mode": "0644",
+      "path": "templates/prompts/naos-specify.prompt.md",
+      "sha256": "1291e29d1292f32766b57f006208ecd563aaa867882d32b465d005401d9caad1"
+    },
+    {
+      "bytes": 1283,
+      "mode": "0644",
+      "path": "templates/prompts/naos-t-precommit.prompt.md",
+      "sha256": "02b0e57ec16bd6486767c2547ff6606e3d8be863405c17f3f7e91c9b6ee36632"
+    },
+    {
+      "bytes": 4867,
+      "mode": "0644",
+      "path": "templates/prompts/naos-t-test-failure.prompt.md",
+      "sha256": "f782651acab9926f0c86d41eadb33733f00d8d9fafb4375850dd3e304d286b3b"
+    },
+    {
+      "bytes": 4969,
+      "mode": "0644",
+      "path": "templates/prompts/naos-task-complete.prompt.md",
+      "sha256": "8505f511a3e1823fb87920cef1008af90ff3693aea14807acab2c3e04915039e"
+    },
+    {
+      "bytes": 7421,
+      "mode": "0644",
+      "path": "templates/prompts/naos-task-start.prompt.md",
+      "sha256": "00b52760394c7229a467eca9eca3dbcafaedc84f194efc71d09e5b42a195abf3"
+    },
+    {
+      "bytes": 3790,
+      "mode": "0644",
+      "path": "templates/prompts/naos-ui-design-start.prompt.md",
+      "sha256": "0ca658ce7cd1e424a682d26705b43c6d9555044c3120699c9fd9274833563071"
+    },
+    {
+      "bytes": 2667,
+      "mode": "0644",
+      "path": "templates/prompts/naos-w-plan.prompt.md",
+      "sha256": "84082781df5b0d5742ab9bef3110929509f2ad1222d35514fa9d9c9498403b03"
+    },
+    {
+      "bytes": 2137,
+      "mode": "0644",
+      "path": "templates/prompts/naos-w-review.prompt.md",
+      "sha256": "c9a683f932f07e6392607b8f93caf133ede40b0b3728142f29b9c359cfc5c595"
+    },
+    {
+      "bytes": 2906,
+      "mode": "0644",
+      "path": "templates/prompts/pre_implementation_alignment.md",
+      "sha256": "a49db5edf523c7ec49888ed5a875415ea76943d89e048aaf35c698326f9fef64"
+    },
+    {
+      "bytes": 8289,
+      "mode": "0644",
+      "path": "templates/rules-chain/.ai/config.yml",
+      "sha256": "e0842eb1a32d3a830dcbfdef7bd95773926bea9172140ed04360643cbec0cb93"
+    },
+    {
+      "bytes": 15827,
+      "mode": "0644",
+      "path": "templates/rules-chain/.githooks/pre-commit",
+      "sha256": "e2cad442302dbaf5fb199e64d2af053d8b1820ce55eaa62af2139f3b8a1fa855"
+    },
+    {
+      "bytes": 1891,
+      "mode": "0644",
+      "path": "templates/setup-modules/agent_sponsor_registry.yaml",
+      "sha256": "26ebf33ffa1abfe3df877d652c8d5df0f308a2977e7edd043f8d6fe71a57d7e8"
+    },
+    {
+      "bytes": 1570,
+      "mode": "0644",
+      "path": "templates/setup-modules/aivss_assessments.yaml",
+      "sha256": "68705a18f9738fcacadab3139b945c774a406b522e7b810ec510a75d19b576ec"
+    },
+    {
+      "bytes": 4421,
+      "mode": "0644",
+      "path": "templates/setup-modules/capabilities/agent_sponsor_registry.yaml",
+      "sha256": "d2aad2bf032b63fffd213098727416a202746bb75527de9da9ebfde542522216"
+    },
+    {
+      "bytes": 4289,
+      "mode": "0644",
+      "path": "templates/setup-modules/capabilities/aivss_arithmetic_verification.yaml",
+      "sha256": "f315c996f212e74304f1f64a33470bb5429a30d017cc48f5656eed350f23cc32"
+    },
+    {
+      "bytes": 3328,
+      "mode": "0644",
+      "path": "templates/skills/ai-surface-health-review/SKILL.md",
+      "sha256": "0df9cac43fa48d9310ca35fa2430328f36065aab740e0d35fcf45b7807178d20"
+    },
+    {
+      "bytes": 8416,
+      "mode": "0644",
+      "path": "templates/skills/cognitive-checkpoint/SKILL.md",
+      "sha256": "d1017bffa256178e6c2d032445fc835eb0e15f9ee6e4641853e670664f8164a6"
+    },
+    {
+      "bytes": 2076,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-configs/SKILL.md",
+      "sha256": "000dab451ad604e644c7a1f477e5f86bf8ab2b59879c337e820d7756cdc880c0"
+    },
+    {
+      "bytes": 1641,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-docker/SKILL.md",
+      "sha256": "34f13be3d9ea4c16eb9970993616535d0a5a585b1be2e5bb27818b75b63883ec"
+    },
+    {
+      "bytes": 3603,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-evals/SKILL.md",
+      "sha256": "f7ffee7b0ab70d5193c8dfa935f717c2775e69f7df43e6420fb4bba531b930cd"
+    },
+    {
+      "bytes": 3288,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-frontend/SKILL.md",
+      "sha256": "0722f060fc1371bbed3acc10f24aeb638f877cb00bcd19000b2d8931b8cf6c8a"
+    },
+    {
+      "bytes": 2398,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-governance/SKILL.md",
+      "sha256": "4836986af79a12f938d6949030588d9b810c8aeeb40f73066cc8922e58fa3833"
+    },
+    {
+      "bytes": 2882,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-migrations/SKILL.md",
+      "sha256": "51618b7d052d40c28d67885e1c7ea2ede1f7d16e5c002abb78310dff0143ba83"
+    },
+    {
+      "bytes": 2376,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-neo4j/SKILL.md",
+      "sha256": "9b829edbf85f5b4eae83c3d90ccb8db1c1cab9dc7e47b4d2363e2f604a53740f"
+    },
+    {
+      "bytes": 3342,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-observability/SKILL.md",
+      "sha256": "97e9eb35485d0950142dced5c970a38f31c0dd9d8947f8fa2445816dd486ac61"
+    },
+    {
+      "bytes": 1992,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-python/SKILL.md",
+      "sha256": "399f48fd51061dc56c0fb00dfe8d8d3fe1fc1a37f1cbc74b435a1bb5533357fc"
+    },
+    {
+      "bytes": 2228,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-tests/SKILL.md",
+      "sha256": "90698d325a697733ecff187d15d472ca4ef5c14f7ec0b4e7ad9d9eb0535c3a4f"
+    },
+    {
+      "bytes": 4017,
+      "mode": "0644",
+      "path": "templates/skills/cookbook-ui/SKILL.md",
+      "sha256": "9d546ee3158e4c66f16eb27a5c684eaf61d810490a0e8fb8692b9da34cce3ff0"
+    },
+    {
+      "bytes": 2106,
+      "mode": "0644",
+      "path": "templates/skills/debug/SKILL.md",
+      "sha256": "1e2b0edd1d065bfde409a8cbc0a2914fe3698ac3fb333a4690a348596e935de7"
+    },
+    {
+      "bytes": 15140,
+      "mode": "0644",
+      "path": "templates/skills/forensic-audit/SKILL.md",
+      "sha256": "e9517b9bcccb24ccd739775578904e48f158595e1a3be2cf1b72a75a1fa7feff"
+    },
+    {
+      "bytes": 4004,
+      "mode": "0644",
+      "path": "templates/skills/function-discovery/SKILL.md",
+      "sha256": "5fbd09c93069f28577e2adaaccd7b3079c0fe026385c9a9888b54fa2518d5b4a"
+    },
+    {
+      "bytes": 2816,
+      "mode": "0644",
+      "path": "templates/skills/gov-refresh/SKILL.md",
+      "sha256": "f2ca0693b33b79b97c81f5eeecbbc3ff5c8548835453bfb7b5aa00832fd233fb"
+    },
+    {
+      "bytes": 7068,
+      "mode": "0644",
+      "path": "templates/skills/governed-coding-execution/SKILL.md",
+      "sha256": "78826c0ff8e602f357a23f577159c9ef2a58a4c24ef8ac6b12116b346a237783"
+    },
+    {
+      "bytes": 2422,
+      "mode": "0644",
+      "path": "templates/skills/governed-learning-lifecycle/SKILL.md",
+      "sha256": "e00243733f84bc1e19f05be1f3738bc84a019c47507d9f60beb200cd3803848b"
+    },
+    {
+      "bytes": 6176,
+      "mode": "0644",
+      "path": "templates/skills/instinct-observer/SKILL.md",
+      "sha256": "f8bbeb1320e0985ed410ffb0728ff8665257cc5235b5d7b130d59035f4dae656"
+    },
+    {
+      "bytes": 2686,
+      "mode": "0644",
+      "path": "templates/skills/spec-extract/SKILL.md",
+      "sha256": "06fcd2cecb4ee5f0b04c1c09488402d4f3fe384811b42da5704013fe1911ce97"
+    },
+    {
+      "bytes": 6284,
+      "mode": "0644",
+      "path": "templates/skills/strategic-compact/SKILL.md",
+      "sha256": "706dce4aa2cebf80a9713d675ad0a01ffdcfa5d3c66d36ba0a8f91ee14a3c1f9"
+    },
+    {
+      "bytes": 13601,
+      "mode": "0644",
+      "path": "templates/skills/systemic-capability-wiring/SKILL.md",
+      "sha256": "f060dd7b84a90c5be35c57b53229661c62bc820a23c906d46646f03b62422051"
+    },
+    {
+      "bytes": 16129,
+      "mode": "0644",
+      "path": "templates/skills/systemic-wiring/SKILL.md",
+      "sha256": "d160333ba07e88f2e1c1eff30e4e97696c8562085b66419386d39dc1a21e537b"
+    },
+    {
+      "bytes": 2480,
+      "mode": "0644",
+      "path": "templates/skills/test-driven-development/SKILL.md",
+      "sha256": "b594d9bfc7d26dfb98da907583432af3bab040f45f935bff43f0b6595d67dc82"
+    },
+    {
+      "bytes": 2420,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/01-problem.md",
+      "sha256": "c2ba8cf86c75beada3b310911f0288d0701b29cda02c34d9bf515b21a7746d81"
+    },
+    {
+      "bytes": 2389,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/02-solution.md",
+      "sha256": "fb2a3d5a9f1b8c58cf4ce445967a00f3c00bd31411629c34aeab054d27d30b48"
+    },
+    {
+      "bytes": 4153,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/03-requirements.md",
+      "sha256": "2f2b199437829fa757c582ee18d4a35e9a4c8a8ddc2ddd08232e3fc355c243e2"
+    },
+    {
+      "bytes": 3069,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/04-architecture.md",
+      "sha256": "f6640dd983549f2571f5d63e047fe3375048469ca6c7ffdf79d5651fb029f065"
+    },
+    {
+      "bytes": 2463,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/05-api.md",
+      "sha256": "1406ae253cbbb7c16419aa87ba2b8200962d1bd3c8dca6f506827454b46eef0d"
+    },
+    {
+      "bytes": 3031,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/06-acceptance.md",
+      "sha256": "f566afdf3661eebaf9e298165139ce115bec4195edd8fe2e9a272084ca2f2e53"
+    },
+    {
+      "bytes": 2081,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/07-cost-analysis.md",
+      "sha256": "e964feae7c17b20620b564eaa2dfe2e4fcf1f288dafcc1d585d85b45c53d1524"
+    },
+    {
+      "bytes": 2287,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/08-market-analysis.md",
+      "sha256": "5f4c7029307042d47a54b08e10a7e9f35eb492a67476d5e1599aecb4f53260f7"
+    },
+    {
+      "bytes": 2355,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/09-integration-contract.md",
+      "sha256": "b5e4860db136deb37ab73a1ed5a343208661ad357a949b88e355093783bd28d0"
+    },
+    {
+      "bytes": 2339,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/10-execution.md",
+      "sha256": "feb0093ffea2b560493a8b0ade60842bdde3b443c8a438cb5872cd01c057c897"
+    },
+    {
+      "bytes": 2741,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/README.md",
+      "sha256": "0179e56cb82171b245e0a78c11390fe94b57065fa02033d25c638f00c4f99a37"
+    },
+    {
+      "bytes": 12335,
+      "mode": "0644",
+      "path": "templates/spec-kit/specs/spec_manifest.yaml",
+      "sha256": "924fa63071f1018bc2dcc3649e827c342cf9f4258e741cd6152539389b167ee9"
+    },
+    {
+      "bytes": 4102,
+      "mode": "0644",
+      "path": "templates/structural-seeds/CONTRIBUTING.md",
+      "sha256": "996b02ef15d98865c8d7d2bff274db33063cdc2d0dd096440915f47f826ec224"
+    },
+    {
+      "bytes": 1646,
+      "mode": "0644",
+      "path": "templates/structural-seeds/Makefile.naos.secure-coding-reporting",
+      "sha256": "592080de25bafebc158bbd48c9f2324a2bc6e06f5c69630b7e5b9f36f69f7eeb"
+    },
+    {
+      "bytes": 5617,
+      "mode": "0644",
+      "path": "templates/structural-seeds/NAOS_QUICKSTART.md",
+      "sha256": "ff20f2ef316e816ad78f23167f71d36cab4fac7e03c32c1ef06bc7c86b8a63ae"
+    },
+    {
+      "bytes": 3270,
+      "mode": "0644",
+      "path": "templates/structural-seeds/QUICK_START.md",
+      "sha256": "e7267ea129e04c788d7ab36ca3caea405bf61c8e9817957489a9640b4194a9b9"
+    },
+    {
+      "bytes": 137,
+      "mode": "0644",
+      "path": "templates/structural-seeds/configs/features.yaml",
+      "sha256": "f7a98a1a37a37b5bd1f016ae5674554efb901507eea3d1c414072442b7d763c6"
+    },
+    {
+      "bytes": 2623,
+      "mode": "0644",
+      "path": "templates/structural-seeds/configs/naos_ai_precommit.yaml",
+      "sha256": "af121ddaa62ab84ecd68d52373bc48477fc09e26c8684d517ac42fd061c8ddca"
+    },
+    {
+      "bytes": 3164,
+      "mode": "0644",
+      "path": "templates/structural-seeds/configs/naos_architecture_boundaries.yaml",
+      "sha256": "f04728972b1bae0c0aaef512f014a362e0f25ff3163ebbef6d0bf73d9631f319"
+    },
+    {
+      "bytes": 5256,
+      "mode": "0644",
+      "path": "templates/structural-seeds/configs/naos_autoresearch.yaml",
+      "sha256": "3bb799995114cce70d3a49855c8d5b50c8e2f00e8b941704319b4efb90461c16"
+    },
+    {
+      "bytes": 1543,
+      "mode": "0644",
+      "path": "templates/structural-seeds/configs/naos_duplicate_allowlist.yaml",
+      "sha256": "3189b8b52404ffbbf5f308dbf34958439b9d300fee30ebad7c2815209b56219f"
+    },
+    {
+      "bytes": 1991,
+      "mode": "0644",
+      "path": "templates/structural-seeds/configs/naos_memory.yaml",
+      "sha256": "934daac7e77a141c491ff6b883149753894204501a447f5a422e69b2e1e7ea26"
+    },
+    {
+      "bytes": 1612,
+      "mode": "0644",
+      "path": "templates/structural-seeds/configs/naos_semantic_allowlist.yaml",
+      "sha256": "11efce3639e5d58561f1716e5e5703b5d3bf2b3e908bc83305831ad816bfbcae"
+    },
+    {
+      "bytes": 1181,
+      "mode": "0644",
+      "path": "templates/structural-seeds/docs/DEPRECATION_LIST.md",
+      "sha256": "e62c64a1399df047e0a3d42b25306cc0c4c5019554bf2183a2033b14692cda4b"
+    },
+    {
+      "bytes": 3957,
+      "mode": "0644",
+      "path": "templates/structural-seeds/docs/DOCS_INDEX.md",
+      "sha256": "d9544ec3b40ecb53fa5d20c234c322f364f78da961be8b72c16052880e6c5de7"
+    },
+    {
+      "bytes": 377,
+      "mode": "0644",
+      "path": "templates/structural-seeds/docs/exploration/README.md",
+      "sha256": "e6bc3bd38f6a3bf580b9a8c1b1f8d73893b91d4c4f4ca3e4db6588c220838213"
+    },
+    {
+      "bytes": 8834,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/AGENTIC_CODING_PLAYBOOK.md",
+      "sha256": "d167d2b2717f49f271fb354484312aeb6f73cb22b8877ceca64f930a6c5bd687"
+    },
+    {
+      "bytes": 196,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/BACKLOG.md",
+      "sha256": "30304342e1cd41f6ae039f9b00e58390ed81a5817cb77a76dbcaf20cce87dfa4"
+    },
+    {
+      "bytes": 203,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/DASHBOARD.md",
+      "sha256": "79ec9ff9166be3754bf46686a9318d95330d9d8857b45f8d8b3e539c43d0cb7c"
+    },
+    {
+      "bytes": 64782,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md",
+      "sha256": "892a3c7cd584d9a6d5941b47192c80b61928284b8b17f8582a0385fdfe2d7c6a"
+    },
+    {
+      "bytes": 1966,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/PLANNING_BASELINES.yaml",
+      "sha256": "6b89184a0bffa46c3c1fc665bc749842806857f29867fac9439ffefbbdb83597"
+    },
+    {
+      "bytes": 3209,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/PRE_IMPLEMENTATION_ALIGNMENT.md",
+      "sha256": "fd172ed1782af7e1b773542476d4a1f5e4fa05c474bf9df5b63e222c1fb5db77"
+    },
+    {
+      "bytes": 2036,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/PROJECT_STATUS.md",
+      "sha256": "aa6ba6f930a3a5a9db7291b65944df53ab9c81589fe1302fe06439a41e17fe6e"
+    },
+    {
+      "bytes": 113,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/RELEASE_NOTES.md",
+      "sha256": "278125f532fa73df29bf5aa83f6a5c9bf696fcfe63c8a7aa90d6adbff00e8456"
+    },
+    {
+      "bytes": 190,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/TASK_PROGRESS_HISTORY.csv",
+      "sha256": "ac3c63b40e0d1ad67f7a120ad52c793913407d8e8ad2db62d317570fd2ea2781"
+    },
+    {
+      "bytes": 6511,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/TASK_REGISTRY.yaml",
+      "sha256": "0f55fbcad57ac2a0147a981e1d161a5a3a36aa7add71cc0203e0bdce486f1a1d"
+    },
+    {
+      "bytes": 208,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/TRACEABILITY_MATRIX.md",
+      "sha256": "34eb7fad439e34e8f8af0e1b3142ff904bef31427852bc08e5ecfe8a11c2f7a1"
+    },
+    {
+      "bytes": 2185,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/ac_completion_evidence.yaml",
+      "sha256": "25d29ac7c92c742f0f588d203746a40a2b4fee74355226c54757ab29fbf65c0c"
+    },
+    {
+      "bytes": 3517,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/active/_TEMPLATE.md",
+      "sha256": "6ab6ca3fc062a027f4cb83f6a1b9b28c45f14d77bc223d2f17751513ef2dff61"
+    },
+    {
+      "bytes": 14344,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/adapter_coherence_rules.yaml",
+      "sha256": "249e28fd11001fb57c26bb7fb92bc9ff7ef6a5edc2c9a1a8f46b0e9ba54bee60"
+    },
+    {
+      "bytes": 15499,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/adapter_propagation_state.yaml",
+      "sha256": "a76d09880b723961ea029efb1978c850216d5b179bc9913ea1ec52b10b153746"
+    },
+    {
+      "bytes": 2545,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/agent_trace_events.yaml",
+      "sha256": "3d83d3a04f27e3d63e2a8b86c5bf51c9aaaa2a4d139bc75c711c098ba4d6f5fe"
+    },
+    {
+      "bytes": 4274,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/agentic_workflow.yaml",
+      "sha256": "071b8821738694310366ad520c3f2ec09445f3ea1a27b60b74eb685f2b192249"
+    },
+    {
+      "bytes": 884,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/ai_artifact_inventory_rules.yaml",
+      "sha256": "a9e6bee7921c2f6976e6be7b772e7bcf52d4bdcada81a002b6045fe5a3a1dcc9"
+    },
+    {
+      "bytes": 1527,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/ai_code_provenance.yaml",
+      "sha256": "7d286bcb56a34cd33504b35d4d17b46fb34d1ff60fd8667342c2843c9c14d4e1"
+    },
+    {
+      "bytes": 3486,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/ai_component_inventory_rules.yaml",
+      "sha256": "2746ff6b30090d5e02379be6cc8f206950103634dcda444580cfb93eaf7ec060"
+    },
+    {
+      "bytes": 15716,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml",
+      "sha256": "70c5eeb160f4222d33f33182758ec3a3fc837e523307b855aa34c462e8834f2f"
+    },
+    {
+      "bytes": 489,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/api_symbol_reality.yaml",
+      "sha256": "203c529545546f2085be725e403df08cf4d8bd8903f75ed20c97491d796014cc"
+    },
+    {
+      "bytes": 2264,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/behavioral_governance_readiness_rules.yaml",
+      "sha256": "690e9f954a3847c956f44aa8341277f63dd91a3bc4a6fdaf5a13c6af06be8a93"
+    },
+    {
+      "bytes": 2317,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/calibration_shadow.yaml",
+      "sha256": "c12638cd7594fc25ed13e310996a7500ef6d8076359a432c00ff09be87ff61b7"
+    },
+    {
+      "bytes": 17597,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/capability_state.yaml",
+      "sha256": "30ce2ec156541bb7a2cec68a7ecf56e6d3cb5e3eda391dd60cf6b65c7ea60230"
+    },
+    {
+      "bytes": 853,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/challenge_rules.yaml",
+      "sha256": "2d8386949e090689372b15bbb1f5d1ffa0a4d4c002906977a6f60f1e9d9dd66c"
+    },
+    {
+      "bytes": 930,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/completed/_TEMPLATE.md",
+      "sha256": "957ba902f4654a737c9a4014c12e48a4f563765506747a62d27b7eb8191fcb0f"
+    },
+    {
+      "bytes": 71,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/completed_history.yaml",
+      "sha256": "2e31265c9ca5feff058110e1c0bf0cf7147121a45b85a96526e9ddf9ca134a9a"
+    },
+    {
+      "bytes": 1636,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/compliance_posture.yaml",
+      "sha256": "1495b24a06e6fe30ce55abdfa47db26c7ba4a51fd9c8ba893c8f58610b01351d"
+    },
+    {
+      "bytes": 340,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/control_plane_review_items.yaml",
+      "sha256": "bdb7bffe6152dd993d782bff82b2ae5444b53d526a5ed645be2fdb478f46658f"
+    },
+    {
+      "bytes": 83574,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/control_plane_review_rules.yaml",
+      "sha256": "b66fc9294b4aa876107a80966ad16001acf15992b7beb3b566f5f843e0de904f"
+    },
+    {
+      "bytes": 2415,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/cross_harness_review_readiness.yaml",
+      "sha256": "f5ae43dc7b9c518ba425a189702f374a99a26dab25d3808e64e88e3b3ac17dbc"
+    },
+    {
+      "bytes": 441,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/dependency_integrity_rules.yaml",
+      "sha256": "af1b8ed7cf5c51d8693abca3ed72ccf6633b49e19bba778ccd5220213d22c1eb"
+    },
+    {
+      "bytes": 2808,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/design_traceability.yaml",
+      "sha256": "fe383e67a8b4ff6fb8827c7a9b4a83afc8c5b5d334494cdab97e61babed2c8c1"
+    },
+    {
+      "bytes": 421,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/duplicate_function_hygiene_rules.yaml",
+      "sha256": "a2d8044f8ebdf4dbff6cc8bad216bd4ca85b970cccfc73dd1d225db67f1eceab"
+    },
+    {
+      "bytes": 520,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/evidence/_TEMPLATE/completion_certificate.yaml",
+      "sha256": "a3fbe220b69997e123ad16bdf8b06d3628735907cce124868477c41ff979ca23"
+    },
+    {
+      "bytes": 469,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/evidence/_TEMPLATE/context_manifest.json",
+      "sha256": "db6c35d59f984c9e1eaa76016a1ba300708894c59d5632950fea09009750b6ef"
+    },
+    {
+      "bytes": 419,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/evidence/_TEMPLATE/task_path.yaml",
+      "sha256": "48f78977537fba3eb7c4ca9ccf5097ffd5533c7fad83a8a81ff799d5e003a55a"
+    },
+    {
+      "bytes": 447,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/evidence/_TEMPLATE/test_evidence.json",
+      "sha256": "30a65286a9d7cab74051fb9a57bf02fd1fbb8d633b7c255c1ff5c9f37d0ee160"
+    },
+    {
+      "bytes": 260,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/evidence/_TEMPLATE/validator_results.json",
+      "sha256": "fc223764bba2b5dd36a24c0c56a0ec595539ffa93dd55d8fd3e4a96157d280c9"
+    },
+    {
+      "bytes": 4477,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/evidence_attestation_rules.yaml",
+      "sha256": "958db19823f930ca21aef18404c6fbef001a5bea9370298f933f3dbcd2af09fa"
+    },
+    {
+      "bytes": 1228,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/evidence_classification_policy.yaml",
+      "sha256": "a97e666fb5db57063f922cacb022bed12b96b21ebf07e62a607737fd07e1e561"
+    },
+    {
+      "bytes": 565,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/evidence_review_attestations.yaml",
+      "sha256": "bff452472723583113b032757f6044f34b3354dc9404640ed2f63d1212fbc958"
+    },
+    {
+      "bytes": 664,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/existing_resource_inventory_rules.yaml",
+      "sha256": "a11482ed91519713ad53dbe4918ffd779318e13e378dfe2419cdb6cd4aae22b6"
+    },
+    {
+      "bytes": 7456,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/failure_mode_observations.yaml",
+      "sha256": "4f122dc44cc1ec4034bef4d4543d1128583c1fd2928db6049314065c9bf32582"
+    },
+    {
+      "bytes": 6409,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/failure_mode_taxonomy.yaml",
+      "sha256": "dcdd77938a21d87a27e2a52d6f84bc5346f623a3997c55c61e30f46cd2881723"
+    },
+    {
+      "bytes": 28194,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/gatekeepers.yaml",
+      "sha256": "acba3b752c2dc4f11e655ac334b7dd7e9631edc83bc411bf22272d7ec7c7590b"
+    },
+    {
+      "bytes": 3985,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/governance/GOVERNANCE_TRUTH_TABLE.md",
+      "sha256": "49fbd60fe47440b48a19f4db115802622414de24548a9522e7d78c9321d1fde9"
+    },
+    {
+      "bytes": 1014,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/governed_debug_escalation.yaml",
+      "sha256": "3d3a78df0f4b598c61015b249f529cf5c277d3e732cb305c01bd231f75aa5153"
+    },
+    {
+      "bytes": 9222,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/graph_context_rules.yaml",
+      "sha256": "269db98179d7acde38ecee3ed8dc29436825bc801e827b67b3afd00701f54cee"
+    },
+    {
+      "bytes": 1050,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/human_decisions/_TEMPLATE.yaml",
+      "sha256": "fe208508b8cf520f965f6229a814fe871a33d6c36d7aa32d8c942f867570d4f9"
+    },
+    {
+      "bytes": 1242,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/install_decision_record_rules.yaml",
+      "sha256": "b834191177e7f0ece48911a35a8b8da1cfe87cf53a90604f2595c054d26f3fc1"
+    },
+    {
+      "bytes": 862,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/install_plan_rules.yaml",
+      "sha256": "c82d84071519852b1003f2cb97e42295349f94449d472059626326140c7260fd"
+    },
+    {
+      "bytes": 823,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/intake_answers.yaml",
+      "sha256": "82f83a7a549365013a085b2a98051819e3bb3602c9f0c11d43b4dc4966ffa0c0"
+    },
+    {
+      "bytes": 209,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/inventory/AI_FUNCTIONALITY_INVENTORY.yaml",
+      "sha256": "55fb9169209bf82e563f5800aa8c3e233304d02bd41d542be3caf64e456d5185"
+    },
+    {
+      "bytes": 172,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/inventory/FUNCTION_INDEX.yaml",
+      "sha256": "ebe3ffe465ea92a6abc0fb0de781eaa14e1c923b132a32c4addfe899315efa28"
+    },
+    {
+      "bytes": 47,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/inventory/FUNCTION_SIMILARITY_INDEX.json",
+      "sha256": "e7f019f32f663ede1c16f85133b48290c856f0a389570c6b4b693ef1df61669d"
+    },
+    {
+      "bytes": 198,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/inventory/MASTER_INVENTORY.md",
+      "sha256": "5642543f76fe920c6d68fbbfcda68719c6461095caf3054e348e025005d1bdf1"
+    },
+    {
+      "bytes": 156,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/inventory/SEMANTIC_WARNINGS_LOG.csv",
+      "sha256": "a228c9a2dfef8f2a7515fd87ef0ed2c78e1c5cd021a44e668b1e088a277c9244"
+    },
+    {
+      "bytes": 2080,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/lane_handoffs/_TEMPLATE.yaml",
+      "sha256": "e2fecf1737c2d13221478f3e17db027dad5a422cea3de88398253ca001f5eefd"
+    },
+    {
+      "bytes": 216,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/learning_candidates.yaml",
+      "sha256": "1203dc7d1d0b771e8dac5a26805c6dc265d9bc036ee9d03d7f8f0aea305e163d"
+    },
+    {
+      "bytes": 257,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/learning_history.yaml",
+      "sha256": "81b703c9448f58cdc9f52ef6550fb595eb1d57108744f89a16b9684c64e5bcb7"
+    },
+    {
+      "bytes": 4257,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/learning_loop_rules.yaml",
+      "sha256": "b5a7ee5dcef88de435490e756d0386ac75453c754d4bde95d11501ebbb089357"
+    },
+    {
+      "bytes": 306,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/learning_state.yaml",
+      "sha256": "d649fdf80c95bf649c06299ffda9fb4de69a7c3bd625467fd36e04715ebf97f5"
+    },
+    {
+      "bytes": 4239,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/llm_grader_readiness_rules.yaml",
+      "sha256": "475188128daa8d638afb909bd4b1f3979033401c84d5757ede91869de3baaf5c"
+    },
+    {
+      "bytes": 9802,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/local_context_index_rules.yaml",
+      "sha256": "535d76a81527e99a15e8265482929eddb3469d24b147e9ca4ad3be3eb2bc6697"
+    },
+    {
+      "bytes": 2569,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/maturity_levels.yaml",
+      "sha256": "576bd884cd2717272b0ca031ec308656af57be8ae9e008f2221035ec0a2c1d09"
+    },
+    {
+      "bytes": 6224,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/memory_authorization_matrix.yaml",
+      "sha256": "d88a3f9544ed2aba63ea1b827930c2ab30ac170801930a3d814396bb57522207"
+    },
+    {
+      "bytes": 6282,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/memory_context_rules.yaml",
+      "sha256": "35f47117177285491b1fb33286618298bd6d3e0ae04e3c7c8a068b7060bd1cce"
+    },
+    {
+      "bytes": 4363,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/memory_mcp_inventory_rules.yaml",
+      "sha256": "8b484a2c13238c49028a502d9f6a8e0b78f9f690b82800f79f801303e1b21ce9"
+    },
+    {
+      "bytes": 7700,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/memory_provider_access_rules.yaml",
+      "sha256": "09bea38bc815b3c98576e1ffbc5d6a979939ca94f3f10f2b737fd3c7079f3c44"
+    },
+    {
+      "bytes": 1810,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/memory_review_items.yaml",
+      "sha256": "aba208edee3c64fa610ebe1af03e3ccef982b1ba8d5493e93c935af37ab82771"
+    },
+    {
+      "bytes": 9188,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/memory_use_policy_rules.yaml",
+      "sha256": "6ef8363eed62a7e99d9fad1f48f4f0880066b6913fdfa09a2adf5a6311ca87f6"
+    },
+    {
+      "bytes": 101,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/metrics/test_coverage.json",
+      "sha256": "53551cf36f056bf21f24f8df65e266cf8486cda532d55546da898724f1ed50da"
+    },
+    {
+      "bytes": 10688,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/model_provider_policy.yaml",
+      "sha256": "59a131ea7fcef626bf8743c46b377244e2a0920da4479c1a8cd98feb866be0d4"
+    },
+    {
+      "bytes": 3182,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/model_telemetry_evidence.yaml",
+      "sha256": "d99a9ce4af660e7d67de35d08505eb518d565f286057baaec4ee74a38843e76b"
+    },
+    {
+      "bytes": 2215,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/module_header_rules.yaml",
+      "sha256": "26723646696c7bab2efee278e73ef1c2e63051f70ba9d438db0ddbac9efa4d9a"
+    },
+    {
+      "bytes": 2367,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/opencode_config_hygiene.yaml",
+      "sha256": "2f9fd1148cef0207d04cae345bb77043b6c64c566b21ff9d52b754468cec0c0b"
+    },
+    {
+      "bytes": 533,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/package_reality_provenance.yaml",
+      "sha256": "64687204e3008fc8e74e2b3c46d4e9dcacde127c2fdb06267210b1432be27807"
+    },
+    {
+      "bytes": 1513,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/package_reality_rules.yaml",
+      "sha256": "5ff8212174d197961b97f908da4d7b4aedde40dd76acc833300f1a44a644b49a"
+    },
+    {
+      "bytes": 1995,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/policy_overrides.d/README.md",
+      "sha256": "5c045868bc06659c1be41bd6c5329b1a7f0aaf8e45f88b5c3b890f9ab1f8bb74"
+    },
+    {
+      "bytes": 1793,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/pr_risk_rules.yaml",
+      "sha256": "0eefde74c389ab9be1bce744495e1c11c1f8cad06e125246e377cd952a61dbb8"
+    },
+    {
+      "bytes": 6766,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/repository_intelligence_rules.yaml",
+      "sha256": "10b2b67b3e70e9db1b24ff5386e4c3f56eaec0229302bb3efa5f18701e4ca996"
+    },
+    {
+      "bytes": 2370,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/research/RECORD_TEMPLATE.yaml",
+      "sha256": "53f35fb993c17ddb293d6751be5395ec4101b94f915d95528a7276153d1b7d23"
+    },
+    {
+      "bytes": 2436,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/research_record_contract.yaml",
+      "sha256": "02861e2d6443226ca00870a39ec7b3a31f94db3a582b7f30863f3d2edff1893c"
+    },
+    {
+      "bytes": 550,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/secret_hygiene_rules.yaml",
+      "sha256": "d458a884154fc00c5ff6750a76260c0d19b1d644f965d22ed68f83fd31c85a52"
+    },
+    {
+      "bytes": 3069,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/secure_coding_control_evidence_routes.yaml",
+      "sha256": "84894aecd459331f8d8a4baa1a9f557f3b812cee715923c8f625114b966c659f"
+    },
+    {
+      "bytes": 548,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/secure_coding_control_render_manifest.yaml",
+      "sha256": "7ad6470f416e921dff3130ca96b7596941303e0c2ebb6fcf76a4b71715267834"
+    },
+    {
+      "bytes": 10901,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/semantic_candidate_layer_rules.yaml",
+      "sha256": "a9058b4f308e381621c32d3264b596d55a9f00c9db590d6300de6076281070c8"
+    },
+    {
+      "bytes": 6548,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/session_lifecycle_rules.yaml",
+      "sha256": "33befa93596be41911ee04d6fabe53096795f09a3ab7f6dfe0fb71ff327440b2"
+    },
+    {
+      "bytes": 260409,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/setup_module_catalog.yaml",
+      "sha256": "0b2f4249c353cd883b32bcf55516f75867509619c716ff4f8983f0d3981cdb5f"
+    },
+    {
+      "bytes": 268879,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/systemic_impact_rules.yaml",
+      "sha256": "4018e680d596e79821ce8cb3da24f17b27118b166e887010c408584cf5c0e511"
+    },
+    {
+      "bytes": 342,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/task_claims.yaml",
+      "sha256": "6d649bbd3581232fe5b4cf94b16eab914cb888aa2f3f4063b6d060bd29c73e2a"
+    },
+    {
+      "bytes": 6045,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/task_context_pack_rules.yaml",
+      "sha256": "3843300ac70708f990445ebfa85af7d5ac6a035e87f404dcb258d245c00fe469"
+    },
+    {
+      "bytes": 3366,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/task_lifecycle_contract.yaml",
+      "sha256": "385a84800c6339ec60a7bcf3cef5124c11b35d6bc5b0b5874f21c6a6cd74af7a"
+    },
+    {
+      "bytes": 475,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/team_operator_map.yaml",
+      "sha256": "41940ac199367ea23e26cece8acb9ddc71922d608f2c2a615243e4463a268a1e"
+    },
+    {
+      "bytes": 365,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/test_quality_hygiene_rules.yaml",
+      "sha256": "250b8a2e62f02cc4e7b690866951ba966378ac50e3fe190f9f9d54f2880d5ab9"
+    },
+    {
+      "bytes": 699,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/traceability_gap_register_rules.yaml",
+      "sha256": "1cf5261c99f425c17f291f693a6a01bbce82fcebe824600633deb80457966f74"
+    },
+    {
+      "bytes": 5392,
+      "mode": "0644",
+      "path": "templates/structural-seeds/naos/ui_experience_quality.yaml",
+      "sha256": "ced761c93f7cf7f186474339e0b3ebdf923b49cc9d002a482699b796d5ee4726"
+    },
+    {
+      "bytes": 202,
+      "mode": "0644",
+      "path": "templates/structural-seeds/reports/semantic_quality_snapshot.json",
+      "sha256": "2e810a047974684f0216d22d49598a2d9d0a750a4022b9e9f0676bb16e2ef765"
+    },
+    {
+      "bytes": 6342,
+      "mode": "0644",
+      "path": "templates/workflows/ci.yml",
+      "sha256": "b75093bd652255097831650887ee8b4b74740906f1f19849108dc78f54dd929d"
+    },
+    {
+      "bytes": 1439,
+      "mode": "0644",
+      "path": "templates/workflows/configs-drift.yml",
+      "sha256": "1840702ed8538717e7552ab312f35e161d8d2e32d71c9f69559972b4f04dceb1"
+    },
+    {
+      "bytes": 839,
+      "mode": "0644",
+      "path": "templates/workflows/download-github-folder.yml",
+      "sha256": "f8ea4c346e1d7abef1a58d5351b26ce9174d88faa5e1ffcabd1c908ec0f41405"
+    },
+    {
+      "bytes": 1950,
+      "mode": "0644",
+      "path": "templates/workflows/license-scan.yml",
+      "sha256": "e6bb75993021696a7b879ebac2a1e56b4c282f998abccf97ddab7dc94fffbd4a"
+    },
+    {
+      "bytes": 3088,
+      "mode": "0644",
+      "path": "templates/workflows/naos-control-plane-ci.yml",
+      "sha256": "2924f10941e2e20b7aff6a7c1b5fbac397969d2ae9078519bfc82eec493d12b8"
+    },
+    {
+      "bytes": 4208,
+      "mode": "0644",
+      "path": "templates/workflows/naos-governance.yml",
+      "sha256": "1de4165621c3788726bde3f3c1585267127a233ca9e05a33207609abedb91ac5"
+    },
+    {
+      "bytes": 3372,
+      "mode": "0644",
+      "path": "templates/workflows/naos-pr-governance.yml.example",
+      "sha256": "0020ec25eb71f3f46ec7ad18191114e2eb62f02798e553965df8f76564631818"
+    },
+    {
+      "bytes": 522,
+      "mode": "0644",
+      "path": "upgrade_contract/__init__.py",
+      "sha256": "12fe0ec467458ec82fa15d3d5ecd66534397760f732b6894a56538338853d2c5"
+    },
+    {
+      "bytes": 4892,
+      "mode": "0644",
+      "path": "upgrade_contract/canonical.py",
+      "sha256": "9f92a9a3d9a81872ef0ec683ad028edce1e437c359e355bb9ea516df56b2e9fd"
+    },
+    {
+      "bytes": 87725,
+      "mode": "0644",
+      "path": "upgrade_contract/planner.py",
+      "sha256": "c403360ae8b84b4abb7c9ac43cf41d9fd12adfd65b1a5fc8236d2352dbbe9ef2"
+    },
+    {
+      "bytes": 126804,
+      "mode": "0644",
+      "path": "upgrade_contract/provenance.py",
+      "sha256": "77025eff5f8006d8b97dac5d79a285960f2585187114ca801525adc81b800274"
+    },
+    {
+      "bytes": 28635,
+      "mode": "0644",
+      "path": "upgrade_contract/security.py",
+      "sha256": "786daa03d0ae16a596d572e5e58d4732133df46983a093c8289eabf3664813da"
+    },
+    {
+      "bytes": 361279,
+      "mode": "0644",
+      "path": "upgrade_contract/transaction.py",
+      "sha256": "1bd9828540419e0423610b6b33b5ce8fec7aa9a2fac03ba7f5b1d0f00b93b7a4"
+    }
+  ],
+  "non_claims": [
+    "The maintainer export generator, selection manifest, and selection schema are private preparation controls and are not shipped in the candidate.",
+    "The export receipt is not a signature, provenance attestation, release, publication, or approval.",
+    "Exclusion from the candidate does not delete or alter its source repository.",
+    "Source and package scans reduce known leakage risk but do not prove absence of every sensitive concept.",
+    "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
+  ],
+  "schema": "naos.public_export_receipt.v1",
+  "source_bytes": 14837056,
+  "source_file_count": 812,
+  "source_manifest": "configs/naos_public_export_manifest.yaml",
+  "tree_sha256": "2ca89b60b7d0a1e0c5481ad5f5d9120e13d39259e33f82c11bdc88f0a6f0c379"
+}

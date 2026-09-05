@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:team_operator_map:v1",
+  "title": "NAOS Team / Operator Map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "updated_at", "teams", "operators", "limitations", "not_claimed", "human_review_required"],
+  "properties": {
+    "schema": {"const": "naos.team_operator_map.v1"},
+    "updated_at": {"type": ["string", "null"]},
+    "teams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["team_id"],
+        "properties": {
+          "team_id": {"$ref": "#/$defs/overlay_id"},
+          "description": {"type": ["string", "null"]},
+          "operator_overlay_ids": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/overlay_id"}
+          }
+        }
+      }
+    },
+    "operators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operator_id"],
+        "properties": {
+          "operator_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@+-]{0,127}$"
+          },
+          "team_ids": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/overlay_id"}
+          },
+          "operator_overlay_id": {"$ref": "#/$defs/overlay_id"}
+        }
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "overlay_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    }
+  }
+}

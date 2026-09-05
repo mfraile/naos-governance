@@ -1,0 +1,88 @@
+id: CAP-CLAIMS-VALIDATION
+name: Claims Validation
+description: >
+  Validates public claims against repo-local evidence and flags statements that
+  overstate shipped maturity, compliance posture, runtime assurance,
+  neuroscience support, test coverage, PETRI adoption, or outcomes generalized
+  from a single project, toolchain, model, IDE, or reference implementation.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Public-safe wording is available as guidance only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Claims file and basic public-doc scan are configured."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Validator runs and produces evidence for release-facing docs."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Release claims can block when evidence is missing or overstated."
+authority:
+  may_read:
+    - README.md
+    - ROADMAP.md
+    - docs/
+    - naos/claims.yaml
+    - naos/reports/
+  may_write:
+    - naos/reports/claims_validation.json
+    - naos/reports/claims_validation.md
+  may_block:
+    - "release or governance gate only when profile policy requires it"
+allowed_resources:
+  - "repo-local Markdown, YAML, and JSON evidence"
+prohibited_resources:
+  - "remote compliance attestation"
+  - "mandatory external legal review service"
+  - "claims based only on marketing language"
+constraints:
+  - "Must distinguish shipped, configured, operational, enforced, measured, assured, experimental, planned, and not applicable."
+  - "Must treat any dogfood, pilot, or reference implementation as bounded evidence, not universal proof."
+  - "Must treat PETRI and runtime governance as inspiration unless implemented evidence exists."
+  - "Must treat claims as time-sensitive and subject to drift from LLM/model version changes, IDE/agent tool changes, repository architecture changes, dependency changes, validator changes, profile/gatekeeper configuration changes, project scope changes, and evidence staleness."
+  - "Must keep kit-level claim validation generic: schemas, categories, validators, safe wording, and lifecycle rules are supplied by the kit."
+  - "Must keep adopter-level claim validation project-local: actual claims, evidence, scope, toolchain context, validity period, owners, and revalidation triggers are supplied by the adopting project."
+required_evidence:
+  - "Machine-readable claim records or configured public-doc scan scope."
+  - "Repo-local artifact proving each shipped/enforced/measured claim."
+validators:
+  - id: claims_validation
+    script: scripts/naos_validate_claims.py
+    status: available
+gatekeepers:
+  - G6
+dashboard_signals:
+  - "claims_validation.status"
+  - "claims_validation.overclaims"
+  - "claims_validation.missing_evidence"
+maturity_path:
+  L0: "Schema, claim categories, and safe wording exist in the kit."
+  L1: "Project configures claims scope and public surfaces."
+  L2: "Validator produces claims validation evidence."
+  L3: "Gatekeeper warns or blocks according to profile severity."
+  L4: "Dashboard tracks unresolved claims, exceptions, and trend."
+  L5: "Release evidence is complete enough for audit-style review."
+known_limitations:
+  - "Cannot determine legal compliance on its own."
+  - "Cannot verify private external results unless evidence is provided."
+  - "Claims can become stale when models, tools, dependencies, validators, repository architecture, project scope, profile policy, or gatekeeper configuration change."
+  - "The kit can validate claim structure and evidence references, but each adopter must define local validity periods, owners, and revalidation triggers."
+not_claimed:
+  - "Legal or regulatory compliance by itself."
+  - "Runtime assurance by installing the kit."
+  - "Neuroscience validation."
+related_docs:
+  - docs/CLAIMS_AND_LIMITATIONS.md
+  - ROADMAP.md
+related_scripts:
+  - scripts/naos_validate_claims.py

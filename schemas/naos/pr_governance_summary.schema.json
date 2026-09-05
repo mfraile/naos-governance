@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:pr_governance_summary:v1",
+  "title": "NAOS PR Governance Summary",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "ci_provider",
+    "event_name",
+    "branch",
+    "base_ref",
+    "head_ref",
+    "commit_sha",
+    "pull_request_number",
+    "session_id",
+    "operator_id",
+    "team_id",
+    "team_resolution_source",
+    "reports_generated",
+    "validators_run",
+    "gate_status_summary",
+    "gate_evaluation_summary",
+    "evidence_pack_summary",
+    "dashboard_summary",
+    "evidence_conflict_summary",
+    "task_claim_summary",
+    "pr_risk_classification_summary",
+    "sarif_summary",
+    "artifact_paths",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.pr_governance_summary.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "advisory",
+        "review_required",
+        "ci_not_detected",
+        "missing_reports",
+        "gates_failed",
+        "conflicts_detected",
+        "not_configured",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "ci_provider": {"type": "string"},
+    "event_name": {"type": ["string", "null"]},
+    "branch": {"type": ["string", "null"]},
+    "base_ref": {"type": ["string", "null"]},
+    "head_ref": {"type": ["string", "null"]},
+    "commit_sha": {"type": ["string", "null"]},
+    "pull_request_number": {"type": ["string", "null"]},
+    "session_id": {"type": ["string", "null"]},
+    "operator_id": {"type": ["string", "null"]},
+    "team_id": {"type": ["string", "null"]},
+    "team_resolution_source": {"type": "string"},
+    "reports_generated": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "validators_run": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "gate_status_summary": {"type": "object"},
+    "gate_evaluation_summary": {"type": "object"},
+    "evidence_pack_summary": {"type": "object"},
+    "dashboard_summary": {"type": "object"},
+    "evidence_conflict_summary": {"type": "object"},
+    "task_claim_summary": {"type": "object"},
+    "pr_risk_classification_summary": {"type": "object"},
+    "sarif_summary": {"type": "object"},
+    "artifact_paths": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "findings": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "known_gaps": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object"}
+  }
+}

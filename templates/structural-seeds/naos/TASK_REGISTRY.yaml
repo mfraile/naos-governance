@@ -1,0 +1,171 @@
+# ID: NAOS-TEMPLATE | CAT: PMGV-MGMT | STATUS: ACTIVE | PURPOSE: Template seed
+# ============================================================================
+# TASK_REGISTRY.yaml - CANONICAL SOURCE OF TRUTH FOR ALL TASKS
+# ============================================================================
+#
+# PURPOSE: Single authoritative file for ALL project tasks
+# RULE: All generators, validators, dashboards MUST read from this file ONLY
+#
+# WORKFLOW (EXPLICIT REFRESH; OPTIONAL HOOK ASSISTANCE):
+#   1. Edit this file (add task, change status, etc.)
+#   2. Run `make -f Makefile.naos gov-refresh`; review its derived-file diff
+#   3. Stage the source and reviewed derived files, then commit
+#
+# OPTIONAL PRE-COMMIT ASSISTANCE (only after explicit hook activation):
+#   - Detects staged TASK_REGISTRY.yaml changes and attempts sync_from_registry.py
+#   - Best-effort stages BACKLOG.md, DASHBOARD.md, and PROJECT_STATUS.md
+#   - Does not fail when sync/staging fails; review and stage outputs manually
+#   - Task-registry validation is profile/installation dependent
+#
+# STRUCTURE:
+#   Each task has:
+#     - id: Exact unique identifier (T-XXX or a namespaced ID such as LKB-T-XXX)
+#     - title: Short description
+#     - requirement: FR-XXX or NFR-XXX it implements
+#     - phase: 1-N (which development phase)
+#     - priority: P0/P1/P2/P3
+#     - status: legacy-compatible status; lifecycle/delivery/verification fields are canonical
+#     - lifecycle_state: planned|active|implementation_complete|completed|deferred|cancelled|absorbed|superseded
+#     - delivery_state: not_started|in_progress|delivered|not_delivered|excluded
+#     - verification_state: unverified|partially_verified|verified|inconclusive|failed|not_applicable
+#         * planned:     Not started
+#         * in_progress: Active development
+#         * implemented: Code complete, feature working
+#         * verified:    Implemented + production verified (NFRs preferred)
+#         * done:        Fully accepted (synonym for verified in non-NFR context)
+#         * absorbed:    Merged into a larger task; never counted as delivered
+#         * deferred:    Out of current scope; never counted as delivered
+#     - estimate_days: Effort estimate in working days
+#     - owner: Team/person responsible
+#     - description: Detailed description (optional)
+#     - dependencies: List of T-XXX this depends on (optional)
+#     - parallelizable: true|false (optional, default: unset = not assessed)
+#
+# ============================================================================
+
+schema: naos.task_registry.v2
+version: "2.0.0"
+lifecycle_contract_version: 1
+last_updated: "[ADAPT: YYYY-MM-DD]"
+total_tasks: 5  # Update this count when adding tasks
+
+# ============================================================================
+# REQUIREMENTS SUMMARY (from specs/03-requirements.md)
+# ============================================================================
+requirements_summary:
+  total_fr: 2         # ADAPT: count FR-XXX sections in 03-requirements.md
+  total_nfr: 2        # ADAPT: count NFR-XXX sections
+  total: 4            # ADAPT: total = total_fr + total_nfr
+
+  status_breakdown:
+    delivered: 0       # Auto-computed by sync_from_registry.py
+    in_progress: 0     # Auto-computed
+    planned: 4         # Auto-computed
+    deferred: 0        # Auto-computed
+
+# ============================================================================
+# PHASES
+# ============================================================================
+phases:
+  - id: 1
+    name: "[ADAPT: Foundation]"
+    objective: "[ADAPT: brief description]"
+  - id: 2
+    name: "[ADAPT: Core Feature]"
+    objective: "[ADAPT]"
+
+# ============================================================================
+# TASKS
+# ============================================================================
+tasks:
+  - id: T-001
+    title: "[ADAPT: Task Title]"
+    requirement: "FR-001"          # Must match FR-XXX section in 03-requirements.md
+    phase: 1
+    priority: P0
+    status: planned                # planned | in_progress | implemented | verified | done | absorbed | deferred
+    lifecycle_state: planned
+    delivery_state: not_started
+    verification_state: unverified
+    estimate_days: 3
+    owner: "[ADAPT: team or person]"
+    description: |
+      [ADAPT: What this task delivers.
+       Be specific enough that another engineer can pick it up cold.]
+    # dependencies: []             # List T-XXX IDs that must complete first
+    # parallelizable: true
+
+  - id: T-002
+    title: "[ADAPT: Supporting FR-001 task]"
+    requirement: "FR-001"
+    phase: 1
+    priority: P1
+    status: planned
+    lifecycle_state: planned
+    delivery_state: not_started
+    verification_state: unverified
+    estimate_days: 2
+    owner: "[ADAPT: team or person]"
+    description: |
+      [ADAPT: Supporting implementation or verification task for FR-001.]
+    dependencies: [T-001]
+    parallelizable: false
+
+  - id: T-003
+    title: "[ADAPT: FR-002 task]"
+    requirement: "FR-002"
+    phase: 2
+    priority: P1
+    status: planned
+    lifecycle_state: planned
+    delivery_state: not_started
+    verification_state: unverified
+    estimate_days: 2
+    owner: "[ADAPT: team or person]"
+    description: |
+      [ADAPT: Implementation or verification task for FR-002.]
+    parallelizable: true
+
+  - id: T-004
+    title: "[ADAPT: Phase 2 enabling task]"
+    requirement: "FR-001"
+    phase: 2
+    priority: P2
+    status: planned
+    lifecycle_state: planned
+    delivery_state: not_started
+    verification_state: unverified
+    estimate_days: 1
+    owner: "[ADAPT: team or person]"
+    description: |
+      [ADAPT: Task referenced from the execution-plan phase detail.]
+    dependencies: [T-001]
+
+  - id: T-005
+    title: "[ADAPT: Phase 2 follow-up task]"
+    requirement: "FR-002"
+    phase: 2
+    priority: P2
+    status: planned
+    lifecycle_state: planned
+    delivery_state: not_started
+    verification_state: unverified
+    estimate_days: 1
+    owner: "[ADAPT: team or person]"
+    description: |
+      [ADAPT: Follow-up task referenced from the execution-plan phase detail.]
+    dependencies: [T-003]
+
+  # ADAPT: Add more tasks following the pattern above.
+  # Example:
+  # - id: T-006
+  #   title: "Implement FR-002 service layer"
+  #   requirement: "FR-002"
+  #   phase: 1
+  #   priority: P1
+  #   status: planned
+  #   lifecycle_state: planned
+  #   delivery_state: not_started
+  #   verification_state: unverified
+  #   estimate_days: 2
+  #   owner: "backend"

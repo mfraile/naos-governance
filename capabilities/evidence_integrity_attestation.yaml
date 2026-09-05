@@ -1,0 +1,107 @@
+id: CAP-EVIDENCE-INTEGRITY-ATTESTATION
+name: Evidence Integrity & Reviewer Attestation
+description: >
+  Produces a deterministic local evidence-attestation report that records which
+  configured evidence artifacts existed, their SHA-256 digests, reviewer
+  metadata, missing or stale artifacts, uncovered artifacts, waivers, known gaps,
+  residual risks, limitations, and human-review requirements. This capability is
+  bounded evidence only; it is not cryptographic signing, signature verification,
+  legal approval, regulatory approval, or compliance certification.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Generates low-noise local digest and reviewer-metadata visibility when configured."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Reports local digest coverage and reviewer metadata as warning-oriented review evidence."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Expects configured evidence artifacts and reviewer metadata to be visible for human review."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "May block when configured evidence artifacts or reviewer metadata are missing under project policy."
+authority:
+  may_read:
+    - "naos/evidence_attestation_rules.yaml"
+    - "naos/evidence_review_attestations.yaml"
+    - "configured local evidence artifacts"
+    - "naos/reports/"
+    - "naos/evidence/"
+  may_write:
+    - "naos/reports/evidence_attestation.json"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "repo-local files and directories"
+  - "local SHA-256 digest calculation"
+  - "structured reviewer metadata"
+prohibited_resources:
+  - "cryptographic signing"
+  - "signature verification"
+  - "key custody or PKI"
+  - "remote notarization or timestamping"
+  - "ledger storage"
+  - "legal e-signature semantics"
+  - "identity verification"
+constraints:
+  - "Must remain deterministic, local, and file-first."
+  - "Must not mutate evidence artifacts."
+  - "Must not treat reviewer metadata as a digital signature."
+  - "Must keep missing, stale, uncovered, waived, known-gap, and residual-risk states visible."
+  - "Must not claim tamper-proof evidence, certified evidence, legal approval, regulatory approval, compliance approval, or guaranteed integrity."
+required_evidence:
+  - "naos/evidence_attestation_rules.yaml"
+  - "naos/evidence_review_attestations.yaml"
+  - "naos/reports/evidence_attestation.json"
+validators:
+  - id: evidence_integrity_attestation
+    script: scripts/naos_evidence_attestation.py
+    status: available
+gatekeepers:
+  - G6
+dashboard_signals:
+  - "evidence_attestation.status"
+  - "evidence_attestation.artifact_manifest"
+  - "evidence_attestation.missing_artifacts"
+  - "evidence_attestation.uncovered_artifacts"
+  - "evidence_attestation.reviewer_attestations"
+  - "evidence_attestation.human_review_required"
+maturity_path:
+  L0: "Capability contract, rules schema, report schema, and seed files exist in the kit."
+  L1: "Project configures evidence artifact groups and reviewer metadata expectations."
+  L2: "Report emits local SHA-256 digests and missing/stale/uncovered evidence states."
+  L3: "Evidence pack, dashboard, and gates expose digest coverage and reviewer metadata for human review."
+  L4: "Known gaps, residual risks, waivers, and reviewer metadata are reviewed as part of governed evidence decisions."
+  L5: "Projects combine local digest/reviewer metadata with external controls if stronger assurance is required."
+known_limitations:
+  - "Local SHA-256 digests only show file contents at report generation time."
+  - "Reviewer attestations are metadata declarations, not digital signatures."
+  - "Evidence can still be edited by someone with repository write access unless external controls are used."
+  - "Hashing evidence_pack.json has circularity: the evidence pack may include the attestation report after the digest is computed."
+  - "Human review remains required for approval, waiver, residual-risk, and compliance decisions."
+not_claimed:
+  - "cryptographic signing"
+  - "signature verification"
+  - "tamper-proof evidence"
+  - "certified evidence"
+  - "legal or regulatory approval"
+  - "compliance approval"
+  - "guaranteed integrity"
+  - "identity verification"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/ADMISSIBILITY.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+  - NAOS_CATALOG.md
+related_scripts:
+  - scripts/naos_evidence_attestation.py

@@ -1,0 +1,102 @@
+# Go + gRPC Archetype Profile
+# NAOS Portable Governance Kit
+# ─────────────────────────────────────────────────────────────────────────────
+# Pre-adapted for a Go microservice(s) with gRPC as the communication layer.
+# Signals: Go, gRPC, protobuf, PostgreSQL (or other), optional Kubernetes.
+# ─────────────────────────────────────────────────────────────────────────────
+
+project:
+  name: "[YOUR_PROJECT_NAME]"
+  path: "."
+  archetype: go-grpc
+  naos_profile: standard
+
+languages:
+  - go
+
+web_frameworks:
+  - grpc                   # gRPC services (google.golang.org/grpc)
+
+database:
+  engines:
+    - postgresql           # ADAPT: adjust to mysql, mongodb, etc.
+  orm:
+    - sqlc                 # ADAPT: adjust to gorm, ent, database/sql
+  migrations:
+    - golang-migrate       # ADAPT: flyway, liquibase, goose
+  vector_store: []
+
+llm_toolchain:
+  api_providers: []
+  local_models: []
+  frameworks: []
+  embedding_frameworks: []
+  local_oss_models: []
+
+graph_db: []
+
+event_bus:
+  - kafka                  # ADAPT: nats, rabbitmq, pubsub, none
+
+auth:
+  - jwt                    # ADAPT: OAuth2 (keycloak), mTLS, API keys
+
+testing:
+  - go-test
+  - testify
+  - gomock                 # ADAPT: mockery, moq
+
+infrastructure:
+  containerisation:
+    - docker
+    - kubernetes           # ADAPT: remove if not using K8s
+  ci_cd:
+    - github-actions       # ADAPT: gitlab-ci, cloud build, etc.
+  cloud:
+    - gcp                  # ADAPT: aws, azure, self-hosted
+
+multi_tenancy: false       # ADAPT: set true if using tenant isolation
+
+signals:
+  has_api: true
+  has_sql_db: true
+  has_vector_store: false
+  has_llm: false
+  has_event_bus: true
+  has_auth: true
+  has_graph_db: false
+  has_multi_tenancy: false
+  has_containerisation: true
+  has_ci_cd: true
+  is_python: false
+  is_node: false
+
+adapt_stubs:
+  db_schema_conventions: |
+    [ADAPT: Describe your DB schema conventions. For a Go microservice:
+     naming conventions, which tables are service-owned vs shared,
+     migration strategy, connection pool configuration.]
+
+  module_boundaries: |
+    [ADAPT: Go package structure and import rules. Which packages
+     may import which (use internal/ for unexported packages). Service
+     mesh boundaries if running multiple microservices. gRPC service
+     definitions (.proto files) as the contract layer.]
+
+  spec_alignment: |
+    [ADAPT: Paths to your proto files (the source of truth for APIs),
+    requirements documentation. Example: proto/v1/*.proto, docs/requirements.md]
+
+  data_flow_invariants: |
+    [ADAPT: gRPC interceptor chain rules, context propagation requirements,
+     Kafka message schema evolution rules, idempotency key requirements,
+     distributed trace propagation (OpenTelemetry).]
+
+  ssrf_allowed_domains: |
+    [ADAPT: External gRPC endpoints or REST APIs your services may call.
+     Example: cloudresourcemanager.googleapis.com, pubsub.googleapis.com]
+
+  conflict_resolution: |
+    [ADAPT: Code review process. Protocol buffer breaking change policy
+     (proto breaking changes require major version bump). Who reviews
+     schema changes for Kafka topics?]

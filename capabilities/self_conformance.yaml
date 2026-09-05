@@ -1,0 +1,79 @@
+id: CAP-SELF-CONFORMANCE
+name: Self-Conformance
+description: >
+  Runs NAOS validators against the kit or an adopting project and summarizes
+  whether configured governance artifacts are internally consistent.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Reports available checks without blocking."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Lightweight configured checks warn on missing evidence."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Core validators must run for normal SDLC evidence."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured validators can block completion or release gates."
+authority:
+  may_read:
+    - schemas/
+    - capabilities/
+    - templates/profiles/
+    - naos/
+    - scripts/
+  may_write:
+    - naos/reports/self_check.json
+    - naos/reports/self_check.md
+  may_block:
+    - "configured conformance gates"
+allowed_resources:
+  - "repo-local scripts and schemas"
+prohibited_resources:
+  - "mandatory hosted conformance service"
+  - "network-only validation"
+constraints:
+  - "Must degrade to advisory when project-specific artifacts are absent."
+  - "Must not require a generated root naos/ directory inside the kit repository."
+required_evidence:
+  - "Validator result summary."
+  - "Capability contract validation result."
+  - "Gatekeeper manifest validation result."
+validators:
+  - id: self_check
+    script: scripts/naos_self_check.py
+    status: available
+gatekeepers:
+  - G0
+  - G6
+dashboard_signals:
+  - "self_check.status"
+  - "self_check.failed_checks"
+  - "self_check.advisory_checks"
+maturity_path:
+  L0: "Self-check contract and expected checks exist."
+  L1: "Project selects checks by profile."
+  L2: "Self-check produces a summary report."
+  L3: "Gatekeeper applies profile severity to failures."
+  L4: "Dashboard tracks conformance over time."
+  L5: "Self-check evidence is included in evidence packs."
+known_limitations:
+  - "Cannot prove runtime behavior."
+  - "Cannot validate unavailable optional validators."
+not_claimed:
+  - "Full external audit certification."
+  - "LLM behavior assurance without configured behavioral evidence."
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+related_scripts:
+  - scripts/naos_self_check.py

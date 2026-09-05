@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant Human as Human/project decision
+    participant Task as Task card / alignment
+    participant Lane as Lane handoff input
+    participant Script as naos_parallel_lane_handoff.py
+    participant CPR as control-plane-review
+    participant Review as Human review
+
+    Human->>Task: Record parallel_lane_opportunity
+    Human->>Task: Choose parallel_lane_decision
+    alt Decision is sequential or deferred
+        Task->>Review: Keep as planning/scope evidence only
+    else Decision is declared
+        Task->>Lane: Fill naos/lane_handoffs/<lane>.yaml
+        Lane->>Script: Generate local handoff report
+        Script->>CPR: Read declared handoff evidence
+        CPR->>Review: Emit HITL reason codes and evidence refs
+    end
+    Review->>Review: Disposition, waive, remediate, or continue

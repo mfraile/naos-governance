@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/profile_generated_surface_contract.schema.json",
+  "title": "NAOS profile generated surface contract",
+  "type": "object",
+  "required": ["schema", "contract_version", "profiles"],
+  "properties": {
+    "schema": {"const": "naos.profile_generated_surface_contract.v1"},
+    "contract_version": {"const": 1},
+    "profiles": {
+      "type": "object",
+      "required": ["quickstart", "lite", "standard", "assured"],
+      "additionalProperties": false,
+      "properties": {
+        "quickstart": {"$ref": "#/$defs/profile"},
+        "lite": {"$ref": "#/$defs/profile"},
+        "standard": {"$ref": "#/$defs/profile"},
+        "assured": {"$ref": "#/$defs/profile"}
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "required": ["required_surfaces", "prohibited_surfaces", "commands"],
+      "properties": {
+        "required_surfaces": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "prohibited_surfaces": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "commands": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["applicability"],
+            "properties": {
+              "applicability": {"enum": ["available", "not_applicable"]},
+              "alternative": {"type": "string", "minLength": 1},
+              "target": {"type": "string", "minLength": 1},
+              "surface": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {"properties": {"applicability": {"const": "not_applicable"}}},
+                "then": {"required": ["alternative"]}
+              }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:adapter_coherence_report:v1",
+  "title": "NAOS Adapter Coherence Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "rules_path",
+    "propagation_state_path",
+    "propagation_state_source",
+    "profile_posture",
+    "canonical_plugin",
+    "adapter_surfaces",
+    "project_local_adapters",
+    "propagation_links",
+    "propagation_reviews",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.adapter_coherence_report.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "rules_path": {"type": "string"},
+    "rules_hash": {"type": ["string", "null"]},
+    "propagation_state_path": {"type": "string"},
+    "propagation_state_source": {"type": "string"},
+    "propagation_state_hash": {"type": ["string", "null"]},
+    "profile_posture": {"type": "object"},
+    "canonical_plugin": {"type": "object"},
+    "canonical_plugins": {"type": "array", "items": {"type": "object"}},
+    "adapter_surfaces": {"type": "array", "items": {"type": "object"}},
+    "project_local_adapters": {"type": "array", "items": {"type": "object"}},
+    "propagation_links": {"type": "array", "items": {"type": "object"}},
+    "propagation_reviews": {"type": "array", "items": {"type": "object"}},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "known_gaps": {"type": "array", "items": {"type": "object"}},
+    "residual_risks": {"type": "array", "items": {"type": "object"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object"}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message", "required_next_actions"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "status": {"type": "string"},
+        "message": {"type": "string"},
+        "required_next_actions": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:static_grader_report:v1",
+  "title": "NAOS StaticGrader Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "grader",
+    "grader_version",
+    "deterministic",
+    "advisory",
+    "cost_posture",
+    "budget_posture",
+    "input_reports",
+    "input_trace_file",
+    "dimensions",
+    "dimension_summary",
+    "deterministic_results",
+    "advisory_results",
+    "not_evaluated_dimensions",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.static_grader_report.v1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["ready", "advisory", "review_required", "blocked", "not_configured", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "grader": {"type": "string"},
+    "grader_version": {"type": "string"},
+    "deterministic": {"type": "boolean"},
+    "advisory": {"type": "boolean"},
+    "cost_posture": {"$ref": "#/$defs/cost_posture"},
+    "budget_posture": {"$ref": "#/$defs/cost_posture"},
+    "ai_surface_health_posture": {"type": "object", "additionalProperties": true},
+    "input_reports": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/input_report"}
+    },
+    "input_trace_file": {"type": ["string", "null"]},
+    "dimensions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/dimension_result"}
+    },
+    "dimension_summary": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "deterministic_results": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/dimension_result"}
+    },
+    "advisory_results": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": true}
+    },
+    "not_evaluated_dimensions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/not_evaluated_dimension"}
+    },
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object", "additionalProperties": true}
+  },
+  "$defs": {
+    "cost_posture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cost_incurred_by_default",
+        "cost_usd",
+        "external_api_required",
+        "provider_dependency_required",
+        "model_dependency_required",
+        "cost_budget_required_if_enabled_later",
+        "human_approval_required_before_cost"
+      ],
+      "properties": {
+        "cost_incurred_by_default": {"type": "boolean"},
+        "cost_usd": {"type": "number", "minimum": 0},
+        "external_api_required": {"type": "boolean"},
+        "provider_dependency_required": {"type": "boolean"},
+        "model_dependency_required": {"type": "boolean"},
+        "cost_budget_required_if_enabled_later": {"type": "boolean"},
+        "human_approval_required_before_cost": {"type": "boolean"}
+      }
+    },
+    "input_report": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "path", "present"],
+      "properties": {
+        "id": {"type": "string"},
+        "path": {"type": "string"},
+        "present": {"type": "boolean"},
+        "status": {"type": ["string", "null"]},
+        "schema": {"type": ["string", "null"]},
+        "generated_at": {"type": ["string", "null"]},
+        "findings_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "dimension_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension_id",
+        "name",
+        "status",
+        "score",
+        "passed",
+        "findings",
+        "input_sources",
+        "limitations",
+        "not_claimed",
+        "human_review_required"
+      ],
+      "properties": {
+        "dimension_id": {"type": "string"},
+        "name": {"type": "string"},
+        "status": {"type": "string", "enum": ["pass", "failed", "review_required", "not_evaluated", "readiness_only", "unknown"]},
+        "score": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "passed": {"type": ["boolean", "null"]},
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+        "input_sources": {"type": "array", "items": {"type": "string"}},
+        "limitations": {"type": "array", "items": {"type": "string"}},
+        "not_claimed": {"type": "array", "items": {"type": "string"}},
+        "human_review_required": {"type": "boolean"}
+      }
+    },
+    "not_evaluated_dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension_id", "name", "status", "reason", "findings", "not_claimed", "human_review_required"],
+      "properties": {
+        "dimension_id": {"type": "string"},
+        "name": {"type": "string"},
+        "status": {"type": "string", "enum": ["readiness_only", "not_evaluated"]},
+        "reason": {"type": "string"},
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+        "not_claimed": {"type": "array", "items": {"type": "string"}},
+        "human_review_required": {"type": "boolean"}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string"},
+        "status": {"type": "string"},
+        "message": {"type": "string"},
+        "dimension_id": {"type": "string"},
+        "source": {"type": "string"}
+      }
+    }
+  }
+}

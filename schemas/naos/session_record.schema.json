@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:session_record:v1",
+  "title": "NAOS Session Record",
+  "description": "A bounded record for one NAOS session. It is coordination metadata with local operator attribution signals, not proof of approval, task completion, authentication, authorization, separation of duties, or audit-log completeness.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "session_id",
+    "created_at",
+    "updated_at",
+    "status",
+    "profile",
+    "report_root",
+    "latest_reports",
+    "operator_id",
+    "limitations",
+    "not_claimed"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"
+    },
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"},
+    "status": {"type": "string", "enum": ["active", "closed", "unknown"]},
+    "task_id": {"type": ["string", "null"]},
+    "profile": {"type": "string"},
+    "report_root": {"type": "string"},
+    "latest_reports": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "latest_path": {"type": ["string", "null"]},
+          "session_path": {"type": ["string", "null"]},
+          "updated_at": {"type": "string"}
+        }
+      }
+    },
+    "operator_id": {"type": ["string", "null"]},
+    "operator_source": {"type": ["string", "null"], "enum": ["env", "git_email", "git_name", "os_user", "unknown", null]},
+    "operator_attribution_status": {"type": ["string", "null"], "enum": ["resolved", "unknown", "conflicting", "not_configured", null]},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,115 @@
+id: CAP-TASK-CONTEXT-PACK
+name: Task Context Pack
+description: >
+  Produces a deterministic, file-first task context pack that summarizes the
+  smallest useful bounded context for one active task. The pack links task
+  cards, task registry entries, specs, capability cards, policy/profile
+  posture, function-index and duplicate-risk evidence, module-header evidence,
+  source-to-test evidence, systemic impact, control-plane review, setup
+  recommendations, memory readiness, gates, dashboard, known gaps, residual
+  risks, waivers, limitations, and human-review boundaries.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Can generate low-noise task context when a task id and active card exist; missing inputs remain advisory."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Supports CI-friendly context packaging without automatic memory access or context injection."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Expects task cards, registry, specs, and deterministic report references to be visible where configured."
+  assured:
+    target_maturity: L3
+    enforcement: required
+    notes: "Surfaces missing, stale, or conflicting context for human review before high-assurance work proceeds."
+authority:
+  may_read:
+    - "naos/task_context_pack_rules.yaml"
+    - "naos/active/*.md"
+    - "naos/TASK_REGISTRY.yaml"
+    - "specs/*.md"
+    - "capabilities/*.yaml"
+    - "naos/reports/*.json"
+    - "naos/evidence/*.yaml"
+    - "naos/test_evidence/*.json"
+  may_write:
+    - "naos/reports/task_context_pack.json"
+    - "naos/context_packs/<TASK-ID>.md when explicitly requested"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "repo-local task cards and compact summaries"
+  - "repo-local specs, policy, capability cards, and deterministic NAOS reports"
+  - "bounded references and short summaries"
+prohibited_resources:
+  - "automatic context injection"
+  - "Engram, MCP, or memory tool calls"
+  - "private memory payload reads"
+  - "durable memory writes"
+  - "semantic retrieval or scoring"
+  - "provider, model, vector database, graph database, database, daemon, scheduler, API, or network dependency installation"
+constraints:
+  - "Must remain deterministic, local, and file-first."
+  - "Must keep JSON as the canonical report output; Markdown is derived and non-authoritative."
+  - "Must include references, statuses, and bounded summaries instead of full report or memory dumps."
+  - "Must treat current user/task constraints and repository evidence as higher authority than memory/context references."
+  - "Must keep missing, stale, waived, not_configured, and human-review states visible."
+  - "Must not claim approval, evidence authority, source-of-truth status, complete coherence, or hallucination prevention."
+required_evidence:
+  - "naos/task_context_pack_rules.yaml"
+  - "naos/reports/task_context_pack.json"
+validators:
+  - id: task_context_pack
+    script: scripts/naos_task_context_pack.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+dashboard_signals:
+  - "task_context_pack.status"
+  - "task_context_pack.task_id"
+  - "task_context_pack.source_artifacts"
+  - "task_context_pack.source_artifacts_missing"
+  - "task_context_pack.memory_context.status"
+  - "task_context_pack.human_review_required"
+maturity_path:
+  L0: "Capability contract, rules schema, report schema, seed rules, and evaluator exist."
+  L1: "Project receives task context pack rules and can generate a bounded JSON report for a task."
+  L2: "Task context packs reference specs, function index, module headers, tests, gates, evidence, and dashboard signals where configured."
+  L3: "Missing, stale, conflicting, or bloated context is routed through human review and control-plane items."
+  L4: "Task context packs support cross-tool handoff while remaining derived from authoritative repository evidence."
+  L5: "Context-pack generation participates in governed context learning without becoming an editable source of truth."
+known_limitations:
+  - "The pack summarizes local artifacts and may miss project-specific intent not recorded in task cards or specs."
+  - "Markdown output is derived for readability and can become stale if not regenerated."
+  - "Memory context is advisory readiness posture only; private memories are not read."
+  - "The pack does not automatically inject context into any AI tool."
+  - "Human review remains required for task scope, governance decisions, waivers, and durable memory actions."
+not_claimed:
+  - "source of truth"
+  - "evidence authority"
+  - "approval"
+  - "maturity promotion"
+  - "complete coherence proof"
+  - "hallucination prevention"
+  - "automatic context injection"
+  - "memory as evidence"
+  - "memory as approval"
+  - "semantic retrieval"
+related_docs:
+  - README.md
+  - INSTALLATION_MANUAL.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/CONTROL_PLANE.md
+  - NAOS_CATALOG.md
+related_scripts:
+  - scripts/naos_task_context_pack.py

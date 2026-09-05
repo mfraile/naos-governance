@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:learning_record:v1",
+  "title": "NAOS Governed Learning Record",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["id", "type", "status", "scope", "retrieval_policy", "limitations"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "type": {
+      "type": "string",
+      "enum": [
+        "fact",
+        "rule",
+        "failure_mode",
+        "anti_pattern",
+        "skill_update",
+        "prompt_update",
+        "workflow_update",
+        "baseline_update",
+        "gate_policy_update"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "verified",
+        "active",
+        "superseded",
+        "deprecated",
+        "archived",
+        "rejected",
+        "redacted"
+      ]
+    },
+    "scope": {"type": "string"},
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "string"},
+          {"type": "object", "additionalProperties": true}
+        ]
+      }
+    },
+    "source_session": {"type": "string"},
+    "verified_by": {"type": "string"},
+    "approved_by": {"type": "string"},
+    "review_after": {"type": "string"},
+    "risk": {"type": "string"},
+    "retrieval_policy": {
+      "type": "string",
+      "enum": ["active", "gated", "suppressed", "archive_only"]
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "replaces": {"type": "string"},
+    "replaced_by": {"type": "string"},
+    "reason": {"type": "string"},
+    "review_path": {"type": "string"},
+    "redaction_reason": {"type": "string"},
+    "promotion_review": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "approved_by": {"type": "string"},
+        "approved_at": {"type": "string"},
+        "target_artifacts": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

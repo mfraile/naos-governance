@@ -1,0 +1,198 @@
+version: "1.0"
+semantics:
+  rules: "Project configuration for bounded task context pack generation."
+  report: "NAOS derives a JSON task context pack and optional Markdown from repository artifacts."
+  governance_boundary: "Task context packs are bounded, derived, and non-authoritative."
+  not_claimed:
+    - "source of truth"
+    - "evidence authority"
+    - "approval"
+    - "complete coherence proof"
+    - "hallucination prevention"
+    - "automatic context injection"
+
+enabled: true
+
+max_sections: 18
+max_items_per_section: 9
+max_chars_per_section: 1800
+include_markdown_output: false
+
+source_priority:
+  - current_user_instruction_and_active_task
+  - repository_governance_specs_policy_capabilities_rules_task_cards
+  - git_working_tree
+  - deterministic_naos_reports_evidence_dashboard
+  - memory_context_references_advisory_only
+  - external_references_with_provenance
+
+authoritative_source_hierarchy:
+  - rank: 1
+    id: current_user_instruction
+    name: "Current user instruction and active task constraints"
+    authority: authoritative
+  - rank: 2
+    id: repository_governance
+    name: "Repository governance files, specs, policies, capability cards, schemas, rules, and task cards"
+    authority: authoritative
+  - rank: 3
+    id: git_working_state
+    name: "Current git state and working tree"
+    authority: authoritative
+  - rank: 4
+    id: deterministic_naos_evidence
+    name: "Deterministic NAOS reports, evidence pack, and dashboard"
+    authority: authoritative
+  - rank: 5
+    id: memory_context_references
+    name: "Memory and context references"
+    authority: advisory_recall
+  - rank: 6
+    id: external_references
+    name: "External references and research with provenance"
+    authority: reference_only
+
+source_freshness_policy:
+  default_freshness_window_days: 30
+  statuses:
+    - fresh
+    - stale
+    - missing
+    - unknown
+  stale_action: "Report stale context as a finding; regenerate or review the source artifact before relying on it."
+
+missing_source_severity_by_profile:
+  quickstart: advisory
+  lite: warning
+  standard: required
+  assured: required
+
+required_sources:
+  quickstart:
+    - active_task_card
+  lite:
+    - active_task_card
+    - task_registry
+  standard:
+    - active_task_card
+    - task_registry
+    - specs
+  assured:
+    - active_task_card
+    - task_registry
+    - specs
+    - deterministic_reports
+
+optional_sources:
+  - compact_recovery_brief
+  - capability_cards
+  - function_index
+  - function_index_health_report
+  - module_header_traceability_report
+  - spec_cascade_report
+  - source_to_test_map
+  - test_evidence_report
+  - systemic_impact_report
+  - control_plane_review_report
+  - ai_surface_context_budget_report
+  - setup_recommendations_report
+  - memory_context_readiness_report
+  - local_context_index_report
+  - local_context_query_report
+  - evidence_attestation_report
+  - gate_status_report
+  - gate_evaluation_report
+  - evidence_pack
+  - dashboard_summary
+  - known_gaps
+  - residual_risks
+  - waivers
+
+memory_inclusion_policy:
+  include_memory_readiness_report: true
+  call_memory_tools: false
+  read_private_memory_payloads: false
+  include_memory_dumps: false
+  memory_is_advisory_only: true
+  include_only_status_findings_and_fallback: true
+  conflict_or_stale_memory_action: "Include as finding and route to control-plane review; do not treat as instruction."
+
+known_gaps_residual_risks_inclusion_policy:
+  include_known_gaps: true
+  include_residual_risks: true
+  include_waivers: true
+  max_items_each: 8
+
+deterministic_report_inclusion_policy:
+  include_report_status: true
+  include_report_summary: true
+  include_findings_count: true
+  include_full_reports: false
+
+context_bloat_controls:
+  include_full_large_documents: false
+  include_full_reports: false
+  include_full_memory_payloads: false
+  summarize_or_reference: true
+  truncate_sections: true
+  include_source_paths: true
+  include_source_digests: true
+
+forbidden_content_categories:
+  - secrets
+  - tokens
+  - API keys
+  - passwords
+  - certificates
+  - private keys
+  - connection strings
+  - PII
+  - customer data
+  - tenant data
+  - regulated data
+  - private memory payloads
+  - unbounded document dumps
+
+human_review_required:
+  missing_required_source: true
+  stale_required_source: true
+  memory_conflict_or_stale_finding: true
+  waiver_or_residual_risk_present: true
+  context_bloat_override: true
+  markdown_pack_use_for_handoff: true
+
+commands_to_run:
+  - "naos task-context --task <TASK-ID> --profile <profile>"
+  - "naos memory-readiness --profile <profile>"
+  - "naos context-index --profile <profile>"
+  - "naos context-query --query \"<keywords>\" --profile <profile>"
+  - "naos function-index-health --profile <profile>"
+  - "naos module-headers --profile <profile>"
+  - "naos spec-pack-contract --profile <profile>"
+  - "naos plan-coherence --profile <profile>"
+  - "naos spec-cascade --profile <profile>"
+  - "naos test-evidence --profile <profile>"
+  - "naos ac-completion-evidence --profile <profile>"
+  - "naos systemic-impact --profile <profile>"
+  - "naos control-plane-review --profile <profile>"
+
+limitations:
+  - "Task context packs are derived snapshots and can become stale."
+  - "The generator does not call memory tools, MCP, providers, models, databases, or external services."
+  - "The generator does not infer unstated acceptance criteria or prove complete context."
+  - "AC-completion evidence, when included, is declared evidence presence only and does not prove AC correctness or complete coverage."
+  - "Markdown output is convenience context only; JSON report and source artifacts remain the review trail."
+  - "Humans remain responsible for task scope, governance decisions, waivers, and approvals."
+
+not_claimed:
+  - "source of truth"
+  - "evidence authority"
+  - "approval"
+  - "implementation, task-closure, merge, release, or publication authority"
+  - "maturity promotion"
+  - "complete coherence proof"
+  - "hallucination prevention"
+  - "automatic context injection"
+  - "memory as evidence"
+  - "memory as approval"
+  - "semantic retrieval"

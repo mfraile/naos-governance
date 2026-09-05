@@ -1,0 +1,143 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "naos-governance"
+version = "1.1.0"
+description = "NAOS-Governance — Governance-as-Code for AI-assisted software development"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.11"
+dependencies = [
+    "PyYAML>=6.0",
+    "jsonschema>=4.0",
+    "rfc8785==0.1.4",
+]
+authors = [
+    {name = "Marlon Fraile"},
+]
+keywords = [
+    "governance",
+    "ai",
+    "sdlc",
+    "code-quality",
+    "pre-commit",
+    "ai-coding",
+    "claude-code",
+    "cursor",
+    "copilot",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+
+[project.optional-dependencies]
+repository-intelligence = ["networkx==3.6.1"]
+
+[project.urls]
+Homepage = "https://github.com/mfraile/naos-governance"
+Repository = "https://github.com/mfraile/naos-governance"
+Documentation = "https://github.com/mfraile/naos-governance#readme"
+Issues = "https://github.com/mfraile/naos-governance/issues"
+
+[project.scripts]
+naos = "naos_governance.cli:main"
+naos-governance = "naos_governance.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+norecursedirs = ["dev", "templates", "plugins", ".git", ".naos-preview", "__pycache__"]
+
+# ---------------------------------------------------------------------------
+# Setuptools configuration
+# ---------------------------------------------------------------------------
+# Maps the kit root directory to the "naos_governance" package name.
+# This means KIT_DIR = Path(__file__).parent works identically for both:
+#   - git clone (naos_init.py at kit root, templates/ alongside)
+#   - pip install (naos_init.py in site-packages/naos_governance/, templates/ alongside)
+# Zero code changes needed in naos_init.py or naos_add.py.
+
+[tool.setuptools]
+packages = ["naos_governance", "naos_governance.upgrade_contract"]
+
+[tool.setuptools.package-dir]
+naos_governance = "."
+"naos_governance.upgrade_contract" = "upgrade_contract"
+
+[tool.setuptools.package-data]
+naos_governance = [
+    # Templates — including dot-prefixed directories
+    "templates/**/*",
+    "templates/**/.ai/*",
+    "templates/**/.ai/**/*",
+    "templates/**/.githooks/*",
+    "templates/**/.github/**/*",
+    "templates/**/.cursor/**/*",
+    "templates/**/.*",
+    # Repo-versioned Codex plugin source
+    "plugins/**/*",
+    # Profiles — RULES.md lives in .ai/ subdirs
+    "profiles/**/*",
+    "profiles/**/.ai/*",
+    "profiles/**/.ai/**/*",
+    # Archetypes
+    "archetypes/**/*",
+    # Kit-level capability contracts
+    "capabilities/**/*",
+    # File-first policy defaults
+    "policies/**/*",
+    # Scripts and automation
+    "scripts/**/*",
+    "autoresearch/**/*",
+    "task_battery/**/*",
+    "schemas/**/*",
+    "baselines/**/*",
+    "configs/features.yaml",
+    "configs/profile_generated_surface_contract.json",
+    "configs/profile_rules_source.yaml",
+    "configs/upgrade_source_policy.yaml",
+    "configs/secure_coding_control_register.yaml",
+    "configs/secure_coding_control_register.sample.yaml",
+    "configs/secure_coding_control_render_manifest.yaml",
+    "KNOWN_LIMITATIONS.md",
+    "docs/COMPLIANCE_MAPPING.md",
+    "docs/CONTROL_PLANE.md",
+    "docs/SECURE_CODING_CONTROL_MODEL.md",
+    "docs/SECURE_CODING_P3_REPORTING.md",
+    "docs/CLAIMS_AND_LIMITATIONS.md",
+    "docs/ADOPTION_GUIDE.md",
+    "docs/AUDIT_PLAYBOOK.md",
+    "docs/ASSURED_PROFILE_ACTIVATION.md",
+    "docs/BEHAVIORAL_AUDIT_ENABLEMENT.md",
+    "docs/NAOS_THREAT_MODEL.md",
+    "docs/OSFI_E23_MAPPING.md",
+    "docs/DORA_MAPPING.md",
+    "docs/REGULATORY_CLAIM_SOURCE_MATRIX.yaml",
+    "docs/ADMISSIBILITY.md",
+    "docs/ENGRAM_SETUP.md",
+    "docs/CODEX_PLUGIN_AND_MCP.md",
+    "docs/GLOSSARY.md",
+    "docs/decisions/ADR-0012-secure-and-agentic-coding-control-register.md",
+    "docs/diagrams/*.mmd",
+]
+
+[tool.setuptools.exclude-package-data]
+naos_governance = [
+    "**/__pycache__/*",
+    "**/*.pyc",
+    "**/*.pyo",
+    "configs/naos_private_project_coherence_overrides.json",
+    "configs/naos_public_export_manifest.yaml",
+    "schemas/naos/public_export_manifest.schema.json",
+    "scripts/naos_public_export.py",
+]

@@ -1,0 +1,124 @@
+id: CAP-BEHAVIORAL-GOVERNANCE-READINESS
+name: Behavioral Governance Readiness
+description: >
+  Composes deterministic conformance, StaticGrader, Grader Assessment,
+  LLMGrader Readiness, AI-surface, trace, setup, and systemic-impact evidence
+  to report whether first behavioral baseline work is ready, whether an
+  existing baseline metadata file is current, or whether deterministic
+  impacters require human review.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Low-noise readiness; missing project rules report not_configured."
+  lite:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Can inspect readiness without model, provider, network, cost, or baseline creation."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Baseline readiness and material deterministic impacters should be reviewed before behavioral baseline work."
+  assured:
+    target_maturity: L1
+    enforcement: blocking
+    notes: "High-impact changes or stale baseline metadata require human review before relying on prior baseline posture."
+authority:
+  may_read:
+    - naos/behavioral_governance_readiness_rules.yaml
+    - naos/behavioral_baseline_state.yaml
+    - naos/reports/conformance_latest.json
+    - naos/reports/static_grader_report.json
+    - naos/reports/grader_assessment.json
+    - naos/reports/llm_grader_readiness.json
+    - naos/reports/ai_surface_context_budget.json
+    - naos/reports/agent_trace_validation.json
+    - naos/reports/setup_recommendations.json
+    - naos/reports/systemic_impact_review.json
+    - selected local governance/config paths declared in the rules seed
+  may_write:
+    - naos/reports/behavioral_governance_readiness.json
+  may_block:
+    - "only through deterministic gate policy and human review when readiness prerequisites are missing, LLMGrader readiness is unsafe, or high-impact deterministic impacter metadata is detected"
+allowed_resources:
+  - "repo-local readiness rules"
+  - "repo-local deterministic reports"
+  - "repo-local optional baseline metadata"
+  - "repo-local governance/config file hashes"
+prohibited_resources:
+  - "model calls, provider SDKs, provider credentials, external network calls, or API credentials"
+  - "runtime behavioral grading, runtime trace capture, scheduler/daemon activation, or automatic baseline creation"
+  - "semantic drift inference, N-run statistics, behavioral scoring, approval, certification, publication, or release authorization"
+constraints:
+  - "Must read local deterministic evidence only."
+  - "Must not create or promote a behavioral baseline automatically."
+  - "Must keep LLMGrader Readiness separate as an input, not a runtime judge."
+  - "Must emit review input only and mark gate/evidence/SARIF/dashboard outputs accordingly."
+  - "Must report cost_usd: 0.0 and avoid provider/API/model/credential dependencies."
+  - "Must not claim behavioral safety, semantic correctness, legal/compliance/regulatory assurance, approval, certification, attestation, maturity promotion, publication readiness, or release authorization."
+required_evidence:
+  - naos/behavioral_governance_readiness_rules.yaml
+  - naos/reports/behavioral_governance_readiness.json
+validators:
+  - id: naos_behavioral_governance_readiness
+    script: scripts/naos_behavioral_governance_readiness.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - behavioral_governance_readiness.status
+  - behavioral_governance_readiness.summary.baseline_present
+  - behavioral_governance_readiness.summary.total_impacters
+  - behavioral_governance_readiness.summary.cost_usd
+  - behavioral_governance_readiness.human_review_required
+maturity_path:
+  L0: "Readiness rules, schema, and report runner exist; runtime and baseline creation remain disabled."
+  L1: "Report composes deterministic prerequisites plus LLMGrader Readiness as input."
+  L2: "Findings are visible in self-check, gates, evidence, dashboard, SARIF, systemic impact, and control-plane routing."
+  L3: "Adopters can maintain reviewed baseline metadata and detect deterministic impacters before maintenance."
+  L4: "Teams can route material baseline-impact review through explicit governance owners."
+  L5: "Future advisory behavioral evaluation, if separately approved, remains secondary to deterministic controls and human review."
+known_limitations:
+  - "Readiness reporting does not run behavioral grading or LLM judging."
+  - "File fingerprints and report metadata do not infer semantic drift or behavioral degradation."
+  - "A current baseline metadata match is not approval, certification, compliance proof, or runtime safety proof."
+  - "Human review is required before first baseline work and after material impacters."
+not_claimed:
+  - "behavioral runtime grading"
+  - "LLM judging"
+  - "model/API/provider dependency"
+  - "provider credential handling"
+  - "baseline creation"
+  - "N-run statistics"
+  - "semantic drift inference"
+  - "behavioral safety proof"
+  - "semantic correctness proof"
+  - "legal/compliance/regulatory conclusion"
+  - "certification"
+  - "approval"
+  - "attestation"
+  - "publication readiness"
+  - "release authorization"
+  - "maturity promotion"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - NAOS_CATALOG.md
+  - KNOWN_LIMITATIONS.md
+  - docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
+related_scripts:
+  - scripts/naos_behavioral_governance_readiness.py
+  - scripts/naos_llm_grader_readiness.py
+  - scripts/naos_grader_assessment.py
+  - scripts/naos_static_grader.py
+related_schemas:
+  - schemas/naos/behavioral_governance_readiness.schema.json
+  - schemas/naos/llm_grader_readiness.schema.json
+  - schemas/naos/grader_assessment.schema.json
+  - schemas/naos/static_grader_report.schema.json

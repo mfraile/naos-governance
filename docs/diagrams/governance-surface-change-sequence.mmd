@@ -1,0 +1,21 @@
+sequenceDiagram
+    participant Maintainer as Maintainer
+    participant Skill as systemic-capability-wiring
+    participant CLI as ai-surface-budget/learning-loop-review/systemic-impact/control-plane-review/spec-pack/spec-cascade
+    participant Reports as Review reports
+    participant Decision as Human decision
+
+    Maintainer->>Skill: Identify affected surfaces
+    Skill->>CLI: Recommend systemic-impact and control-plane review
+    alt Prompts, agents, skills, instructions, workflows, manuals, or governance docs changed
+        Skill->>CLI: Recommend ai-surface-budget
+    end
+    alt Lesson may affect future behavior or governed artifacts
+        Skill->>CLI: Recommend learning-loop-review
+    end
+    alt Specs, tasks, source refs, or source traceability changed
+        Skill->>CLI: Recommend spec-pack, spec-cascade, and module-header checks
+    end
+    CLI->>Reports: Record affected families, traceability findings, next actions
+    Reports->>Decision: Present gaps, waivers, remediation options
+    Decision->>Decision: Update artifacts or record known residual risk

@@ -1,0 +1,121 @@
+id: CAP-PACKAGE-REALITY
+name: Package Reality
+description: >
+  Reviews declared Python package names, lock-style pins, optional documentation
+  install snippets, typo-near known packages, optional local SBOM/provenance/hash
+  evidence, and explicit opt-in registry metadata checks as bounded
+  package-reality evidence.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Advisory offline package-reality review only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns on missing lock-style pins, suspicious names, or docs install snippets when configured."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Package-reality report is expected for governed dependency changes."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured package-reality findings can block until reviewed."
+authority:
+  may_read:
+    - pyproject.toml
+    - requirements.txt
+    - requirements/
+    - poetry.lock
+    - uv.lock
+    - Pipfile.lock
+    - bom.json
+    - "*.cdx.json"
+    - sbom/
+    - docs/
+    - README.md
+    - naos/package_reality_rules.yaml
+    - naos/package_reality_provenance.yaml
+  may_write:
+    - naos/reports/package_reality.json
+  may_block:
+    - "only through configured deterministic gate policy and human review for unresolved package-reality findings"
+allowed_resources:
+  - "repo-local dependency manifests"
+  - "repo-local lock files"
+  - "repo-local documentation install snippets when explicitly configured"
+  - "repo-local CycloneDX JSON SBOM files when configured"
+  - "repo-local package provenance manifest when configured"
+  - "repo-local package hash evidence declared in SBOM/provenance artifacts"
+  - "PyPI JSON metadata only when --registry-mode online and --allow-network are both provided"
+prohibited_resources:
+  - "network calls by default"
+  - "automatic package installation"
+  - "malware scanning claims"
+  - "vulnerability scanning claims"
+  - "package safety or supply-chain assurance claims"
+  - "SBOM completeness claims"
+  - "provenance authenticity claims"
+  - "registry trust claims"
+constraints:
+  - "Must not perform online registry checks unless the operator explicitly enables network mode."
+  - "Must not install, upgrade, remove, or mutate packages."
+  - "Must report registry existence as review evidence only."
+  - "Must include limitations, non-claims, and human-review boundaries."
+required_evidence:
+  - "naos/reports/package_reality.json"
+validators:
+  - id: package_reality
+    script: scripts/naos_package_reality.py
+    status: available
+gatekeepers:
+  - G4
+  - G6
+dashboard_signals:
+  - "package_reality.status"
+  - "package_reality.registry_mode"
+  - "package_reality.network_used"
+  - "package_reality.declared_without_lockfile_entry"
+  - "package_reality.sbom_pypi_components"
+  - "package_reality.provenance_packages"
+maturity_path:
+  L0: "Capability contract, rules seed, script, and report schema exist."
+  L1: "Offline package-reality report can be generated from local manifests, lock files, and allowlists."
+  L2: "Report is wired into CLI, Make, evidence, gate, and dashboard review surfaces."
+  L3: "Profile severity and reviewed allowlists are applied to unresolved package-reality findings."
+  L4: "Optional docs-snippet, SBOM, provenance, hash, and registry-metadata review are routinely captured when dependency changes are in scope."
+  L5: "Projects pair package-reality evidence with adopter-owned SCA/SBOM review where required."
+known_limitations:
+  - "Offline mode cannot confirm registry existence."
+  - "Registry existence does not prove package safety, legitimacy, maintenance, vulnerability absence, or suitability."
+  - "Private registries and package aliases require project-specific allowlists."
+  - "Typo-near checks are heuristic and can false-positive."
+  - "Local SBOM and provenance evidence can be stale, incomplete, or generated from the wrong environment."
+  - "Hash cross-checks compare configured local evidence only and do not download or verify package distributions."
+not_claimed:
+  - "package safety proof"
+  - "malware detection"
+  - "vulnerability scanning"
+  - "supply-chain assurance"
+  - "registry trust proof"
+  - "SBOM completeness proof"
+  - "provenance authenticity proof"
+  - "hash attestation proof"
+  - "license approval"
+  - "dependency freshness proof"
+  - "installation approval"
+  - "approval"
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_package_reality.py
+related_schemas:
+  - schemas/naos/package_reality.schema.json
+  - schemas/naos/package_reality_provenance.schema.json

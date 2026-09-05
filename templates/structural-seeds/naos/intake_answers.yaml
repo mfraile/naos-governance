@@ -1,0 +1,29 @@
+schema: naos.intake_answers.v1
+profile: quickstart
+updated_at: null
+description: >
+  Local answer-file seed for professional NAOS adoption. Unknown values stay
+  unknown until a human answers, defers, or records residual risk.
+mode: greenfield
+project_purpose: unknown
+accountable_owner: unknown
+domain: unknown
+risk_profile: unknown
+regulated_context: unknown
+data_class: unknown
+ai_tools: unknown
+evidence_expectations: unknown
+review_model: unknown
+language_framework_intent: unknown
+memory_mcp_posture: unknown
+ai_artifact_disposition: unknown
+brownfield_scope: unknown
+first_touched_area: unknown
+not_claimed:
+  - automatic approval
+  - legal or regulatory compliance conclusion
+  - requirements completeness proof
+  - runtime safety proof
+  - memory authority
+  - human review replacement
+human_review_required: true

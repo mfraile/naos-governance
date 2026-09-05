@@ -1,0 +1,48 @@
+version: "1.0"
+semantics:
+  state: "Manual memory review ledger for governed memory-use decisions."
+  report: "NAOS evaluates these metadata items without reading private memory payloads."
+  governance_boundary: "Leave this file empty until a human reviewer records approved memory-use metadata."
+
+# Safe template only. Do not paste private memory payloads, secrets, customer data,
+# tenant data, regulated data, Engram database contents, or MCP tool output here.
+memory_review_items: []
+
+# Optional future/manual readiness records. These are metadata only in Group 30.
+recall_traces: []
+audit_events: []
+
+# Example shape for future human-authored items:
+# memory_review_items:
+#   - memory_reference_id: "MEM-EXAMPLE-001"
+#     title: "Non-sensitive project setup lesson"
+#     state: "supporting_context_memory"
+#     scope: "project_local"
+#     project_scope: "example-project"
+#     source_references:
+#       - source_type: "task_card"
+#         source_path: "naos/active/T-001.md"
+#         source_hash: null
+#     provenance: "explicit_human_review"
+#     confidence: "medium"
+#     review_status: "approved_with_limits"
+#     reviewer: "project_owner"
+#     reviewed_at: "YYYY-MM-DD"
+#     expires_at: null
+#     freshness_status: "recent"
+#     supersedes: []
+#     superseded_by: []
+#     limitations:
+#       - "Example only; not instruction-grade."
+#     can_use_as_context: true
+#     can_use_as_supporting_evidence: true
+#     can_use_as_instruction: false
+#     requires_user_confirmation: true
+#     allowed_profiles: ["standard", "assured"]
+#     allowed_agents: []
+#     allowed_surfaces: []
+#     forbidden_uses:
+#       - "source of truth"
+#       - "approval"
+#       - "legal/compliance conclusion"
+#     notes: "Replace with a real reviewed memory reference only after human approval."

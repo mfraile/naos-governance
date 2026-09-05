@@ -1,0 +1,38 @@
+{
+  "schema": "naos.integration_manifest.v1",
+  "integration_id": "spec_kit_adapter",
+  "name": "Optional Spec-Kit Adapter",
+  "status": "optional_template",
+  "core_dependency": false,
+  "activation": "manual_review_required",
+  "reads": [
+    ".specify/specs/*.md"
+  ],
+  "writes_by_default": [],
+  "write_targets_if_explicit": [
+    "naos/reports/spec_kit_mapping.json"
+  ],
+  "install_targets": [
+    "naos/integrations/spec-kit/"
+  ],
+  "dependencies": [],
+  "security_boundaries": [
+    "No dependencies are installed silently.",
+    "No files under .specify/ are mutated by default.",
+    "No provider, model, API, MCP, Engram, or memory runtime is called.",
+    "No secrets or credentials are required."
+  ],
+  "not_claimed": [
+    "official Spec-Kit support",
+    "official Microsoft support",
+    "regulatory mapping completeness",
+    "proof of compliance",
+    "approval",
+    "certification",
+    "source of truth",
+    "automatic context injection",
+    "memory write-back",
+    "core dependency"
+  ],
+  "human_review_required": true
+}

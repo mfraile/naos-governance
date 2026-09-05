@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:agent_orchestration_policy:v1",
+  "title": "NAOS deterministic agent orchestration proposal policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "enabled",
+    "mode",
+    "activation",
+    "allowed_profiles",
+    "max_parallel",
+    "priority_order",
+    "client_contract_max_age_days",
+    "max_affected_files",
+    "max_affected_bytes",
+    "client_contracts",
+    "authority",
+    "required_nonclaims"
+  ],
+  "properties": {
+    "schema": {"const": "naos.agent_orchestration_policy.v1"},
+    "version": {"const": 1},
+    "enabled": {"type": "boolean"},
+    "mode": {"const": "proposal_only"},
+    "activation": {"const": "per_run"},
+    "allowed_profiles": {
+      "const": ["assured"]
+    },
+    "max_parallel": {"type": "integer", "minimum": 1, "maximum": 8},
+    "priority_order": {"const": ["P0", "P1", "P2", "P3"]},
+    "client_contract_max_age_days": {"type": "integer", "minimum": 1, "maximum": 365},
+    "max_affected_files": {"type": "integer", "minimum": 1, "maximum": 5000},
+    "max_affected_bytes": {"type": "integer", "minimum": 1, "maximum": 1073741824},
+    "client_contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["codex", "claude_code", "cursor", "github_copilot_cli", "opencode"],
+      "properties": {
+        "codex": {"$ref": "#/$defs/client_contract"},
+        "claude_code": {"$ref": "#/$defs/client_contract"},
+        "cursor": {"$ref": "#/$defs/client_contract"},
+        "github_copilot_cli": {"$ref": "#/$defs/client_contract"},
+        "opencode": {"$ref": "#/$defs/client_contract"}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "client_launch",
+        "client_configuration_write",
+        "provider_or_model_call",
+        "task_state_write",
+        "task_completion",
+        "claim_write",
+        "automatic_approval",
+        "merge",
+        "push",
+        "release",
+        "publication",
+        "worktree_creation",
+        "hook_installation",
+        "memory_write"
+      ],
+      "properties": {
+        "client_launch": {"const": false},
+        "client_configuration_write": {"const": false},
+        "provider_or_model_call": {"const": false},
+        "task_state_write": {"const": false},
+        "task_completion": {"const": false},
+        "claim_write": {"const": false},
+        "automatic_approval": {"const": false},
+        "merge": {"const": false},
+        "push": {"const": false},
+        "release": {"const": false},
+        "publication": {"const": false},
+        "worktree_creation": {"const": false},
+        "hook_installation": {"const": false},
+        "memory_write": {"const": false}
+      }
+    },
+    "required_nonclaims": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 10,
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "client_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supported",
+        "source_url",
+        "source_checked_at",
+        "configuration_path",
+        "model_field",
+        "reasoning_effort_field",
+        "limitations"
+      ],
+      "properties": {
+        "supported": {"type": "boolean"},
+        "source_url": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "source_checked_at": {"type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+        "configuration_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000-\\u001f]+$"
+        },
+        "model_field": {"type": ["string", "null"]},
+        "reasoning_effort_field": {"type": ["string", "null"]},
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "minItems": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"supported": {"const": true}},
+            "required": ["supported"]
+          },
+          "then": {
+            "properties": {
+              "model_field": {"type": "string", "minLength": 1},
+              "reasoning_effort_field": {"type": "string", "minLength": 1}
+            }
+          },
+          "else": {
+            "properties": {
+              "model_field": {"type": "null"},
+              "reasoning_effort_field": {"type": "null"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

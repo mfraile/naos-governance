@@ -1,0 +1,77 @@
+id: CAP-FUNCTION-INDEX-HEALTH
+name: Function-Index Health
+description: >
+  Tracks whether a project has a current function inventory, stale index risks,
+  duplicate-triage debt, and semantic-quality evidence where configured.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Function index is optional guidance."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warn when configured index is missing or stale."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Index health evidence is expected for governed coding."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured stale or missing index can block gates."
+authority:
+  may_read:
+    - naos/inventory/
+    - reports/semantic_quality_snapshot.json
+    - src/
+  may_write:
+    - naos/reports/function_index_health.json
+allowed_resources:
+  - "repo-local source inventory"
+  - "semantic quality snapshot"
+prohibited_resources:
+  - "mandatory embedding service"
+  - "mandatory graph database"
+constraints:
+  - "Must report advisory results when project-specific source data is missing."
+  - "Must route semantic-quality or duplicate-triage findings to human review before durable governance decisions."
+  - "Must avoid claiming complete duplicate elimination."
+required_evidence:
+  - "Function index or explicit not-configured result."
+  - "Freshness timestamp or source-change comparison when available."
+validators:
+  - id: function_index_health
+    script: scripts/naos_function_index_health.py
+    status: available
+gatekeepers:
+  - G1
+  - G4
+dashboard_signals:
+  - "function_index.status"
+  - "function_index.freshness"
+  - "function_index.duplicate_warnings"
+maturity_path:
+  L0: "Function-index health contract exists."
+  L1: "Project configures source roots and index location."
+  L2: "Health validator produces evidence."
+  L3: "Gatekeeper applies profile severity."
+  L4: "Dashboard tracks freshness and triage debt."
+  L5: "Index evidence is included in evidence packs."
+known_limitations:
+  - "Semantic similarity depends on configured tooling."
+  - "Static index cannot prove absence of duplication."
+not_claimed:
+  - "Every duplicate is detected."
+  - "Repository memory is equivalent to human memory."
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+related_scripts:
+  - scripts/naos_code_quality_audit.py
+  - scripts/naos_function_index_query.py
+  - scripts/naos_function_index_health.py

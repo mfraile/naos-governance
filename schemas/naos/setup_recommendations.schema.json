@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:setup_recommendations:v1",
+  "title": "NAOS Setup Recommendations Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "detected_signals",
+    "profile_guidance",
+    "repository_intelligence",
+    "summary",
+    "recommended_modules",
+    "optional_modules",
+    "deferred_modules",
+    "configured_modules",
+    "not_configured_modules",
+    "warnings",
+    "prerequisites",
+    "next_actions",
+    "limitations",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.setup_recommendations.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["pass", "advisory", "warning", "required_missing", "blocked", "not_configured", "disabled", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "catalog": {"type": "object"},
+    "policy": {"type": "object"},
+    "detected_signals": {"type": "object"},
+    "profile_guidance": {
+      "type": "object",
+      "required": ["selected_profile", "recommended_action", "recommended_profile", "detected_baseline_profile", "automatic_upgrade", "human_review_required"],
+      "properties": {
+        "selected_profile": {"type": "string"},
+        "recommended_action": {
+          "type": "string",
+          "enum": ["stay_on_profile", "consider_lite", "consider_standard", "consider_assured"]
+        },
+        "recommended_profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+        "detected_baseline_profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+        "rationale": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "matched_signals": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "automatic_upgrade": {"type": "boolean"},
+        "human_review_required": {"type": "boolean"},
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": true
+    },
+    "repository_intelligence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicable",
+        "applicability_status",
+        "lifecycle_status",
+        "continuation_allowed",
+        "selected_profile",
+        "engine_execution",
+        "plan_status",
+        "recommendation",
+        "required_usage_scopes",
+        "usage_scope_satisfied",
+        "installation",
+        "not_claimed"
+      ],
+      "properties": {
+        "applicable": {"type": "boolean"},
+        "applicability_status": {"enum": ["applicable", "not_applicable", "undetermined"]},
+        "lifecycle_status": {"enum": ["not_applicable", "activation_required", "validated_current", "refresh_required", "recovery_required", "blocked"]},
+        "continuation_allowed": {"type": "boolean"},
+        "selected_profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+        "engine_execution": {"enum": ["completed", "refused"]},
+        "plan_status": {"enum": ["confirmation_required", "enrollment_required", "not_applicable", "blocked_prerequisite", "active", "refresh_required", "recovery_required"]},
+        "plan_id": {"type": "string", "pattern": "^RI-[0-9a-f]{16}$"},
+        "plan_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "effective_source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "purpose": {"enum": ["brownfield-onboarding", "ongoing-change-impact", "task-context"]},
+        "component_mode": {"enum": ["auto", "baseline", "graph"]},
+        "rules_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "coverage": {"type": "object"},
+        "profile_gate": {"type": "object"},
+        "maturity": {"type": "object"},
+        "maturity_authorization_effect": {"const": "none"},
+        "provenance_status": {"enum": ["valid", "enrollment_required", "scope_enrollment_required", "refused"]},
+        "recommendation": {"enum": ["capability_enrollment_then_activation", "digest_review_and_activation", "no_install_recommended", "blocked_prerequisite", "use_validated_current_generation", "refresh_and_revalidate", "recover_then_revalidate"]},
+        "required_usage_scopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "authorized_usage_scopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "usage_scope_satisfied": {"type": "boolean"},
+        "active_context": {"type": ["object", "null"]},
+        "components": {"type": "object"},
+        "graph_eligibility": {"type": "object"},
+        "installation": {
+          "type": "object",
+          "required": ["automatic", "explicit_digest_confirmation_required", "capability_enrollment_required", "transaction_and_recovery_required", "source_artifacts_remain_authoritative", "next_action"],
+          "properties": {
+            "automatic": {"const": false},
+            "explicit_digest_confirmation_required": {"type": "boolean"},
+            "capability_enrollment_required": {"type": "boolean"},
+            "transaction_and_recovery_required": {"type": "boolean"},
+            "source_artifacts_remain_authoritative": {"const": true},
+            "next_action": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        "effectiveness_hypothesis": {"type": "object"},
+        "finding_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "error": {"type": "string"},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "engine_execution": {"const": "completed"},
+              "plan_status": {"enum": ["confirmation_required", "enrollment_required", "not_applicable", "blocked_prerequisite"]}
+            },
+            "required": ["engine_execution", "plan_status"]
+          },
+          "then": {
+            "required": ["plan_id", "plan_sha256", "purpose", "component_mode", "rules_sha256"]
+          }
+        },
+        {
+          "if": {
+            "properties": {"plan_status": {"enum": ["confirmation_required", "enrollment_required", "not_applicable", "active"]}},
+            "required": ["plan_status"]
+          },
+          "then": {
+            "required": [
+              "effective_source_sha256",
+              "coverage",
+              "profile_gate",
+              "maturity",
+              "maturity_authorization_effect",
+              "provenance_status",
+              "components",
+              "graph_eligibility",
+              "effectiveness_hypothesis",
+              "finding_ids"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {"lifecycle_status": {"const": "validated_current"}},
+            "required": ["lifecycle_status"]
+          },
+          "then": {
+            "properties": {
+              "continuation_allowed": {"const": true},
+              "plan_status": {"const": "active"},
+              "recommendation": {"const": "use_validated_current_generation"},
+              "usage_scope_satisfied": {"const": true}
+            },
+            "required": ["active_context", "authorized_usage_scopes"]
+          }
+        },
+        {
+          "if": {
+            "properties": {"engine_execution": {"const": "refused"}},
+            "required": ["engine_execution"]
+          },
+          "then": {
+            "required": ["error"],
+            "properties": {
+              "applicable": {"const": false},
+              "applicability_status": {"const": "undetermined"},
+              "plan_status": {"const": "blocked_prerequisite"},
+              "recommendation": {"const": "blocked_prerequisite"}
+            }
+          }
+        }
+      ]
+    },
+    "summary": {"type": "object"},
+    "recommended_modules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/module_recommendation"}
+    },
+    "optional_modules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/module_recommendation"}
+    },
+    "deferred_modules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/module_recommendation"}
+    },
+    "configured_modules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/module_recommendation"}
+    },
+    "not_configured_modules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/module_recommendation"}
+    },
+    "warnings": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "findings": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "module_recommendation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "module_id",
+        "name",
+        "category",
+        "recommendation",
+        "requires_confirmation",
+        "installation_status",
+        "rationale",
+        "benefit",
+        "warning",
+        "consequence_if_deferred",
+        "prerequisites",
+        "evidence_outputs",
+        "commands",
+        "dependency_posture",
+        "noise_risk",
+        "human_review_boundary",
+        "not_claimed",
+        "related_capabilities",
+        "related_reports"
+      ],
+      "properties": {
+        "module_id": {"type": "string"},
+        "name": {"type": "string"},
+        "category": {"type": "string"},
+        "recommendation": {
+          "type": "string",
+          "enum": [
+            "recommended",
+            "configured",
+            "optional",
+            "defer",
+            "readiness_only",
+            "experimental",
+            "not_configured",
+            "disabled",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "requires_confirmation": {"type": "boolean"},
+        "installation_status": {
+          "enum": ["absent", "partial_unverified", "present_unverified", "not_installable"]
+        },
+        "rationale": {"type": "string"},
+        "benefit": {"type": "string"},
+        "warning": {"type": "string"},
+        "consequence_if_deferred": {"type": "string"},
+        "prerequisites": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "evidence_outputs": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "commands": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "dependency_posture": {"type": "string"},
+        "noise_risk": {"type": "string"},
+        "human_review_boundary": {"type": "string"},
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "related_capabilities": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "related_reports": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,215 @@
+version: "1.0"
+enabled: true
+state: readiness_only
+semantics:
+  state: "Rules declare deterministic session-start, checkpoint, and end reporting posture."
+  report: "NAOS packages lifecycle state into bounded reports/checklists without mutating task artifacts."
+  governance_boundary: "Lifecycle reports coordinate context; they do not approve work or inject context automatically."
+
+lifecycle_modes:
+  - session_start
+  - session_checkpoint
+  - session_end
+
+source_priority:
+  - current_user_instruction_and_active_task_constraints
+  - repo_governance_specs_policies_capabilities_rules_task_cards
+  - current_git_state_and_working_tree
+  - deterministic_naos_reports_evidence_dashboard
+  - memory_context_references_as_advisory_recall_only
+  - external_references_with_provenance
+
+task_discovery_policy:
+  prefer_explicit_task_argument: true
+  fallback_to_active_task_cards: true
+  fallback_to_task_registry: true
+  never_invent_task_ids: true
+  missing_task_quickstart_severity: advisory
+  missing_task_standard_severity: required
+
+active_card_policy:
+  required_when_task_declared: true
+  missing_card_status: missing_task_card
+  freshness_days: 14
+  stale_card_routes_to_control_plane_review: true
+
+compact_checkpoint_policy:
+  compact_required_for_checkpoint: true
+  compact_recommended_for_session_end: true
+  compact_freshness_days: 7
+  checkpoint_fields:
+    - what
+    - why
+    - files
+    - remaining
+    - gotchas
+  report_only: true
+  write_compact_files: false
+
+git_state_policy:
+  inspect_git_status: true
+  inspect_git_branch: true
+  inspect_git_head: true
+  mutate_git_state: false
+  dirty_worktree_requires_handoff_note: true
+
+report_freshness_policy:
+  freshness_days: 7
+  stale_reports_become_findings: true
+  missing_optional_reports_are_visible: true
+
+required_reports_by_profile:
+  quickstart: []
+  lite:
+    - memory_context_readiness_report
+    - memory_provider_access_report
+    - memory_use_policy_report
+  standard:
+    - memory_context_readiness_report
+    - memory_provider_access_report
+    - memory_use_policy_report
+    - task_context_pack_report
+    - local_context_index_report
+    - ai_surface_context_budget_report
+    - gate_status_report
+    - dashboard_summary_report
+  assured:
+    - memory_context_readiness_report
+    - memory_provider_access_report
+    - memory_use_policy_report
+    - task_context_pack_report
+    - local_context_index_report
+    - local_context_query_report
+    - graph_context_readiness_report
+    - graph_context_query_report
+    - systemic_impact_report
+    - control_plane_review_report
+    - ai_surface_context_budget_report
+    - gate_status_report
+    - gate_evaluation_report
+    - evidence_pack_report
+    - dashboard_summary_report
+
+optional_reports:
+  - semantic_candidate_layer_report
+  - setup_recommendations_report
+  - evidence_attestation_report
+  - ai_surface_context_budget_report
+  - local_context_query_report
+  - graph_context_query_report
+
+memory_posture_policy:
+  check_memory_readiness_report: true
+  check_memory_access_report: true
+  check_memory_use_policy_report: true
+  fallback_when_unavailable: "Use repo evidence, task cards, compact briefs, git state, and deterministic reports."
+  memory_is_advisory_only: true
+  memory_is_not_evidence: true
+  memory_is_not_approval: true
+
+memory_candidate_proposal_policy:
+  enabled: true
+  modes_allowed:
+    - session_checkpoint
+    - session_end
+  proposal_only: true
+  not_written: true
+  default_proposed_state: raw_memory_candidate
+  allowed_use: advisory_context_candidate
+  requires_human_review: true
+  instruction_grade_proposals_allowed: false
+  private_payloads_allowed: false
+  direct_memory_writes_allowed: false
+
+control_plane_routing_policy:
+  route_stale_or_conflicting_context: true
+  route_checkpoint_gaps: true
+  route_memory_candidate_overclaims: true
+  route_automatic_injection_overclaims: true
+
+systemic_impact_routing_policy:
+  route_lifecycle_rule_changes: true
+  route_ai_surface_lifecycle_changes: true
+  route_compact_recovery_changes: true
+  route_memory_candidate_policy_changes: true
+
+evidence_dashboard_recommendation_policy:
+  recommend_evidence_pack_refresh_on_session_end: true
+  recommend_dashboard_refresh_on_session_end: true
+  reports_are_review_aids_not_proof: true
+
+no_mutation_policy:
+  mutate_task_cards: false
+  mutate_task_registry: false
+  write_compact_files: false
+  install_hooks: false
+
+no_memory_write_policy:
+  call_engram: false
+  call_mcp: false
+  call_memory_tools: false
+  read_private_payloads: false
+  read_engram_db: false
+  write_memory: false
+  durable_memory_write_back: false
+  cloud_memory: false
+
+no_automatic_injection_policy:
+  automatic_context_injection: false
+  hook_installation: false
+  tool_specific_hooks_are_optional: true
+
+profile_posture:
+  quickstart:
+    state: advisory
+    severity: advisory
+    human_review_required_for_stale_or_missing_lifecycle_critical_context: false
+  lite:
+    state: readiness_only
+    severity: advisory
+    human_review_required_for_stale_or_missing_lifecycle_critical_context: false
+  standard:
+    state: readiness_only
+    severity: review_required
+    human_review_required_for_stale_or_missing_lifecycle_critical_context: true
+  assured:
+    state: readiness_only
+    severity: review_required
+    human_review_required_for_stale_or_missing_lifecycle_critical_context: true
+
+human_review_requirements:
+  stale_lifecycle_context: true
+  checkpoint_gap: true
+  session_end_with_dirty_worktree: true
+  memory_candidate_proposals: true
+  durable_memory_write: true
+  lifecycle_hook_automation: true
+
+known_gaps: []
+residual_risks:
+  - id: SESSION-LIFECYCLE-RISK-001
+    description: "Lifecycle reports summarize file/report posture but do not guarantee a human or agent followed the checklist."
+    owner: project_team
+    status: accepted_default
+waivers: []
+
+limitations:
+  - "Session lifecycle reports are deterministic report/checklist artifacts only."
+  - "The report does not mutate task cards, TASK_REGISTRY, compact files, git state, or memory."
+  - "The report does not call Engram, MCP, memory tools, semantic/vector runtimes, or graph runtimes."
+  - "The report does not inject context automatically."
+  - "Memory candidates are proposals only and require human review before any durable use."
+
+not_claimed:
+  - "proof"
+  - "approval"
+  - "evidence authority"
+  - "task completion"
+  - "automatic context injection"
+  - "automatic memory write-back"
+  - "memory as evidence"
+  - "memory as approval"
+  - "memory as truth"
+  - "source of truth"
+  - "hallucination prevention"
+  - "cloud memory"

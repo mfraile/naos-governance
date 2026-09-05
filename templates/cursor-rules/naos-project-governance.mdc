@@ -1,0 +1,166 @@
+---
+description: NAOS project governance rules — PII handling, file management, PM discipline
+globs: ["**/*"]
+alwaysApply: true
+---
+<!-- NAOS Kit: Portable governance rule. Adapt RESTRICTED_PATHS and PII rules to your stack. -->
+
+# [ADAPT: Project Name] — Project Governance Rules
+
+## 🧭 NATURAL-LANGUAGE ROUTER
+
+When the user states a goal, route it to explicit NAOS commands instead of
+guessing hidden automation:
+
+- New project -> `naos adopt . --mode greenfield --profile <profile> --dry-run`
+- Existing repo -> `naos adopt . --mode brownfield --profile <profile> --dry-run`
+- Daily task -> `/naos-d-start` then `/naos-task-start <TASK-ID>`
+- PR/release review -> `naos gate-evaluate`, `naos evidence-pack`, `naos dashboard`
+- Governance-surface change -> `naos systemic-impact`, `naos control-plane-review`
+
+Keep commands visible. Reports are review evidence, not approval.
+
+## 🔒 RULE #1: DATA PRIVACY GOVERNANCE
+
+### Define Your Restricted Schemas
+
+[ADAPT: Replace this with your data isolation model]
+
+**Example (multi-tenant SaaS)**:
+- ✅ `[TENANT_DB]` — PII storage ALLOWED (encrypted, per-tenant)
+- ❌ `[DISCOVERY_LAYER]` — PII storage FORBIDDEN
+
+**Forbidden in restricted schemas:**
+- Full name (first_name, last_name, full_name)
+- Email address (email, contact_email)
+- Phone number (phone, mobile, telephone)
+- Physical address (street, city, zip, postal_code)
+- Government IDs (ssn, passport, driver_license)
+- IP addresses (if tied to individual)
+
+**Safe identifiers:**
+- ✅ Organization UUID / tenant_id
+- ✅ Company name (not person name)
+- ✅ Aggregated statistics
+- ✅ Cryptographic hashes
+
+If PII detected in restricted paths → **STOP! FIX BEFORE COMMIT!**
+
+---
+
+## 📁 RULE #2: FILE MANAGEMENT
+
+### Do Not Create
+- ❌ `archive/` folders (use `git rm` instead)
+- ❌ `*.bak`, `*_backup*` files
+- ❌ `session_*.md`, `analysis_*.md` temp files
+- ❌ New PM files in `naos/` root beyond core structure
+
+### Do Update (not create)
+- `naos/PROJECT_STATUS.md` — single source of project status
+- `docs/DOCS_INDEX.md` — when adding new docs
+- Existing spec files — add to them, don't create new ones
+
+### Allowed to Create
+- `naos/active/*.md` — story cards for active tasks
+- `naos/completed/*.md` — completed task records
+- `docs/exploration/*.md` — exploratory notes, spikes, and decision inputs (exempt from validation)
+- Source files for features (with test coverage)
+
+---
+
+## 📊 RULE #3: PM DISCIPLINE
+
+- ONE source of truth: `naos/TASK_REGISTRY.yaml`
+- All task status changes → `naos/TASK_REGISTRY.yaml` first
+- Run `make -f Makefile.naos gov-refresh` after any registry change
+- No duplicate status in multiple files
+
+---
+
+## 🔄 RULE #4: GOVERNANCE SYNC
+
+After ANY change to TASK_REGISTRY:
+```bash
+make -f Makefile.naos gov-refresh  # syncs all derived PM files
+```
+
+After ANY change to specs/ or requirements:
+- Update `naos/TRACEABILITY_MATRIX.md` if present
+- If `specs/04-architecture.md` changes, check linkage to specs 01-03, `naos/TASK_REGISTRY.yaml`, `naos/TRACEABILITY_MATRIX.md` where present, affected capabilities, gate/evidence expectations, known gaps, and residual risks
+
+After ANY new function in src/:
+```bash
+python scripts/naos_code_quality_audit.py --generate-index
+make -f Makefile.naos naos-function-index-health
+make -f Makefile.naos naos-module-headers
+make -f Makefile.naos naos-spec-pack-contract
+make -f Makefile.naos naos-spec-pack-materialize
+make -f Makefile.naos naos-spec-assembly-worksheet
+make -f Makefile.naos naos-spec-cascade
+make -f Makefile.naos naos-test-evidence-map
+make -f Makefile.naos naos-test-evidence
+```
+
+After evidence-affecting changes:
+```bash
+make -f Makefile.naos naos-self-check
+make -f Makefile.naos naos-gate-status
+make -f Makefile.naos naos-evidence-attestation
+make -f Makefile.naos naos-evidence-conflicts
+make -f Makefile.naos naos-evidence-pack
+make -f Makefile.naos naos-static-grader
+make -f Makefile.naos naos-grader-assessment MODE=audit
+make -f Makefile.naos naos-llm-grader-readiness
+make -f Makefile.naos naos-sarif-export
+make -f Makefile.naos naos-dashboard
+```
+
+---
+
+## 💬 RULE #5: COMMIT DISCIPLINE
+
+Every commit must reference:
+- A task (`T-XXX`) or requirement (`FR-XXX`) OR
+- A governance prefix (`chore:`, `docs:`, `refactor:`, `test:`, `ci:`)
+
+Bad: `"fixed stuff"` → invalid
+Good: `"fix(T-042): Handle timezone in date parser"`
+
+---
+
+## 🤖 RULE #6: AI GOVERNANCE
+
+- Read `naos/active/*.md` BEFORE starting any task
+- Check `naos/inventory/FUNCTION_INDEX.yaml` BEFORE writing functions
+- Check related tests, source-to-test mapping, and capability constraints where present
+- `parallel_lane_opportunity`; `parallel_lane_decision`.
+- Route actionable research/autoresearch/trend-review findings into capabilities, policy, gates, validators, roadmap/crosswalk, task registry, known gaps, residual risks, evidence pack, dashboard, next action, instruction surfaces, or specs 01-04
+- Perform control-plane self-review when agents, skills, prompts, instructions, workflows, specs, task/source traceability, source spec references, module headers, policies, capabilities, gatekeepers, validators, evidence semantics, dashboards, or AI tool surfaces change
+- Use `templates/skills/systemic-capability-wiring/SKILL.md` as the canonical wiring checklist when designing or changing capabilities, features, validators, AI surfaces, docs, source modules, or project configuration
+- Run or recommend `naos setup-recommendations` when orienting adopters or module choices; use `naos add setup-module MODULE_ID --profile PROFILE --dry-run` for selected installable modules and never silently enable readiness-only/deferred modules.
+- Run or recommend `naos memory-readiness`, `naos memory-access`, and `naos memory-use-policy` before claiming memory or MCP access; memory is advisory recall only, instruction-grade memory requires explicit approval/provenance/scope/reviewer/timestamp/freshness, recall traces are usage records, audit events are records, repo evidence outranks memory, durable writes require configured, authorized, verified, and memory-use-policy-permitted access plus human review, secrets/customer data must not be stored, and unavailable memory means degraded recovery.
+- Run or recommend `naos task-context --task <id>` for bounded active-task handoff context; do not treat the pack as source artifacts, approval, automatic context injection, or memory evidence.
+- Before relying on adopter-local policy overlays, run or recommend `naos policy-overrides --profile <profile> --dry-run`; static YAML overlays support global and optional team/operator scopes selected by `naos/team_operator_map.yaml` or explicit flags. Team/operator overlays are configuration only, not authentication, authorization, access control, identity proof, or separation-of-duties satisfaction. Executable adopter plugin runtime remains deferred; Codex and Claude Code plugin sources are optional operator adapters over project-local NAOS artifacts, not source authority, and overrides cannot weaken ADR-0010: Control-Plane Advisory Boundaries or enable deferred runtimes. For team-scoped gatekeeper posture, run or recommend `make -f Makefile.naos naos-gate-status TEAM_ID=platform` and `make -f Makefile.naos naos-gate-evaluate TEAM_ID=platform`; team gatekeeper config is governance configuration, not authorization, access control, team-membership proof, approval, proof of compliance, or separation-of-duties satisfaction.
+- For PR-time review evidence, run or recommend `naos pr-risk-classify --profile <profile>` or `make -f Makefile.naos naos-pr-risk-classify` before PR governance summary when local diff risk evidence is needed, then run or recommend `naos pr-governance-summary --profile <profile>` or `make -f Makefile.naos naos-pr-governance-summary` after gate/evidence/dashboard/conflict/task-claim/PR-risk reports run. The example workflow at `templates/workflows/naos-pr-governance.yml.example` is adopter-reviewed before copying, `TEAM_ID` and `NAOS_OPERATOR_ID` are metadata only, artifacts need sensitivity review, and CI output is not PR approval, malware analysis, sandbox execution, security proof, deployment authorization, release authorization, proof of compliance, authentication, authorization, access control, separation-of-duties satisfaction, or conflict resolution.
+- Treat optional integration templates as convenience only. `spec_kit_adapter`, `claude_code_hooks`, `codex_plugin_adapter`, and `claude_code_plugin_adapter` copy files under `naos/integrations/` after dry-run review; they are not core dependencies, official third-party support, hook activation, plugin cache or marketplace mutation, Claude settings mutation, silent context injection, memory write-back, provider/API calls, approval, certification, or proof of compliance.
+- Run or recommend `naos session-id` or `make -f Makefile.naos naos-session-id` to create/reuse a session id and namespaced report root; session-specific reports live under `naos/sessions/<session_id>/reports/`, latest `naos/reports/` remains compatibility output. Run or recommend `naos operator-attribution` or `make -f Makefile.naos naos-operator-attribution` to record local operator attribution for who initiated the run/session. Operator attribution is not identity proof, authentication, authorization, task ownership, locking, separation-of-duties evidence, non-repudiation, or approval. Run or recommend `naos audit-log` or `make -f Makefile.naos naos-audit-log` to summarize append-only event history; audit events are records over time, not approval, non-repudiation, cryptographic signing, tamper-proof storage, task locking, evidence conflict detection, proof of compliance, or source of truth. Run or recommend `naos task-claim --task <TASK-ID>` or `make -f Makefile.naos naos-task-claim TASK=T-123` for local task-claim coordination metadata, `naos task-release --task <TASK-ID>` to release it, and `naos task-claims` to summarize; claims are not authorization, approval, ownership proof, separation-of-duties evidence, task completion, exclusive access, conflict resolution, or proof of compliance. M3 adds local SQLite write coordination through `naos context-index`, M4 adds audit history, M5 adds evidence conflict detection, M6 adds task claim/release coordination metadata, M7 adds static team/operator policy overlay scopes, M8 adds team-scoped gatekeeper posture, M9 adds PR-time CI evidence templates, and P1 adds optional tool integration templates plus `naos adapter-coherence`; authorization-backed task locking, release approval, deployment authorization, and public-release re-audit remain separate human-governed steps.
+- Run or recommend `naos session-start --task <id>`, `naos session-checkpoint --task <id>`, and `naos session-end --task <id>` for bounded lifecycle reports/checklists; do not treat them as approval, task completion, automatic context injection, compact writes, task-card mutation, or memory writes. Memory candidates remain proposal_only and not_written.
+- Run or recommend `naos agent-traces` only for declared trace records; trace events are StaticGrader/future-audit inputs, not proof, approval, memory writes, runtime capture, runtime enforcement, tool-call interception, legal/compliance/regulatory assurance, hallucination prevention, or behavioral safety evidence, and they must not contain secrets or private payloads. For standard/assured projects, use concise `action_receipt` metadata for side effects, approvals, memory trust, or claim evidence; never store prompts, private data, credentials, or secrets.
+- Run or recommend `naos static-grader` after trace validation when deterministic structural grading is useful; StaticGrader costs 0.0 by default, calls no model/API/provider, does not execute trace commands, and does not prove behavioral safety, semantic correctness, runtime behavior, legal/regulatory posture, approval, maturity promotion, or hallucination prevention.
+- Run or recommend `naos grader-assessment --mode audit` or `make -f Makefile.naos naos-grader-assessment MODE=audit` when deterministic grading needs packaging for review; audit mode is deterministic review input, drift mode compares deterministic reports without semantic drift inference, assess mode summarizes posture rather than certification, zero cost by default remains explicit, and there is no LLMGrader runtime, model/API/provider call, behavioral compliance determination, approval, attestation, or maturity promotion.
+- Run/recommend `naos model-policy` before future model/provider work; declaration review only, no calls, credentials, model recommendations, routing, approval, or certification.
+- UI evidence: `naos design-traceability`/`naos ui-experience-quality` only when enabled; no calls, mutation, approval, certification, or compliance.
+- Run or recommend `naos llm-grader-readiness` or `make -f Makefile.naos naos-llm-grader-readiness` only as readiness-only governance posture; runtime is disabled by default, no provider/model/API dependency or credential handling is enabled, cost is 0.0 by default, StaticGrader remains primary, future advisory use may incur cost/expose data/drift/be biased, and human approval is required before any future cost-bearing design.
+- Run or recommend `naos context-index` only for generated local candidate lookup; it also emits SQLite write coordination posture for local lock/temp/atomic-replace index file integrity, not task locking, evidence conflict detection, distributed locking, or full multi-user completion. Run or recommend `naos context-query --query "<keywords>"` for bounded candidate references; query results are candidates, not answers. The SQLite index is cache-like and not authoritative, with no sqlite-vec, embeddings, graph traversal, Engram/MCP calls, private memory payload indexing, or automatic injection.
+- Run or recommend `naos sarif-export` only when structured findings need SARIF interoperability; deterministic findings are primary, advisory findings require explicit inclusion, and SARIF does not approve, certify, attest, promote maturity, or replace repository evidence.
+- Run or recommend `naos evidence-attestation` when evidence artifacts or reviewer metadata change; do not call local digest evidence signing, tamper-proof storage, or compliance approval.
+- Run or recommend `naos spec-pack-contract`, `naos spec-pack-materialize --dry-run`, `naos spec-assembly-worksheet`, and `naos spec-cascade` when specs, profile-required spec files, brownfield evidence, task registry entries, module headers, source spec references, or source traceability changed; treat them as structural review evidence, not filled-content proof, candidate promotion, complete traceability, or code-correctness proof.
+- Lite+: require live `naos plan-coherence` readiness before implementation (Lite: 03; Standard/Assured: 03+04). Use `--diff-base <ref>` for scoped paths. Plans supersede; default vertical; foundations name a consuming slice/result. No approval/release authority.
+- Run or recommend `naos systemic-impact` when governed artifact families change; update related artifacts or record a known gap, residual risk, waiver, or next action. Treat it as coherence review evidence, not automatic consistency proof.
+- When governance-surface changes or actionable research/autoresearch findings need disposition, update `naos/control_plane_review_items.yaml` and run or recommend `naos control-plane-review`; do not claim research completeness or silently rewrite code.
+- Use adopter-facing capability names; no internal work-item labels or semantic behavioral grading claims.
+- Save decisions to memory only when memory is configured, authorized, verified, permitted by memory-use policy, and explicitly human-approved for durable write use; otherwise update the active task card or compact summary
+- NEVER skip tests after code changes
+- NEVER hard-code config values
+- NEVER silently delete, merge, or rewrite security, encryption, authentication, authorization, database, public API, or regulatory-control code without explicit approval

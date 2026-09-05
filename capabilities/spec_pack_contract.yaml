@@ -1,0 +1,109 @@
+id: CAP-SPEC-PACK-CONTRACT
+name: Spec-Pack Contract
+description: >
+  Evaluates NAOS spec-pack manifest conformance for canonical spec filenames,
+  profile-required files, not-applicable-by-profile files, required sections,
+  anchors, manifest-declared reference codes, sync markers, and optional
+  filled-content placeholder review so generated projects can detect template
+  drift before relying on spec-cascade evidence.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Quickstart does not require spec files, but can report manifest posture when specs exist."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns when lite-required spec-pack structure is missing or drifted."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires all ten canonical spec files and spec-pack contract evidence before normal spec-cascade review."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Can block on missing files, unresolved reference codes, or materially drifted spec-pack contract evidence through configured policy."
+authority:
+  may_read:
+    - "templates/spec-kit/specs/spec_manifest.yaml"
+    - "templates/spec-kit/specs/"
+    - "specs/spec_manifest.yaml"
+    - "specs/"
+  may_write:
+    - "naos/reports/spec_pack_contract.json"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "repo-local YAML, JSON, and Markdown spec-pack artifacts"
+  - "repo-local generated-project spec directories"
+prohibited_resources:
+  - "automatic requirement rewrites"
+  - "automatic template rewrites"
+  - "mandatory semantic model"
+  - "mandatory external service"
+  - "runtime gateway"
+constraints:
+  - "Must keep structural conformance deterministic and file-first."
+  - "Must keep standard and assured profiles on the full ten-file spec pack."
+  - "Must report quickstart/lite omissions as not applicable by profile rather than silently ignoring them."
+  - "Must resolve manifest-declared reference codes deterministically when their defining artifacts apply to the selected profile."
+  - "Must allow fresh greenfield [ADAPT] placeholders in default structural mode."
+  - "Must flag unresolved placeholders only when filled mode is explicitly requested."
+  - "Must not claim requirements are correct, complete, approved, implemented, tested, evidenced, certified, or compliant."
+  - "Must keep manifest, report schema, CLI, Make, dashboard, evidence-pack, docs, and tests wired together when contract rules change."
+required_evidence:
+  - "templates/spec-kit/specs/spec_manifest.yaml"
+  - "naos/reports/spec_pack_contract.json"
+validators:
+  - id: spec_pack_contract
+    script: scripts/naos_spec_pack_contract.py
+    status: available
+  - id: validate_spec_pack_contract
+    script: scripts/validators/validate_spec_pack_contract.py
+    status: available
+gatekeepers:
+  - G4
+  - G6
+dashboard_signals:
+  - "spec_pack_contract.status"
+  - "spec_pack_contract.summary.files_expected"
+  - "spec_pack_contract.summary.files_present"
+  - "spec_pack_contract.summary.files_missing"
+  - "spec_pack_contract.summary.files_not_applicable"
+  - "spec_pack_contract.summary.traceability_reference_findings"
+  - "spec_pack_contract.summary.total_findings"
+  - "spec_pack_contract.summary.placeholder_findings"
+maturity_path:
+  L0: "Manifest, schemas, validator, CLI, Make target, and capability contract exist in the kit."
+  L1: "Generated projects include the manifest and run structural conformance as review evidence."
+  L2: "Dashboard, evidence pack, docs, and focused tests consume the report."
+  L3: "Profile policy can require or block on missing or materially drifted structural evidence."
+  L4: "Dashboard tracks contract drift, exceptions, and review obligations over time."
+  L5: "Evidence is complete enough to support governed review of spec-pack structure decisions."
+known_limitations:
+  - "Does not prove requirements are correct or complete."
+  - "Does not prove design quality, implementation coverage, test behavior, approval, certification, or compliance."
+  - "Reference resolution proves only that manifest-declared codes resolve structurally; it is not complete traceability proof."
+  - "Default structural mode intentionally permits [ADAPT] placeholders for fresh generated projects."
+  - "Filled mode detects unresolved placeholder syntax but still requires human review."
+not_claimed:
+  - "approved specifications"
+  - "complete requirements"
+  - "correct architecture"
+  - "implemented behavior"
+  - "passing tests"
+  - "evidence-backed acceptance"
+  - "certification or compliance proof"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/ADOPTION_GUIDE.md
+related_scripts:
+  - scripts/naos_spec_pack_contract.py
+  - scripts/validators/validate_spec_pack_contract.py
+  - scripts/naos_detect_spec_drift.py

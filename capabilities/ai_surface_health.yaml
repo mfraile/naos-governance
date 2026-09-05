@@ -1,0 +1,107 @@
+id: CAP-AI-SURFACE-HEALTH
+name: AI Surface Health And Context Budget
+description: >
+  Provides deterministic review of AI instruction, prompt, agent, skill, workflow,
+  and rules surfaces for context-budget pressure, semantic-anchor presence,
+  combined-loadout risk, optional approved-baseline drift, and isolated fresh
+  Quickstart/Lite/Standard/Assured footprint measurement. The capability is
+  implemented as file-first source-health evidence and does not call models,
+  providers, APIs, memory, MCP tools, or behavioral evaluators.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Advisory visibility for obvious overload and missing core anchors."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Supports lean, tool-neutral AI-surface health review."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires review when posture is degraded or baseline drift is unreviewed."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Can block on severe overload, anchor loss, or unapproved baseline drift through policy/strict gates."
+authority:
+  may_read:
+    - "AI instruction, prompt, agent, skill, workflow, and rules files"
+    - "naos/ai_surface_context_budget_rules.yaml"
+    - "naos/baselines/ai_surface_health_baseline.json when present"
+    - "kit naos_init.py, cli.py, profile surface contract, and approved fresh-profile baseline"
+  may_write:
+    - "naos/reports/ai_surface_context_budget.json"
+    - "an explicitly selected fresh-profile baseline output path; aggregate mode has no default write"
+  may_block:
+    - "only through configured profile policy, strict mode, or assured gates"
+allowed_resources:
+  - "repo-local AI-surface source files"
+  - "repo-local YAML rules"
+  - "optional approved baseline JSON"
+  - "isolated temporary fresh-profile scaffolds"
+prohibited_resources:
+  - "LLM judging"
+  - "model/provider/API calls"
+  - "behavioral scoring"
+  - "memory or MCP reads"
+  - "dashboard, gate, self-check, evidence-pack, StaticGrader, or grader-assessment reports as inputs"
+constraints:
+  - "Must remain deterministic, local, and file-first."
+  - "Must preserve one-way dependency flow into downstream reports."
+  - "Advisory output requires human review before durable decisions, waivers, maturity changes, approvals, or blocking escalation."
+  - "Must not auto-tune thresholds or auto-approve baseline changes."
+  - "Fresh-profile mode must keep complete finding occurrences, distinct evidence states, and a maximum 24-row default detail/rollup view."
+  - "Fresh-profile mode must measure generated-script-reachable commands separately from the installed global CLI envelope."
+  - "Fresh-profile self-checks must exclude user-level provider binaries, provider/database metadata, MCP configuration, ambient NAOS/GitHub/task variables, and dynamic host paths/identifiers through a recorded temporary isolation contract."
+  - "Must not claim hallucination prevention, behavioral safety, approval, certification, or proof of compliance."
+required_evidence:
+  - "scripts/naos_ai_surface_budget.py"
+  - "templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml"
+  - "schemas/naos/ai_surface_profile_footprint_baseline.schema.json"
+  - "baselines/ai_surface_profile_footprint_baseline.json when approved"
+  - "naos/reports/ai_surface_context_budget.json when generated"
+validators:
+  - id: ai_surface_context_budget
+    script: scripts/naos_ai_surface_budget.py
+    status: available
+gatekeepers:
+  - G6
+dashboard_signals:
+  - ai_surface_health.status
+  - ai_surface_health.ai_surface_health_posture
+  - ai_surface_health.summary.total_estimated_tokens
+maturity_path:
+  L0: "Capability contract, rules seed, and validator exist."
+  L1: "Project can generate AI-surface health reports."
+  L2: "Reports are reviewed with StaticGrader/autoresearch baseline metadata."
+  L3: "Profile policy and gates surface degraded posture for review or blocking."
+  L4: "Approved baselines are reviewed for drift over time."
+  L5: "AI-surface health is part of an evidence-backed governance review program."
+known_limitations:
+  - "Token estimation is approximate and deterministic, not model tokenizer output."
+  - "Does not evaluate AI behavior or semantic correctness."
+  - "Does not prevent hallucinations."
+  - "Does not automatically update baselines or thresholds."
+  - "Fresh-profile counts are deterministic source-scaffold measurements, not proof of adopter usability or either named pilot's closure."
+not_claimed:
+  - "hallucination prevention"
+  - "behavioral scoring"
+  - "semantic correctness proof"
+  - "automatic threshold tuning"
+  - "automatic baseline approval"
+  - "approval"
+  - "certification"
+  - "proof of compliance"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_ai_surface_budget.py
+  - scripts/naos_validate_instruction_budget.py

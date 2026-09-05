@@ -1,0 +1,303 @@
+# NAOS Profile Preset: governance-assured
+# Created: 2026-03-19
+#
+# Target: Regulated / high-stakes / enterprise project
+# Depth: assured-evidence — standard controls plus evidence packs and behavioral readiness
+#
+# REFERENCE document only — does NOT modify live project files.
+# Use the NAOS CLI to extract and adapt these components for a new project.
+
+---
+
+id: governance-assured
+name: "Governance Assured"
+depth: assured-evidence
+target: "Regulated industry, enterprise SaaS, high-stakes AI/ML project, compliance-required"
+description: >
+  The strongest governance evidence profile. Extends governance-standard with
+  evidence packs, exception approvals, and Behavioral Governance Readiness for
+  deterministic first-baseline and impacter review. Any behavioral evaluator is
+  separately implemented and approved by the project. The default kit does not
+  produce behavioral scores, confidence intervals, drift alerts, or calibrated
+  behavioral baselines. NAOS evidence supports review; it does not prove legal
+  or regulatory compliance by itself.
+
+# Canonical active RULES rows match Standard; Assured changes their posture.
+rules:
+  active_rule_ids: [1, 2, 5, 6, 7, 8, 9, 10, 11, 13, 14, 18, 19, 20, 21, 22, 24, 25, 26]
+  included:
+    # All canonical Standard active rows carry over with Assured posture.
+    - see: governance-standard.yaml#rules.included
+  adaptation_notes:
+    - "Rules 3, 4, 12, 15, 16, 17, and 23 remain explicit ADAPT headings, not active-table membership."
+  policy_extensions:
+    - name: "Behavioral Governance Readiness"
+      description: >
+        Track deterministic prerequisites, scenario metadata, review criteria,
+        known gaps, residual risks, and human review needs before first
+        baseline work or baseline maintenance. Do not require behavioral scores
+        by default.
+    - name: "Behavioral Evaluator Cadence"
+      description: >
+        A project may add a disabled/readiness-only cadence after approving an
+        evaluator design. The default kit does not run behavioral drift checks.
+    - name: "Instinct Crystallization"
+      description: >
+        After ≥3 behavioral sessions, review observed patterns against instinct
+        files. Promote recurring patterns (≥5 confirmations) from Tier 1 to Tier 2.
+
+# Skills included (all standard skills + governance-assured additions)
+skills:
+  included:
+    - see: governance-standard.yaml#skills.included
+    - id: cookbook-governance
+      path: ".github/skills/cookbook-governance/SKILL.md"
+      adaptation: "Update source-project-specific PM file refs"
+    - id: gov-refresh
+      path: ".github/skills/gov-refresh/SKILL.md"
+      adaptation: "Replace make -f Makefile.naos gov-refresh with project-equivalent script"
+    - id: spec-extract
+      path: ".github/skills/spec-extract/SKILL.md"
+      adaptation: "Update extract_spec_section.py to match project specs structure"
+
+# Agents included (all standard agents — no additions)
+agents:
+  included:
+    - see: governance-standard.yaml#agents.included
+  additional_configuration:
+    - agent: plan
+      addition: "Compact Protocol section"
+    - agent: implement
+      addition: "Compact Protocol section"
+    - agent: review
+      addition: "Compact Protocol section"
+    - agent: debug
+      addition: "Compact Protocol section"
+    - agent: gov-audit
+      addition: "Compact Protocol section"
+
+# Scripts included (standard scripts + autoresearch runner)
+scripts:
+  included:
+    - see: governance-standard.yaml#scripts.included
+    - id: runner
+      path: ".github/autoresearch/runner.py"
+      rationale: "Deterministic Conformance Review runner; behavioral governance remains future/project-configured"
+      adaptation: "Use --conformance for static/file-first checks; configure behavioral evaluators only if separately implemented and approved"
+    - id: profiler
+      path: ".github/autoresearch/profiler.py"
+      rationale: "Portability analysis — tags rules as GENERIC vs project-specific"
+    - id: scorer
+      path: ".github/autoresearch/scorer.py"
+      rationale: "Portability scoring"
+    - id: generate_adapted_full
+      path: ".github/autoresearch/generate_adapted_full.py"
+      rationale: "Generates adapted governance kit for new project"
+
+# Configs included
+configs:
+  included:
+    - see: governance-standard.yaml#configs.included
+    - id: autoresearch
+      path: "configs/naos_autoresearch.yaml"
+      sections:
+        - behavioral  # --runs N statistical confidence
+        - monthly_drift_check  # drift detection
+        - instincts  # instinct recording system
+        - profiles   # profile preset references
+      adaptation: >
+        Update battery_version and scenarios_count for deterministic conformance.
+        Add any behavioral baseline only after a project-approved evaluator exists.
+
+# Autoresearch configuration
+autoresearch:
+  battery_version: "2.4.0"  # Inherit current battery; adapt scenarios for new project
+  required_tiers:
+    - api_compatible  # Minimum: run on API models without tool injection
+  recommended_initial_scenarios:
+    - "rule_datetime_safety"      # Evidence-first datetime handling
+    - "instruction_configs"       # Config file adherence
+    - "agent_implement_memory_checkpoint"  # Memory discipline
+  behavioral_baseline:
+    minimum_target: 0.85          # <85% triggers remediation
+    drift_alert_threshold: 0.05   # >5pp drop → ALERT
+    drift_block_threshold: 0.10   # >10pp drop → BLOCK
+
+# Instinct system
+instincts:
+  enabled: true
+  schema: ".github/instincts/schema.yaml"
+  tiers:
+    tier_1:
+      path: ".github/instincts/"
+      scope: "project-scoped (git repo)"
+    tier_2:
+      path_note: "approved user-scoped memory, preferably local-first Engram under ENGRAM_DATA_DIR; replication remains local/off unless separately reviewed"
+      scope: "user-scoped (cross-project; local-first by default)"
+    tier_3:
+      path_note: "ships with NAOS kit repo"
+      scope: "universal (all projects)"
+  seed_instincts:
+    - "INS-001: Agents skip authorized memory/context recovery when task has existing session state"
+    - "INS-002: Drift alerts trigger false positives on N=1 runs — use N≥5"
+    - "INS-003: Cold-start compaction recovery requires 3-step sequence not 1"
+
+# CI/CD drift checks
+ci_checks:
+  monthly_drift:
+    enabled: true
+    runs: 5
+    dimensions: [1, 2, 3]  # Core dimensions
+    baseline_source: "configs/naos_autoresearch.yaml#calibration_baselines"
+    alert_threshold_pp: 5
+    block_threshold_pp: 10
+  pre_sprint_behavioral:
+    enabled: true
+    runs: 1
+    tier: api_compatible
+    minimum_pass_score: 0.80
+
+# Features enabled
+features:
+  pre_commit_hooks: true
+  task_registry: true
+  traceability_matrix: true
+  behavioral_testing: true
+  instinct_recording: true
+  drift_checks: true
+  profile_autoresearch: true
+  compact_protocol: true
+  capability_framework: enforced
+
+capabilities:
+  default_target_maturity: L3
+  default_enforcement: blocking
+  activated_by_default:
+    - CAP-CLAIMS-VALIDATION
+    - CAP-SELF-CONFORMANCE
+    - CAP-ROADMAP-CROSSWALK-VALIDATION
+    - CAP-FUNCTION-INDEX-HEALTH
+    - CAP-TEST-EVIDENCE
+    - CAP-EVIDENCE-PACK
+    - CAP-GATEKEEPER-MANIFEST
+  blocking_when_configured:
+    - CAP-CLAIMS-VALIDATION
+    - CAP-SELF-CONFORMANCE
+    - CAP-ROADMAP-CROSSWALK-VALIDATION
+    - CAP-FUNCTION-INDEX-HEALTH
+    - CAP-TEST-EVIDENCE
+    - CAP-EVIDENCE-PACK
+    - CAP-GATEKEEPER-MANIFEST
+  experimental_advisory:
+    - CAP-RUNTIME-HANDOFF
+    - CAP-STRUCTURED-SUBSTRATE
+    - CAP-SOURCE-TEST-GRAPH
+    - CAP-DIGITAL-TWIN-EVALUATION
+
+gate_policy:
+  default_severity: blocking
+  allow_blocking: true
+  require_evidence_pack: true
+  require_exception_approval: true
+  gates:
+    G0: blocking
+    G1: blocking
+    G2: blocking
+    G3: blocking
+    G4: blocking
+    G5: blocking
+    G6: blocking
+    G7: warning
+    G8: advisory
+
+# Setup effort
+setup:
+  effort_basis: "Project-dependent; record actual install and validation receipts rather than using a kit-wide estimate."
+  prerequisites:
+    - "All prerequisites from governance-standard"
+    - "Optional project-approved provider setup only if a future behavioral evaluator is separately implemented"
+    - "CI/CD pipeline that can run Python scripts"
+  steps:
+    - "Complete all governance-standard setup steps"
+    - "Copy .github/autoresearch/ directory"
+    - "Adapt core_scenarios.yaml to target project rules"
+    - "Run initial deterministic conformance review to establish static baseline"
+    - "Record any future behavioral evaluator baseline in configs/naos_autoresearch.yaml only after evaluator approval"
+    - "Create 3 seed instinct files from observed patterns"
+    - "Configure CI deterministic conformance job"
+    - "Keep behavioral evaluator cadences disabled unless a project-approved evaluator exists"
+
+notes: >
+  This profile requires ongoing maintenance: deterministic conformance checks,
+  instinct reviews quarterly, and battery metadata updates when new rules are
+  added. Behavioral Governance Readiness is deterministic review posture;
+  behavioral governance evaluation remains future/project-configured and
+  requires explicit approval before use. Ongoing effort is repository-specific
+  and must be measured from actual maintenance receipts; NAOS makes no default
+  time-saving, cost-saving, or return-on-investment claim.
+
+# ─── Context Phase Injection (fresh-context-per-task principle) ───────────────
+# For each SDLC phase, only the listed files should be injected into the AI
+# agent's context. Excluding irrelevant files prevents context pollution and
+# drift across tasks.
+# [ADAPT] Adjust paths to match your project structure.
+# ─────────────────────────────────────────────────────────────────────────────
+context_phases:
+  plan:
+    inject:
+      - .github/copilot-instructions.md
+      - .ai/RULES.md
+      - naos/active/                 # [ADAPT] Active task cards
+      - naos/TASK_REGISTRY.yaml      # [ADAPT] Task registry for context
+      - .github/instincts/schema.yaml # Instinct schema for RCA awareness
+    exclude:
+      - .github/skills/              # Skills not needed in planning
+      - .github/autoresearch/        # Autoresearch not needed in planning
+      - src/                         # [ADAPT] Source not needed for planning
+    rationale: "Planning: task context + rules + instinct schema for RCA"
+
+  implement:
+    inject:
+      - .github/copilot-instructions.md
+      - naos/active/                 # [ADAPT] Active task card
+      - .github/skills/              # Cookbook skills for implementation
+      - .github/instincts/schema.yaml # Instinct awareness during coding
+    exclude:
+      - naos/DASHBOARD.md            # Dashboard is output, not input
+      - naos/TRACEABILITY_MATRIX.md  # Traceability not needed during coding
+      - .github/autoresearch/        # Autoresearch not needed during coding
+    rationale: "Implementation: task card + skills + instinct schema"
+
+  review:
+    inject:
+      - .github/copilot-instructions.md
+      - .ai/RULES.md
+      - .github/instincts/           # Full instinct set for pattern review
+    exclude:
+      - naos/active/                 # Task details not needed for review
+      - .github/skills/              # Skills are reference, not review criteria
+      - .github/autoresearch/        # Autoresearch not needed during review
+    rationale: "Review: governance standards + instinct pattern matching"
+
+  commit:
+    inject:
+      - .github/copilot-instructions.md
+      - .github/prompts/naos-d-commit.prompt.md  # [ADAPT] Commit prompt
+    exclude:
+      - specs/
+      - naos/active/
+      - .github/instincts/
+      - .github/autoresearch/
+    rationale: "Commit: conventions and commit prompt only"
+
+  behavioral_audit:
+    inject:
+      - .github/autoresearch/runner.py
+      - configs/naos_autoresearch.yaml     # [ADAPT] Autoresearch config
+      - .github/autoresearch/task_battery/ # Portable scenario battery
+      - .github/instincts/                 # Full instinct set for pattern awareness
+    exclude:
+      - naos/active/                       # Task cards not needed for audit
+      - .github/skills/                    # Skills not needed for audit
+      - src/                               # [ADAPT] Source not needed for audit
+    rationale: "Audit: runner + battery + instincts; exclude implementation context"

@@ -1,0 +1,94 @@
+schema: naos.agent_orchestration_policy.v1
+version: 1
+enabled: false
+mode: proposal_only
+activation: per_run
+allowed_profiles: [assured]
+max_parallel: 2
+priority_order: [P0, P1, P2, P3]
+client_contract_max_age_days: 90
+max_affected_files: 500
+max_affected_bytes: 52428800
+
+# These are declaration formats checked against the named primary documentation
+# on 2026-08-30. A projection is never proof that a client honored the values.
+client_contracts:
+  codex:
+    supported: true
+    source_url: https://developers.openai.com/codex/subagents
+    source_checked_at: "2026-08-30"
+    configuration_path: ".codex/agents/{agent_name}.toml"
+    model_field: model
+    reasoning_effort_field: model_reasoning_effort
+    limitations:
+      - "The plan does not write the TOML file or prove the effective Codex runtime model."
+  claude_code:
+    supported: true
+    source_url: https://code.claude.com/docs/en/sub-agents
+    source_checked_at: "2026-08-30"
+    configuration_path: ".claude/agents/{agent_name}.md"
+    model_field: model
+    reasoning_effort_field: effort
+    limitations:
+      - "The plan does not write agent frontmatter or prove the effective Claude Code runtime model."
+  cursor:
+    supported: false
+    source_url: https://docs.cursor.com/cli/reference/configuration
+    source_checked_at: "2026-08-30"
+    configuration_path: .cursor/cli.json
+    model_field: null
+    reasoning_effort_field: null
+    limitations:
+      - "No supported repository-local Cursor CLI model-and-effort projection contract was documented at the source check date."
+  github_copilot_cli:
+    supported: true
+    source_url: https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference
+    source_checked_at: "2026-08-30"
+    configuration_path: ".github/agents/{agent_name}.agent.md"
+    model_field: model
+    reasoning_effort_field: reasoningEffort
+    limitations:
+      - "Copilot may fall back when a declared model or effort is unsupported; the plan does not prove effective runtime use."
+  opencode:
+    supported: true
+    source_url: https://opencode.ai/docs/agents/
+    source_checked_at: "2026-08-30"
+    configuration_path: opencode.json
+    model_field: "agent.{agent_name}.model"
+    reasoning_effort_field: "agent.{agent_name}.reasoningEffort"
+    limitations:
+      - "Reasoning-effort support is provider-specific; the plan does not write opencode.json or prove effective runtime use."
+
+authority:
+  client_launch: false
+  client_configuration_write: false
+  provider_or_model_call: false
+  task_state_write: false
+  task_completion: false
+  claim_write: false
+  automatic_approval: false
+  merge: false
+  push: false
+  release: false
+  publication: false
+  worktree_creation: false
+  hook_installation: false
+  memory_write: false
+
+required_nonclaims:
+  - automatic client launch
+  - client configuration mutation
+  - provider or model call
+  - task state mutation
+  - task completion or closure
+  - claim mutation
+  - automatic approval
+  - merge
+  - push
+  - release
+  - publication
+  - worktree creation
+  - hook installation
+  - memory write
+  - signer identity proof
+  - independent execution proof

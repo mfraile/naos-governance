@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:capability:v1",
+  "title": "NAOS Capability Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "description",
+    "status",
+    "default_maturity",
+    "minimum_profile",
+    "profiles",
+    "authority",
+    "allowed_resources",
+    "prohibited_resources",
+    "constraints",
+    "required_evidence",
+    "validators",
+    "gatekeepers",
+    "dashboard_signals",
+    "maturity_path",
+    "known_limitations",
+    "not_claimed",
+    "related_docs",
+    "related_scripts"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^CAP-[A-Z0-9-]+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "scaffolded", "experimental", "planned", "deprecated"]
+    },
+    "default_maturity": {
+      "$ref": "#/$defs/maturity_level"
+    },
+    "minimum_profile": {
+      "$ref": "#/$defs/profile"
+    },
+    "enforcement_default": {
+      "type": "string",
+      "enum": ["none", "advisory", "warning", "required", "blocking"]
+    },
+    "requires_project_readiness": {
+      "type": "boolean"
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quickstart", "lite", "standard", "assured"],
+      "properties": {
+        "quickstart": {"$ref": "#/$defs/profile_behavior"},
+        "lite": {"$ref": "#/$defs/profile_behavior"},
+        "standard": {"$ref": "#/$defs/profile_behavior"},
+        "assured": {"$ref": "#/$defs/profile_behavior"}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "allowed_resources": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "prohibited_resources": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "constraints": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "required_evidence": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "validators": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/tool_ref"}
+    },
+    "gatekeepers": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^G[0-9]+$"}
+    },
+    "dashboard_signals": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "maturity_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["L0", "L1", "L2", "L3", "L4", "L5"],
+      "properties": {
+        "L0": {"type": "string"},
+        "L1": {"type": "string"},
+        "L2": {"type": "string"},
+        "L3": {"type": "string"},
+        "L4": {"type": "string"},
+        "L5": {"type": "string"}
+      }
+    },
+    "known_limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "human_review_required": {
+      "type": "boolean"
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "related_docs": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "related_scripts": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "related_schemas": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "maturity_level": {
+      "type": "string",
+      "enum": ["L0", "L1", "L2", "L3", "L4", "L5"]
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["quickstart", "lite", "standard", "assured"]
+    },
+    "profile_behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_maturity", "enforcement", "notes"],
+      "properties": {
+        "target_maturity": {"$ref": "#/$defs/maturity_level"},
+        "enforcement": {
+          "type": "string",
+          "enum": ["none", "advisory", "warning", "required", "blocking", "not_applicable"]
+        },
+        "notes": {"type": "string"}
+      }
+    },
+    "tool_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "script": {"type": "string"},
+        "status": {
+          "type": "string",
+          "enum": ["available", "planned", "external", "manual"]
+        },
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

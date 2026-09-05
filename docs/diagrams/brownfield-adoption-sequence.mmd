@@ -1,0 +1,65 @@
+sequenceDiagram
+    participant User as Human adopter
+    participant RI as Repository intelligence
+    participant Init as Brownfield init
+    participant Upgrade as Managed upgrade
+    participant Adapter as Layout compatibility
+    participant Tx as Managed transaction
+    participant Adopt as Adoption evidence
+    participant Review as Human adaptation and validation
+
+    rect rgb(232, 245, 233)
+    User->>RI: Plan baseline repository intelligence
+    RI->>RI: Inspect source, tests, docs, specs, CI, and relationships
+    RI-->>User: Immutable plan, findings, component recommendation, digest
+    alt Repository intelligence is applicable
+        User->>RI: Enroll exact scope, re-plan, digest-confirm apply, validate
+        RI-->>User: Source-bound SQLite/FTS generation and receipts
+    else Not applicable for the executed repository
+        RI-->>User: Explicit not-applicable evidence; no component installed
+    end
+    end
+    Note over User,RI: NetworkX/GraphML is selected only when the executed relationship model adds value.<br/>sqlite-vec remains off until a deterministic vector workload exists.<br/>Profile and declared L0-L5 maturity guide review; neither grants approval.
+
+    rect rgb(227, 242, 253)
+    User->>Init: Preview Standard or Assured brownfield activation
+    Init->>Adapter: Check prospective setup destinations and existing host-owned Python namespaces
+    alt Host owns scripts/ and setup could later add Python there
+        Adapter->>Adapter: Remap exact NAOS tool paths to naos_tools/
+        Adapter-->>Init: Rewritten setup catalogue, Makefile, workflow, hook, and surface contract
+    else No blocking namespace collision
+        Adapter-->>Init: Keep normal generated layout
+    end
+    Init-->>User: Complete no-target-mutation preview and bounded compatibility report
+    User->>Init: Separate reviewed --activate invocation
+    Init->>Tx: Bind repository-intelligence generation and managed-content plan
+    Tx->>Tx: Lock, stage, journal, publish each leaf atomically, receipt, recover on interruption
+    Tx-->>User: Specs 01-10, task registry, dashboard seed, rules, controls, and provenance
+    end
+    Note over Init,Tx: Existing adopter files are preserved. Any destination collision refuses the whole create-only activation.<br/>The layout adapter changes only the generated preview before the transaction digest is frozen.
+
+    rect rgb(255, 248, 225)
+    User->>Adopt: Run brownfield adoption against the installed surface
+    Adopt->>Adopt: Inventories, baseline, candidate requirements, gaps, challenges, decision record
+    Adopt-->>Review: Deterministic reports; activation_planned remains false
+    Review->>Review: Accept, reject, defer, or edit candidates into project-owned specs and tasks
+    Review->>Review: Run gov-refresh, dashboard, profile and maturity gates, and native tests
+    Review-->>User: Evidence-backed onboarding result with remaining gaps stated
+    end
+    Note over Adopt,Review: Candidate evidence is never promoted automatically.<br/>Initial installation remains create-only; later upgrades preserve human edits.
+
+    rect rgb(255, 235, 238)
+    User->>Upgrade: Plan later managed profile transition
+    Upgrade->>Upgrade: Classify complete base / current / new inventory
+    Upgrade-->>User: External immutable plan, preservation decisions, SHA-256 digest
+    User->>Upgrade: Apply exact plan with expected digest
+    Upgrade->>Upgrade: Regenerate fixed sources and revalidate provenance and current state
+    Upgrade->>Tx: Replace only unchanged kit-owned derived regular files
+    Tx->>Tx: Journal, ordered atomic leaves, receipt; rollback or recover on interruption
+    Tx-->>User: Applied, refused, recovery-required, or rollback-incomplete result
+    end
+    Note over Upgrade,Tx: Adopter-owned, modified, ambiguous, unsafe, and out-of-scope content is preserved.<br/>Managed init transitions and eligible add/setup collisions use this same service; blanket force is refused.<br/>Mutation support is the executed Darwin regular-file adapter only.
+
+    rect rgb(243, 229, 245)
+    Note over User,RI: Controlled comparison: Repo 1 uses the SQLite/FTS baseline.<br/>Only after Repo 1 completes, Repo 2 starts from an identical source copy and adds NetworkX/GraphML.<br/>Graph expansion may reprioritize human review but cannot change candidate authority, confidence, or promotion state.<br/>Compare coverage, accuracy, manual work, runtime, preservation, and native-test results before claiming benefit.
+    end

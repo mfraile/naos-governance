@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/task_lifecycle.schema.json",
+  "title": "NAOS Task Lifecycle Report",
+  "$defs": {
+    "rootedPath": {
+      "type": "object",
+      "required": ["base", "path"],
+      "properties": {
+        "base": {"enum": ["project_root", "naos_root"]},
+        "path": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "referenceReceipt": {
+      "type": "object",
+      "required": ["original_reference", "portable_reference", "resolved_path", "fragment", "exists", "regular_file", "allowed_root", "path_base", "path_traversal", "failures"],
+      "properties": {
+        "original_reference": {"type": "string"},
+        "portable_reference": {"type": ["string", "null"]},
+        "resolved_path": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/rootedPath"}]},
+        "fragment": {"type": ["string", "null"]},
+        "exists": {"type": "boolean"},
+        "regular_file": {"type": "boolean"},
+        "allowed_root": {"type": "boolean"},
+        "path_base": {"type": ["string", "null"]},
+        "path_traversal": {"type": "boolean"},
+        "failures": {"type": "array", "items": {"type": "string"}},
+        "decision_type": {"type": ["string", "null"]},
+        "outcome": {"type": ["string", "null"]},
+        "structurally_attributable": {"type": "boolean"},
+        "evidence_linked": {"type": "boolean"},
+        "qualifies_for_verified_delivery": {"type": "boolean"},
+        "authority_failures": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "completionVerification": {
+      "type": "object",
+      "required": ["requested_state", "effective_state", "prerequisites_met", "test_references", "evidence_references", "decision_references", "failures", "limitations"],
+      "properties": {
+        "requested_state": {"type": "string"},
+        "effective_state": {"type": "string"},
+        "prerequisites_met": {"type": "boolean"},
+        "test_references": {"type": "array", "items": {"$ref": "#/$defs/referenceReceipt"}},
+        "evidence_references": {"type": "array", "items": {"$ref": "#/$defs/referenceReceipt"}},
+        "decision_references": {"type": "array", "items": {"$ref": "#/$defs/referenceReceipt"}},
+        "failures": {"type": "array", "items": {"type": "string"}},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["schema", "generated_at", "profile", "status", "action", "task_id", "mutated", "human_review_required", "summary"],
+  "properties": {
+    "schema": {"const": "naos.task_lifecycle.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string"},
+    "action": {"enum": ["inspect", "complete"]},
+    "task_id": {"type": ["string", "null"]},
+    "lifecycle_state": {"type": ["string", "null"]},
+    "delivery_state": {"type": ["string", "null"]},
+    "verification_state": {"type": ["string", "null"]},
+    "requested_verification_state": {"type": ["string", "null"]},
+    "effective_verification_state": {"type": ["string", "null"]},
+    "effective_delivery_state": {"type": ["string", "null"]},
+    "verification_prerequisites_met": {"type": "boolean"},
+    "completion_verification": {"$ref": "#/$defs/completionVerification"},
+    "mutated": {"type": "boolean"},
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object"}
+  },
+  "additionalProperties": true
+}

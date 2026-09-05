@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:task_context_pack_rules:v1",
+  "title": "NAOS Task Context Pack Rules",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "version",
+    "semantics",
+    "enabled",
+    "max_sections",
+    "max_items_per_section",
+    "max_chars_per_section",
+    "include_markdown_output",
+    "source_priority",
+    "authoritative_source_hierarchy",
+    "source_freshness_policy",
+    "missing_source_severity_by_profile",
+    "memory_inclusion_policy",
+    "context_bloat_controls",
+    "forbidden_content_categories",
+    "human_review_required",
+    "limitations",
+    "not_claimed"
+  ],
+  "properties": {
+    "version": {"type": "string"},
+    "semantics": {"type": "object"},
+    "enabled": {"type": "boolean"},
+    "max_sections": {"type": "integer", "minimum": 1},
+    "max_items_per_section": {"type": "integer", "minimum": 1},
+    "max_chars_per_section": {"type": "integer", "minimum": 100},
+    "include_markdown_output": {"type": "boolean"},
+    "source_priority": {"type": "array", "items": {"type": "string"}},
+    "authoritative_source_hierarchy": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rank", "id", "name", "authority"],
+        "properties": {
+          "rank": {"type": "integer", "minimum": 1},
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "authority": {"type": "string"}
+        }
+      }
+    },
+    "source_freshness_policy": {"type": "object"},
+    "missing_source_severity_by_profile": {"type": "object"},
+    "required_sources": {"type": "object"},
+    "optional_sources": {"type": "array", "items": {"type": "string"}},
+    "memory_inclusion_policy": {
+      "type": "object",
+      "required": ["call_memory_tools", "read_private_memory_payloads", "include_memory_dumps", "memory_is_advisory_only"],
+      "properties": {
+        "include_memory_readiness_report": {"type": "boolean"},
+        "call_memory_tools": {"type": "boolean"},
+        "read_private_memory_payloads": {"type": "boolean"},
+        "include_memory_dumps": {"type": "boolean"},
+        "memory_is_advisory_only": {"type": "boolean"}
+      }
+    },
+    "context_bloat_controls": {"type": "object"},
+    "forbidden_content_categories": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "object"},
+    "commands_to_run": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  }
+}

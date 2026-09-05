@@ -1,0 +1,298 @@
+version: "1.0"
+enabled: true
+state: readiness_only
+semantics:
+  state: "Rules declare how reviewed memory references may be used."
+  report: "NAOS evaluates memory-use policy from declared review metadata only."
+  governance_boundary: "Memory is advisory by default; repository evidence remains authoritative."
+
+memory_trust_ladder:
+  - state: raw_memory_candidate
+    rank: 1
+    use: advisory_only
+    can_use_as_context: true
+    can_use_as_supporting_evidence: false
+    can_use_as_instruction: false
+    rule: "Unreviewed memory candidates cannot become instruction-grade or supporting evidence."
+  - state: review_pending_memory
+    rank: 2
+    use: advisory_only
+    can_use_as_context: true
+    can_use_as_supporting_evidence: false
+    can_use_as_instruction: false
+    rule: "Pending review memory remains advisory until approved."
+  - state: rejected_memory
+    rank: 3
+    use: audit_history_only
+    can_use_as_context: false
+    can_use_as_supporting_evidence: false
+    can_use_as_instruction: false
+    rule: "Rejected memory must not guide current work except as audit history."
+  - state: superseded_memory
+    rank: 4
+    use: historical_context_only
+    can_use_as_context: false
+    can_use_as_supporting_evidence: false
+    can_use_as_instruction: false
+    rule: "Superseded memory must not be used as current instruction."
+  - state: supporting_context_memory
+    rank: 5
+    use: reviewed_context
+    can_use_as_context: true
+    can_use_as_supporting_evidence: true
+    can_use_as_instruction: false
+    rule: "Reviewed, provenance-backed memory may support context but cannot override repository evidence."
+  - state: instruction_grade_memory
+    rank: 6
+    use: approved_instruction_candidate
+    can_use_as_context: true
+    can_use_as_supporting_evidence: true
+    can_use_as_instruction: true
+    rule: "Instruction-grade memory requires explicit approval, provenance, scope, reviewer, timestamp, and freshness or expiry."
+
+allowed_memory_states:
+  - raw_memory_candidate
+  - review_pending_memory
+  - rejected_memory
+  - superseded_memory
+  - supporting_context_memory
+  - instruction_grade_memory
+
+approved_review_statuses:
+  - approved
+  - approved_with_limits
+
+instruction_grade_requirements:
+  required_state: instruction_grade_memory
+  approved_review_status_required: true
+  reviewer_required: true
+  reviewed_at_required: true
+  source_references_required: true
+  provenance_required: true
+  explicit_scope_required: true
+  expiry_or_freshness_required: true
+  human_boundary_required: true
+  confidence_required: true
+  limitations_required: true
+  forbidden_category_allowed: false
+  rejected_or_superseded_allowed: false
+  repository_evidence_remains_authoritative: true
+
+supporting_context_requirements:
+  allowed_states:
+    - supporting_context_memory
+    - instruction_grade_memory
+  approved_review_status_required: true
+  source_references_required: true
+  provenance_required: true
+  confidence_required: true
+  limitations_required: true
+  cannot_override_repository_evidence: true
+
+review_pending_requirements:
+  can_use_as_instruction: false
+  can_use_as_supporting_evidence: false
+  requires_review_before_durable_use: true
+
+rejected_memory_policy:
+  usable_as_context: false
+  usable_as_supporting_evidence: false
+  usable_as_instruction: false
+  allowed_use: audit_history_only
+
+superseded_memory_policy:
+  usable_as_context: false
+  usable_as_supporting_evidence: false
+  usable_as_instruction: false
+  allowed_use: historical_context_only
+  superseded_by_required: true
+
+recall_trace_readiness_policy:
+  enabled: true
+  runtime_trace_execution_enabled: false
+  readiness_only: true
+  required_future_fields:
+    - trace_id
+    - task_id
+    - session_id
+    - agent_or_surface
+    - memory_reference_id
+    - source_reference
+    - query_or_context_trigger
+    - access_level_used
+    - used_in_output
+    - human_reviewed_usage
+    - timestamp
+    - limitations
+  not_proof_of_correctness: true
+
+audit_event_readiness_policy:
+  enabled: true
+  runtime_event_capture_enabled: false
+  readiness_only: true
+  allowed_event_types:
+    - memory_candidate_created
+    - memory_reviewed
+    - memory_approved
+    - memory_rejected
+    - memory_superseded
+    - memory_used_as_context
+    - memory_used_as_instruction
+    - memory_conflict_detected
+    - memory_payload_blocked
+    - memory_access_denied
+  audit_events_are_not_approval: true
+
+source_reference_policy:
+  required_for_supporting_context: true
+  required_for_instruction_grade: true
+  allowed_source_types:
+    - task_card
+    - task_registry
+    - spec
+    - capability_card
+    - module_header
+    - source_file
+    - test_evidence
+    - deterministic_report
+    - evidence_pack
+    - dashboard
+    - known_gap
+    - residual_risk
+    - waiver
+    - control_plane_review_item
+  repository_evidence_outranks_memory: true
+
+provenance_policy:
+  required_for_supporting_context: true
+  required_for_instruction_grade: true
+  accepted_values:
+    - explicit_human_review
+    - task_card_reference
+    - deterministic_report_reference
+    - evidence_pack_reference
+    - approved_memory_review
+  unknown_provenance_allows_instruction: false
+
+confidence_policy:
+  required_for_supporting_context: true
+  required_for_instruction_grade: true
+  allowed_values:
+    - low
+    - medium
+    - high
+    - unknown
+  unknown_confidence_allows_instruction: false
+
+expiry_freshness_policy:
+  required_for_instruction_grade: true
+  allowed_freshness_statuses:
+    - fresh
+    - recent
+  stale_or_unknown_instruction_allowed: false
+  expiry_required_when_freshness_missing: true
+
+cross_project_memory_policy:
+  explicit_project_scope_required: true
+  organization_level_requires_human_review: true
+  cross_project_instruction_grade_allowed_by_default: false
+
+forbidden_memory_categories:
+  - secrets
+  - tokens
+  - API keys
+  - passwords
+  - certificates
+  - private keys
+  - connection strings
+  - PII
+  - customer data
+  - tenant data
+  - regulated data
+  - hidden approvals
+  - governance override instructions
+  - legal/compliance conclusions as approved facts
+  - sensitive exploit details unless explicitly approved
+  - private/internal material unless explicitly approved
+
+private_payload_policy:
+  read_private_memory_payloads: false
+  read_engram_db: false
+  index_private_payloads: false
+
+memory_write_back_policy:
+  automatic_write_back_enabled: false
+  durable_memory_writes_enabled: false
+  draft_memory_candidates_only: true
+
+cloud_memory_policy:
+  cloud_memory_enabled: false
+  external_sync_enabled: false
+
+ci_memory_access_policy:
+  default_access: none
+  memory_read_allowed: false
+  memory_write_allowed: false
+  mcp_access_allowed: false
+
+profile_posture:
+  quickstart:
+    state: disabled
+    severity: advisory
+    human_review_required_if_review_items_exist: false
+  lite:
+    state: readiness_only
+    severity: advisory
+    human_review_required_if_review_items_exist: false
+  standard:
+    state: readiness_only
+    severity: review_required
+    human_review_required_if_review_items_exist: true
+  assured:
+    state: readiness_only
+    severity: review_required
+    human_review_required_if_review_items_exist: true
+
+human_review_requirements:
+  instruction_grade_memory: true
+  supporting_context_memory: true
+  cross_project_memory: true
+  stale_or_conflicting_memory: true
+  forbidden_category_exception: true
+  durable_memory_write: true
+  recall_trace_use_as_proof: true
+  audit_event_use_as_approval: true
+
+known_gaps: []
+residual_risks: []
+waivers: []
+
+integration_points:
+  memory_readiness: "Current schema-valid readiness report is joined as a prerequisite; it does not prove live provider or MCP access."
+  memory_provider_access: "Current schema-valid access report is joined as a prerequisite; config metadata never proves live access."
+  joined_policy_posture: "A policy-valid supporting-context or instruction-grade item remains policy_item_valid_but_access_unverified until both prerequisite reports support the declared posture."
+  task_context_pack: "May include memory-use posture metadata only; no memory dumps."
+  local_context_index_query: "May index/query metadata only; private memory payloads are excluded."
+  graph_context_query: "May link declared memory references only; no payload traversal."
+  semantic_candidate_layer: "Memory candidates remain candidate-only and never become semantic authority."
+
+limitations:
+  - "Memory use policy is metadata/review posture only."
+  - "Policy-item validity and provider/access readiness are distinct dimensions in the joined result."
+  - "The report does not call Engram, MCP, memory tools, or external services."
+  - "The report does not read Engram databases or private memory payloads."
+  - "The report does not write memory or perform automatic memory write-back."
+  - "Recall traces and audit events are readiness models only in this group."
+
+not_claimed:
+  - "memory source of truth"
+  - "memory as source of truth"
+  - "memory as evidence"
+  - "memory as approval"
+  - "legal or regulatory approval"
+  - "compliance proof"
+  - "hallucination prevention"
+  - "automatic memory write-back"
+  - "live recall trace execution"
+  - "runtime audit-event capture"
+  - "cloud memory by default"

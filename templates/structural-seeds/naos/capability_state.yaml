@@ -1,0 +1,432 @@
+version: "1.0"
+semantics:
+  state_rule: "This file is an adopter declaration of capability state, not proof."
+  report_rule: "NAOS evaluates maturity readiness from this declaration and available evidence."
+  promotion_rule: "NAOS does not automatically promote, certify, or approve maturity; final maturity decisions remain project governance decisions."
+
+capabilities:
+  - capability_id: CAP-CLAIMS-VALIDATION
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters: {}
+    evidence_roots:
+      - naos/reports
+    evidence_refs:
+      - naos/reports/claims_validation.json
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Set owners, evidence references, and project criteria before treating this capability as configured."
+    criteria:
+      L1:
+        - "Claims scope and owners are configured."
+      L2:
+        - "Claims validation report exists and is fresh."
+      L3:
+        - "Gatekeeper decision is reviewed under the selected profile."
+
+  - capability_id: CAP-SELF-CONFORMANCE
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters: {}
+    evidence_roots:
+      - naos/reports
+    evidence_refs:
+      - naos/reports/self_check.json
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Set project owners and run self-check before evaluating operational maturity."
+    criteria:
+      L1:
+        - "Self-check scope and policy are configured."
+      L2:
+        - "Self-check report exists and is fresh."
+      L3:
+        - "Self-check findings are reviewed through gates or waivers."
+
+  - capability_id: CAP-EVIDENCE-PACK
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters: {}
+    evidence_roots:
+      - naos/evidence
+      - naos/reports
+    evidence_refs:
+      - naos/evidence/evidence_pack.json
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Evidence packs support review; they do not prove compliance."
+    criteria:
+      L1:
+        - "Evidence-pack contents and owner expectations are configured."
+      L2:
+        - "Evidence pack is generated from current validator outputs."
+      L3:
+        - "Gatekeeper decision accounts for missing evidence, waivers, and residual risks."
+
+  - capability_id: CAP-MODULE-HEADER-TRACEABILITY
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      source_scope: "Configured in naos/module_header_rules.yaml"
+    evidence_roots:
+      - naos/reports
+    evidence_refs:
+      - naos/reports/module_header_traceability.json
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Header traceability evidence supports review; it does not prove code correctness."
+    criteria:
+      L1:
+        - "Source roots, exclusions, and required sections are configured."
+      L2:
+        - "Module-header traceability report exists and is fresh."
+      L3:
+        - "Gatekeeper decision accounts for missing, legacy, stale, or duplicate headers."
+
+  - capability_id: CAP-SPEC-CASCADE-COHERENCE
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      source_scope: "Specs, task registry, module headers, and configured source roots"
+    evidence_roots:
+      - naos/reports
+    evidence_refs:
+      - naos/reports/spec_cascade_coherence.json
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Spec-cascade evidence supports structural review; it does not prove complete traceability or code correctness."
+    criteria:
+      L1:
+        - "Specs, task registry, and source traceability conventions are configured."
+      L2:
+        - "Spec-cascade coherence report exists and is fresh."
+      L3:
+        - "Gatekeeper decision accounts for uncovered requirements, stale statuses, orphan headers, overloaded requirements, or untraced source."
+
+  - capability_id: CAP-AC-COMPLETION-EVIDENCE
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      manifest: "naos/ac_completion_evidence.yaml"
+      completion_source: "Project-declared AC/SCEN completion evidence only."
+    evidence_roots:
+      - naos/reports
+      - specs
+    evidence_refs:
+      - naos/reports/ac_completion_evidence.json
+      - naos/ac_completion_evidence.yaml
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "AC completion evidence supports review of declared completion claims and optional local Git binding/supersession posture; it does not prove command execution, clean or independent execution, signing, identity, AC correctness, implementation correctness, complete coverage, approval, or compliance."
+    criteria:
+      L1:
+        - "Completion manifest location and ownership are known."
+      L2:
+        - "AC completion evidence report exists when completion claims are declared; optional repository bindings and supersession links are visible when used."
+      L3:
+        - "Gatekeeper decision accounts for missing, unresolved, stale, failed, or manual-review-only completion evidence."
+
+  - capability_id: CAP-HARNESS-TRACE-IMPORT
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      default_mode: "Report-only; --write-events is explicit."
+      source_format: "Repo-local JSONL/NDJSON harness trace files."
+    evidence_roots:
+      - naos/reports
+      - naos
+    evidence_refs:
+      - naos/reports/harness_trace_import.json
+      - naos/agent_trace_events.yaml
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Harness trace import normalizes local trace records for review; it does not execute harnesses, capture runtime events, approve work, or prove behavior."
+    criteria:
+      L1:
+        - "Local harness trace source and import ownership are known."
+      L2:
+        - "Harness trace import report exists and imported events are validated with agent-traces when written."
+      L3:
+        - "Gatekeeper decision accounts for invalid records, rejected records, duplicate event ids, stale imports, and unreviewed trace evidence."
+
+  - capability_id: CAP-API-SYMBOL-REALITY
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      manifest: "naos/api_symbol_reality.yaml"
+      default_mode: "Local source inspection only; target modules are not imported or executed."
+      source_scope: "Explicit manifest entries only."
+    evidence_roots:
+      - naos/reports
+      - naos
+    evidence_refs:
+      - naos/reports/api_symbol_reality.json
+      - naos/api_symbol_reality.yaml
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "API symbol reality supports review of declared Python symbols; it does not prove API semantics, runtime behavior, package safety, approval, or compliance."
+    criteria:
+      L1:
+        - "API symbol manifest location and ownership are known."
+      L2:
+        - "API symbol reality report exists when symbol claims are declared."
+      L3:
+        - "Gatekeeper decision accounts for missing, unverified, dynamic, compiled, or environment-dependent symbols."
+
+  - capability_id: CAP-SPEC-PACK-CONTRACT
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      structural_mode: "Default mode permits [ADAPT] placeholders."
+      filled_mode: "Explicit filled mode flags unresolved placeholders."
+      profile_applicability: "Standard/assured require the ten-file spec pack; quickstart/lite omissions are reported as not applicable by profile."
+      reference_resolution: "Manifest-declared reference codes are resolved deterministically when their source artifacts apply to the selected profile."
+    evidence_roots:
+      - naos/reports
+      - specs
+    evidence_refs:
+      - naos/reports/spec_pack_contract.json
+      - specs/spec_manifest.yaml
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Spec-pack contract evidence supports structural/profile/reference review; it does not prove specification quality, approval, implementation, complete traceability, or compliance."
+    criteria:
+      L1:
+        - "Manifest, profile-required spec files, and not-applicable-by-profile inventory exist."
+      L2:
+        - "Spec-pack contract report exists and is fresh."
+      L3:
+        - "Gatekeeper decision accounts for missing files, missing sections, missing anchors, unresolved reference codes, missing sync markers, or unresolved filled-mode placeholders."
+
+  - capability_id: CAP-SPEC-PACK-MATERIALIZATION
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      default_make_mode: "Dry-run unless SPEC_PACK_MATERIALIZE_ARGS is overridden."
+      overwrite_policy: "Existing regular specs are skipped unless --force is explicit; force never relaxes path or file-type checks."
+      refusal_policy: "Invalid manifests, missing/unsafe sources, unsafe report sinks, out-of-project/symlink/non-regular targets, and apply requests outside the executed macOS/POSIX tuple block before any spec file is changed."
+      transaction_model: "Each leaf uses a same-directory temporary install; if post-install cleanup fails, the target stays counted as copied and the residue is blocking evidence. Executed evidence is macOS-local, and a multi-file run is sequential with no rollback."
+    evidence_roots:
+      - naos/reports
+      - specs
+      - naos/spec_templates/spec-kit/specs
+    evidence_refs:
+      - naos/reports/spec_pack_materialization.json
+      - naos/spec_templates/spec-kit/specs/spec_manifest.yaml
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Materialization copies missing template files only after complete preflight; requested report sinks receive a basic writability probe, while post-install cleanup failure, late report failure, multi-file rollback, Linux/Windows behavior, hostile concurrency, and crash consistency remain bounded or unproven."
+    criteria:
+      L1:
+        - "Local template source and spec-pack manifest are available."
+      L2:
+        - "Materialization report or stdout evidence exists and any manifest, source, destination, report-sink, platform, or copy refusal is reviewed."
+      L3:
+        - "Review records explain why copied specs are applicable and what remains unfilled; materialization is not profile-transition evidence."
+
+  - capability_id: CAP-SPEC-ASSEMBLY-WORKSHEET
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      candidate_promotion: "Disabled; candidates remain review-only."
+      mapping_mode: "Deterministic heuristic target-spec mapping."
+    evidence_roots:
+      - naos/reports
+      - specs
+    evidence_refs:
+      - naos/reports/spec_assembly_worksheet.json
+      - naos/reports/candidate_requirements.json
+      - naos/reports/traceability_gap_register.json
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "The worksheet supports evidence-to-spec assembly review; it does not promote candidates or prove traceability."
+    criteria:
+      L1:
+        - "Adoption reports exist or missing inputs are explicitly visible."
+      L2:
+        - "Worksheet report exists and missing required spec files are reviewed."
+      L3:
+        - "Non-applicability decisions are recorded for empty standard spec areas."
+
+  - capability_id: CAP-GOVERNED-LEARNING-LIFECYCLE
+    enabled: true
+    current_maturity: L0
+    target_maturity: L1
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      rules: "Configured in naos/learning_loop_rules.yaml"
+    evidence_roots:
+      - naos/reports
+    evidence_refs:
+      - naos/reports/learning_loop_review.json
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: true
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Learning lifecycle evidence supports reviewed self-improvement; it does not write memory, mutate governed artifacts, or prove semantic truth."
+    criteria:
+      L1:
+        - "Learning candidate, active state, history, and rules files exist."
+      L2:
+        - "Learning-loop review report exists and is fresh."
+      L3:
+        - "Gatekeeper decision accounts for active-learning metadata, stale learning, redaction gaps, and promotion-review requirements."
+
+  - capability_id: CAP-GOVERNED-DEBUG-ESCALATION
+    enabled: false
+    current_maturity: L0
+    target_maturity: L2
+    owner_1lod: "@unassigned"
+    owner_2lod: "@unassigned"
+    accountable_reviewer: "@unassigned"
+    parameters:
+      config: "naos/governed_debug_escalation.yaml"
+      allowed_transition: "naos-implement-with-debug -> naos-debug"
+      activation_thresholds: "Standard L2; Assured L3"
+    evidence_roots:
+      - naos
+      - .github/agents
+    evidence_refs:
+      - naos/governed_debug_escalation.yaml
+      - .github/agents/naos-implement-with-debug.agent.md
+      - .github/agents/naos-debug.agent.md
+    freshness_window_days: 30
+    waiver_policy:
+      allow_waiver: false
+      requires_approval: true
+      approval_owner: "@unassigned"
+    waivers: []
+    notes: "Disabled by default. Profile and maturity are eligibility evidence, not invocation authority or proof that a child agent ran."
+    criteria:
+      L1:
+        - "A named owner records dormant configuration, host intent, and the manual fallback boundary."
+      L2:
+        - "A Standard project has matching configuration, explicit enablement, host acknowledgement, named approval, and a passing activation validator."
+      L3:
+        - "An Assured project meets the stronger maturity threshold and records named review evidence without expanding the child allowlist or recursion depth."
+      L4:
+        - "Reviewed host-specific pilots measure invocation, fallback, cost, and cascade outcomes."
+      L5:
+        - "Audit-style evidence is complete; no new target, depth, approval, merge, release, or publication authority is created."
+
+  - capability_id: CAP-AI-COMPONENT-INVENTORY
+    enabled: false
+    current_maturity: L0
+    target_maturity: L0
+    owner_1lod: project-governance-reviewer
+    owner_2lod: project-governance-reviewer
+    accountable_reviewer: project-governance-reviewer
+    parameters:
+      format: ai_component_inventory.v1
+      applicability: "Generated Standard and Assured profiles only."
+      freshness_basis: "Content SHA-256 and canonical semantic digests; no wall-clock or copied-mtime expiry."
+    evidence_roots:
+      - naos/reports
+    evidence_refs:
+      - naos/reports/ai_component_inventory.json
+    freshness_window_days: 0
+    waiver_policy:
+      allow_waiver: false
+      requires_approval: true
+      approval_owner: project-governance-reviewer
+    waivers: []
+    notes: "Profile rendering enables this declaration at L1 only for generated Standard and Assured projects. The report supports G2/G6 review routing; it is not a standard BOM, runtime discovery, signing, attestation, completeness proof, compliance approval, release, or publication authority."
+    criteria:
+      L1:
+        - "The custom declared-facts inventory is current, schema-valid, complete for required declarations, and consumed by control-plane review."
+      L2:
+        - "Adopter-owned review evidence confirms maintained declarations across supported lifecycle changes."
+      L3:
+        - "Any external-standard export is separately designed and validated without expanding this inventory's claims."

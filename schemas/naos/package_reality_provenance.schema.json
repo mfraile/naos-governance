@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:package_reality_provenance:v1",
+  "title": "NAOS Package Reality Provenance Manifest",
+  "description": "Optional adopter-maintained package provenance manifest for package-reality review evidence. It records local evidence declarations only; it is not package safety proof, vulnerability scanning, supply-chain assurance, approval, certification, or proof of compliance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "packages"],
+  "properties": {
+    "schema": {"const": "naos.package_reality_provenance.v1"},
+    "packages": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/package"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": ["string", "number"]},
+        "source": {"type": "string"},
+        "evidence": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/evidence"}
+        },
+        "expected_hashes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/hash"}
+        },
+        "notes": {"type": "string"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path", "outcome"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "command": {"type": "string"},
+        "outcome": {"type": "string", "enum": ["present", "passing", "reviewed"]},
+        "notes": {"type": "string"}
+      }
+    },
+    "hash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "value"],
+      "properties": {
+        "alg": {"type": "string", "minLength": 1},
+        "value": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

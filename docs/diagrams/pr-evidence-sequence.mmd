@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant Author as PR author
+    participant CLI as PR evidence commands
+    participant Trace as spec-pack/spec-cascade/module-headers
+    participant Surface as ai-surface-budget
+    participant Risk as pr-risk-classify
+    participant Evidence as Gate/evidence/dashboard/SARIF
+    participant Reviewer as Human reviewer
+
+    Author->>CLI: Run PR-time evidence chain
+    CLI->>Trace: Check template contract and requirement/task/source coherence
+    CLI->>Surface: Check AI/governance instruction context health
+    CLI->>Risk: Classify local diff risk surfaces
+    CLI->>Evidence: Generate gate, evidence pack, dashboard, SARIF
+    Evidence->>Reviewer: Present findings and limitations
+    Reviewer->>Reviewer: Approve PR externally, request fixes, or waive risk

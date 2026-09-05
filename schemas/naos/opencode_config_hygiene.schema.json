@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:opencode_config_hygiene:v1",
+  "title": "NAOS OpenCode Config Hygiene Report",
+  "description": "Deterministic local review evidence for optional repo-local OpenCode configuration surfaces. It is not OpenCode execution, MCP activation, provider/model access, credential validation, prompt-injection prevention, security proof, approval, certification, attestation, proof of compliance, release authority, publication authority, or runtime orchestration.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "deterministic",
+    "declaration_path",
+    "declaration_source",
+    "enabled",
+    "opencode_config_declared",
+    "runtime_enabled",
+    "opencode_execution_allowed",
+    "mcp_allowed",
+    "provider_calls_allowed",
+    "model_calls_allowed",
+    "memory_allowed",
+    "hook_activation_allowed",
+    "tool_mutation_allowed",
+    "config_files",
+    "opencode_surfaces",
+    "findings",
+    "reason_code_counts",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "generated_by",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.opencode_config_hygiene.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["pass", "advisory", "warning", "required_missing", "blocked", "not_configured", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "declaration_path": {"type": "string"},
+    "declaration_source": {"type": "string", "enum": ["project", "template", "explicit"]},
+    "declaration_hash": {"type": ["string", "null"]},
+    "enabled": {"type": "boolean"},
+    "opencode_config_declared": {"type": "boolean"},
+    "runtime_enabled": {"const": false},
+    "opencode_execution_allowed": {"const": false},
+    "mcp_allowed": {"const": false},
+    "provider_calls_allowed": {"const": false},
+    "model_calls_allowed": {"const": false},
+    "memory_allowed": {"const": false},
+    "hook_activation_allowed": {"const": false},
+    "tool_mutation_allowed": {"const": false},
+    "profile_posture": {"type": "object"},
+    "config_files": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": true}
+    },
+    "opencode_surfaces": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": true}
+    },
+    "model_provider_policy_report_ref": {"type": ["string", "null"]},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "severity", "status", "reason_code", "gate", "message", "human_review_required"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+          "status": {"type": "string"},
+          "reason_code": {"type": "string"},
+          "related_gates": {"type": "array", "items": {"type": "string"}},
+          "gate": {"type": "string"},
+          "message": {"type": "string"},
+          "human_review_required": {"type": "boolean"}
+        }
+      }
+    },
+    "reason_code_counts": {"type": "object"},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"},
+      "allOf": [
+        {"contains": {"const": "OpenCode execution"}},
+        {"contains": {"const": "MCP activation"}},
+        {"contains": {"const": "memory activation"}},
+        {"contains": {"const": "provider call"}},
+        {"contains": {"const": "model call"}},
+        {"contains": {"const": "credential validation"}},
+        {"contains": {"const": "runtime orchestration"}},
+        {"contains": {"const": "approval"}},
+        {"contains": {"const": "certification"}},
+        {"contains": {"const": "attestation"}},
+        {"contains": {"const": "proof of compliance"}}
+      ]
+    },
+    "human_review_required": {"type": "boolean"},
+    "generated_by": {"type": "object", "additionalProperties": true},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "opencode_files": {"type": "integer", "minimum": 0},
+        "project_config_files": {"type": "integer", "minimum": 0},
+        "project_config_parse_errors": {"type": "integer", "minimum": 0},
+        "local_plugin_files": {"type": "integer", "minimum": 0},
+        "runtime_authority_findings": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

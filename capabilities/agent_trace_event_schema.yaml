@@ -1,0 +1,117 @@
+id: CAP-AGENT-TRACE-EVENT-SCHEMA
+name: Agent Trace Event Schema
+description: >
+  Defines schema-validated, file-first agent trace event records and a
+  deterministic validation report for future StaticGrader, audit, drift, and
+  assessment flows. Trace events may include optional declared action-receipt
+  metadata for intended action, side-effect class, approval posture, permission
+  scope, claim refs, and memory trust state. Trace events are declared records
+  requiring review; the capability does not capture runtime events, judge
+  behavior, write memory, enforce permissions, or call providers.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Empty trace seed and low-noise validation posture."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Manual trace records can be validated without runtime capture."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Invalid trace records and unsafe payload indicators should be reviewed before relying on future grading inputs."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Trace payload risks and trace-as-authority overclaims can block release readiness until reviewed."
+authority:
+  may_read:
+    - naos/agent_trace_events.yaml
+    - schemas/naos/agent_trace_event.schema.json
+    - schemas/naos/agent_trace_validation.schema.json
+  may_write:
+    - naos/reports/agent_trace_validation.json
+  may_block:
+    - "only through configured profile gate policy for invalid trace records or protected payload findings"
+allowed_resources:
+  - "repo-local YAML trace declarations"
+  - "schema-validated event metadata"
+  - "schema-validated declared action-receipt metadata"
+  - "source-linked artifact references where available"
+prohibited_resources:
+  - "runtime trace capture"
+  - "runtime audit-event capture"
+  - "runtime permission enforcement or tool-call interception"
+  - "LLM judging, LLMGrader runtime, model calls, API calls, or provider credentials"
+  - "Engram, MCP, memory tools, private memory payload reads, or memory write-back"
+  - "sqlite-vec, NetworkX, graph runtime, semantic runtime, or automatic context injection"
+constraints:
+  - "Must remain deterministic schema/validation only."
+  - "Trace events are records, not proof, approval, evidence authority, legal/compliance/regulatory assurance, or behavioral safety proof."
+  - "Optional action receipts are declared metadata only; they may flag side-effect, approval, permission-scope, claim-evidence, and memory-trust inconsistencies but must not enforce policy."
+  - "Must not run commands declared in trace records."
+  - "Must flag secret-like, private-payload, memory-write, and authority-overclaim indicators."
+  - "Must support StaticGrader and deterministic audit/drift/assessment review-input flows without enabling runtime capture."
+required_evidence:
+  - naos/agent_trace_events.yaml
+  - naos/reports/agent_trace_validation.json
+validators:
+  - id: naos_agent_trace_validate
+    script: scripts/naos_agent_trace_validate.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - agent_trace_validation.status
+  - agent_trace_validation.event_count
+  - agent_trace_validation.summary.action_receipt_events
+  - agent_trace_validation.invalid_event_count
+  - agent_trace_validation.forbidden_payload_findings
+maturity_path:
+  L0: "Trace seed exists and validation can report no-events/not-configured without blocking quickstart."
+  L1: "Manual trace records validate against schema and remain declared records."
+  L2: "Trace payload risks, source-reference gaps, and overclaims are visible in reports, evidence, dashboard, and gates."
+  L3: "Assured projects route invalid trace records and payload risks for human review before using traces as grading inputs."
+  L4: "Trace records are consistently source-linked and reviewed before deterministic audit/drift/assessment use."
+  L5: "Trace validation supports a governed behavioral-grading substrate without replacing deterministic evidence or human review."
+known_limitations:
+  - "No runtime trace capture is implemented."
+  - "This capability validates trace records only; StaticGrader and grader assessment are separate deterministic consumers, and LLMGrader runtime is not implemented."
+  - "Action receipts are declared metadata only; they do not prove approval, enforce permissions, or intercept tool calls."
+  - "Pattern checks are lightweight safety checks, not a full secret scanner."
+  - "Trace events can be incomplete or inaccurate because they are declared records."
+not_claimed:
+  - "runtime capture"
+  - "runtime audit-event capture"
+  - "runtime enforcement"
+  - "tool-call interception"
+  - "permission enforcement"
+  - "behavioral grading"
+  - "LLM judging"
+  - "correctness proof"
+  - "approval"
+  - "hallucination prevention"
+  - "legal/compliance/regulatory assurance"
+  - "behavioral safety proof"
+  - "memory write-back"
+  - "provider setup"
+  - "MCP or Engram integration"
+  - "automatic context injection"
+related_docs:
+  - README.md
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/tutorials/README.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+  - docs/GLOSSARY.md
+  - INSTALLATION_MANUAL.md
+  - NAOS_CATALOG.md
+related_scripts:
+  - scripts/naos_agent_trace_validate.py

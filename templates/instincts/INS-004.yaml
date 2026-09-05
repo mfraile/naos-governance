@@ -1,0 +1,42 @@
+# NAOS Instinct Seed — INS-004
+# Tier 1 seed — stripped of source-project evidence for kit distribution.
+# Set evidence_count ≥ 1 and add your source_sessions as you observe this pattern.
+---
+
+id: INS-004
+title: "Recall questions need compact-first lookup, not re-derivation from raw Engram"
+status: hypothesis
+tier: 1
+
+observed_pattern: >
+  When user asks a recall question ("what did we decide", "what were the things",
+  "remember the analysis"), the agent re-searches Engram raw observations and
+  re-presents the data instead of checking the strategic compact first. This wastes
+  context window tokens on data already synthesized, and sometimes misses items
+  because the agent treats it as a new question rather than a retrieval task.
+
+context: >
+  Applies whenever: (a) the user asks about a prior decision or analysis from
+  the current or recent session, (b) the user says "remember", "recall", "what
+  did we do", "what were the things", or (c) the agent has already loaded the
+  relevant Engram observation earlier in the session. Most wasteful when the
+  answer is already in the session compact but the agent skips it.
+
+mitigation: >
+  On any recall question:
+    1. Check session compact (/memories/session/compact.md) FIRST
+    2. If compact has the answer, surface it directly (no re-search)
+    3. Only if compact is empty or stale, fall back to mem_context → mem_search when access is configured, authorized, verified, and permitted by memory-use policy
+    4. If the data was already loaded in current context, cite it — don't re-derive
+  The strategic compact skill must be actively maintained during sessions:
+  update it after every significant decision, analysis, or user choice.
+
+evidence_count: 0
+first_observed: null
+last_confirmed: null
+source_sessions: []
+
+confidence: 0.0   # evidence_count = 0 → seed only
+tags: [memory, recall, compact, engram, context-efficiency]
+promoted_to_rule: null
+dismissed: false

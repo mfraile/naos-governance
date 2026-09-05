@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_transaction_journal:v1",
+  "title": "NAOS Repository Intelligence Transaction Journal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "transaction_id", "state", "created_at", "updated_at", "plan_sha256", "bundle_sha256", "generation_id", "generation_content_sha256", "staging_path", "staging_files", "staging_device", "staging_inode", "context_staging_path", "context_staging_device", "context_staging_inode", "context_published", "final_path", "generation_published", "initial_context_absent", "active_path", "active_pending_path", "active_before", "active_before_bytes_hex", "active_before_file_sha256", "proposed_active_sha256", "proposed_active_file_sha256", "actions", "completed_action_index", "last_error", "journal_sha256"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.transaction_journal.v1"},
+    "transaction_id": {"type": "string", "pattern": "^RIT-[0-9a-f]{24}$"},
+    "state": {"enum": ["PREPARED", "APPLYING", "VALIDATING", "COMMITTED", "RECOVERY_REQUIRED", "ROLLBACK_INCOMPLETE", "ROLLED_BACK"]},
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"},
+    "plan_sha256": {"$ref": "#/$defs/sha256"},
+    "bundle_sha256": {"$ref": "#/$defs/sha256"},
+    "generation_id": {"type": "string", "pattern": "^RI-[0-9a-f]{24}$"},
+    "generation_content_sha256": {"$ref": "#/$defs/sha256"},
+    "staging_path": {"type": "string"},
+    "staging_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "size_bytes"],
+        "properties": {
+          "path": {"type": "string", "pattern": "^[^/]+$"},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "size_bytes": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "staging_device": {"type": ["integer", "null"], "minimum": 0},
+    "staging_inode": {"type": ["integer", "null"], "minimum": 0},
+    "context_staging_path": {"type": "string"},
+    "context_staging_device": {"type": ["integer", "null"], "minimum": 0},
+    "context_staging_inode": {"type": ["integer", "null"], "minimum": 0},
+    "context_published": {"type": "boolean"},
+    "final_path": {"type": "string"},
+    "generation_published": {"type": "boolean"},
+    "initial_context_absent": {"type": "boolean"},
+    "active_path": {"type": "string"},
+    "active_pending_path": {"type": "string"},
+    "active_before": {"type": ["object", "null"]},
+    "active_before_bytes_hex": {"type": ["string", "null"], "pattern": "^[0-9a-f]*$"},
+    "active_before_file_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "proposed_active_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "proposed_active_file_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "actions": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "completed_action_index": {"type": "integer", "minimum": -1},
+    "last_error": {"type": ["string", "null"]},
+    "journal_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

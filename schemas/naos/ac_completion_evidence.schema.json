@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:ac_completion_evidence:v1",
+  "title": "NAOS AC Completion Evidence Report",
+  "description": "Deterministic report for project-declared AC/SCEN completion evidence. It checks declared evidence structure and paths; it does not prove AC correctness, complete coverage, implementation correctness, approval, certification, or compliance.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "configured",
+    "project_root",
+    "naos_root",
+    "specs_root",
+    "manifest_path",
+    "deterministic",
+    "summary",
+    "findings",
+    "completions",
+    "known_gaps",
+    "limitations",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.ac_completion_evidence.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked", "not_configured"]},
+    "configured": {"type": "boolean"},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "specs_root": {"type": "string"},
+    "manifest_path": {"type": "string"},
+    "deterministic": {"type": "boolean"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "blocking",
+        "required",
+        "warnings",
+        "advisory",
+        "total_findings",
+        "configured",
+        "defined_ac_scen_ids",
+        "completions_declared",
+        "current_completion_records",
+        "superseded_completion_records",
+        "claimed_complete",
+        "satisfied_completions",
+        "unsatisfied_completions",
+        "repository_bound_completions",
+        "subject_operands_checked",
+        "evidence_items",
+        "deterministic_evidence_items"
+      ]
+    },
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "completions": {"type": "array", "items": {"$ref": "#/$defs/completion"}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "git_oid": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "completion": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "record_id",
+        "record_state",
+        "supersedes",
+        "superseded_by",
+        "correction_reason",
+        "ac_id",
+        "status",
+        "source_ref",
+        "repository_binding",
+        "evidence",
+        "deterministic_completion_evidence_present"
+      ],
+      "properties": {
+        "record_id": {"type": ["string", "null"]},
+        "record_state": {"enum": ["current", "superseded"]},
+        "supersedes": {"type": ["string", "null"]},
+        "superseded_by": {"type": ["string", "null"]},
+        "correction_reason": {"type": ["string", "null"]},
+        "ac_id": {"type": "string"},
+        "status": {"enum": ["claimed_complete", "not_claimed", "deferred", "review_only"]},
+        "source_ref": {"type": ["string", "null"]},
+        "repository_binding": {"$ref": "#/$defs/repository_binding"},
+        "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
+        "deterministic_completion_evidence_present": {"type": "boolean"}
+      }
+    },
+    "repository_binding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requested", "status", "validation_scope"],
+          "properties": {
+            "requested": {"const": false},
+            "status": {"const": "not_requested"},
+            "validation_scope": {"const": "git_object_database"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requested",
+            "status",
+            "validation_scope",
+            "base_commit",
+            "base_tree",
+            "subject_commit",
+            "subject_tree",
+            "head_commit",
+            "subject_reachable_from_head",
+            "subject_is_head",
+            "worktree_clean_at_validation"
+          ],
+          "properties": {
+            "requested": {"const": true},
+            "status": {"const": "ready"},
+            "validation_scope": {"const": "git_object_database"},
+            "base_commit": {"$ref": "#/$defs/git_oid"},
+            "base_tree": {"$ref": "#/$defs/git_oid"},
+            "subject_commit": {"$ref": "#/$defs/git_oid"},
+            "subject_tree": {"$ref": "#/$defs/git_oid"},
+            "head_commit": {"$ref": "#/$defs/git_oid"},
+            "subject_reachable_from_head": {"const": true},
+            "subject_is_head": {"type": "boolean"},
+            "worktree_clean_at_validation": {"type": "boolean"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requested",
+            "status",
+            "validation_scope",
+            "base_commit",
+            "base_tree",
+            "subject_commit",
+            "subject_tree",
+            "head_commit",
+            "subject_reachable_from_head",
+            "subject_is_head",
+            "worktree_clean_at_validation"
+          ],
+          "properties": {
+            "requested": {"const": true},
+            "status": {"const": "invalid"},
+            "validation_scope": {"const": "git_object_database"},
+            "base_commit": {"type": ["string", "null"]},
+            "base_tree": {"type": ["string", "null"]},
+            "subject_commit": {"type": ["string", "null"]},
+            "subject_tree": {"type": ["string", "null"]},
+            "head_commit": {"type": ["string", "null"]},
+            "subject_reachable_from_head": {"type": "boolean"},
+            "subject_is_head": {"type": "boolean"},
+            "worktree_clean_at_validation": {"type": ["boolean", "null"]}
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["subject_operand_validation", "satisfies_deterministic_completion"],
+      "properties": {
+        "subject_operand_validation": {"$ref": "#/$defs/subject_operand_validation"},
+        "satisfies_deterministic_completion": {"type": "boolean"}
+      }
+    },
+    "subject_operand_validation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "operands"],
+          "properties": {
+            "status": {"const": "not_requested"},
+            "operands": {"type": "array", "maxItems": 0}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "operands"],
+          "properties": {
+            "status": {"const": "blocked_by_repository_binding"},
+            "operands": {"type": "array", "maxItems": 0}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "operands"],
+          "properties": {
+            "status": {"const": "ready"},
+            "operands": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/ready_operand_receipt"}
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "operands"],
+          "properties": {
+            "status": {"const": "invalid"},
+            "operands": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/operand_receipt"}
+            }
+          }
+        }
+      ]
+    },
+    "operand_receipt": {
+      "oneOf": [
+        {"$ref": "#/$defs/ready_operand_receipt"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operand", "path", "status", "mode", "object_type", "object_id"],
+          "properties": {
+            "operand": {"type": "string", "minLength": 1},
+            "path": {"type": "null"},
+            "status": {"const": "invalid"},
+            "mode": {"type": "null"},
+            "object_type": {"type": "null"},
+            "object_id": {"type": "null"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operand", "path", "status", "mode", "object_type", "object_id"],
+          "properties": {
+            "operand": {"type": "string", "minLength": 1},
+            "path": {"type": "string", "minLength": 1},
+            "status": {"const": "missing"},
+            "mode": {"type": "null"},
+            "object_type": {"type": "null"},
+            "object_id": {"type": "null"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operand", "path", "status", "mode", "object_type", "object_id"],
+          "properties": {
+            "operand": {"type": "string", "minLength": 1},
+            "path": {"type": "string", "minLength": 1},
+            "status": {"const": "unsupported_type"},
+            "mode": {
+              "type": "string",
+              "pattern": "^[0-7]{6}$",
+              "not": {"enum": ["040000", "100644", "100755"]}
+            },
+            "object_type": {"enum": ["blob", "tree", "commit"]},
+            "object_id": {"$ref": "#/$defs/git_oid"}
+          }
+        }
+      ]
+    },
+    "ready_operand_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operand", "path", "status", "mode", "object_type", "object_id"],
+      "properties": {
+        "operand": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "status": {"const": "ready"},
+        "mode": {"enum": ["040000", "100644", "100755"]},
+        "object_type": {"enum": ["blob", "tree"]},
+        "object_id": {"$ref": "#/$defs/git_oid"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "mode": {"const": "040000"},
+            "object_type": {"const": "tree"}
+          }
+        },
+        {
+          "properties": {
+            "mode": {"enum": ["100644", "100755"]},
+            "object_type": {"const": "blob"}
+          }
+        }
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message", "human_review_required", "not_claimed"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+        "status": {"type": "string"},
+        "message": {"type": "string"},
+        "ac_id": {"type": "string"},
+        "record_id": {"type": "string"},
+        "path": {"type": "string"},
+        "human_review_required": {"type": "boolean"},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

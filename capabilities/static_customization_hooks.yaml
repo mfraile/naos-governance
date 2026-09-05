@@ -1,0 +1,115 @@
+id: CAP-STATIC-CUSTOMIZATION-HOOKS
+name: Static Customization Hooks
+description: >
+  Validates adopter-local static YAML policy overlays and produces a deterministic
+  merge report so teams can tune safe policy values without forking NAOS. The
+  hook is schema-validated and file-first; it does not execute plugins, shell
+  commands, providers, cloud services, or arbitrary code.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Low-noise placeholder and advisory merge report."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Supports deterministic local overlay checks without plugin runtime."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Protected invariant violations should be reviewed before relying on merged policy."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Protected invariant violations can block release readiness until human-reviewed."
+authority:
+  may_read:
+    - policies/default_policy.yaml
+    - naos/policy/default_policy.yaml
+    - naos/policy_overrides.d/*.yaml
+    - naos/policy_overrides.d/teams/<team_id>/*.yaml
+    - naos/policy_overrides.d/operators/<operator_overlay_id>/*.yaml
+    - naos/team_operator_map.yaml
+    - schemas/naos/policy_override.schema.json
+  may_write:
+    - naos/reports/policy_override_merge.json
+    - naos/reports/effective_policy.yaml when explicitly requested
+  may_block:
+    - "only through configured profile gate policy for protected invariant violations"
+allowed_resources:
+  - "repo-local YAML policy overlays"
+  - "repo-local team/operator mapping metadata"
+  - "schema-validated static configuration values"
+  - "deterministic global, team, then operator scope order"
+prohibited_resources:
+  - "Python plugin execution"
+  - "arbitrary code execution"
+  - "shell commands, provider credentials, API keys, cloud endpoints, or dependency installation"
+  - "MCP, Engram, memory write-back, semantic/vector, graph, LLMGrader, cloud memory, or signing runtime enablement"
+constraints:
+  - "Must remain static YAML overlay only in v1."
+  - "Must treat team/operator scopes as configuration overlays, not authentication, authorization, access control, or separation-of-duties evidence."
+  - "Must reject attempts to weaken ADR-0010 advisory-control boundaries."
+  - "Must not allow advisory outputs to replace deterministic evidence or promote without human review."
+  - "Must not remove required limitations, non-claims, human review, or source hierarchy boundaries."
+required_evidence:
+  - naos/policy_overrides.d/README.md
+  - naos/team_operator_map.yaml
+  - naos/reports/policy_override_merge.json
+validators:
+  - id: naos_policy_overrides
+    script: scripts/naos_policy_overrides.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - policy_overrides.status
+  - policy_overrides.override_files
+  - policy_overrides.applied_paths
+  - policy_overrides.applied_overlay_scopes
+  - policy_overrides.team_ids
+  - policy_overrides.operator_overlay_id
+  - policy_overrides.protected_invariant_violations
+maturity_path:
+  L0: "Override directory placeholder exists and the merge report is optional/advisory."
+  L1: "YAML overlays validate and merge deterministically in sorted file order."
+  L2: "Global/team/operator YAML overlays validate and protected invariant violations are routed for review before relying on effective policy."
+  L3: "Assured profile treats protected invariant violations as blocking until resolved."
+  L4: "Teams review override history, conflicts, and residual risks during policy changes."
+  L5: "Static customization supports governed project variation without forking NAOS."
+known_limitations:
+  - "Only static YAML overlays are supported in v1."
+  - "Plugin discovery and plugin execution are deferred pending separate security review."
+  - "Team/operator mappings are local static configuration and can drift from organizational reality."
+  - "Multi-team gatekeeper severity remains deferred to a later control."
+  - "Generated effective policy is derived; the canonical source remains default policy plus validated overlays."
+  - "The report cannot prove that future project-specific policy choices are operationally safe."
+not_claimed:
+  - "authentication"
+  - "authorization"
+  - "access control"
+  - "identity proof"
+  - "separation-of-duties satisfaction"
+  - "team-specific gatekeeper severity"
+  - "plugin runtime"
+  - "sandbox for arbitrary extensions"
+  - "arbitrary code execution"
+  - "provider setup"
+  - "cloud integration"
+  - "API key handling"
+  - "advisory authority override"
+  - "automatic memory write-back"
+  - "cryptographic signing by NAOS"
+related_docs:
+  - README.md
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+  - NAOS_CATALOG.md
+related_scripts:
+  - scripts/naos_policy_overrides.py

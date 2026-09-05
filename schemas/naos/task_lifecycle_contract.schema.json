@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/task_lifecycle_contract.schema.json",
+  "title": "NAOS Task Lifecycle Contract",
+  "type": "object",
+  "required": ["schema", "contract_version", "identity", "lifecycle_states", "delivery_states", "verification_states", "delivered_metric", "transitions", "legacy_status_compatibility"],
+  "properties": {
+    "schema": {"const": "naos.task_lifecycle_contract.v1"},
+    "contract_version": {"const": 1},
+    "identity": {
+      "type": "object",
+      "required": ["exact_registry_id_authoritative", "plain_pattern", "namespaced_pattern", "substring_extraction_forbidden"],
+      "properties": {
+        "exact_registry_id_authoritative": {"const": true},
+        "plain_pattern": {"type": "string"},
+        "namespaced_pattern": {"type": "string"},
+        "substring_extraction_forbidden": {"const": true}
+      },
+      "additionalProperties": true
+    },
+    "lifecycle_states": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "delivery_states": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "verification_states": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "delivered_metric": {"type": "object"},
+    "transitions": {"type": "object"},
+    "recovery_modes": {"type": "array", "items": {"enum": ["auto", "active", "completed"]}},
+    "unknown_task": {"type": "object"},
+    "authority": {"type": "object"},
+    "legacy_status_compatibility": {"type": "object", "additionalProperties": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "string"}}}
+  },
+  "additionalProperties": true
+}

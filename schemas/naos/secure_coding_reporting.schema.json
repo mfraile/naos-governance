@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos-governance.com/schemas/naos/secure_coding_reporting.schema.json",
+  "title": "NAOS Secure-Coding Multidimensional Reporting",
+  "type": "object",
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "project_root",
+    "naos_root",
+    "deterministic",
+    "check_mode",
+    "sources",
+    "standards_snapshot",
+    "summary",
+    "dimensions",
+    "findings",
+    "limitations",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.secure_coding_reporting.v1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string"},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "check_mode": {"type": "boolean"},
+    "sources": {"type": "object"},
+    "standards_snapshot": {"$ref": "#/$defs/standards_snapshot"},
+    "summary": {
+      "type": "object",
+      "required": ["dimensions", "dimension_keys", "human_review_required"],
+      "properties": {
+        "dimensions": {"const": 5},
+        "dimension_keys": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "register_validity"},
+            {"const": "reference_integrity"},
+            {"const": "detector_evidence"},
+            {"const": "mapping_verification"},
+            {"const": "human_review"}
+          ],
+          "items": false,
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "human_review_required": {"const": true}
+      },
+      "additionalProperties": true
+    },
+    "dimensions": {
+      "type": "object",
+      "required": [
+        "register_validity",
+        "reference_integrity",
+        "detector_evidence",
+        "mapping_verification",
+        "human_review"
+      ],
+      "properties": {
+        "register_validity": {"$ref": "#/$defs/dimension"},
+        "reference_integrity": {"$ref": "#/$defs/dimension"},
+        "detector_evidence": {"$ref": "#/$defs/dimension"},
+        "mapping_verification": {"$ref": "#/$defs/dimension"},
+        "human_review": {"$ref": "#/$defs/dimension"}
+      },
+      "additionalProperties": false
+    },
+    "projection": {"type": "object"},
+    "findings": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "human_review_required": {"const": true}
+  },
+  "$defs": {
+    "dimension": {
+      "type": "object",
+      "required": ["state", "source"],
+      "properties": {
+        "state": {"type": "string"},
+        "source": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "standards_snapshot": {
+      "type": "object",
+      "required": [
+        "state",
+        "source",
+        "register_schema",
+        "register_version",
+        "standards",
+        "human_review_required",
+        "not_claimed"
+      ],
+      "properties": {
+        "state": {"enum": ["available", "unavailable"]},
+        "source": {"type": "string"},
+        "register_schema": {"type": ["string", "null"]},
+        "register_version": {"type": ["string", "null"]},
+        "standards": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "name",
+              "version",
+              "role",
+              "source",
+              "mapping_default_status"
+            ],
+            "properties": {
+              "name": {"type": ["string", "null"]},
+              "version": {"type": "string"},
+              "role": {"type": ["string", "null"]},
+              "source": {"type": ["string", "null"]},
+              "mapping_default_status": {"type": ["string", "null"]},
+              "source_release": {"type": "string", "format": "date"},
+              "source_dataset_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "selected_control_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+              "claim_posture": {"const": "relevance_only"},
+              "decision_use": {"type": "string"},
+              "scope": {"type": "string"},
+              "non_claims": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+            },
+            "additionalProperties": false
+          },
+          "allOf": [
+            {
+              "if": {"required": ["aicm"]},
+              "then": {
+                "properties": {
+                  "aicm": {
+                    "required": ["name", "version", "role", "source", "mapping_default_status", "source_release", "source_dataset_sha256", "selected_control_ids", "claim_posture", "decision_use", "scope", "non_claims"],
+                    "properties": {
+                      "name": {"const": "CSA AI Controls Matrix"},
+                      "version": {"const": "1.1.1"},
+                      "role": {"const": "reference"},
+                      "source": {"const": "https://cloudsecurityalliance.org/artifacts/aicm-machine-readable-bundle-json-yaml-oscal"},
+                      "mapping_default_status": {"const": "draft"},
+                      "source_release": {"const": "2026-08-04"},
+                      "source_dataset_sha256": {"const": "864d4bec6d8843c138810f05ea95094f4c7c41e614d3b04f05e010aa2c7f519d"},
+                      "selected_control_ids": {"const": ["AIS-04", "AIS-11", "AIS-12", "GRC-04", "GRC-06", "GRC-15"]},
+                      "claim_posture": {"const": "relevance_only"},
+                      "decision_use": {"const": "Bound an adopter's review of which NAOS build-time evidence may support AICM scoping and which responsibilities require adopter or runtime controls."},
+                      "scope": {"const": "SDLC process, declared agent boundaries, source-management evidence, responsibility and exception routing, and human-review evidence only."},
+                      "non_claims": {"const": ["AICM compliance", "control satisfaction", "certification", "runtime security", "enterprise exception-process operation", "enterprise responsibility-model completeness", "effective human supervision"]}
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "human_review_required": {"const": true},
+        "not_claimed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

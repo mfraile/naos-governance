@@ -1,0 +1,25 @@
+schema: naos.human_decision_record.v1
+decision_id: DECISION-YYYYMMDD-001
+# Use planning_baseline for one exact PB-* subject. Use
+# agent_orchestration_plan only for one exact RUN-* proposal emitted by
+# naos agent-orchestration-plan; neither decision launches an agent.
+decision_type: task_delivery
+outcome: deferred
+subject_refs:
+  - T-001
+# Required with the matching digest kind for planning_baseline or
+# agent_orchestration_plan decisions; copy the digest from the current report.
+subject_digest: null
+evidence_refs:
+  - naos/reports/example.json
+decided_by: "[Named human or repository-authorized decision role.]"
+decided_at: "YYYY-MM-DDTHH:MM:SSZ"
+rationale: "[Decision rationale and residual risk.]"
+authority_scope: "[Exact task-delivery boundary; this does not imply merge, release, or evidence admission.]"
+real_world_authority_proven: false
+supersedes: null
+not_claimed:
+  - reviewer-issued approval
+  - merge, release, or evidence-admission authority
+  - authority outside the declared scope
+  - semantic correctness or test sufficiency

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:evidence_classification_policy:v1",
+  "title": "NAOS Evidence Classification Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "profile",
+    "updated_at",
+    "classification_levels",
+    "default_classification",
+    "missing_classification_status",
+    "accepted_evidence_refs",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.evidence_classification_policy.v1"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "updated_at": {"type": ["string", "null"]},
+    "classification_levels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmed", "deduced", "hypothesized", "unknown"],
+      "properties": {
+        "confirmed": {"$ref": "#/$defs/classificationLevel"},
+        "deduced": {"$ref": "#/$defs/classificationLevel"},
+        "hypothesized": {"$ref": "#/$defs/classificationLevel"},
+        "unknown": {"$ref": "#/$defs/classificationLevel"}
+      }
+    },
+    "default_classification": {"enum": ["confirmed", "deduced", "hypothesized", "unknown"]},
+    "missing_classification_status": {"enum": ["advisory", "review_required", "blocked", "unknown"]},
+    "accepted_evidence_refs": {
+      "type": "array",
+      "items": {"type": "string"},
+      "minItems": 1
+    },
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "classificationLevel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "requires"],
+      "properties": {
+        "description": {"type": "string"},
+        "requires": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

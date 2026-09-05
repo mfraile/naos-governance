@@ -1,0 +1,78 @@
+id: CAP-DUPLICATE-FUNCTION-HYGIENE
+name: Duplicate Function Hygiene
+description: >
+  Detects normalized duplicate Python function bodies with deterministic AST
+  hashing so duplicate-triage findings can be routed through human review.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Advisory duplicate-function hygiene only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns on duplicate normalized function bodies."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Duplicate-function hygiene report is expected for governed coding."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured duplicate-function findings can block until reviewed."
+authority:
+  may_read:
+    - src/
+    - app/
+    - tests/
+    - naos/duplicate_function_hygiene_rules.yaml
+  may_write:
+    - naos/reports/duplicate_function_hygiene.json
+allowed_resources:
+  - "repo-local Python source and tests"
+  - "adopter-local allowlist metadata"
+prohibited_resources:
+  - "embedding service"
+  - "model/provider/API calls"
+  - "runtime execution"
+constraints:
+  - "Must use deterministic local AST normalization only."
+  - "Must route duplicates to human review instead of deleting or merging code."
+  - "Must not claim semantic equivalence or complete duplicate elimination."
+required_evidence:
+  - "naos/reports/duplicate_function_hygiene.json"
+validators:
+  - id: duplicate_function_hygiene
+    script: scripts/naos_duplicate_function_hygiene.py
+    status: available
+gatekeepers:
+  - G4
+dashboard_signals:
+  - "duplicate_function_hygiene.status"
+  - "duplicate_function_hygiene.duplicate_groups"
+maturity_path:
+  L0: "Capability contract and rules seed exist."
+  L1: "Report can be generated with project scan roots."
+  L2: "Report is wired into G4 and evidence surfaces."
+  L3: "Profile severity and reviewed allowlists are applied."
+  L4: "Dashboard/SARIF summarize duplicate-triage posture."
+  L5: "Duplicate-triage review evidence is included in release gates."
+known_limitations:
+  - "AST-identical duplication does not prove semantic equivalence."
+  - "Paraphrased duplicate logic requires human or optional semantic review."
+not_claimed:
+  - "semantic correctness proof"
+  - "behavioral correctness proof"
+  - "complete duplicate elimination"
+  - "approval"
+  - "human review replacement"
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_duplicate_function_hygiene.py

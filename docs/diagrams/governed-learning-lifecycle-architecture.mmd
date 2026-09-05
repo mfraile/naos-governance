@@ -1,0 +1,79 @@
+flowchart LR
+    subgraph INPUTS["Learning signal sources"]
+        SESSION["Session lifecycle<br/>start, end, handoff"]
+        AUTORESEARCH["Autoresearch<br/>metrics, findings, drift signals"]
+        FORENSIC["Forensic audit<br/>validated observations"]
+        HUMAN["Human reviewer<br/>approved evidence"]
+        PROJECT["Project evidence<br/>greenfield, brownfield, PR, CI"]
+    end
+
+    subgraph RECORDS["Governed learning records"]
+        CANDIDATES["learning_candidates.yaml<br/>candidate or verified proposals"]
+        STATE["learning_state.yaml<br/>active reviewed guidance"]
+        HISTORY["learning_history.yaml<br/>superseded, deprecated,<br/>archived, rejected, redacted"]
+        RULES["learning_loop_rules.yaml<br/>status, promotion, forgetting,<br/>retrieval, profile posture"]
+    end
+
+    subgraph REVIEW["Deterministic review"]
+        CLI["naos learning-loop-review"]
+        REPORT["learning_loop_review.json<br/>findings, posture, residual risk"]
+        SCHEMAS["schemas/naos<br/>learning record, rules, report"]
+    end
+
+    subgraph CONSUMERS["Downstream governance consumers"]
+        GATES["Gatekeepers<br/>G2, G3, G6"]
+        CONTROL["Control-plane review<br/>routing and human decisions"]
+        SYSTEMIC["Systemic-impact review<br/>interconnected artifact impact"]
+        BUDGET["AI-surface budget<br/>context health for changed surfaces"]
+        DASH["Dashboard and evidence pack"]
+    end
+
+    subgraph ACTIONS["Reviewed action surfaces"]
+        SKILLS["Skills"]
+        PROMPTS["Prompts"]
+        WORKFLOWS["Workflows"]
+        BASELINES["Baselines and metrics"]
+        POLICIES["Gates, maturity, policies"]
+        MEMORY["Engram or memory references<br/>advisory recall only"]
+    end
+
+    SESSION --> CANDIDATES
+    AUTORESEARCH --> CANDIDATES
+    FORENSIC --> CANDIDATES
+    HUMAN --> CANDIDATES
+    PROJECT --> CANDIDATES
+
+    RULES --> CLI
+    CANDIDATES --> CLI
+    STATE --> CLI
+    HISTORY --> CLI
+    SCHEMAS --> CLI
+    CLI --> REPORT
+
+    CANDIDATES -->|"human review and promotion"| STATE
+    STATE -->|"supersede, deprecate, archive, reject, redact"| HISTORY
+    HISTORY -->|"new evidence may justify replacement"| CANDIDATES
+
+    REPORT --> GATES
+    REPORT --> CONTROL
+    REPORT --> SYSTEMIC
+    REPORT --> DASH
+    REPORT --> BUDGET
+
+    CONTROL -->|"approved promotion only"| SKILLS
+    CONTROL -->|"approved promotion only"| PROMPTS
+    CONTROL -->|"approved promotion only"| WORKFLOWS
+    CONTROL -->|"approved promotion only"| BASELINES
+    CONTROL -->|"approved promotion only"| POLICIES
+    REPORT -->|"metadata only, no write-back"| MEMORY
+
+    BUDGET --> CONTROL
+    SYSTEMIC --> CONTROL
+    GATES --> CONTROL
+    DASH --> CONTROL
+
+    BOUNDARY["Boundaries:<br/>no model weight learning<br/>no automatic memory write-back<br/>no automatic skill or prompt promotion<br/>no automatic context injection<br/>no automatic threshold tuning<br/>repo evidence remains authoritative<br/>human approval required for active guidance"]:::boundary
+    REPORT --> BOUNDARY
+    CONTROL --> BOUNDARY
+
+    classDef boundary fill:#fde2e2,stroke:#b91c1c,color:#5a0d0d,stroke-dasharray:4 3

@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:capability_maturity_report:v1",
+  "title": "NAOS Capability Maturity Report",
+  "description": "Schema for the readiness report emitted by scripts/naos_capability_maturity.py. The report is advisory evaluation evidence; it does not promote, certify, approve, or prove capability maturity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "naos_root",
+    "project_root",
+    "state",
+    "policy",
+    "semantics",
+    "status",
+    "summary",
+    "related_evidence",
+    "capabilities",
+    "findings",
+    "limitations"
+  ],
+  "properties": {
+    "schema": {"const": "naos.capability_maturity.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "exists", "source"],
+      "properties": {
+        "path": {"type": "string"},
+        "exists": {"type": "boolean"},
+        "source": {"type": "string", "enum": ["project", "missing"]}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "source", "path"],
+      "properties": {
+        "version": {"type": ["string", "number", "null"]},
+        "source": {"type": ["string", "null"]},
+        "path": {"type": ["string", "null"]}
+      }
+    },
+    "semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "report", "promotion", "flow"],
+      "properties": {
+        "state": {"type": "string"},
+        "report": {"type": "string"},
+        "promotion": {"type": "string"},
+        "flow": {"type": "string"}
+      }
+    },
+    "status": {"type": "string"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blocking",
+        "required",
+        "warnings",
+        "advisory",
+        "total_findings",
+        "capabilities",
+        "enabled",
+        "disabled",
+        "not_configured",
+        "unknown",
+        "ready",
+        "blocked",
+        "advisory_status",
+        "ready_for_promotion",
+        "human_approval_required",
+        "promotion_recorded",
+        "waivers"
+      ],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "capabilities": {"type": "integer", "minimum": 0},
+        "enabled": {"type": "integer", "minimum": 0},
+        "disabled": {"type": "integer", "minimum": 0},
+        "not_configured": {"type": "integer", "minimum": 0},
+        "unknown": {"type": "integer", "minimum": 0},
+        "ready": {"type": "integer", "minimum": 0},
+        "blocked": {"type": "integer", "minimum": 0},
+        "advisory_status": {"type": "integer", "minimum": 0},
+        "ready_for_promotion": {"type": "integer", "minimum": 0},
+        "human_approval_required": {"type": "integer", "minimum": 0},
+        "promotion_recorded": {"type": "integer", "minimum": 0},
+        "waivers": {"type": "integer", "minimum": 0}
+      }
+    },
+    "related_evidence": {"type": "object"},
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "capability_id",
+          "current_maturity",
+          "target_maturity",
+          "evaluated_status",
+          "enabled",
+          "ready_for_promotion",
+          "human_approval_required"
+        ]
+      }
+    },
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

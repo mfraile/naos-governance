@@ -1,0 +1,118 @@
+# Django + PostgreSQL Archetype Profile
+# NAOS Portable Governance Kit
+# ─────────────────────────────────────────────────────────────────────────────
+# This profile is pre-adapted for a Django web application backed by PostgreSQL.
+# Signals: Python, Django ORM, PostgreSQL, REST APIs, optional Celery, optional Redis.
+#
+# Usage:
+#   naos init --archetype django-postgresql --tier standard .
+#   OR manually use this file as input to the governance profiler.
+# ─────────────────────────────────────────────────────────────────────────────
+
+project:
+  name: "[YOUR_PROJECT_NAME]"    # ADAPT: replace with your project name
+  path: "."
+  archetype: django-postgresql
+  naos_profile: standard          # lite | standard | assured
+
+languages:
+  - python
+
+web_frameworks:
+  - django
+
+database:
+  engines:
+    - postgresql
+  orm:
+    - django-orm
+  migrations:
+    - django-migrations
+  vector_store: []
+
+llm_toolchain:
+  api_providers: []         # ADAPT: add anthropic, openai, etc. if using LLMs
+  local_models: []
+  frameworks: []
+  embedding_frameworks: []
+  local_oss_models: []
+
+graph_db: []
+event_bus: []               # ADAPT: add redis-channels, celery, kafka if used
+
+auth:
+  - django-auth             # Django's built-in auth framework
+
+testing:
+  - pytest
+  - pytest-django
+  - factory-boy
+
+infrastructure:
+  containerisation:
+    - docker
+    - docker-compose
+  ci_cd:
+    - github-actions         # ADAPT: change to gitlab-ci, jenkins, etc.
+  cloud: []                  # ADAPT: add aws, gcp, azure if deploying to cloud
+
+multi_tenancy: false         # ADAPT: set true if using django-tenants or custom schema
+
+signals:
+  has_api: true
+  has_sql_db: true
+  has_vector_store: false
+  has_llm: false
+  has_event_bus: false       # ADAPT: set true if Celery/Channels/Redis in use
+  has_auth: true
+  has_graph_db: false
+  has_multi_tenancy: false
+  has_containerisation: true
+  has_ci_cd: true
+  is_python: true
+  is_node: false
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADAPT STUBS — fill in project-specific governance context
+# ─────────────────────────────────────────────────────────────────────────────
+
+adapt_stubs:
+  # Rule 4 / ADAPT: Database schema conventions
+  # Describe your database schema conventions so agents know the rules.
+  # Example: "shared schema = global lookup data (no tenant_id),
+  #           app schema = tenant-owned data (always has tenant_id + RLS)"
+  db_schema_conventions: |
+    [ADAPT: Describe your Django app schema conventions, naming rules,
+     multi-tenancy model (if any), which models require Row-Level Security,
+     and any constraints (e.g., no PII in shared tables).]
+
+  # Rule 15 / ADAPT: Module boundaries
+  # Describe which Django apps can import from which other apps.
+  # Example: "auth app → never imports from billing app"
+  module_boundaries: |
+    [ADAPT: List your Django app structure and which apps may import
+     from which. Include any forbidden import paths so agents respect
+     your architecture layering.]
+
+  # Rule 16 / ADAPT: Spec alignment
+  # Point agents to your requirements / spec files.
+  spec_alignment: |
+    [ADAPT: Paths to your requirements spec, API spec, and acceptance
+     criteria. Example: specs/requirements.md, docs/api.md]
+
+  # Rule 12 / ADAPT: Data flow invariants
+  # Describe your data pipeline conventions (if any).
+  data_flow_invariants: |
+    [ADAPT: List any data flow invariants for your pipeline. For a
+     Django project this might cover: ORM query patterns, signal
+     dispatch rules, celery task idempotency requirements, etc.]
+
+  # Rule 17 / ADAPT: Conflict resolution
+  conflict_resolution: |
+    [ADAPT: Describe your code review and merge conflict resolution
+     process. Who reviews what, what gates exist, branch strategy.]
+
+  # Rule 23 / ADAPT: External API SSRF rules
+  ssrf_allowed_domains: |
+    [ADAPT: List trusted external domains your application may contact.
+     Example: api.stripe.com, api.sendgrid.com, auth0.com]

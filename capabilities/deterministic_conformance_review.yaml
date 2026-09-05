@@ -1,0 +1,106 @@
+id: CAP-DETERMINISTIC-CONFORMANCE-REVIEW
+name: Deterministic Conformance Review
+description: >
+  Evaluates initialized NAOS projects with deterministic, file-first checks for
+  required governance structure, task-registry YAML, generated AI-surface
+  frontmatter, and configured task-battery metadata. This capability is
+  implemented by the autoresearch conformance runner and does not use LLMs, API
+  keys, behavioral grading, semantic inference, provider-backed scoring, web
+  research, or network services.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Runs low-noise static checks without requiring behavioral governance machinery."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Supports repeatable deterministic conformance evidence for initialized projects."
+  standard:
+    target_maturity: L2
+    enforcement: warning
+    notes: "Surfaces missing structure or metadata as review findings for governance owners."
+  assured:
+    target_maturity: L2
+    enforcement: required
+    notes: "Requires human review of deterministic conformance evidence before relying on it."
+authority:
+  may_read:
+    - ".ai/RULES.md"
+    - ".github/copilot-instructions.md"
+    - ".github/agents/"
+    - ".github/skills/"
+    - ".github/instructions/"
+    - "naos/TASK_REGISTRY.yaml"
+    - "naos/DASHBOARD.md"
+    - "specs/"
+    - "task_battery/*.yaml"
+  may_write:
+    - "naos/reports/conformance_latest.json"
+  may_block:
+    - "only through configured project policy or gates"
+allowed_resources:
+  - "repo-local YAML, Markdown, and generated AI-surface files"
+  - "deterministic file existence and YAML/frontmatter parsing"
+prohibited_resources:
+  - "LLM judging"
+  - "API keys"
+  - "behavioral grading"
+  - "composite behavioral scoring"
+  - "behavioral drift operation"
+  - "semantic inference"
+  - "provider-backed scoring"
+  - "web research"
+  - "network service"
+constraints:
+  - "Must remain deterministic, file-first, and local."
+  - "Must not claim behavioral results, behavioral scoring, certification, or complete governance correctness."
+  - "Must treat task-battery scenarios as metadata unless a separate project-approved evaluator exists."
+  - "Must keep missing or failed checks visible for human review."
+required_evidence:
+  - "autoresearch/runner.py"
+  - "task_battery/portable_scenarios.yaml"
+  - "naos/reports/conformance_latest.json when generated"
+validators:
+  - id: deterministic_conformance_review
+    script: autoresearch/runner.py --conformance
+    status: available
+gatekeepers:
+  - G6
+dashboard_signals:
+  - "ai_quality.conformance.status"
+  - "ai_quality.conformance.structural_checks"
+  - "ai_quality.conformance.frontmatter_checks"
+  - "ai_quality.conformance.battery_checks"
+maturity_path:
+  L0: "Capability contract and deterministic conformance runner exist in the kit."
+  L1: "Project receives configured governance files and can run the deterministic conformance check."
+  L2: "Conformance report is generated and reviewed alongside other NAOS evidence."
+  L3: "Dashboard and evidence-pack consumers expose deterministic conformance evidence."
+  L4: "Project governance reviews failed/static findings with waivers, known gaps, or next actions."
+  L5: "Deterministic conformance is part of a broader governed evidence program with human review."
+known_limitations:
+  - "Does not evaluate AI behavior."
+  - "Does not produce behavioral results or behavioral scores."
+  - "Does not run web research or LLM-backed research."
+  - "Does not prove complete project conformance or code correctness."
+  - "Scenario files are metadata unless a future/project-configured evaluator is separately approved."
+not_claimed:
+  - "behavioral grading"
+  - "LLM judging"
+  - "behavioral scoring"
+  - "compliance certification"
+  - "complete governance correctness"
+  - "automatic approval"
+related_docs:
+  - README.md
+  - NAOS_CATALOG.md
+  - docs/CONTROL_PLANE.md
+  - docs/ADOPTION_GUIDE.md
+related_scripts:
+  - autoresearch/runner.py

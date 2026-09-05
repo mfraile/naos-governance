@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:learning_loop_review:v1",
+  "title": "NAOS Governed Learning Lifecycle Review Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "rules_path",
+    "candidate_path",
+    "state_path",
+    "history_path",
+    "profile_posture",
+    "status_counts",
+    "type_counts",
+    "retrieval_policy_counts",
+    "active_learning_records",
+    "high_authority_active_records",
+    "inactive_learning_records",
+    "redacted_learning_records",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "waivers",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.learning_loop_review.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "rules_path": {"type": "string"},
+    "rules_hash": {"type": ["string", "null"]},
+    "candidate_path": {"type": "string"},
+    "candidate_hash": {"type": ["string", "null"]},
+    "candidate_present": {"type": "boolean"},
+    "state_path": {"type": "string"},
+    "state_hash": {"type": ["string", "null"]},
+    "state_present": {"type": "boolean"},
+    "history_path": {"type": "string"},
+    "history_hash": {"type": ["string", "null"]},
+    "history_present": {"type": "boolean"},
+    "profile_posture": {"type": "object"},
+    "status_counts": {"type": "object"},
+    "type_counts": {"type": "object"},
+    "retrieval_policy_counts": {"type": "object"},
+    "source_reference_summary": {"type": "object"},
+    "failure_mode_observations_review": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "status": {"type": "string"},
+        "path": {"type": "string"},
+        "report_present": {"type": "boolean"},
+        "summary": {"type": "object"},
+        "review_opportunities": {
+          "type": ["array", "object"],
+          "items": {"type": "object"}
+        },
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+        "human_review_required": {"type": "boolean"},
+        "automatic_learning_allowed": {"const": false},
+        "candidate_write_allowed": {"const": false}
+      }
+    },
+    "active_learning_records": {"type": "array", "items": {"type": "object"}},
+    "high_authority_active_records": {"type": "array", "items": {"type": "object"}},
+    "inactive_learning_records": {"type": "array", "items": {"type": "object"}},
+    "redacted_learning_records": {"type": "array", "items": {"type": "object"}},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "known_gaps": {"type": "array", "items": {"type": "object"}},
+    "residual_risks": {"type": "array", "items": {"type": "object"}},
+    "waivers": {"type": "array", "items": {"type": "object"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object"}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message", "required_next_actions"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "status": {"type": "string"},
+        "message": {"type": "string"},
+        "required_next_actions": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

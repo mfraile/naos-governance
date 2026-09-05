@@ -1,0 +1,39 @@
+flowchart LR
+    START["Project under adoption"] --> MODE{"Mode"}
+
+    MODE --> GREEN["Greenfield"]
+    MODE --> BROWN["Brownfield"]
+
+    GREEN --> G1["naos preflight"]
+    G1 --> G2["naos intake --mode greenfield"]
+    G2 --> G3["naos install-plan --mode greenfield"]
+    G3 --> G4["naos context-challenge --mode greenfield"]
+    G4 --> G5["naos install-decision-record"]
+    G5 --> G6["naos adopt --mode greenfield"]
+
+    BROWN --> B1["naos preflight"]
+    B1 --> B2["naos existing-resource-inventory"]
+    B2 --> B3["naos ai-artifact-inventory"]
+    B3 --> B4["naos memory-resource-inventory / mcp-resource-inventory"]
+    B4 --> B5["naos repo-context-challenge --mode brownfield"]
+    B5 --> B6["naos brownfield-baseline"]
+    B6 --> B7["naos requirements-reconstruct"]
+    B7 --> B8["naos traceability-gap-register"]
+    B8 --> B8A["naos spec-assembly-worksheet<br/>map candidates and gaps to specs"]
+    B8A --> B8B["naos spec-pack-contract + materialize dry-run + spec-cascade<br/>where specs/tasks/source refs exist"]
+    B8B --> B8C["naos ai-surface-budget<br/>AI/governance instruction health"]
+    B8C --> B9["naos install-decision-record"]
+    B9 --> B10["naos adopt --mode brownfield"]
+
+    G6 --> G7["naos spec-pack-contract + materialize dry-run + spec-cascade<br/>where specs/tasks/source refs exist"]
+    G7 --> G8["naos ai-surface-budget<br/>generated instruction health"]
+    G8 --> REPORTS["Generated reports<br/>preflight, intake, install plan, challenge,<br/>traceability, AI-surface health, decision record"]
+    B10 --> REPORTS
+    REPORTS --> REVIEW["Human review"]
+    REVIEW --> NEXT["Record disposition"]
+    NEXT --> STOP["Current naos adopt boundary<br/>no activation or protected-file changes"]
+
+    NONCLAIMS["Non-claims:<br/>candidate requirements are not approved requirements<br/>spec assembly does not promote candidates<br/>materialization does not fill specs<br/>AI-surface health is not hallucination prevention<br/>memory is advisory<br/>reports are evidence, not approval<br/>readiness rules are not NetworkX/GraphML/sqlite-vec runtime<br/>add/setup transactions are not brownfield reconstruction"]:::boundary
+    REVIEW --> NONCLAIMS
+
+    classDef boundary fill:#fde2e2,stroke:#b91c1c,color:#5a0d0d,stroke-dasharray:4 3

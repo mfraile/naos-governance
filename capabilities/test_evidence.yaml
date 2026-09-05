@@ -1,0 +1,80 @@
+id: CAP-TEST-EVIDENCE
+name: Test Evidence
+description: >
+  Maps source paths to available unit, integration, acceptance, security, and
+  coverage evidence without claiming complete coverage unless evidence exists.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "No hard failure when tests are not configured."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns on obvious missing test evidence."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Source-to-test mapping is expected for normal SDLC work."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Risk-tiered missing evidence can block."
+authority:
+  may_read:
+    - src/
+    - tests/
+    - coverage reports
+    - naos/test_evidence/
+  may_write:
+    - naos/reports/test_evidence_health.json
+    - naos/test_evidence/source_to_test_map.json
+allowed_resources:
+  - "repo-local test reports"
+  - "coverage summaries"
+  - "source-to-test mapping files"
+prohibited_resources:
+  - "fabricated test coverage"
+  - "mandatory test SaaS"
+constraints:
+  - "Must not claim complete test coverage for every source file unless evidence exists."
+  - "Must respect profile severity and configured risk tier."
+required_evidence:
+  - "Test command results or explicit missing-evidence record."
+  - "Source-to-test mapping."
+validators:
+  - id: test_evidence_map
+    script: scripts/naos_test_evidence_map.py
+    status: available
+  - id: test_evidence_validate
+    script: scripts/naos_validate_test_evidence.py
+    status: available
+gatekeepers:
+  - G5
+dashboard_signals:
+  - "test_evidence.status"
+  - "test_evidence.mapped_sources"
+  - "test_evidence.unmapped_high_risk_sources"
+maturity_path:
+  L0: "Test evidence templates and contract exist."
+  L1: "Project configures source roots, test roots, and risk tiers."
+  L2: "Mapping and validation reports are produced."
+  L3: "Gatekeeper applies configured severity."
+  L4: "Dashboard tracks coverage evidence, gaps, and waivers."
+  L5: "Risk-tiered test evidence is included in evidence packs."
+known_limitations:
+  - "Mapping by names/imports can miss behavioral coverage gaps."
+  - "Coverage numbers require project test tooling."
+not_claimed:
+  - "Complete test coverage for every generated source file."
+  - "Coverage percentage alone proves correctness."
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+related_scripts:
+  - scripts/naos_test_evidence_map.py
+  - scripts/naos_validate_test_evidence.py

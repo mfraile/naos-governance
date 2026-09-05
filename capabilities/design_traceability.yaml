@@ -1,0 +1,122 @@
+id: CAP-DESIGN-TRACEABILITY
+name: Design Traceability
+description: >
+  Provides a deterministic local review report for optional UI spec-object
+  identity declarations that link screen/component object IDs to FR/NFR/task
+  refs, local screen specs, implementation paths, changed-file evidence,
+  test/check evidence, optional design references, residual risks, and
+  human-review posture.
+status: active
+default_maturity: L1
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Optional local traceability review only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warn when configured UI object-identity declarations have evidence gaps."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Route configured object-identity evidence gaps to human review."
+  assured:
+    target_maturity: L1
+    enforcement: required
+    notes: "First implementation slice remains required review only; blocking requires future validated L3+ maturity and gate wiring."
+authority:
+  may_read:
+    - naos/design_traceability.yaml
+    - docs/ui/screens/**
+    - declared implementation paths
+    - declared local test/check evidence references
+  may_write:
+    - naos/reports/design_traceability.json
+  may_block:
+    - "none in this implementation slice; findings are review evidence only"
+allowed_resources:
+  - "repo-local design traceability declarations"
+  - "repo-local screen spec paths"
+  - "repo-local implementation path references"
+  - "repo-local changed-file and test/check evidence references"
+  - "optional design-tool references as non-authoritative metadata"
+prohibited_resources:
+  - "Figma API calls, MCP calls, html.to.design automation, browser automation, design-tool mutation, provider calls, model calls, memory tools, hooks, or network access"
+  - "design quality, accessibility, privacy, brand, legal, compliance, certification, attestation, approval, merge, release, or publication authority"
+constraints:
+  - "Must remain optional and local-file-first."
+  - "Must not inspect, call, configure, or mutate Figma, MCP, html.to.design, IDEs, providers, models, memory tools, browsers, hooks, or runtime systems."
+  - "Must treat optional design refs as references only, never proof of design-tool state or successful sync."
+  - "Must not claim design quality, accessibility compliance, privacy compliance, brand compliance, user-experience correctness, legal sufficiency, approval, certification, attestation, release authority, publication authority, or compliance proof."
+required_evidence:
+  - naos/design_traceability.yaml
+  - naos/reports/design_traceability.json
+validators:
+  - id: naos_design_traceability
+    script: scripts/naos_design_traceability.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G4
+  - G5
+  - G6
+dashboard_signals:
+  - design_traceability.status
+  - design_traceability.enabled
+  - design_traceability.runtime_enabled
+  - design_traceability.design_tool_calls_allowed
+  - design_traceability.external_api_calls_allowed
+  - design_traceability.tool_mutation_allowed
+  - design_traceability.hitl_required
+  - design_traceability.reason_code_counts
+  - design_traceability.related_gates
+maturity_path:
+  L0: "Candidate design card and challenge exist."
+  L1: "Disabled-by-default local seed, schema, script, setup module, CLI/Make dispatch, generated-adopter packaging, and focused tests exist."
+  L2: "Control-plane review can route local design-traceability findings to human review without gate, dashboard, SARIF, evidence-pack, or runtime authority."
+  L3: "Adopter UI drift pilots show the report reduces handoff ambiguity without creating false design-quality confidence."
+  L4: "Broader evidence consumers may be considered only after external/team adopter evidence and claim-control review."
+  L5: "Any future design-tool integration remains separately approved, tool-specific, credential-reviewed, and non-authoritative."
+known_limitations:
+  - "The report does not inspect live design-tool state, screenshots, rendered UI, browser behavior, accessibility, privacy, brand quality, or user experience."
+  - "The report validates local declaration shape and local path references only."
+  - "Optional design references can be stale or incomplete."
+  - "Path existence does not prove semantic correctness or design-code fidelity."
+not_claimed:
+  - "automatic code-to-design synchronization"
+  - "automatic design-to-code synchronization"
+  - "Figma availability"
+  - "Figma API access"
+  - "MCP activation"
+  - "html.to.design fidelity"
+  - "design quality proof"
+  - "accessibility compliance proof"
+  - "privacy compliance proof"
+  - "brand compliance proof"
+  - "approval"
+  - "merge approval"
+  - "release authority"
+  - "publication authority"
+  - "certification"
+  - "attestation"
+  - "compliance proof"
+  - "runtime orchestration"
+  - "provider calls"
+  - "model calls"
+  - "memory activation"
+related_docs:
+  - README.md
+  - NAOS_CATALOG.md
+  - docs/CONTROL_PLANE.md
+  - docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
+related_scripts:
+  - scripts/naos_design_traceability.py
+  - scripts/naos_control_plane_review.py
+related_schemas:
+  - schemas/naos/design_traceability.schema.json
+  - schemas/naos/control_plane_review.schema.json

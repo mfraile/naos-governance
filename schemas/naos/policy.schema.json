@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:policy:v1",
+  "title": "NAOS File-First Policy",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["version", "profiles", "paths", "claims", "evidence", "test_evidence"],
+  "properties": {
+    "version": {"type": "string"},
+    "description": {"type": "string"},
+    "task_claim_default_ttl_hours": {"type": "integer", "minimum": 1},
+    "profiles": {
+      "type": "object",
+      "required": ["supported", "default", "severity_by_profile", "exit_code"],
+      "properties": {
+        "supported": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "default": {"type": "string"},
+        "severity_by_profile": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["none", "advisory", "warning", "required", "blocking"]
+          }
+        },
+        "exit_code": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["fail_on", "strict_fail_on"],
+            "properties": {
+              "fail_on": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "strict_fail_on": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "required": ["default_naos_root", "reports_dir", "ignored_scan_dirs"],
+      "properties": {
+        "default_naos_root": {"type": "string"},
+        "reports_dir": {"type": "string"},
+        "claims_report": {"type": "string"},
+        "roadmap_report": {"type": "string"},
+        "function_index_report": {"type": "string"},
+        "test_evidence_report": {"type": "string"},
+        "self_check_report": {"type": "string"},
+        "capability_maturity_report": {"type": "string"},
+        "capability_state": {"type": "string"},
+        "systemic_impact_report": {"type": "string"},
+        "systemic_impact_rules": {"type": "string"},
+        "module_header_traceability_report": {"type": "string"},
+        "spec_pack_contract_report": {"type": "string"},
+        "spec_pack_materialization_report": {"type": "string"},
+        "spec_assembly_worksheet_report": {"type": "string"},
+        "spec_cascade_report": {"type": "string"},
+        "module_header_rules": {"type": "string"},
+        "control_plane_review_report": {"type": "string"},
+        "control_plane_review_rules": {"type": "string"},
+        "control_plane_review_items": {"type": "string"},
+        "setup_recommendations_report": {"type": "string"},
+        "setup_module_catalog": {"type": "string"},
+        "governance_bypass_posture_report": {"type": "string"},
+        "external_evidence_ingest_report": {"type": "string"},
+        "evidence_attestation_report": {"type": "string"},
+        "evidence_verification_report": {"type": "string"},
+        "evidence_conflict_detection_report": {"type": "string"},
+        "evidence_attestation_rules": {"type": "string"},
+        "evidence_review_attestations": {"type": "string"},
+        "memory_context_readiness_report": {"type": "string"},
+        "memory_context_rules": {"type": "string"},
+        "memory_authorization_matrix": {"type": "string"},
+        "memory_provider_access_report": {"type": "string"},
+        "memory_provider_access_rules": {"type": "string"},
+        "memory_use_policy_report": {"type": "string"},
+        "memory_use_policy_rules": {"type": "string"},
+        "memory_review_items": {"type": "string"},
+        "learning_loop_review_report": {"type": "string"},
+        "learning_loop_rules": {"type": "string"},
+        "learning_candidates": {"type": "string"},
+        "learning_state": {"type": "string"},
+        "learning_history": {"type": "string"},
+        "failure_mode_observations": {"type": "string"},
+        "failure_mode_observations_report": {"type": "string"},
+        "adapter_coherence_report": {"type": "string"},
+        "adapter_coherence_rules": {"type": "string"},
+        "task_context_pack_report": {"type": "string"},
+        "task_context_pack_rules": {"type": "string"},
+        "task_context_pack_markdown_dir": {"type": "string"},
+        "task_lifecycle_report": {"type": "string"},
+        "task_lifecycle_contract": {"type": "string"},
+        "completed_task_history": {"type": "string"},
+        "research_record_report": {"type": "string"},
+        "composed_traceability_report": {"type": "string"},
+        "task_claims_file": {"type": "string"},
+        "task_claim_report": {"type": "string"},
+        "local_context_index_report": {"type": "string"},
+        "local_context_index_rules": {"type": "string"},
+        "local_context_index_sqlite": {"type": "string"},
+        "local_context_index_db_lock": {"type": "string"},
+        "sqlite_write_coordination_report": {"type": "string"},
+        "local_context_query_report": {"type": "string"},
+        "local_context_query_markdown_dir": {"type": "string"},
+        "semantic_candidate_layer_report": {"type": "string"},
+        "semantic_candidate_layer_rules": {"type": "string"},
+        "graph_context_readiness_report": {"type": "string"},
+        "graph_context_rules": {"type": "string"},
+        "graph_context_query_report": {"type": "string"},
+        "graph_context_query_markdown_dir": {"type": "string"},
+        "session_lifecycle_report": {"type": "string"},
+        "session_lifecycle_rules": {"type": "string"},
+        "sessions_root": {"type": "string"},
+        "sessions_index": {"type": "string"},
+        "session_identity_report": {"type": "string"},
+        "operator_attribution_report": {"type": "string"},
+        "audit_log_root": {"type": "string"},
+        "audit_log_summary_report": {"type": "string"},
+        "agent_trace_events": {"type": "string"},
+        "agent_trace_validation_report": {"type": "string"},
+        "ai_surface_context_budget_report": {"type": "string"},
+        "ai_surface_context_budget_rules": {"type": "string"},
+        "ai_surface_health_baseline": {"type": "string"},
+        "static_grader_report": {"type": "string"},
+        "duplicate_function_hygiene_rules": {"type": "string"},
+        "duplicate_function_hygiene_report": {"type": "string"},
+        "secret_hygiene_rules": {"type": "string"},
+        "secret_hygiene_report": {"type": "string"},
+        "test_quality_hygiene_rules": {"type": "string"},
+        "test_quality_hygiene_report": {"type": "string"},
+        "dependency_integrity_rules": {"type": "string"},
+        "dependency_integrity_report": {"type": "string"},
+        "grader_assessment_report": {"type": "string"},
+        "llm_grader_readiness_rules": {"type": "string"},
+        "llm_grader_readiness_report": {"type": "string"},
+        "behavioral_governance_readiness_rules": {"type": "string"},
+        "behavioral_governance_readiness_baseline_state": {"type": "string"},
+        "behavioral_governance_readiness_report": {"type": "string"},
+        "sarif_report": {"type": "string"},
+        "sarif_export_summary_report": {"type": "string"},
+        "policy_override_merge_report": {"type": "string"},
+        "pr_risk_classification_report": {"type": "string"},
+        "plan_coherence_report": {"type": "string"},
+        "pr_risk_rules": {"type": "string"},
+        "pr_governance_summary_report": {"type": "string"},
+        "agentic_workflow": {"type": "string"},
+        "agentic_coding_playbook": {"type": "string"},
+        "agentic_workflow_review_report": {"type": "string"},
+        "pre_implementation_alignment": {"type": "string"},
+        "pre_implementation_alignment_review_report": {"type": "string"},
+        "calibration_shadow": {"type": "string"},
+        "calibration_shadow_report": {"type": "string"},
+        "evidence_classification_policy": {"type": "string"},
+        "evidence_classification_report": {"type": "string"},
+        "cross_harness_review_readiness": {"type": "string"},
+        "cross_harness_review_readiness_report": {"type": "string"},
+        "adoption_summary_report": {"type": "string"},
+        "preflight_report": {"type": "string"},
+        "intake_report": {"type": "string"},
+        "install_plan_report": {"type": "string"},
+        "existing_resource_inventory_report": {"type": "string"},
+        "ai_artifact_inventory_report": {"type": "string"},
+        "ai_artifact_reconciliation_report": {"type": "string"},
+        "ai_code_provenance_report": {"type": "string"},
+        "memory_resource_inventory_report": {"type": "string"},
+        "memory_resource_reconciliation_report": {"type": "string"},
+        "mcp_resource_inventory_report": {"type": "string"},
+        "brownfield_baseline_report": {"type": "string"},
+        "candidate_requirements_report": {"type": "string"},
+        "traceability_gap_register_report": {"type": "string"},
+        "install_decision_record_report": {"type": "string"},
+        "context_challenge_report": {"type": "string"},
+        "repo_context_challenge_report": {"type": "string"},
+        "plan_challenge_report": {"type": "string"},
+        "decision_probe_report": {"type": "string"},
+        "planning_gate_review_report": {"type": "string"},
+        "intake_answers": {"type": "string"},
+        "install_plan_rules": {"type": "string"},
+        "existing_resource_inventory_rules": {"type": "string"},
+        "ai_artifact_inventory_rules": {"type": "string"},
+        "ai_code_provenance_manifest": {"type": "string"},
+        "memory_mcp_inventory_rules": {"type": "string"},
+        "traceability_gap_register_rules": {"type": "string"},
+        "challenge_rules": {"type": "string"},
+        "install_decision_record_rules": {"type": "string"},
+        "effective_policy": {"type": "string"},
+        "team_operator_map": {"type": "string"},
+        "source_to_test_map": {"type": "string"},
+        "dashboard_markdown": {"type": "string"},
+        "dashboard_summary_report": {"type": "string"},
+        "evidence_dir": {"type": "string"},
+        "evidence_pack_report": {"type": "string"},
+        "task_path_report": {"type": "string"},
+        "context_manifest_report": {"type": "string"},
+        "validator_results_report": {"type": "string"},
+        "completion_certificate_report": {"type": "string"},
+        "exceptions_report": {"type": "string"},
+        "gate_status_report": {"type": "string"},
+        "gate_evaluation_report": {"type": "string"},
+        "gatekeeper_team_overrides": {"type": "string"},
+        "task_path_template": {"type": "string"},
+        "context_manifest_template": {"type": "string"},
+        "validator_results_template": {"type": "string"},
+        "test_evidence_template": {"type": "string"},
+        "completion_certificate_template": {"type": "string"},
+        "adopter_policy": {"type": "string"},
+        "ignored_scan_dirs": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "required": [
+        "status_values",
+        "revalidation_triggers",
+        "external_evidence_verification_default",
+        "safe_context_window_chars",
+        "safe_context_phrases",
+        "overclaim_patterns"
+      ],
+      "properties": {
+        "status_values": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "revalidation_triggers": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "external_evidence_verification_default": {"type": "string"},
+        "safe_context_window_chars": {"type": "integer", "minimum": 0},
+        "safe_context_phrases": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "disclaimers": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "overclaim_patterns": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["default_staleness_days", "external_reference_default_status"],
+      "properties": {
+        "default_staleness_days": {"type": "integer", "minimum": 0},
+        "external_reference_default_status": {"type": "string"}
+      }
+    },
+    "test_evidence": {
+      "type": "object",
+      "required": ["accepted_types", "coverage_supports_source_default", "global_coverage_maps_sources"],
+      "properties": {
+        "accepted_types": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "coverage_supports_source_default": {"type": "string"},
+        "global_coverage_maps_sources": {"type": "boolean"}
+      }
+    },
+    "team_gatekeepers": {
+      "type": "object",
+      "properties": {
+        "team_gatekeeper_config_enabled": {"type": "boolean"},
+        "team_gatekeeper_strict_mode": {"type": "boolean"}
+      }
+    }
+  }
+}

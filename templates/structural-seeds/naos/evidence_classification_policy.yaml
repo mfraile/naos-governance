@@ -1,0 +1,45 @@
+schema: naos.evidence_classification_policy.v1
+profile: quickstart
+updated_at: null
+classification_levels:
+  confirmed:
+    description: Directly supported by local file, schema, report, test, or validator output.
+    requires:
+      - evidence_ref
+      - source_path_or_report
+  deduced:
+    description: Inferred from two or more local evidence points, but not directly asserted by one artifact.
+    requires:
+      - evidence_refs
+      - reasoning_summary
+      - human_review_required
+  hypothesized:
+    description: Plausible concern or advisory item that requires further review or evidence.
+    requires:
+      - hypothesis_reason
+      - next_review_step
+      - human_review_required
+  unknown:
+    description: Finding lacks enough evidence to classify.
+    requires:
+      - review_required
+default_classification: unknown
+missing_classification_status: review_required
+accepted_evidence_refs:
+  - local_file
+  - json_schema
+  - validator_output
+  - generated_report
+  - test_output
+  - git_diff
+  - audit_log_event
+  - evidence_pack
+  - sarif_finding
+not_claimed:
+  - truth proof
+  - legal conclusion
+  - compliance proof
+  - approval
+  - issue resolution
+  - human review replacement
+human_review_required: true

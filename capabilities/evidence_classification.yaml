@@ -1,0 +1,104 @@
+id: CAP-EVIDENCE-CLASSIFICATION
+name: Evidence Classification
+description: >
+  Provides deterministic provenance classification support for NAOS findings.
+  The capability distinguishes confirmed, deduced, hypothesized, and unknown
+  finding provenance categories without replacing severity, truth review, or
+  human judgment.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Missing classifications are advisory review hints."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Supports provenance hygiene without making all reports mandatory."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Missing or unknown finding provenance should be reviewed."
+  assured:
+    target_maturity: L3
+    enforcement: required
+    notes: "High unknown/missing classification counts require explicit human review under adopter policy."
+authority:
+  may_read:
+    - "naos/evidence_classification_policy.yaml"
+    - "naos/reports/*.json"
+    - "naos/evidence/*.json"
+    - "naos/sessions_index.json"
+  may_write:
+    - "naos/reports/evidence_classification_report.json"
+    - "naos/sessions/<session_id>/reports/evidence_classification_report.json"
+  may_block:
+    - "only through configured profile gate policy and human review"
+allowed_resources:
+  - "repo-local evidence classification policy"
+  - "repo-local deterministic NAOS reports"
+  - "repo-local findings arrays and evidence references"
+prohibited_resources:
+  - "LLM, provider, model, API, SaaS, or network calls"
+  - "legal conclusions"
+  - "truth proof"
+  - "approval or issue resolution"
+  - "memory write-back"
+constraints:
+  - "Classification is orthogonal to severity."
+  - "Inferred classifications are candidates requiring review unless explicitly declared by a source finding."
+  - "Missing provenance must remain visible."
+  - "Must not claim correctness, compliance, regulator acceptance, or approval."
+required_evidence:
+  - "schemas/naos/evidence_classification_policy.schema.json"
+  - "schemas/naos/evidence_classification_report.schema.json"
+  - "templates/structural-seeds/naos/evidence_classification_policy.yaml"
+  - "scripts/naos_evidence_classification.py"
+  - "naos/reports/evidence_classification_report.json"
+validators:
+  - id: evidence_classification
+    script: scripts/naos_evidence_classification.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+  - G8
+dashboard_signals:
+  - "evidence_classification_report.status"
+  - "evidence_classification_report.classification_counts"
+  - "evidence_classification_report.missing_classification"
+  - "evidence_classification_report.human_review_required"
+maturity_path:
+  L0: "Capability contract, schema, seed, and review script exist."
+  L1: "Generated projects receive an evidence classification policy and can produce a report."
+  L2: "Findings include or can be conservatively classified with provenance candidates."
+  L3: "Missing and unknown classifications are routed to human review."
+  L4: "Classification results are considered with evidence pack, dashboard, SARIF, and PR governance summaries."
+  L5: "Teams maintain provenance discipline without treating classification as truth proof or approval."
+known_limitations:
+  - "The script reads findings already present in local reports; it does not discover new issues."
+  - "Candidate classifications may be incomplete or overly conservative."
+  - "Confirmed provenance does not prove that the finding is legally correct or resolved."
+residual_risks:
+  - "Reports without structured findings can leave important review items unclassified."
+  - "Human reviewers must decide whether evidence is sufficient."
+  - "Classification labels can drift if report authors use inconsistent provenance fields."
+not_claimed:
+  - "truth proof"
+  - "legal conclusion"
+  - "compliance proof"
+  - "approval"
+  - "issue resolution"
+  - "human review replacement"
+human_review_required: true
+related_docs:
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/BEHAVIORAL_AUDIT_ENABLEMENT.md
+  - templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md
+related_scripts:
+  - scripts/naos_evidence_classification.py

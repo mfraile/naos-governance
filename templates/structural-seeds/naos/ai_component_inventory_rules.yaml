@@ -1,0 +1,105 @@
+schema: naos.ai_component_inventory_rules.v1
+format:
+  id: ai_component_inventory.v1
+  version: 1
+  kind: custom_declared_facts_inventory
+  standard_conformance: null
+decision_supported: >-
+  Determine whether the project's declared AI agents, skills, instructions,
+  model roles, AI tools, and tool-model bindings form a current and internally
+  consistent review input before relying on the declared governance posture.
+review_owner: project-governance-reviewer
+profiles:
+  quickstart:
+    required: false
+    posture: optional
+  lite:
+    required: false
+    posture: optional
+  standard:
+    required: true
+    posture: human_review_on_missing_stale_or_incomplete
+  assured:
+    required: true
+    posture: human_review_on_missing_stale_or_incomplete
+applicability:
+  generated_adopter_required_profiles: [standard, assured]
+  source_kit_missing_report: not_applicable
+  rationale: >-
+    The kit repository supplies the generator, schemas, rules, and consumer;
+    generated Standard and Assured adopters own the required project report.
+lifecycle:
+  regeneration_triggers:
+    - agent_skill_or_instruction_frontmatter_change
+    - model_provider_policy_change
+    - inventory_rules_change
+    - generator_or_frontmatter_normalizer_change
+    - before_control_plane_review
+  freshness_basis: content_sha256_and_canonical_semantic_digest
+  wall_clock_expiry: false
+  copied_mtime_used: false
+  stale_when:
+    - declared_input_set_or_content_digest_changes
+    - canonical_inventory_digest_does_not_match_current_sources
+    - report_or_rules_schema_validation_fails
+  owner: project-governance-reviewer
+required_component_fields:
+  - component_id
+  - component_type
+  - name
+  - status
+  - source_file
+  - source_sha256
+  - declarations
+  - redactions
+allowed_component_types:
+  - agent
+  - skill
+  - instruction
+  - model_role
+  - ai_tool
+  - tool_model_binding
+active_model_or_binding_required_declarations:
+  - provider_kind
+  - model
+  - model_version
+  - cost_tier
+  - data_exposure_level
+sources:
+  ai_authoring_surfaces: agent_skill_and_instruction_frontmatter_via_naos_emit_capabilities
+  model_roles_and_tool_bindings: naos/model_provider_policy.yaml
+  provenance: repository_relative_paths_and_sha256_content_digests
+field_sources:
+  component_id: emitted_catalogue_id_or_deterministic_policy_key_prefix
+  component_type: emitted_catalogue_type_or_generator_assigned_policy_record_type
+  name: emitted_frontmatter_name_or_model_policy_mapping_key
+  status: emitted_catalogue_status_or_model_policy_enabled_flag
+  source_file: normalized_repository_relative_path_of_the_declaring_file
+  source_sha256: sha256_of_the_raw_declaring_file_bytes
+  declarations: bounded_frontmatter_or_model_policy_fields_named_by_the_generator
+  redactions: generator_count_of_secret_like_values_replaced_before_output
+routing:
+  consumer: scripts/naos_control_plane_review.py
+  source_type: ai_component_inventory_finding
+  target_gates: [G2, G6]
+  conditions:
+    - missing_required_report
+    - malformed_or_schema_invalid_report
+    - stale_or_content_mismatched_report
+    - incomplete_active_required_declaration
+non_claims:
+  - CycloneDX conformance
+  - SPDX conformance
+  - software bill of materials
+  - runtime discovery
+  - inventory completeness
+  - provider availability
+  - model identity verification
+  - signing
+  - attestation
+  - provenance authenticity
+  - supply-chain assurance
+  - security approval
+  - compliance approval
+  - release authority
+  - publication authority

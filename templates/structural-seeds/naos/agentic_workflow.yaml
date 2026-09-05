@@ -1,0 +1,146 @@
+schema: naos.agentic_workflow.v1
+profile: quickstart
+updated_at: null
+
+context_hygiene:
+  enabled: true
+  fresh_session_per_task: recommended
+  compacted_chat_not_authoritative: true
+  task_context_pack_required: recommended
+  max_context_policy: bounded_task_context
+  limitations:
+    - Exact model context behavior varies by model and task.
+
+pre_implementation_alignment:
+  enabled: true
+  pattern: alignment_interview
+  required_artifact: naos/PRE_IMPLEMENTATION_ALIGNMENT.md
+  prompt_template: templates/prompts/pre_implementation_alignment.md
+  required_questions:
+    - intended_user
+    - problem_statement
+    - first_vertical_slice
+    - input_output_contract
+    - edge_cases
+    - failure_modes
+    - security_privacy_assumptions
+    - evidence_required
+    - test_strategy
+    - explicit_out_of_scope
+    - human_review_boundary
+  human_review_required: true
+
+implementation_readiness_baseline:
+  enabled: true
+  applicable_profiles: [lite, standard, assured]
+  required_artifact: naos/PLANNING_BASELINES.yaml
+  planning_model: hybrid_vertical_default
+  # Discovery and draft plans may evolve before this deterministic boundary.
+  draft_and_discovery_allowed: true
+  profile_inputs:
+    lite: [requirements, task_registry, alignment, owner_decision]
+    standard: [requirements, architecture, task_registry, alignment, owner_decision]
+    assured: [requirements, architecture, task_registry, alignment, owner_decision]
+  structural_evidence: [spec_pack_contract, pre_implementation_alignment_review]
+  replanning_method: versioned_supersession
+  # The stable registry projection excludes delivery/status fields.
+  routine_task_status_change_requires_rebaseline: false
+  horizontal_foundation_requires: [consuming_vertical_slice, changed_consumed_result]
+  does_not_authorize: [implementation, task closure, merge, release, publication]
+
+vertical_slice_delivery:
+  enabled: true
+  preferred_slice_strategy: vertical
+  tracer_bullet_required: recommended
+  avoid_horizontal_big_bang: true
+  evidence_required:
+    - end_to_end_path
+    - test_evidence
+    - gate_report
+
+tdd_feedback:
+  enabled: true
+  red_green_evidence_recommended: true
+  implementation_without_tests_is_review_required: true
+  public_interface_tests_preferred: true
+
+module_design:
+  enabled: true
+  prefer_deep_modules_with_stable_interfaces: true
+  avoid_shallow_wrapper_sprawl: true
+  interface_evidence_required: recommended
+
+human_ai_work_split:
+  enabled: true
+  human_tasks:
+    - planning
+    - architecture
+    - risk_acceptance
+    - QA
+    - final_review
+  afk_candidate_tasks:
+    - bounded_implementation
+    - deterministic_refactor
+    - generated_report_review
+  afk_tasks_require_gates: true
+
+kanban_dag:
+  enabled: true
+  explicit_dependencies_required: recommended
+  parallel_work_requires_task_claims: true
+
+parallel_lane_opportunity:
+  enabled: true
+  advisory_values:
+    - not_applicable
+    - sequential_recommended
+    - parallel_possible
+    - parallel_recommended
+  decision_values:
+    - sequential
+    - declared
+    - deferred
+  reason_codes:
+    - independent_acceptance_criteria
+    - distinct_path_scopes
+    - dependency_unlocked
+    - frontend_backend_test_docs_split
+    - high_context_load
+    - solo_checkpoint_value
+    - unresolved_dependency
+    - high_scope_overlap
+    - schema_or_api_decision_first
+    - high_risk_tightly_controlled_work
+    - missing_task_or_requirement_link
+    - missing_test_strategy
+  declaration_required_for_handoff: true
+  suggested_lanes_do_not_activate_handoff: true
+  solo_developer_posture: logical_checkpoints_optional
+  team_lane_posture: task_claims_and_handoff_when_declared
+  worktree_posture: optional_physical_isolation_only
+  no_silent_activation: true
+  no_branch_or_worktree_automation: true
+
+push_pull_context:
+  enabled: true
+  pull_context:
+    - quick_reference
+    - task_context_pack
+    - adoption_guide
+    - tool_neutral_usage
+  push_context:
+    - validators
+    - gate_evaluate
+    - evidence_pack
+    - pr_governance_summary
+    - sarif_export
+  silent_context_injection_prohibited: true
+
+not_claimed:
+  - behavioral correctness proof
+  - hallucination prevention
+  - autonomous approval
+  - compliance proof
+  - model attention guarantee
+  - human review replacement
+human_review_required: true

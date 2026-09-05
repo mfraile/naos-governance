@@ -1,0 +1,104 @@
+# Next.js + Supabase Archetype Profile
+# NAOS Portable Governance Kit
+# ─────────────────────────────────────────────────────────────────────────────
+# Pre-adapted for a Next.js full-stack application with Supabase as the backend.
+# Signals: TypeScript, Next.js, React, Supabase (PostgreSQL + Auth + Storage + Edge Functions).
+# ─────────────────────────────────────────────────────────────────────────────
+
+project:
+  name: "[YOUR_PROJECT_NAME]"
+  path: "."
+  archetype: nextjs-supabase
+  naos_profile: standard
+
+languages:
+  - typescript
+  - javascript
+
+web_frameworks:
+  - nextjs
+  - react
+
+database:
+  engines:
+    - postgresql           # via Supabase
+  orm:
+    - supabase-client
+  migrations:
+    - supabase-migrations  # supabase/migrations/*.sql
+  vector_store:
+    - pgvector             # ADAPT: remove if not using AI/vector search
+
+llm_toolchain:
+  api_providers:
+    - openai               # ADAPT: adjust or remove
+  local_models: []
+  frameworks:
+    - vercel-ai-sdk        # ADAPT: adjust or remove
+  embedding_frameworks: []
+  local_oss_models: []
+
+graph_db: []
+event_bus:
+  - supabase-realtime      # ADAPT: remove if not using realtime
+
+auth:
+  - supabase-auth          # Supabase Auth (magic link, OAuth, password)
+
+testing:
+  - jest
+  - testing-library
+  - playwright             # ADAPT: remove if not using E2E tests
+
+infrastructure:
+  containerisation: []     # ADAPT: add docker if containerising
+  ci_cd:
+    - github-actions
+  cloud:
+    - vercel               # ADAPT: adjust to your deployment target
+
+multi_tenancy: true        # Supabase RLS enables multi-tenancy by default
+
+signals:
+  has_api: true            # Next.js API routes / Route Handlers
+  has_sql_db: true
+  has_vector_store: true
+  has_llm: true
+  has_event_bus: true
+  has_auth: true
+  has_graph_db: false
+  has_multi_tenancy: true
+  has_containerisation: false
+  has_ci_cd: true
+  is_python: false
+  is_node: true
+
+adapt_stubs:
+  db_schema_conventions: |
+    [ADAPT: Supabase uses PostgreSQL with Row-Level Security (RLS).
+     Describe: which tables have RLS enabled, how user_id references
+     auth.users, naming conventions (snake_case), and any service-role
+     vs anon-role access patterns.]
+
+  module_boundaries: |
+    [ADAPT: Next.js App Router vs Pages Router; which components are
+     Server Components vs Client Components; where server-side DB access
+     is allowed (only in Server Components / Route Handlers, never in
+     client components); any domain service boundaries.]
+
+  spec_alignment: |
+    [ADAPT: Paths to your API types (TypeScript), OpenAPI spec if any,
+     and requirements documentation.]
+
+  data_flow_invariants: |
+    [ADAPT: Supabase data flow rules — e.g., "Never expose service_role
+     key to client", "All mutations via authenticated client only (anon
+     role has no write access)", "RLS must be enabled on all user-scoped tables".]
+
+  ssrf_allowed_domains: |
+    [ADAPT: External APIs your Edge Functions or Route Handlers call.
+     Example: api.openai.com, accounts.google.com, stripe.com]
+
+  conflict_resolution: |
+    [ADAPT: Code review process, who approves DB migrations (Supabase
+     migrations are irreversible in production), branch strategy.]

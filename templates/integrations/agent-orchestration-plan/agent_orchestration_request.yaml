@@ -1,0 +1,19 @@
+schema: naos.agent_orchestration_request.v1
+version: 1
+enabled: false
+run_id: RUN-EXAMPLE-001
+project_id: replace-me
+requested_by: replace-me
+requested_at: "2026-08-30T00:00:00Z"
+expected_branch: main
+max_parallel: 2
+decision_ref: naos/human_decisions/DECISION-RUN-EXAMPLE-001.yaml
+model_policy_ref: naos/model_provider_policy.yaml
+task_registry_ref: naos/TASK_REGISTRY.yaml
+
+# Enable only for one reviewed run. Every lane must name one current task and
+# bounded paths. Use component-aware globs: * and ? stay within one path
+# component, while ** is recursive. Output references are unique handoff
+# evidence destinations only; this request does not create them or launch an
+# agent.
+lanes: []

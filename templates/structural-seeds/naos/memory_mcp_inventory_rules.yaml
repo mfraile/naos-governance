@@ -1,0 +1,116 @@
+schema: naos.memory_mcp_inventory_rules.v1
+profile: quickstart
+updated_at: null
+description: >
+  Rules for advisory memory, Engram, and MCP posture inventory. Memory and
+  MCP findings are advisory and never become source authority by default.
+states:
+  - Engram binary available on the current PATH
+  - configured or default local Engram data directory
+  - derived local Engram SQLite database
+  - optional management toolkit candidate at ~/engram-memories
+  - declared but unverified MCP
+  - declared but unauthorized MCP
+  - static-only mode
+  - IDE-agent mode
+  - local Ollama mode
+  - provider/API mode without credentials
+engram_operating_model:
+  data_directory: "ENGRAM_DATA_DIR when set, otherwise ~/.engram"
+  database: "engram.db under the resolved data directory"
+  replication_mode: local_only
+  git_memory_chunks_used: false
+  toolkit_candidate: "~/engram-memories is reported only when managed toolkit marker files exist"
+  toolkit_is_memory_store: false
+  toolkit_is_memory_transport: false
+inventory_boundaries:
+  metadata_only: true
+  memory_payload_reads_allowed: false
+  provider_calls_allowed: false
+  absolute_user_paths_emitted: false
+  mcp_config_presence_proves_live_access: false
+  project_local_live_store_allowed: false
+  project_local_store_disposition_options:
+    - repair
+    - disabled
+    - deferred
+    - review_required
+descriptor_review:
+  schema: naos.mcp_descriptor_review_policy.v1
+  version: 1.0.0
+  updated_at: "2026-08-31"
+  default_disposition: review_required
+  policy_integrity_sha256: 2a5b39d7f89673df223f35890393da528ae413b4979e3766be155aea37c30375
+  mcp_specification:
+    version: "2026-07-28"
+    source: https://modelcontextprotocol.io/specification/2026-07-28
+  descriptor_format: naos.static_mcp_descriptor.v1
+  threat_scope:
+    - endpoint or transport substitution
+    - server-label spoofing
+    - local declaration and policy drift
+    - unaudited activation or authentication
+    - confusion between descriptor allowlisting and tool or write authority
+  residual_risks:
+    - remote implementation and tool-list drift are not observable offline
+    - static endpoint matching does not verify remote identity or behavior
+    - client authentication, permissions, consent, and tool execution remain external
+  rules:
+    - rule_id: figma_remote_vscode_workspace_default_v1
+      disposition: allowlisted_pending_activation
+      approved_basis_sha256: 9ae4c1ceeb95d5cc52bbc3f6b9330054e5692c9489438a87dec02be360aa3eba
+      basis:
+        descriptor_id: figma_remote_mcp_v1
+        display_server_label: figma
+        server_label_is_identity: false
+        config_ids:
+          - vscode_workspace_mcp
+        containers:
+          - servers
+        declared_keys:
+          - type
+          - url
+        transport_field: type
+        transport: http
+        endpoint_key: url
+        endpoint: https://mcp.figma.com/mcp
+        endpoint_sha256: 5b64146edc1804e6918ae66a0ce88dc3048f5958fa88c0b4ffcb724bbf834feb
+        pinning: exact_static_declaration_tuple
+        risk_owner:
+          role: repository_risk_owner
+          authority_ref: profile policy approved by the repository risk owner
+      source:
+        publisher: Figma
+        observed_on: "2026-08-31"
+        official_setup_url: https://help.figma.com/hc/en-us/articles/39890361040535-VS-Code-and-Figma-Set-up-the-MCP-server
+      activation_boundary:
+        explicit_user_action_required: true
+        external_authentication_required: true
+        tool_execution_authorized: false
+        write_authority_granted: false
+        desktop_endpoint_allowlisted: false
+  non_claims:
+    - policy allowlisting is not MCP activation or authentication
+    - a matching server label is not identity evidence
+    - static endpoint matching does not verify remote server identity or behavior
+    - tool availability, safety, and write authority are not verified
+    - the remote implementation and tool list are not pinned
+reconciliation_options:
+  - connect
+  - reuse
+  - repair
+  - new
+  - disabled
+  - deferred
+  - review_required
+memory_remains_advisory: true
+not_claimed:
+  - memory authority
+  - hidden context injection
+  - memory write-back
+  - provider API enablement
+  - model API enablement
+  - Git memory-chunk replication
+  - management toolkit as a memory store or sync repository
+  - automatic approval
+human_review_required: true

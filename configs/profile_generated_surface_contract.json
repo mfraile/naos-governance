@@ -1,0 +1,203 @@
+{
+  "schema": "naos.profile_generated_surface_contract.v1",
+  "contract_version": 1,
+  "profiles": {
+    "quickstart": {
+      "required_surfaces": [
+        ".github/agents/naos-research.agent.md",
+        ".github/instructions/function-discovery.instructions.md",
+        "naos/research_record_contract.yaml",
+        "naos/research/RECORD_TEMPLATE.yaml",
+        "schemas/naos/research_record.schema.json",
+        "schemas/naos/research_record_validation.schema.json",
+        "schemas/naos/overlay_compatibility.schema.json"
+      ],
+      "prohibited_surfaces": [
+        ".github/agents/naos-plan.agent.md",
+        ".github/agents/naos-implement.agent.md",
+        ".github/agents/naos-review.agent.md",
+        ".github/prompts/naos-design.prompt.md",
+        ".github/prompts/naos-task-complete.prompt.md",
+        ".github/profiles/governance-assured.yaml",
+        ".github/profiles/governance-lite.yaml",
+        ".github/profiles/governance-quickstart.yaml",
+        ".github/profiles/governance-standard.yaml",
+        ".github/profiles/schema.yaml",
+        "scripts/naos_task_lifecycle.py",
+        "scripts/naos_research_record.py",
+        "scripts/naos_composed_traceability.py",
+        "scripts/naos_validate_task_registry.py",
+        "scripts/naos_plan_coherence.py",
+        "naos/PLANNING_BASELINES.yaml",
+        "schemas/naos/planning_baselines.schema.json",
+        "schemas/naos/plan_coherence.schema.json"
+      ],
+      "commands": {
+        "gov-refresh": {
+          "applicability": "not_applicable",
+          "alternative": "naos doctor"
+        },
+        "naos-readiness": {
+          "applicability": "not_applicable",
+          "alternative": "naos doctor"
+        },
+        "research": {
+          "applicability": "available",
+          "surface": ".github/agents/naos-research.agent.md"
+        }
+      }
+    },
+    "lite": {
+      "required_surfaces": [
+        ".github/agents/AGENTS.md",
+        ".github/agents/_HANDOFF_TEMPLATE.yaml",
+        ".github/agents/naos-plan.agent.md",
+        ".github/agents/naos-implement.agent.md",
+        ".github/agents/naos-research.agent.md",
+        ".github/agents/naos-review.agent.md",
+        ".github/prompts/naos-design.prompt.md",
+        ".github/prompts/naos-task-complete.prompt.md",
+        ".github/profiles/governance-assured.yaml",
+        ".github/profiles/governance-lite.yaml",
+        ".github/profiles/governance-quickstart.yaml",
+        ".github/profiles/governance-standard.yaml",
+        ".github/profiles/schema.yaml",
+        "naos/task_lifecycle_contract.yaml",
+        "naos/completed_history.yaml",
+        "naos/completed/_TEMPLATE.md",
+        "naos/research_record_contract.yaml",
+        "naos/research/RECORD_TEMPLATE.yaml",
+        "naos/human_decisions/_TEMPLATE.yaml",
+        "naos/PLANNING_BASELINES.yaml",
+        "schemas/naos/task_lifecycle_contract.schema.json",
+        "schemas/naos/completed_task_history.schema.json",
+        "schemas/naos/task_lifecycle.schema.json",
+        "schemas/naos/research_record.schema.json",
+        "schemas/naos/research_record_validation.schema.json",
+        "schemas/naos/composed_traceability.schema.json",
+        "schemas/naos/overlay_compatibility.schema.json",
+        "schemas/naos/human_decision_record.schema.json",
+        "schemas/naos/planning_baselines.schema.json",
+        "schemas/naos/plan_coherence.schema.json",
+        "schemas/naos/pre_implementation_alignment_review.schema.json",
+        "scripts/naos_task_lifecycle.py",
+        "scripts/naos_research_record.py",
+        "scripts/naos_composed_traceability.py",
+        "scripts/naos_plan_coherence.py"
+      ],
+      "prohibited_surfaces": [
+        ".github/agents/naos-conformance.agent.md",
+        ".github/agents/naos-triage.agent.md"
+      ],
+      "commands": {
+        "gov-refresh": {
+          "applicability": "available",
+          "target": "gov-refresh"
+        },
+        "naos-readiness": {
+          "applicability": "available",
+          "target": "naos-readiness"
+        },
+        "research": {
+          "applicability": "available",
+          "surface": ".github/agents/naos-research.agent.md"
+        },
+        "review": {
+          "applicability": "available",
+          "surface": ".github/agents/naos-review.agent.md"
+        },
+        "design": {
+          "applicability": "available",
+          "surface": ".github/prompts/naos-design.prompt.md"
+        },
+        "task-complete": {
+          "applicability": "available",
+          "target": "naos-task-complete",
+          "surface": ".github/prompts/naos-task-complete.prompt.md"
+        }
+      }
+    },
+    "standard": {
+      "required_surfaces": [
+        ".github/agents/naos-research.agent.md",
+        ".github/agents/naos-review.agent.md",
+        ".github/prompts/naos-design.prompt.md",
+        ".github/prompts/naos-task-complete.prompt.md",
+        ".github/profiles/governance-assured.yaml",
+        ".github/profiles/governance-lite.yaml",
+        ".github/profiles/governance-quickstart.yaml",
+        ".github/profiles/governance-standard.yaml",
+        ".github/profiles/schema.yaml",
+        "naos/task_lifecycle_contract.yaml",
+        "naos/completed_history.yaml",
+        "naos/completed/_TEMPLATE.md",
+        "naos/research_record_contract.yaml",
+        "naos/research/RECORD_TEMPLATE.yaml",
+        "naos/human_decisions/_TEMPLATE.yaml",
+        "naos/PLANNING_BASELINES.yaml",
+        "schemas/naos/task_lifecycle_contract.schema.json",
+        "schemas/naos/completed_task_history.schema.json",
+        "schemas/naos/task_lifecycle.schema.json",
+        "schemas/naos/research_record.schema.json",
+        "schemas/naos/research_record_validation.schema.json",
+        "schemas/naos/composed_traceability.schema.json",
+        "schemas/naos/overlay_compatibility.schema.json",
+        "schemas/naos/human_decision_record.schema.json",
+        "schemas/naos/planning_baselines.schema.json",
+        "schemas/naos/plan_coherence.schema.json",
+        "schemas/naos/pre_implementation_alignment_review.schema.json",
+        "scripts/naos_task_lifecycle.py",
+        "scripts/naos_research_record.py",
+        "scripts/naos_composed_traceability.py",
+        "scripts/naos_plan_coherence.py"
+      ],
+      "prohibited_surfaces": [],
+      "commands": {
+        "gov-refresh": {"applicability": "available", "target": "gov-refresh"},
+        "naos-readiness": {"applicability": "available", "target": "naos-readiness"},
+        "task-complete": {"applicability": "available", "target": "naos-task-complete"}
+      }
+    },
+    "assured": {
+      "required_surfaces": [
+        ".github/agents/naos-research.agent.md",
+        ".github/agents/naos-review.agent.md",
+        ".github/prompts/naos-design.prompt.md",
+        ".github/prompts/naos-task-complete.prompt.md",
+        ".github/profiles/governance-assured.yaml",
+        ".github/profiles/governance-lite.yaml",
+        ".github/profiles/governance-quickstart.yaml",
+        ".github/profiles/governance-standard.yaml",
+        ".github/profiles/schema.yaml",
+        "naos/task_lifecycle_contract.yaml",
+        "naos/completed_history.yaml",
+        "naos/completed/_TEMPLATE.md",
+        "naos/research_record_contract.yaml",
+        "naos/research/RECORD_TEMPLATE.yaml",
+        "naos/human_decisions/_TEMPLATE.yaml",
+        "naos/PLANNING_BASELINES.yaml",
+        "schemas/naos/task_lifecycle_contract.schema.json",
+        "schemas/naos/completed_task_history.schema.json",
+        "schemas/naos/task_lifecycle.schema.json",
+        "schemas/naos/research_record.schema.json",
+        "schemas/naos/research_record_validation.schema.json",
+        "schemas/naos/composed_traceability.schema.json",
+        "schemas/naos/overlay_compatibility.schema.json",
+        "schemas/naos/human_decision_record.schema.json",
+        "schemas/naos/planning_baselines.schema.json",
+        "schemas/naos/plan_coherence.schema.json",
+        "schemas/naos/pre_implementation_alignment_review.schema.json",
+        "scripts/naos_task_lifecycle.py",
+        "scripts/naos_research_record.py",
+        "scripts/naos_composed_traceability.py",
+        "scripts/naos_plan_coherence.py"
+      ],
+      "prohibited_surfaces": [],
+      "commands": {
+        "gov-refresh": {"applicability": "available", "target": "gov-refresh"},
+        "naos-readiness": {"applicability": "available", "target": "naos-readiness"},
+        "task-complete": {"applicability": "available", "target": "naos-task-complete"}
+      }
+    }
+  }
+}

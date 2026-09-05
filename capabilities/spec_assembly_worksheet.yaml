@@ -1,0 +1,97 @@
+id: CAP-SPEC-ASSEMBLY-WORKSHEET
+name: Spec Assembly Worksheet
+description: >
+  Maps existing brownfield adoption evidence, candidate requirements, and
+  traceability gaps to manifest-declared spec files so reviewers can decide
+  what should be filled, what is not applicable, and what remains missing.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Quickstart can emit review evidence when adoption reports exist."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Maps available evidence to lite-required specs for human review."
+  standard:
+    target_maturity: L2
+    enforcement: warning
+    notes: "Maps available evidence to all standard spec files and flags applicability decisions."
+  assured:
+    target_maturity: L2
+    enforcement: warning
+    notes: "Adds review evidence only; assurance decisions require separate owner approval."
+authority:
+  may_read:
+    - "specs/spec_manifest.yaml"
+    - "naos/spec_templates/spec-kit/specs/spec_manifest.yaml"
+    - "naos/reports/existing_resource_inventory.json"
+    - "naos/reports/candidate_requirements.json"
+    - "naos/reports/traceability_gap_register.json"
+    - "naos/reports/brownfield_baseline.json"
+  may_write:
+    - "naos/reports/spec_assembly_worksheet.json"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "repo-local JSON, YAML, and Markdown adoption/spec artifacts"
+prohibited_resources:
+  - "automatic requirement promotion"
+  - "automatic spec file editing"
+  - "semantic model judgement"
+  - "external services"
+  - "runtime governance"
+constraints:
+  - "Must keep candidate requirements review-only and unpromoted."
+  - "Must flag missing manifest-required spec files before downstream spec-cascade review."
+  - "Must flag standard optional-looking spec areas for applicability review when evidence is absent."
+  - "Must not claim that heuristic target mapping proves traceability."
+required_evidence:
+  - "naos/reports/spec_assembly_worksheet.json"
+  - "naos/reports/candidate_requirements.json"
+  - "naos/reports/traceability_gap_register.json"
+validators:
+  - id: spec_assembly_worksheet
+    script: scripts/naos_spec_assembly_worksheet.py
+    status: available
+gatekeepers:
+  - G4
+  - G6
+dashboard_signals:
+  - "spec_assembly_worksheet.status"
+  - "spec_assembly_worksheet.summary.required_spec_files_missing"
+  - "spec_assembly_worksheet.summary.candidate_requirements"
+  - "spec_assembly_worksheet.summary.non_applicability_decisions_needed"
+maturity_path:
+  L0: "CLI, Make target, policy report path, schema, and capability contract exist."
+  L1: "Brownfield projects can generate a worksheet from adoption evidence."
+  L2: "Dashboard and evidence pack expose missing spec files and applicability decisions."
+  L3: "Profile gates can require reviewed worksheet evidence without treating it as profile-transition evidence."
+  L4: "Review decisions are linked to the spec files and tasks that resolved them."
+  L5: "Project governance has durable criteria for accepting evidence-to-spec assembly."
+known_limitations:
+  - "Does not write or fill spec files."
+  - "Does not promote candidate requirements to authority."
+  - "Does not prove requirement correctness, applicability, implementation, testing, or complete traceability."
+  - "Target-spec mapping is deterministic but heuristic."
+not_claimed:
+  - "approved requirements"
+  - "complete specifications"
+  - "correct architecture"
+  - "implemented behavior"
+  - "passing tests"
+  - "traceability proof"
+  - "certification or compliance proof"
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+  - docs/CONTROL_PLANE.md
+  - docs/AUDIT_PLAYBOOK.md
+related_scripts:
+  - scripts/naos_spec_assembly_worksheet.py
+  - scripts/naos_requirements_reconstruct.py
+  - scripts/naos_traceability_gap_register.py

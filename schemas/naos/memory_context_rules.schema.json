@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:memory_context_rules:v1",
+  "title": "NAOS Memory Context Rules",
+  "type": "object",
+  "additionalProperties": true,
+  "oneOf": [
+    {"required": ["version", "semantics", "enabled", "provider_posture", "authoritative_source_hierarchy", "forbidden_memory_categories", "allowed_memory_categories", "memory_scopes", "staleness_policy", "conflict_policy", "context_pack_readiness", "fallback_recovery", "human_review_required", "profile_severity_behavior", "limitations", "not_claimed"]},
+    {"required": ["version", "semantics", "access_levels", "platforms", "surfaces", "limitations"]}
+  ],
+  "properties": {
+    "version": {"type": "string"},
+    "semantics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "enabled": {"type": "boolean"},
+    "provider_posture": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "recommended_provider": {"type": "string"},
+        "local_only": {"type": "boolean"},
+        "external_sync_default": {"type": "boolean"},
+        "cloud_memory_allowed": {"type": "boolean"}
+      }
+    },
+    "authoritative_source_hierarchy": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/source"}
+    },
+    "forbidden_memory_categories": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "allowed_memory_categories": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "memory_scopes": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/memory_scope"}
+    },
+    "staleness_policy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "conflict_policy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "context_pack_readiness": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "fallback_recovery": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "human_review_required": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "profile_severity_behavior": {
+      "type": "object",
+      "required": ["quickstart", "lite", "standard", "assured"],
+      "properties": {
+        "quickstart": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "lite": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "standard": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "assured": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]}
+      }
+    },
+    "access_levels": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["none", "read_only", "draft_write", "approved_write", "admin_config"]}
+    },
+    "platforms": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/platform"}
+    },
+    "surfaces": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/surface"}
+    },
+    "declared_memory_findings": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["rank", "id", "name", "authority"],
+      "properties": {
+        "rank": {"type": "integer", "minimum": 1},
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "authority": {"type": "string"}
+      }
+    },
+    "memory_scope": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "status", "description", "default_allowed"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "description": {"type": "string"},
+        "default_allowed": {"type": "boolean"}
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "memory_access_declared", "mcp_configured", "mcp_required", "read_access", "write_access", "admin_access", "fallback_when_unavailable", "human_review_required_for_write"],
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "memory_access_declared": {"type": "boolean"},
+        "mcp_configured": {"type": "boolean"},
+        "mcp_required": {"type": "boolean"},
+        "read_access": {"type": "string"},
+        "write_access": {"type": "string"},
+        "admin_access": {"type": "string"},
+        "fallback_when_unavailable": {"type": "string"},
+        "human_review_required_for_write": {"type": "boolean"}
+      }
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "surface_type", "default_access", "write_access", "human_review_required_for_write"],
+      "properties": {
+        "id": {"type": "string"},
+        "surface_type": {"type": "string"},
+        "default_access": {"type": "string"},
+        "write_access": {"type": "string"},
+        "human_review_required_for_write": {"type": "boolean"}
+      }
+    }
+  }
+}

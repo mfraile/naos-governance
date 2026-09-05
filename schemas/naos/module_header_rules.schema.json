@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:module_header_rules:v1",
+  "title": "NAOS Module Header Rules",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "version",
+    "semantics",
+    "enabled",
+    "file_types",
+    "include_patterns",
+    "exclude_patterns",
+    "required_sections",
+    "legacy_header_handling",
+    "stale_module_path_behavior",
+    "duplicate_header_behavior",
+    "profile_severity_behavior",
+    "human_review_required",
+    "limitations"
+  ],
+  "properties": {
+    "version": {"type": "string"},
+    "semantics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "enabled": {"type": "boolean"},
+    "file_types": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["python"]}
+    },
+    "include_patterns": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "exclude_patterns": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "required_sections": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["Module", "Purpose", "Implements", "Tasks", "Specs", "Rationale", "Design notes"]
+      }
+    },
+    "optional_sections": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "allowed_requirement_id_patterns": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "allowed_task_id_patterns": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "allowed_spec_reference_patterns": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "legacy_header_handling": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["enabled", "status"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "report_legacy_task_label": {"type": "boolean"},
+        "report_inline_sections": {"type": "boolean"},
+        "status": {"type": "string", "enum": ["legacy", "advisory", "warning"]}
+      }
+    },
+    "stale_module_path_behavior": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["enabled", "status"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "status": {"type": "string", "enum": ["stale", "advisory", "warning"]}
+      }
+    },
+    "duplicate_header_behavior": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["enabled", "status"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "status": {"type": "string", "enum": ["duplicate", "advisory", "warning"]}
+      }
+    },
+    "cross_checks": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "profile_severity_behavior": {
+      "type": "object",
+      "required": ["quickstart", "lite", "standard", "assured"],
+      "properties": {
+        "quickstart": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "lite": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "standard": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "assured": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]}
+      }
+    },
+    "human_review_required": {
+      "type": "object",
+      "additionalProperties": {"type": "boolean"}
+    },
+    "waivers": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  }
+}

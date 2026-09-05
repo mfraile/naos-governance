@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/human_decision_record.schema.json",
+  "title": "NAOS attributable human decision record",
+  "type": "object",
+  "required": ["schema", "decision_id", "decision_type", "outcome", "subject_refs", "evidence_refs", "decided_by", "decided_at", "rationale", "authority_scope", "supersedes", "not_claimed"],
+  "properties": {
+    "schema": {"const": "naos.human_decision_record.v1"},
+    "decision_id": {"type": "string", "pattern": "^DECISION-[A-Z0-9-]+$"},
+    "decision_type": {"enum": ["planning_baseline", "agent_orchestration_plan", "task_delivery", "merge", "release", "evidence_admission", "exception_closure", "other"]},
+    "outcome": {"enum": ["approved", "rejected", "deferred"]},
+    "subject_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "subject_digest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["digest_kind", "sha256"],
+          "properties": {
+            "digest_kind": {"const": "planning_baseline_projection_sha256_v1"},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["digest_kind", "sha256"],
+          "properties": {
+            "digest_kind": {"const": "agent_orchestration_plan_sha256_v1"},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
+        {"type": "null"}
+      ]
+    },
+    "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "decided_by": {"type": "string", "minLength": 1},
+    "decided_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "rationale": {"type": "string", "minLength": 1},
+    "authority_scope": {"type": "string", "minLength": 1},
+    "real_world_authority_proven": {"type": "boolean"},
+    "supersedes": {"type": ["string", "null"]},
+    "not_claimed": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {"decision_type": {"const": "planning_baseline"}},
+        "required": ["decision_type"]
+      },
+      "then": {
+        "required": ["subject_digest"],
+        "properties": {"subject_digest": {"type": "object"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"decision_type": {"const": "agent_orchestration_plan"}},
+        "required": ["decision_type"]
+      },
+      "then": {
+        "required": ["subject_digest", "real_world_authority_proven"],
+        "properties": {
+          "subject_digest": {
+            "type": "object",
+            "properties": {"digest_kind": {"const": "agent_orchestration_plan_sha256_v1"}}
+          },
+          "real_world_authority_proven": {"const": false}
+        }
+      }
+    }
+  ]
+}

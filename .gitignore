@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# G1 disposable maintainer-tool environment; never source input or evidence authority
+.naos-g1-repository-intelligence/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NAOS preview output (local only)
+.naos-preview/
+
+# Claude Code local state (worktrees are ephemeral tool output, not repo content)
+.claude/worktrees/
+
+# VS Code workspace file (local convenience, no repo value)
+*.code-workspace
+
+# Internal planning docs (not published)
+docs/trends/

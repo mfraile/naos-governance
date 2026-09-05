@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:agent_trace_validation:v1",
+  "title": "NAOS Agent Trace Validation Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "trace_file",
+    "trace_file_present",
+    "event_count",
+    "valid_event_count",
+    "invalid_event_count",
+    "event_status_counts",
+    "lifecycle_phase_counts",
+    "action_type_counts",
+    "agent_surface_counts",
+    "task_refs",
+    "source_reference_summary",
+    "deterministic_controls_used",
+    "advisory_controls_used",
+    "memory_reference_summary",
+    "forbidden_payload_findings",
+    "schema_validation_results",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.agent_trace_validation.v1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["ready", "advisory", "no_events", "not_configured", "invalid_trace_events", "review_required", "blocked", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "trace_file": {"type": "string"},
+    "trace_file_present": {"type": "boolean"},
+    "event_count": {"type": "integer", "minimum": 0},
+    "valid_event_count": {"type": "integer", "minimum": 0},
+    "invalid_event_count": {"type": "integer", "minimum": 0},
+    "event_status_counts": {"$ref": "#/$defs/counts"},
+    "lifecycle_phase_counts": {"$ref": "#/$defs/counts"},
+    "action_type_counts": {"$ref": "#/$defs/counts"},
+    "agent_surface_counts": {"$ref": "#/$defs/counts"},
+    "task_refs": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "source_reference_summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["source_references", "source_hashes", "events_with_output_without_source_refs"],
+      "properties": {
+        "source_references": {"type": "integer", "minimum": 0},
+        "source_hashes": {"type": "integer", "minimum": 0},
+        "events_with_output_without_source_refs": {"type": "integer", "minimum": 0}
+      }
+    },
+    "deterministic_controls_used": {"type": "array", "items": {"type": "string"}},
+    "advisory_controls_used": {"type": "array", "items": {"type": "string"}},
+    "memory_reference_summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["events_with_memory_refs", "memory_refs", "advisory_only"],
+      "properties": {
+        "events_with_memory_refs": {"type": "integer", "minimum": 0},
+        "memory_refs": {"type": "integer", "minimum": 0},
+        "advisory_only": {"type": "boolean"}
+      }
+    },
+    "forbidden_payload_findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "schema_validation_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["event_index", "event_id", "valid", "errors"],
+        "properties": {
+          "event_index": {"type": "integer", "minimum": 0},
+          "event_id": {"type": ["string", "null"]},
+          "valid": {"type": "boolean"},
+          "errors": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object", "additionalProperties": true}
+  },
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string"},
+        "status": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}

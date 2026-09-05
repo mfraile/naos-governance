@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:parallel_lane_handoff:v1",
+  "title": "NAOS Parallel Lane Handoff Report",
+  "description": "Deterministic local review evidence for declared parallel agent lanes. It is not approval, merge readiness proof, task completion proof, legal sufficiency, compliance proof, certification, attestation, runtime orchestration, MCP activation, memory activation, provider calls, or model calls.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "deterministic",
+    "parallel_lanes_declared",
+    "criticality_context",
+    "capability_maturity",
+    "handoff_path",
+    "lane",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "generated_by",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.parallel_lane_handoff.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "advisory",
+        "warning",
+        "required_missing",
+        "blocked",
+        "not_applicable",
+        "unknown"
+      ]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "parallel_lanes_declared": {"type": "boolean"},
+    "criticality_context": {"type": "string"},
+    "capability_maturity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "current",
+        "assured_blocking_enabled",
+        "blocking_requires_l3_plus_and_gate_wiring"
+      ],
+      "properties": {
+        "current": {"type": "string"},
+        "assured_blocking_enabled": {"const": false},
+        "blocking_requires_l3_plus_and_gate_wiring": {"const": true}
+      }
+    },
+    "handoff_path": {"type": ["string", "null"]},
+    "lane": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "lane_id",
+        "lane_status",
+        "task_id",
+        "fr_nfr_refs",
+        "requirement_refs",
+        "dependency_blockers",
+        "unlock_evidence",
+        "claim_conflicts",
+        "planned_change_paths",
+        "out_of_scope_paths",
+        "changed_files",
+        "review_changed_files",
+        "generated_evidence_files",
+        "evidence_noise",
+        "unplanned_changed_files",
+        "out_of_scope_changed_files",
+        "tests",
+        "naos_reports_generated"
+      ],
+      "properties": {
+        "lane_id": {"type": ["string", "null"]},
+        "lane_status": {
+          "type": "string",
+          "enum": [
+            "complete_needs_review",
+            "blocked_dependency",
+            "blocked_scope_drift",
+            "blocked_failed_checks",
+            "abandoned",
+            "superseded",
+            "unknown"
+          ]
+        },
+        "task_id": {"type": ["string", "null"]},
+        "fr_nfr_refs": {"type": "array", "items": {"type": "string"}},
+        "requirement_refs": {"type": "array", "items": {"type": "string"}},
+        "operator_id": {"type": ["string", "null"]},
+        "operator_source": {"type": ["string", "null"]},
+        "session_id": {"type": ["string", "null"]},
+        "branch": {"type": ["string", "null"]},
+        "worktree_path": {"type": ["string", "null"]},
+        "started_at": {"type": ["string", "null"]},
+        "completed_at": {"type": ["string", "null"]},
+        "dependency_state": {"type": ["string", "null"]},
+        "dependency_blockers": {"type": "array", "items": {"type": "string"}},
+        "unlock_evidence": {"type": "array", "items": {"type": "string"}},
+        "claim_status": {"type": ["string", "null"]},
+        "claim_conflicts": {"type": "array", "items": {"type": "string"}},
+        "planned_change_paths": {"type": "array", "items": {"type": "string"}},
+        "out_of_scope_paths": {"type": "array", "items": {"type": "string"}},
+        "changed_files": {"type": "array", "items": {"type": "string"}},
+        "review_changed_files": {"type": "array", "items": {"type": "string"}},
+        "generated_evidence_files": {"type": "array", "items": {"type": "string"}},
+        "evidence_noise": {"type": "array", "items": {"type": "string"}},
+        "unplanned_changed_files": {"type": "array", "items": {"type": "string"}},
+        "out_of_scope_changed_files": {"type": "array", "items": {"type": "string"}},
+        "tests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attempted", "passed", "failed", "unavailable", "skipped"],
+          "properties": {
+            "attempted": {"type": "array", "items": {"type": "string"}},
+            "passed": {"type": "array", "items": {"type": "string"}},
+            "failed": {"type": "array", "items": {"type": "string"}},
+            "unavailable": {"type": "array", "items": {"type": "string"}},
+            "skipped": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "naos_reports_generated": {"type": "array", "items": {"type": "string"}},
+        "report_freshness": {"type": "object"},
+        "handoff_summary": {"type": ["string", "null"]},
+        "recommended_next_review_action": {"type": ["string", "null"]}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "severity", "status", "gate", "message", "human_review_required"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+          "status": {"type": "string"},
+          "gate": {"type": "string"},
+          "message": {"type": "string"},
+          "human_review_required": {"type": "boolean"}
+        }
+      }
+    },
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"},
+      "allOf": [
+        {"contains": {"const": "approval"}},
+        {"contains": {"const": "merge approval"}},
+        {"contains": {"const": "compliance proof"}},
+        {"contains": {"const": "certification"}},
+        {"contains": {"const": "attestation"}},
+        {"contains": {"const": "runtime orchestration"}},
+        {"contains": {"const": "MCP activation"}},
+        {"contains": {"const": "memory activation"}},
+        {"contains": {"const": "provider calls"}},
+        {"contains": {"const": "model calls"}}
+      ]
+    },
+    "human_review_required": {"type": "boolean"},
+    "generated_by": {"type": "object", "additionalProperties": true},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "parallel_lanes_declared": {"type": "integer", "minimum": 0},
+        "changed_files": {"type": "integer", "minimum": 0},
+        "review_changed_files": {"type": "integer", "minimum": 0},
+        "generated_evidence_files": {"type": "integer", "minimum": 0},
+        "evidence_noise_files": {"type": "integer", "minimum": 0},
+        "unplanned_changed_files": {"type": "integer", "minimum": 0},
+        "out_of_scope_changed_files": {"type": "integer", "minimum": 0},
+        "checks_passed": {"type": "integer", "minimum": 0},
+        "checks_failed": {"type": "integer", "minimum": 0},
+        "checks_unavailable": {"type": "integer", "minimum": 0},
+        "assured_blocking_enabled": {"const": 0}
+      }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+schema: naos.ai_artifact_inventory_rules.v1
+profile: quickstart
+updated_at: null
+description: >
+  Rules for classifying local AI instruction, prompt, agent, workflow, hook,
+  and third-party tool artifacts before adoption.
+artifact_patterns:
+  - CLAUDE.md
+  - AGENTS.md
+  - .github/copilot-instructions.md
+  - .github/agents
+  - .github/prompts
+  - .github/skills
+  - .github/instructions
+  - .cursor/rules
+  - .claude/settings.json
+  - GEMINI.md
+  - .specify
+  - .bmad
+  - .gsd
+classifications:
+  - NAOS-owned
+  - user-owned
+  - third-party
+  - conflicting
+  - stale
+  - compatible
+  - review_required
+decision_states:
+  - keep
+  - merge
+  - replace
+  - quarantine
+  - create
+  - review_required
+not_claimed:
+  - tool endorsement
+  - provider runtime
+  - automatic hook activation
+  - silent context injection
+  - memory write-back
+  - automatic approval
+human_review_required: true

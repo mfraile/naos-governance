@@ -1,0 +1,48 @@
+schema: naos.secure_coding_control_render_manifest.v1
+version: 1.0.0
+register: configs/secure_coding_control_register.yaml
+renderer: scripts/naos_render_secure_coding_controls.py
+boundary: Generated sections are bounded requirement summaries. They do not define severity, blocking, waivers, approvals, or compliance.
+targets:
+- path: templates/instructions/security.instructions.md
+  section_id: secure-coding-controls
+  title: Canonical Secure-Coding Controls
+  controls:
+  - SC-SECRETS-01
+  - SC-AUTHZ-01
+  - SC-INJECTION-01
+  - SC-SSRF-01
+  - SC-CSRF-01
+  - SC-ERRORS-01
+  - SC-SECURITY-LOGGING-01
+  - SC-CRYPTO-JWT-01
+  - SC-PII-01
+  - SC-DESERIAL-01
+  - SC-DEPENDENCY-01
+  - AC-DEP-HALLUCINATION-01
+- path: templates/instructions/ai-pipeline.instructions.md
+  section_id: agentic-coding-controls
+  title: Canonical Agentic-Coding Controls
+  controls:
+  - SC-PII-01
+  - AC-PROMPT-INJECT-01
+  - AC-TOOL-AUTHORITY-01
+  - AC-CONTEXT-LEAK-01
+  - AC-CLAIM-INTEGRITY-01
+  - AC-AUTONOMY-BOUNDARY-01
+- path: templates/cursor-rules/naos-security-standards.mdc
+  section_id: secure-coding-controls
+  title: Canonical Secure-Coding Controls
+  controls:
+  - SC-SECRETS-01
+  - SC-AUTHZ-01
+  - SC-INJECTION-01
+  - SC-SSRF-01
+  - SC-CSRF-01
+  - SC-ERRORS-01
+  - SC-SECURITY-LOGGING-01
+  - SC-CRYPTO-JWT-01
+  - SC-PII-01
+  - SC-DESERIAL-01
+  - SC-DEPENDENCY-01
+  - AC-DEP-HALLUCINATION-01

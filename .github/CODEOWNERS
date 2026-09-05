@@ -1,0 +1,42 @@
+# CODEOWNERS — NAOS Portable Governance Kit
+#
+# This file documents who owns which parts of the kit. The kit is currently a
+# single-maintainer project; this file exists primarily to make ownership
+# explicit and to seed the structure for future contributors.
+#
+# Syntax: https://docs.github.com/en/repositories/managing-your-repositories-settings-and-customizations/managing-your-repositorys-rules/about-code-owners
+
+# Default owner for everything in the repo
+*                                                @mfraile
+
+# Public strategic documents and contributor surfaces
+/README.md                                       @mfraile
+/ROADMAP.md                                      @mfraile
+/SECURITY.md                                     @mfraile
+/CONTRIBUTING.md                                 @mfraile
+/MAINTENANCE_PLAYBOOK.md                         @mfraile
+
+# Governance contracts (rules, schemas, profiles)
+/.ai/                                            @mfraile
+/profiles/                                       @mfraile
+/schemas/                                        @mfraile
+/templates/agents/                               @mfraile
+/templates/skills/                               @mfraile
+/templates/instructions/                         @mfraile
+/templates/instincts/                            @mfraile
+/templates/prompts/                              @mfraile
+/templates/rules-chain/                          @mfraile
+/templates/spec-kit/                             @mfraile
+
+# Audit and threat-model surfaces
+/docs/COMPLIANCE_MAPPING.md                      @mfraile
+/docs/CLAIMS_AND_LIMITATIONS.md                  @mfraile
+/docs/NAOS_THREAT_MODEL.md                       @mfraile
+
+# Enforcement infrastructure (validators, runner, hook)
+/autoresearch/                                   @mfraile
+/scripts/                                        @mfraile
+/task_battery/                                   @mfraile
+
+# CI workflows and GitHub configuration
+/.github/                                        @mfraile

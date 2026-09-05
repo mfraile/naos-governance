@@ -1,0 +1,67 @@
+id: CAP-EXAMPLE
+name: Example Capability
+description: >
+  Short statement of what this capability enables and what evidence it should
+  produce when configured by an adopting project.
+status: scaffolded
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Scaffolded reference only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Configured with lightweight checks."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Runs and produces evidence for normal SDLC work."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Can block when configured evidence is missing or invalid."
+authority:
+  may_read:
+    - "repo-local governance files"
+  may_write:
+    - "repo-local reports when explicitly run"
+  may_block:
+    - "only through configured profile gate policy"
+allowed_resources:
+  - "file-first YAML, JSON, Markdown, and script outputs"
+prohibited_resources:
+  - "mandatory database"
+  - "mandatory daemon"
+  - "mandatory scheduler"
+  - "mandatory runtime gateway"
+  - "mandatory external service"
+constraints:
+  - "Must preserve existing NAOS init/add/upgrade/memory flow."
+required_evidence:
+  - "Profile configuration"
+validators:
+  - id: example_validator
+    script: scripts/example.py
+    status: planned
+gatekeepers:
+  - G0
+dashboard_signals:
+  - "Example capability status"
+maturity_path:
+  L0: "Contract exists in the kit."
+  L1: "Project configures the capability."
+  L2: "Capability produces evidence."
+  L3: "Gatekeeper applies configured severity."
+  L4: "Dashboard tracks trends and exceptions."
+  L5: "Evidence is complete enough for audit-style review."
+known_limitations:
+  - "Template only."
+not_claimed:
+  - "Does not prove compliance."
+related_docs: []
+related_scripts: []

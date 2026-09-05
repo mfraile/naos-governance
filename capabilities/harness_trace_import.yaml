@@ -1,0 +1,111 @@
+id: CAP-HARNESS-TRACE-IMPORT
+name: Harness Trace Import
+description: >
+  Imports explicit repo-local JSONL/NDJSON harness trace records into NAOS
+  agent trace event shape as review evidence. The default mode writes an import
+  report only; appending to `naos/agent_trace_events.yaml` requires an explicit
+  `--write-events` flag.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Report-only local import review is available when a source file is provided."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Supports local harness trace normalization without runtime capture."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Invalid local harness trace imports should be reviewed before relying on trace evidence."
+  assured:
+    target_maturity: L3
+    enforcement: required
+    notes: "Imported trace records should be validated through agent-traces before Assured evidence use."
+authority:
+  may_read:
+    - "repo-local JSONL/NDJSON harness trace source files"
+    - "naos/agent_trace_events.yaml"
+    - "schemas/naos/agent_trace_event.schema.json"
+  may_write:
+    - "naos/reports/harness_trace_import.json"
+    - "naos/agent_trace_events.yaml only when --write-events is explicit"
+  may_block:
+    - "only through configured profile gate policy and human review for invalid local import evidence"
+allowed_resources:
+  - "repo-local JSONL/NDJSON harness trace files"
+  - "repo-local NAOS trace declarations"
+  - "repo-local schemas and policy"
+prohibited_resources:
+  - "runtime trace capture"
+  - "external harness execution"
+  - "hook activation"
+  - "LLM, provider, model, API, SaaS, or network calls"
+  - "command execution from trace records"
+  - "memory payload reads or memory write-back"
+constraints:
+  - "Must remain local-file import/reporting only."
+  - "Must not execute commands declared in trace records."
+  - "Must not read source files outside the project by default."
+  - "Must treat imported events as declared records, not proof."
+  - "Must recommend agent trace validation after write mode."
+required_evidence:
+  - "schemas/naos/harness_trace_import.schema.json"
+  - "scripts/naos_harness_trace_import.py"
+  - "naos/reports/harness_trace_import.json"
+validators:
+  - id: harness_trace_import
+    script: scripts/naos_harness_trace_import.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals:
+  - "harness_trace_import.status"
+  - "harness_trace_import.imported_event_count"
+  - "harness_trace_import.rejected_record_count"
+  - "harness_trace_import.events_written"
+maturity_path:
+  L0: "Capability contract, script, report schema, CLI, and Make target exist."
+  L1: "Local JSONL/NDJSON harness traces can be normalized in report-only mode."
+  L2: "Explicit write mode appends valid declared events for agent-trace validation."
+  L3: "Imported events are validated and reviewed before use as grading or audit input."
+  L4: "Teams keep source trace files, import reports, and validation reports fresh."
+  L5: "Adopter-owned harness pipelines provide governed local exports without NAOS executing harnesses."
+known_limitations:
+  - "Only JSONL/NDJSON local-file imports are supported."
+  - "Imported records can be incomplete, stale, or inaccurate."
+  - "The importer does not prove that harness execution occurred."
+  - "The importer does not validate behavioral correctness."
+  - "Run agent-trace validation after write mode to review combined trace records."
+not_claimed:
+  - "runtime trace capture"
+  - "harness execution"
+  - "command execution"
+  - "hook activation"
+  - "provider/API call"
+  - "network access"
+  - "memory write-back"
+  - "private memory payload read"
+  - "behavioral correctness proof"
+  - "approval"
+  - "certification"
+  - "compliance proof"
+  - "hallucination prevention"
+human_review_required: true
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/AUDIT_PLAYBOOK.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+  - templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md
+related_scripts:
+  - scripts/naos_harness_trace_import.py
+  - scripts/naos_agent_trace_validate.py
+related_schemas:
+  - schemas/naos/harness_trace_import.schema.json
+  - schemas/naos/agent_trace_event.schema.json

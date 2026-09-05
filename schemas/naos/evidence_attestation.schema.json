@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:evidence_attestation:v1",
+  "title": "NAOS Evidence Attestation Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "digest_algorithm",
+    "summary",
+    "artifact_manifest",
+    "missing_artifacts",
+    "stale_artifacts",
+    "reviewer_attestations",
+    "uncovered_artifacts",
+    "known_gaps",
+    "residual_risks",
+    "waivers",
+    "human_review_required",
+    "findings",
+    "limitations",
+    "not_claimed"
+  ],
+  "properties": {
+    "schema": {"const": "naos.evidence_attestation.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "review_required",
+        "missing",
+        "stale",
+        "uncovered",
+        "advisory",
+        "warning",
+        "blocked",
+        "not_configured",
+        "disabled",
+        "waived",
+        "unknown"
+      ]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "digest_algorithm": {"type": "string", "enum": ["sha256"]},
+    "manifest_root_digest": {"type": "string"},
+    "rules": {"type": "object"},
+    "review_metadata": {"type": "object"},
+    "summary": {"type": "object"},
+    "artifact_manifest": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "missing_artifacts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/missing_artifact"}
+    },
+    "stale_artifacts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "reviewer_attestations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/reviewer_attestation"}
+    },
+    "uncovered_artifacts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "known_gaps": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "waivers": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "human_review_required": {"type": "boolean"},
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["path", "status", "digest", "size_bytes"],
+      "properties": {
+        "path": {"type": "string"},
+        "artifact_group": {"type": "string"},
+        "status": {"type": "string"},
+        "digest": {"type": ["string", "null"]},
+        "size_bytes": {"type": ["integer", "null"]},
+        "modified_time": {"type": ["string", "null"]},
+        "freshness": {"type": "object"}
+      }
+    },
+    "missing_artifact": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["path", "artifact_group", "status"],
+      "properties": {
+        "path": {"type": "string"},
+        "artifact_group": {"type": "string"},
+        "status": {"type": "string"}
+      }
+    },
+    "reviewer_attestation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "review_scope", "review_outcome", "human_review_required"],
+      "properties": {
+        "id": {"type": "string"},
+        "reviewer_name": {"type": "string"},
+        "reviewer_role": {"type": "string"},
+        "review_date": {"type": "string"},
+        "reviewed_artifacts": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "artifact_groups": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "review_scope": {"type": "string"},
+        "review_outcome": {"type": "string"},
+        "human_review_required": {"type": "boolean"}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {
+          "type": "string",
+          "enum": ["none", "advisory", "warning", "required", "blocking"]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "review_required",
+            "missing",
+            "stale",
+            "uncovered",
+            "advisory",
+            "blocked",
+            "not_configured",
+            "disabled",
+            "waived",
+            "unknown",
+            "invalid_rules",
+            "missing_reviewer_metadata"
+          ]
+        },
+        "message": {"type": "string"},
+        "required_next_actions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

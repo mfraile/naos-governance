@@ -1,0 +1,324 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ============================================================================
+# Pre-Commit Hook — NAOS Portable Governance
+# ============================================================================
+# Copy to: .githooks/pre-commit (then chmod +x && git config core.hooksPath .githooks)
+#
+# [ADAPT] sections: update Python runner, script paths, project-specific validators
+#
+# BEHAVIOR SUMMARY (section labels are not a one-to-one governance-rule count):
+#  CORE — quickstart, lite, standard, and assured:
+#   - Best-effort TASK_REGISTRY synchronization when its source is staged.
+#   - Hard failures for defined archive, backup, session-summary, and temp/draft
+#     filename patterns.
+#   - Warnings for new-doc indexing and, only when a message-file argument is
+#     supplied, commit-message format.
+#
+#  STANDARD — standard and assured:
+#   - Soft Ruff, duplicate-hygiene, and missing-Implements-header findings.
+#   - Task-registry validation warns in Standard and fails in Assured.
+#   - The caller-supplied NAOS_CONTEXT_REMAINING_PCT signal warns below 35 and
+#     rejects the commit attempt below 25; unset is a no-op. It does not measure
+#     instruction lines, verify a checkpoint, or intercept tool calls.
+#   - Test-AC reference validation fails when its validator is installed and the
+#     staged tests contain unknown AC/SCEN references.
+#
+#  ASSURED — conditional hard checks when corresponding files/scripts exist:
+#   architecture coherence, Mermaid syntax, metrics coherence, and task coherence.
+#
+# Profile tiers are controlled by NAOS_TIER: quickstart | lite (default) |
+# standard | assured. The code below is authoritative for exact warning/failure
+# behavior; RULES posture counts are not executable-check counts.
+# ============================================================================
+
+# Path resolution (NAOS_ROOT can be overridden via env var)
+NAOS_ROOT="${NAOS_ROOT:-naos}"
+NAOS_TIER="${NAOS_TIER:-lite}"   # quickstart | lite | standard | assured
+
+# [ADAPT: Update PYTHON_CMD for your environment]
+# Examples:
+#   PYTHON_CMD="python"                                          # system python
+#   PYTHON_CMD="conda run -n myenv python"                      # conda env
+#   PYTHON_CMD="source .venv/bin/activate && python"            # venv
+#   PYTHON_CMD="/home/user/.venv/bin/python"                    # absolute path
+PYTHON_CMD="${NAOS_PYTHON:-python}"
+
+# Colors
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+VIOLATIONS=0
+
+# Get staged files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+
+# ============================================================================
+# 0. AUTO-SYNC: If TASK_REGISTRY.yaml modified, sync derived files
+# ============================================================================
+if echo "$STAGED_FILES" | grep -q "^${NAOS_ROOT}/TASK_REGISTRY\\.yaml\$"; then
+  echo -e "${CYAN}[pre-commit] TASK_REGISTRY.yaml modified — auto-syncing derived files...${NC}"
+  # [ADAPT: update script path if your sync script lives elsewhere]
+  $PYTHON_CMD "${NAOS_ROOT}/workflows/scripts/sync_from_registry.py" 2>/dev/null || true
+  # [ADAPT: update these paths to match your auto-generated files]
+  git add "${NAOS_ROOT}/BACKLOG.md" "${NAOS_ROOT}/DASHBOARD.md" "${NAOS_ROOT}/PROJECT_STATUS.md" 2>/dev/null || true
+  echo -e "   ${YELLOW}[WARN]${NC} Best-effort sync attempted — review and stage derived files"
+  STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+fi
+
+# ============================================================================
+# 1. Project-specific validation (ADAPT this section)
+# ============================================================================
+echo "[pre-commit] Running project validators..."
+# [ADAPT: Add your project-specific validators here]
+# Examples:
+#   $PYTHON_CMD scripts/validate_spec_consistency.py
+#   $PYTHON_CMD scripts/naos_validate_truth.py
+#
+# Remove this echo line once you've added real validators below:
+echo "   (no project validators configured — add to section 1 of pre-commit)"
+
+# ============================================================================
+# 2. Governance Checks — CORE (checks 2-6, all tiers)
+# ============================================================================
+echo "[pre-commit] AI governance checks (CORE)"
+
+# Check 2: No archive/ folders
+echo "  - Checking for archive folders..."
+if echo "$STAGED_FILES" | grep -iE '(^|/)archive/' >/dev/null 2>&1; then
+  echo -e "${RED}[FAIL]${NC} Archive folders forbidden (.ai/RULES.md Rule 2)"
+  echo "$STAGED_FILES" | grep -iE '(^|/)archive/' | sed 's/^/    /'
+  echo "  Fix: Delete with 'git rm' instead of moving to archive/"
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+# Check 3: No backup files
+echo "  - Checking for backup files..."
+if echo "$STAGED_FILES" | grep -E '\.(bak|backup)$|_backup\.' >/dev/null 2>&1; then
+  echo -e "${RED}[FAIL]${NC} Backup files forbidden"
+  echo "$STAGED_FILES" | grep -E '\.(bak|backup)$|_backup\.' | sed 's/^/    /'
+  echo "  Fix: Delete backup files, rely on git history"
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+# Check 4: No session summary files
+echo "  - Checking for session summary files..."
+if echo "$STAGED_FILES" | grep -iE '(session_|session_notes_|session-summary)' >/dev/null 2>&1; then
+  echo -e "${RED}[FAIL]${NC} Session summaries forbidden (.ai/RULES.md Rule 3)"
+  echo "$STAGED_FILES" | grep -iE '(session_|session_notes_|session-summary)' | sed 's/^/    /'
+  echo "  Fix: Update ${NAOS_ROOT}/PROJECT_STATUS.md 'Update History' instead"
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+# Check 5: No temp/draft files (outside docs/exploration/)
+echo "  - Checking for temp/analysis files..."
+if echo "$STAGED_FILES" | grep -iE '(^temp_|^draft_|analysis_[0-9]{4})' | grep -v 'docs/exploration/' >/dev/null 2>&1; then
+  echo -e "${RED}[FAIL]${NC} Temp/draft files forbidden (.ai/RULES.md Rule 1)"
+  echo "$STAGED_FILES" | grep -iE '(^temp_|^draft_|analysis_[0-9]{4})' | grep -v 'docs/exploration/' | sed 's/^/    /'
+  echo "  Fix: Use docs/exploration/ for exploration (exempt from validation)"
+  VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+# Check 6a: New docs should be in DOCS_INDEX.md
+echo "  - Checking new docs indexed..."
+# [ADAPT: update docs path if different]
+NEW_DOCS=$(echo "$STAGED_FILES" | grep '^docs/.*\.md$' | grep -v '^docs/DOCS_INDEX\.md$' | grep -v '^docs/exploration/' || true)
+if [ -n "$NEW_DOCS" ]; then
+  if ! echo "$STAGED_FILES" | grep -q '^docs/DOCS_INDEX\.md$'; then
+    echo -e "${YELLOW}[WARN]${NC} New docs should be added to docs/DOCS_INDEX.md"
+    echo "$NEW_DOCS" | sed 's/^/    /'
+    echo "  Fix: Add entries to docs/DOCS_INDEX.md and stage it"
+  fi
+fi
+
+# Check 6b: Commit message format
+echo "  - Checking commit message format..."
+COMMIT_MSG_FILE="${1:-}"
+if [ -n "$COMMIT_MSG_FILE" ] && [ -f "$COMMIT_MSG_FILE" ]; then
+  COMMIT_MSG=$(head -1 "$COMMIT_MSG_FILE")
+  if ! echo "$COMMIT_MSG" | grep -iE '(FR-[0-9]+|T-[0-9]+|chore|docs|refactor|style|test|ci)' >/dev/null 2>&1; then
+    echo -e "${YELLOW}[WARN]${NC} Commit message should reference T-XXX or FR-XXX"
+    echo "  Current: $COMMIT_MSG"
+    echo "  Examples: feat(T-042): ..., fix(FR-007): ..., chore: ..."
+  fi
+fi
+
+# ============================================================================
+# [ADAPT: enforcement_level: soft]
+# 3. STANDARD checks (7-10) — enabled when NAOS_TIER=standard or assured
+# ============================================================================
+if [ "$NAOS_TIER" = "standard" ] || [ "$NAOS_TIER" = "assured" ]; then
+  echo "[pre-commit] Standard checks (tier: $NAOS_TIER)"
+
+  # Check 7: Ruff lint gate (code quality)
+  # enforcement_level: soft
+  echo "  - Code quality gate (ruff)..."
+  # [ADAPT: update to match your Python source directory]
+  if command -v ruff >/dev/null 2>&1; then
+    PY_STAGED=$(echo "$STAGED_FILES" | grep '\.py$' || true)
+    if [ -n "$PY_STAGED" ]; then
+      if ! echo "$PY_STAGED" | xargs ruff check --quiet 2>/dev/null; then
+        echo -e "${YELLOW}[WARN]${NC} Ruff lint issues found (enforcement: soft — fix before merge)"
+        echo "  Run: ruff check <files>"
+      fi
+    fi
+  else
+    echo "   (ruff not installed — skipping lint gate)"
+  fi
+
+  # Check 8: Anti-duplication gate (deterministic duplicate hygiene)
+  # enforcement_level: soft
+  echo "  - Anti-duplication gate (duplicate hygiene)..."
+  PY_STAGED=$(echo "$STAGED_FILES" | grep '\.py$' || true)
+  if [ -n "$PY_STAGED" ] && [ -f scripts/naos_duplicate_function_hygiene.py ]; then
+    if ! $PYTHON_CMD scripts/naos_duplicate_function_hygiene.py --profile "$NAOS_TIER" --naos-root "$NAOS_ROOT" --json >/tmp/naos_duplicate_function_hygiene_precommit.json 2>/dev/null; then
+      echo -e "${YELLOW}[WARN]${NC} Duplicate-function hygiene findings detected (enforcement: soft — review before merge)"
+      echo "  Run: make -f Makefile.naos naos-duplicate-function-hygiene"
+    fi
+  elif [ -n "$PY_STAGED" ] && [ -f scripts/naos_code_quality_audit.py ]; then
+    if ! $PYTHON_CMD scripts/naos_code_quality_audit.py --check-duplicates --staged-only >/tmp/naos_duplicate_function_hygiene_precommit.json 2>/dev/null; then
+      echo -e "${YELLOW}[WARN]${NC} Potential duplicate functions detected (enforcement: soft — review before merge)"
+      echo "  Run: python scripts/naos_code_quality_audit.py --check-duplicates --staged-only"
+    fi
+  else
+    echo "   duplicate hygiene script not installed or no staged Python files — skipping"
+  fi
+
+  # Check 9: Spec alignment gate (traceability headers in staged .py files)
+  # enforcement_level: soft
+  echo "  - Spec alignment gate (traceability headers)..."
+  NEW_PY=$(echo "$STAGED_FILES" | grep '\.py$' || true)
+  if [ -n "$NEW_PY" ]; then
+    MISSING_HEADERS=""
+    while IFS= read -r py_file; do
+      [ -f "$py_file" ] || continue
+      if ! grep -qE 'Implements\s*:?\s*(FR|NFR)-' "$py_file" 2>/dev/null; then
+        MISSING_HEADERS="$MISSING_HEADERS\n    $py_file"
+      fi
+    done <<< "$NEW_PY"
+    if [ -n "$MISSING_HEADERS" ]; then
+      echo -e "${YELLOW}[WARN]${NC} New Python files missing 'Implements: FR-XXX' header:"
+      echo -e "$MISSING_HEADERS"
+      echo "  Add: Implements: FR-XXX, Task: T-XXX, Specs: …, Rationale: …"
+    fi
+  fi
+
+  # Check 10: Task registry schema + dependency/parallelism validation
+  # enforcement_level: warning in Standard; hard in Assured when TASK_REGISTRY.yaml is staged and validation fails
+  echo "  - Task registry schema + dependency/parallelism validation..."
+  if echo "$STAGED_FILES" | grep -q "TASK_REGISTRY\\.yaml\$"; then
+    # [ADAPT: update script path]
+    if ! $PYTHON_CMD scripts/naos_validate_task_registry.py; then
+      if [ "$NAOS_TIER" = "assured" ]; then
+        echo -e "${RED}[FAIL]${NC} TASK_REGISTRY.yaml validation failed — check schema, dependencies, and parallelizable metadata"
+        VIOLATIONS=$((VIOLATIONS + 1))
+      else
+        echo -e "${YELLOW}[WARN]${NC} TASK_REGISTRY.yaml validation failed — check schema, dependencies, and parallelizable metadata"
+      fi
+    fi
+  fi
+
+  # Check 10b: Caller-supplied context signal (Rule 26 PAUL brackets)
+  # enforcement_level: hard for both Standard and Assured when caller-supplied percentage is a valid integer below 25
+  # Reads caller-supplied NAOS_CONTEXT_REMAINING_PCT (integer 0-100).
+  # No-op when unset, so direct human commits are never blocked by missing telemetry.
+  echo "  - Caller-supplied context signal (Rule 26)..."
+  if [ -n "${NAOS_CONTEXT_REMAINING_PCT:-}" ]; then
+    PCT="$NAOS_CONTEXT_REMAINING_PCT"
+    if ! [[ "$PCT" =~ ^[0-9]+$ ]]; then
+      echo -e "${YELLOW}[WARN]${NC} NAOS_CONTEXT_REMAINING_PCT='$PCT' is not an integer — skipping context monitor"
+    elif [ "$PCT" -lt 25 ]; then
+      echo -e "${RED}[FAIL]${NC} CRITICAL bracket (${PCT}% remaining < 25%). Save full Rule 26 checkpoint and hand off via strategic-compact before committing."
+      echo "  Override (rare): NAOS_CONTEXT_REMAINING_PCT=100 git commit ..."
+      exit 1
+    elif [ "$PCT" -lt 35 ]; then
+      echo -e "${YELLOW}[WARN]${NC} DEEP bracket (${PCT}% remaining < 35%). Compact memory before next sub-task; T1+T5 checkpoints required."
+    fi
+  fi
+
+  # Check 10c: Test-AC reference validator (test hallucination detection — A6)
+  # enforcement_level: soft (Standard) / hard (Assured)
+  # Cross-refs AC-/SCEN- ids in staged tests against specs/06-acceptance.md.
+  echo "  - Test-AC reference validator..."
+  if [ -f "scripts/validators/validate_test_ac_references.py" ]; then
+    if ! $PYTHON_CMD scripts/validators/validate_test_ac_references.py --staged; then
+      echo -e "${RED}[FAIL]${NC} Test references AC/SCEN ids that don't exist in specs/"
+      echo "  Run: python scripts/validators/validate_test_ac_references.py"
+      VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+  fi
+fi
+
+# ============================================================================
+# [ADAPT: enforcement_level: hard]
+# 4. ASSURED checks (11-14) — enabled when NAOS_TIER=assured
+# ============================================================================
+if [ "$NAOS_TIER" = "assured" ]; then
+  echo "[pre-commit] Assured checks (tier: $NAOS_TIER)"
+
+  # Check 11: Architecture boundary gate
+  # enforcement_level: hard
+  echo "  - Architecture boundary gate..."
+  if [ -f "configs/naos_architecture_boundaries.yaml" ]; then
+    if ! $PYTHON_CMD scripts/validators/validate_architecture_coherence.py 2>/dev/null; then
+      echo -e "${RED}[FAIL]${NC} Architecture boundary violations detected"
+      echo "  Run: python scripts/validators/validate_architecture_coherence.py"
+      VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+  else
+    echo "   (naos_architecture_boundaries.yaml not found — skipping boundary gate)"
+  fi
+
+  # Check 12: Mermaid diagram lint
+  # enforcement_level: hard
+  echo "  - Mermaid diagram lint..."
+  MD_STAGED=$(echo "$STAGED_FILES" | grep '\.md$' || true)
+  if [ -n "$MD_STAGED" ]; then
+    if ! $PYTHON_CMD scripts/validators/lint_mermaid_diagrams.py . 2>/dev/null; then
+      echo -e "${RED}[FAIL]${NC} Repository Mermaid scan failed (triggered because Markdown is staged)"
+      echo "  Run: python scripts/validators/lint_mermaid_diagrams.py"
+      VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+  fi
+
+  # Check 13: Metrics coherence check
+  # enforcement_level: hard
+  echo "  - Metrics coherence check..."
+  if echo "$STAGED_FILES" | grep -qE '(DASHBOARD|PROJECT_STATUS|03-requirements)'; then
+    if ! $PYTHON_CMD scripts/validators/validate_metrics_coherence.py 2>/dev/null; then
+      echo -e "${RED}[FAIL]${NC} Metrics coherence violation — DASHBOARD.md may be out of sync"
+      echo "  Run: python scripts/validators/validate_metrics_coherence.py"
+      VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+  fi
+
+  # Check 14: Task coherence check
+  # enforcement_level: hard
+  echo "  - Task coherence check..."
+  TASK_FILES=$(echo "$STAGED_FILES" | grep -E '(TASK_REGISTRY|DASHBOARD|BACKLOG|PROJECT_STATUS)' || true)
+  if [ -n "$TASK_FILES" ]; then
+    if ! $PYTHON_CMD scripts/validators/validate_task_coherence.py 2>/dev/null; then
+      echo -e "${RED}[FAIL]${NC} Task coherence violation — governance files out of sync with TASK_REGISTRY"
+      echo "  Run: python scripts/validators/validate_task_coherence.py"
+      VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+  fi
+fi
+
+# ============================================================================
+# Final verdict
+# ============================================================================
+if [ "$VIOLATIONS" -gt 0 ]; then
+  echo ""
+  echo -e "${RED}❌ Commit BLOCKED: $VIOLATIONS violation(s) found${NC}"
+  echo "   Fix the issues above and try again."
+  echo "   See: .ai/RULES.md for governance rules"
+  exit 1
+fi
+
+echo -e "${GREEN}✅ Pre-commit checks passed (tier: ${NAOS_TIER})${NC}"
+exit 0

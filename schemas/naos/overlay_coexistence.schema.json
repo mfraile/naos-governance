@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/overlay_coexistence.schema.json",
+  "title": "NAOS reversible overlay coexistence report",
+  "type": "object",
+  "required": ["schema", "status", "target", "profile", "expected_commit", "observed_commit", "commit_match", "target_unchanged", "findings", "human_review_required", "limitations", "not_claimed", "summary"],
+  "properties": {
+    "schema": {"const": "naos.overlay_coexistence.v1"},
+    "status": {"enum": ["pass", "failed"]},
+    "target": {"type": "string"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "expected_commit": {"type": ["string", "null"]},
+    "observed_commit": {"type": ["string", "null"]},
+    "validated_commit": {"type": ["string", "null"]},
+    "commit_match": {"type": "boolean"},
+    "target_snapshot_before": {"type": "object"},
+    "target_snapshot_after": {"type": "object"},
+    "target_unchanged": {"type": ["boolean", "null"]},
+    "compatibility_preflight": {"type": ["object", "null"]},
+    "activation_outcome": {"enum": ["blocked_before_activation", "activated_in_disposable_checkout", "failed"]},
+    "disposable_target_snapshot_before_activation": {"type": "object"},
+    "disposable_target_snapshot_after_activation": {"type": "object"},
+    "disposable_target_unchanged_when_blocked": {"type": ["boolean", "null"]},
+    "overlay": {"type": "object"},
+    "verification": {"type": "object"},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "human_review_required": {"type": "boolean"},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "summary": {"type": "object"}
+  },
+  "additionalProperties": false
+}

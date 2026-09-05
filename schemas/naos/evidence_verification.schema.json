@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:evidence_verification:v1",
+  "title": "NAOS Evidence Verification Report",
+  "description": "Deterministic local digest verification report. It recomputes artifact digests and manifest roots and reports signature-entry presence; it does not validate third-party signatures or authenticate identities.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "deterministic",
+    "summary",
+    "findings",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "tamper_evident",
+    "signed"
+  ],
+  "properties": {
+    "schema": {"const": "naos.evidence_verification.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "summary": {"type": "object", "additionalProperties": true},
+    "findings": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+    "tamper_evident": {"type": "boolean"},
+    "recomputed_root": {"type": ["string", "null"]},
+    "recorded_root": {"type": ["string", "null"]},
+    "artifacts_checked": {"type": "integer", "minimum": 0},
+    "signed": {
+      "type": "boolean",
+      "description": "Compatibility field indicating only whether signature entries are present; it is not a signature-validation result."
+    },
+    "signature_entries_present": {"type": "boolean"},
+    "signature_validation_performed": {
+      "const": false,
+      "description": "NAOS performs no envelope or third-party signature validation."
+    },
+    "identity_binding": {
+      "type": "object",
+      "description": "Compatibility-named best-effort Git HEAD metadata. Git may report signature status and signer text; NAOS applies no independent signature trust or acceptance policy and does not authenticate an identity.",
+      "additionalProperties": true
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"},
+      "contains": {"const": "signature by NAOS"}
+    },
+    "human_review_required": {"type": "boolean"}
+  }
+}

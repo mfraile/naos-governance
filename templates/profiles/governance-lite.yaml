@@ -1,0 +1,227 @@
+# NAOS Profile Preset: governance-lite
+# Created: 2026-03-19
+#
+# Target: Solo developer, quick start, proof-of-concept project
+# Depth: guardrails — minimum friction, maximum safety
+#
+# REFERENCE document only — does NOT modify live project files.
+# Use the NAOS CLI to extract and adapt these components for a new project.
+
+---
+
+id: governance-lite
+name: "Governance Lite"
+depth: guardrails
+target: "Solo developers and small projects seeking a lighter configured posture"
+description: >
+  The minimum viable governance stance. Provides core rules and review guidance
+  intended to reduce common AI coding risks (file proliferation, code duplication,
+  silent error swallowing, dangerous dependencies) with near-zero tooling
+  overhead. It includes a file-first task registry, bounded lifecycle reports,
+  and dashboard generation, but no behavioral evaluator.
+  Profile-selection guidance: consider governance-standard when team size > 1
+  or project > 3 months; existing-project apply is not currently available.
+
+# Canonical active RULES rows for Lite (posture, not executable-check count)
+rules:
+  active_rule_ids: [1, 2, 5, 7, 10, 19, 20, 24, 26]
+  included:
+    - id: RULES-01
+      name: "Update Existing Files"
+      rationale: "Declares update-first policy; the hook covers only its documented filename patterns"
+    - id: RULES-02
+      name: "No Archive Folders"
+      rationale: "Declares no-archive policy; an explicitly activated hook checks archive paths"
+    - id: RULES-05
+      name: "Exploration Notes Only"
+      rationale: "Carves out a safe exploration space without polluting main docs"
+    - id: RULES-07
+      name: "Deep Analysis Protocol"
+      rationale: "Prompts evidence-first analysis; it does not guarantee factual correctness"
+    - id: RULES-10
+      name: "License Compliance"
+      rationale: "Declares licence-review posture; Lite installs no licence scanner"
+    - id: RULES-19
+      name: "Memory Governance Protocol"
+      rationale: "Declares bounded memory handling and repository-source authority"
+    - id: RULES-20
+      name: "Dependency Declaration"
+      rationale: "Declares dependency traceability and review posture"
+    - id: RULES-24
+      name: "WI Context Brief Protocol"
+      rationale: "Provides context-brief guidance without commit-time rejection"
+    - id: RULES-26
+      name: "Cognitive Checkpoint Protocol"
+      rationale: "Provides checkpoint guidance; caller-supplied hook telemetry is optional"
+  excluded:
+    - reason: "Rules 03,04,16,17 reference source-project-specific PM infrastructure"
+    - reason: "Rules 08,09 (bulk migration, enhancement protocol) are too advanced for lite"
+    - reason: "Rules 12,15 reference source-project-specific data architecture"
+    - reason: "Rules 21-23 (ML/artifacts) are not active Lite rows"
+
+# Skills included by the generated Lite profile
+skills:
+  included:
+    - id: cognitive-checkpoint
+      path: ".github/skills/cognitive-checkpoint/SKILL.md"
+    - id: debug
+      path: ".github/skills/debug/SKILL.md"
+      rationale: "Evidence-first debug methodology"
+    - id: gov-refresh
+      path: ".github/skills/gov-refresh/SKILL.md"
+    - id: cookbook-governance
+      path: ".github/skills/cookbook-governance/SKILL.md"
+    - id: cookbook-observability
+      path: ".github/skills/cookbook-observability/SKILL.md"
+    - id: cookbook-evals
+      path: ".github/skills/cookbook-evals/SKILL.md"
+  excluded:
+    - reason: "cookbook-migrations, cookbook-neo4j are domain-specific"
+    - reason: "spec-extract requires project-specific specs/ structure"
+
+# Agents included by the generated Lite profile
+agents:
+  included:
+    - id: plan
+      path: ".github/agents/naos-plan.agent.md"
+      rationale: "Planning guidance supports explicit scope review"
+    - id: implement
+      path: ".github/agents/naos-implement.agent.md"
+      rationale: "Implement discipline with anti-duplication and memory checkpoint"
+    - id: research
+      path: ".github/agents/naos-research.agent.md"
+      rationale: "Read-only evidence collection and bounded handoff"
+    - id: review
+      path: ".github/agents/naos-review.agent.md"
+      rationale: "Independent review with human merge-decision boundary"
+  excluded:
+    - reason: "Conformance and triage agents remain standard+ surfaces."
+
+# Scripts included
+scripts:
+  included:
+    - id: task_lifecycle
+      path: "scripts/naos_task_lifecycle.py"
+    - id: task_context
+      path: "scripts/naos_task_context_pack.py"
+    - id: session_lifecycle
+      path: "scripts/naos_session_lifecycle.py"
+    - id: readiness
+      path: "scripts/naos_readiness.py"
+    - id: governance_refresh
+      path: "scripts/workflows/sync_from_registry.py"
+  excluded:
+    - reason: "Deep validators and full evidence tooling remain standard+ surfaces."
+  notes: >
+    Generated Lite scripts operate on adopter-local file-first contracts. They
+    produce review evidence and do not approve merge, release, or correctness.
+
+# Configs included
+configs:
+  included:
+    - id: policy
+      path: "naos/policy/default_policy.yaml"
+    - id: profile_generated_surface_contract
+      path: "naos/profile_generated_surface_contract.json"
+  excluded:
+    - reason: "Other configs are source-project-specific (AI models, event bus, thresholds)"
+
+# Features enabled
+features:
+  pre_commit_hooks: true
+  task_registry: true
+  traceability_matrix: true
+  behavioral_testing: false
+  instinct_recording: false
+  drift_checks: false
+  profile_autoresearch: false
+  capability_framework: configured
+
+commands:
+  gov-refresh: {applicability: available, target: gov-refresh}
+  naos-readiness: {applicability: available, target: naos-readiness}
+  research: {applicability: available, surface: ".github/agents/naos-research.agent.md"}
+  review: {applicability: available, surface: ".github/agents/naos-review.agent.md"}
+  design: {applicability: available, surface: ".github/prompts/naos-design.prompt.md"}
+  task-complete: {applicability: available, target: naos-task-complete, surface: ".github/prompts/naos-task-complete.prompt.md"}
+
+capabilities:
+  default_target_maturity: L1
+  default_enforcement: warning
+  activated_by_default:
+    - CAP-CLAIMS-VALIDATION
+    - CAP-SELF-CONFORMANCE
+    - CAP-GATEKEEPER-MANIFEST
+  warning_only:
+    - CAP-ROADMAP-CROSSWALK-VALIDATION
+    - CAP-FUNCTION-INDEX-HEALTH
+    - CAP-TEST-EVIDENCE
+  advisory_only:
+    - CAP-EVIDENCE-PACK
+  experimental_not_activated:
+    - CAP-RUNTIME-HANDOFF
+    - CAP-STRUCTURED-SUBSTRATE
+    - CAP-SOURCE-TEST-GRAPH
+    - CAP-DIGITAL-TWIN-EVALUATION
+
+gate_policy:
+  default_severity: warning
+  allow_blocking: false
+  require_evidence_pack: false
+  require_exception_approval: false
+  gates:
+    G0: warning
+    G1: warning
+    G2: warning
+    G3: warning
+    G4: warning
+    G5: warning
+    G6: warning
+    G7: advisory
+    G8: advisory
+
+# Setup effort
+setup:
+  effort_basis: "Project-dependent; record actual install and validation receipts rather than using a kit-wide estimate."
+  prerequisites:
+    - "VS Code with GitHub Copilot or Claude Code"
+    - "Python project (adapts to other languages with minor edits)"
+  steps:
+    - "Generate with naos init --tier lite and inspect naos/profile_generated_surface_contract.json"
+    - "Fill profile-required specs 01-03 with the generated naos-design prompt"
+    - "Use the generated research, plan, implement, review, and task-complete surfaces"
+
+notes: >
+  Consider governance-standard when the team grows beyond 1 person, the
+  project exceeds 3 months, or traceability becomes a review requirement.
+  For an existing project, use `naos upgrade . --tier standard --dry-run` for
+  comparison only.
+
+# ─── Context Phase Injection (fresh-context-per-task principle) ───────────────
+# For each SDLC phase, only the listed files should be injected into the AI
+# agent's context. Excluding irrelevant files reduces context pollution and
+# drift across tasks.
+# [ADAPT] Adjust paths to match your project structure.
+# ─────────────────────────────────────────────────────────────────────────────
+context_phases:
+  plan:
+    inject:
+      - .github/copilot-instructions.md
+      - .ai/RULES.md
+    exclude: []
+    rationale: "Planning needs rules only — keep context minimal"
+
+  implement:
+    inject:
+      - .github/copilot-instructions.md
+      - .ai/RULES.md
+    exclude:
+      - .github/skills/   # Skills add noise for simple single-pass tasks
+    rationale: "Implementation needs governance discipline only"
+
+  commit:
+    inject:
+      - .github/copilot-instructions.md
+    exclude:
+      - specs/
+    rationale: "Commit needs conventions only — exclude all doc context"

@@ -1,0 +1,172 @@
+id: CAP-GOVERNED-AGENTIC-CODING-WORKFLOW
+name: Governed Agentic Coding Workflow
+description: >
+  Provides deterministic, file-first review of declared AI-assisted engineering
+  operating controls. The capability checks whether a project records context
+  hygiene, Pre-Implementation Alignment, vertical-slice delivery, red-green
+  feedback, module-design guidance, human/AI work split, Kanban/DAG task flow,
+  push/pull context discipline, and a versioned implementation-readiness
+  planning baseline as reviewable NAOS artifacts. An optional Assured-only
+  module can also build a deterministic, human-gated task-lane proposal; it
+  never launches agents or mutates client configuration or task state.
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Surfaces missing workflow declarations as low-friction advisory guidance."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Supports deterministic review of workflow and alignment artifacts; implementation-ready planning binds requirements but does not require or synthesize architecture."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Expects key workflow sections, requirements, architecture, task plan, Pre-Implementation Alignment evidence, and an attributable planning decision before an implementation-ready baseline."
+  assured:
+    target_maturity: L3
+    enforcement: required
+    notes: "Requires unsafe workflow flags and missing alignment evidence to be routed to human review; the optional orchestration planner remains proposal-only and separately confirmed."
+authority:
+  may_read:
+    - "naos/agentic_workflow.yaml"
+    - "naos/AGENTIC_CODING_PLAYBOOK.md"
+    - "naos/PRE_IMPLEMENTATION_ALIGNMENT.md"
+    - "naos/PLANNING_BASELINES.yaml"
+    - "naos/TASK_REGISTRY.yaml"
+    - "specs/03-requirements.md"
+    - "specs/04-architecture.md"
+    - "naos/reports/*.json"
+    - "naos/sessions_index.json"
+    - "naos/agent_orchestration_policy.yaml"
+    - "naos/agent_orchestration_request.yaml"
+    - "naos/human_decisions/DECISION-RUN-*.yaml"
+  may_write:
+    - "naos/reports/agentic_workflow_review.json"
+    - "naos/reports/pre_implementation_alignment_review.json"
+    - "naos/reports/plan_coherence.json"
+    - "naos/sessions/<session_id>/reports/agentic_workflow_review.json"
+    - "naos/sessions/<session_id>/reports/pre_implementation_alignment_review.json"
+  may_block:
+    - "only through configured profile gate policy and human review"
+allowed_resources:
+  - "repo-local workflow declarations"
+  - "repo-local Markdown alignment checklist"
+  - "repo-local deterministic NAOS reports"
+  - "repo-local schemas and templates"
+  - "optional Assured-only orchestration policy, request, and stdout proposal"
+prohibited_resources:
+  - "LLM, provider, model, API, SaaS, or network calls"
+  - "runtime MCP, Engram, vector, graph, or memory behavior"
+  - "memory write-back"
+  - "automatic context injection"
+  - "automatic approval"
+  - "automatic agent launch, client configuration mutation, task/claim mutation, or task closure"
+  - "deployment or release automation"
+constraints:
+  - "Must remain deterministic, local, file-first, and tool-neutral."
+  - "Must treat repository files, schemas, policy, and deterministic reports as primary evidence."
+  - "Must keep advisory findings from replacing deterministic evidence or human review."
+  - "Must not infer actual model attention, hidden chat history, behavioral correctness, or requirements completeness."
+  - "Must surface unsafe flags such as allowed silent context injection, memory write-back, or auto-approval."
+  - "Must allow discovery and draft plans to evolve while preventing G2 readiness until the applicable profile inputs, current deterministic evidence, complete task coverage, and attributable owner decision converge."
+  - "Must use hybrid planning with vertical delivery as the default; a horizontal foundation must name a consuming vertical slice and the consumed result it changes."
+  - "Must treat routine task-status changes as execution progress rather than structural replanning; structural task/spec/alignment/evidence changes require versioned supersession."
+  - "When the optional orchestration module is installed, it must fail closed on stale live planning, undelivered dependencies, active claims, unsupported client projection contracts, missing exact model/effort metadata, dirty Git state, or a missing/mismatched human decision."
+  - "A priority/dependency wave is a proposal only; later waves must be recomputed and no result may be automatically approved, closed, merged, pushed, released, or published."
+required_evidence:
+  - "schemas/naos/agentic_workflow.schema.json"
+  - "schemas/naos/agentic_workflow_review.schema.json"
+  - "schemas/naos/pre_implementation_alignment.schema.json"
+  - "schemas/naos/pre_implementation_alignment_review.schema.json"
+  - "schemas/naos/planning_baselines.schema.json"
+  - "schemas/naos/plan_coherence.schema.json"
+  - "templates/structural-seeds/naos/agentic_workflow.yaml"
+  - "templates/structural-seeds/naos/AGENTIC_CODING_PLAYBOOK.md"
+  - "templates/structural-seeds/naos/PRE_IMPLEMENTATION_ALIGNMENT.md"
+  - "templates/structural-seeds/naos/PLANNING_BASELINES.yaml"
+  - "templates/prompts/pre_implementation_alignment.md"
+  - "scripts/naos_agentic_workflow_review.py"
+  - "scripts/naos_pre_implementation_alignment_review.py"
+  - "scripts/naos_plan_coherence.py"
+  - "naos/reports/agentic_workflow_review.json"
+  - "naos/reports/pre_implementation_alignment_review.json"
+  - "naos/reports/plan_coherence.json"
+validators:
+  - id: agentic_workflow_review
+    script: scripts/naos_agentic_workflow_review.py
+    status: available
+  - id: pre_implementation_alignment_review
+    script: scripts/naos_pre_implementation_alignment_review.py
+    status: available
+  - id: plan_coherence
+    script: scripts/naos_plan_coherence.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+  - G8
+dashboard_signals:
+  - "agentic_workflow_review.status"
+  - "agentic_workflow_review.workflow_config_valid"
+  - "agentic_workflow_review.missing_artifacts"
+  - "pre_implementation_alignment_review.status"
+  - "pre_implementation_alignment_review.question_coverage"
+  - "pre_implementation_alignment_review.missing_required_questions"
+  - "pre_implementation_alignment_review.human_review_required"
+  - "plan_coherence.implementation_readiness.status"
+  - "plan_coherence.implementation_readiness.task_coverage.complete"
+  - "plan_coherence.implementation_readiness.decision.status"
+maturity_path:
+  L0: "Capability contract, schemas, seeds, prompt, and review scripts exist."
+  L1: "Generated Lite+ projects receive workflow, alignment, and planning-baseline artifacts and can produce review reports."
+  L2: "Applicable specs, alignment, task-plan projection, structural evidence, and an attributable owner decision converge in a current implementation-ready baseline."
+  L3: "Unsafe workflow flags, missing alignment evidence, and missing test/evidence strategy are routed to human review."
+  L4: "Teams use task claims, PR summaries, evidence packs, and gate reports to review parallel agentic work."
+  L5: "Workflow controls participate in governed learning and retrospectives without becoming autonomous approval."
+known_limitations:
+  - "The review scripts inspect declared local files and reports, and plan coherence reruns the bound structural spec-pack and alignment prerequisites; they do not inspect chat history or runtime model behavior."
+  - "A complete checklist can still miss project-specific ambiguity or risk."
+  - "Structural spec/evidence validation and attributable decision records do not prove requirements or architecture quality or real-world role authority."
+  - "Model performance may vary with context shape, task difficulty, and tool behavior."
+  - "Fresh task context is recommended where practical, but the kit cannot force how an external assistant manages context."
+  - "Optional client projections are dated declaration formats and do not prove the effective runtime model, reasoning effort, or independent clean execution."
+residual_risks:
+  - "Teams may treat advisory workflow findings as stronger than the underlying evidence supports."
+  - "Alignment artifacts can become stale if not updated with task scope changes."
+  - "Incorrect task decomposition can remain structurally valid; the owner and reviewers remain responsible for plan quality."
+  - "Human review quality remains adopter-owned."
+not_claimed:
+  - "runtime behavioral proof"
+  - "AI quality certification"
+  - "hallucination prevention"
+  - "model attention guarantee"
+  - "autonomous approval"
+  - "design approval"
+  - "implementation approval"
+  - "task closure"
+  - "automatic task dispatch or client configuration"
+  - "merge or release authority"
+  - "requirements completeness proof"
+  - "legal or regulatory compliance"
+  - "proof of compliance"
+  - "human review replacement"
+human_review_required: true
+related_docs:
+  - README.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/CONTROL_PLANE.md
+  - docs/TOOL_NEUTRAL_USAGE.md
+  - templates/structural-seeds/naos/AGENTIC_CODING_PLAYBOOK.md
+  - templates/structural-seeds/naos/PRE_IMPLEMENTATION_ALIGNMENT.md
+  - templates/structural-seeds/naos/PLANNING_BASELINES.yaml
+related_scripts:
+  - scripts/naos_agentic_workflow_review.py
+  - scripts/naos_pre_implementation_alignment_review.py
+  - scripts/naos_plan_coherence.py
+  - scripts/naos_agent_orchestration_plan.py

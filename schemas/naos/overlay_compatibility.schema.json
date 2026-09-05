@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/overlay_compatibility.schema.json",
+  "title": "NAOS pre-activation overlay compatibility report",
+  "type": "object",
+  "required": ["schema", "status", "project_root", "preview_root", "generated_python_paths", "categories", "findings", "activation_allowed", "blocked_before_activation", "layout_adapter", "isolation_route", "human_review_required", "limitations", "not_claimed"],
+  "properties": {
+    "schema": {"const": "naos.overlay_compatibility.v1"},
+    "status": {"enum": ["blocking_collision", "compatible_by_detected_paths"]},
+    "project_root": {"type": "string"},
+    "preview_root": {"type": "string"},
+    "generated_python_paths": {"type": "array", "items": {"type": "string"}},
+    "prospective_setup_python_paths": {"type": "array", "items": {"type": "string"}},
+    "categories": {"type": "object"},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "activation_allowed": {"type": "boolean"},
+    "blocked_before_activation": {"type": "boolean"},
+    "layout_adapter": {"type": "object"},
+    "host_lint_boundary": {"type": "object"},
+    "isolation_route": {"type": "object"},
+    "human_review_required": {"type": "boolean"},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

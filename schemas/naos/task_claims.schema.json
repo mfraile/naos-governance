@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:task_claims:v1",
+  "title": "NAOS Task Claims File",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "updated_at", "claims"],
+  "properties": {
+    "schema": { "const": "naos.task_claims.v1" },
+    "updated_at": { "type": ["string", "null"] },
+    "claims": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/claim" }
+    }
+  },
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "claim_id",
+        "task_id",
+        "operator_id",
+        "operator_source",
+        "session_id",
+        "branch",
+        "claimed_at",
+        "expires_at",
+        "released_at",
+        "status",
+        "claim_source",
+        "generated_by",
+        "limitations",
+        "not_claimed",
+        "human_review_required"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@+-]{7,180}$"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@+-]{0,127}$"
+        },
+        "operator_id": { "type": ["string", "null"] },
+        "operator_source": { "type": "string" },
+        "session_id": { "type": ["string", "null"] },
+        "branch": { "type": "string" },
+        "claimed_at": { "type": "string" },
+        "expires_at": { "type": ["string", "null"] },
+        "released_at": { "type": ["string", "null"] },
+        "status": {
+          "type": "string",
+          "enum": ["active", "released", "expired", "stale", "conflicting", "unknown"]
+        },
+        "claim_source": { "type": "string" },
+        "generated_by": { "type": "object" },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "not_claimed": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "human_review_required": { "type": "boolean" }
+      }
+    }
+  }
+}

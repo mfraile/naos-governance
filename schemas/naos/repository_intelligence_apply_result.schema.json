@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_apply_result:v1",
+  "title": "NAOS Repository Intelligence Apply Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "transaction_id", "generation_id", "generation_content_sha256", "plan_sha256", "bundle_sha256", "active_pointer", "active_sha256", "manifest", "manifest_sha256", "activation_receipt", "activation_receipt_sha256", "validation", "idempotent_reuse", "previous_generation_id", "source_artifacts_modified", "generated_state_only", "exact_bundle_bytes_promoted"],
+  "properties": {
+    "schema": {"const": "naos.repository_intelligence.apply_result.v1"},
+    "status": {"enum": ["validated_active", "already_active"]},
+    "transaction_id": {"type": "string", "pattern": "^RIT-[0-9a-f]{24}$"},
+    "generation_id": {"type": "string", "pattern": "^RI-[0-9a-f]{24}$"},
+    "generation_content_sha256": {"$ref": "#/$defs/sha256"},
+    "plan_sha256": {"$ref": "#/$defs/sha256"},
+    "bundle_sha256": {"$ref": "#/$defs/sha256"},
+    "active_pointer": {"type": "string"},
+    "active_sha256": {"$ref": "#/$defs/sha256"},
+    "manifest": {"type": "string"},
+    "manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "activation_receipt": {"type": "string"},
+    "activation_receipt_sha256": {"$ref": "#/$defs/sha256"},
+    "validation": {"type": "object"},
+    "idempotent_reuse": {"type": "boolean"},
+    "previous_generation_id": {"type": ["string", "null"]},
+    "source_artifacts_modified": {"type": "array", "maxItems": 0},
+    "generated_state_only": {"const": true},
+    "exact_bundle_bytes_promoted": {"const": true}
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

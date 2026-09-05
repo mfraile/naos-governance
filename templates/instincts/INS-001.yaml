@@ -1,0 +1,41 @@
+# NAOS Instinct Seed — INS-001
+# Tier 1 seed — stripped of source-project evidence for kit distribution.
+# Set evidence_count ≥ 1 and add your source_sessions as you observe this pattern.
+---
+
+id: INS-001
+title: "Agents skip authorized memory/context recovery when task has active session state"
+status: hypothesis
+tier: 1
+
+observed_pattern: >
+  When resuming a task with a known task ID, the implement agent reads the active
+  task card and begins coding without first checking memory readiness and calling
+  mem_context when Engram/MCP read access is configured, authorized, verified, and permitted by memory-use policy.
+  This skips recent session observations that may contain critical blockers, prior
+  decisions, or scope clarifications made since the session file was last written.
+
+context: >
+  Applies whenever: (a) a session summary exists, OR (b) the user says "continue"
+  or "resume", OR (c) a task card has been modified in the current session.
+  Most dangerous after token compaction — the agent has no memory of prior work
+  and skips the cheapest recovery step.
+
+mitigation: >
+  BEFORE opening the active task card, check memory readiness. If Engram/MCP read
+  access is configured, authorized, verified, and permitted by memory-use policy, call mem_context. If mem_context returns
+  session observations on the same task, read them before the card.
+  The implement agent instructions already mandate this — but agents de-prioritise
+  it when the task card is immediately visible and looks complete.
+  Enforce: treat authorized memory/context recovery or degraded fallback as a
+  mandatory pre-flight, not an optional check.
+
+evidence_count: 0
+first_observed: null
+last_confirmed: null
+source_sessions: []
+
+confidence: 0.0   # evidence_count = 0 → seed only
+tags: [memory, compaction, pre-flight, implement-agent]
+promoted_to_rule: null
+dismissed: false

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:evidence_attestation_rules:v1",
+  "title": "NAOS Evidence Attestation Rules",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "version",
+    "semantics",
+    "enabled",
+    "digest_algorithm",
+    "artifact_groups",
+    "reviewer_attestation_requirements",
+    "profile_severity_behavior",
+    "human_review_required",
+    "waiver_handling",
+    "residual_risk_handling",
+    "known_gap_handling",
+    "limitations",
+    "not_claimed"
+  ],
+  "properties": {
+    "version": {"type": "string"},
+    "semantics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "enabled": {"type": "boolean"},
+    "digest_algorithm": {"type": "string", "enum": ["sha256"]},
+    "default_freshness_window_days": {"type": "integer", "minimum": 0},
+    "excluded_paths": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "artifact_groups": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/artifact_group"}
+    },
+    "reviewer_attestation_requirements": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "profile_severity_behavior": {
+      "type": "object",
+      "required": ["quickstart", "lite", "standard", "assured"],
+      "properties": {
+        "quickstart": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "lite": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "standard": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "assured": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]}
+      }
+    },
+    "human_review_required": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "waiver_handling": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "residual_risk_handling": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "known_gap_handling": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "artifact_group": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "enabled", "included_paths", "required_artifacts", "optional_artifacts"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "name": {"type": "string"},
+        "enabled": {"type": "boolean"},
+        "included_paths": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "required_artifacts": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "optional_artifacts": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "excluded_paths": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "freshness_window_days": {"type": "integer", "minimum": 0},
+        "human_review_required": {"type": "boolean"},
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

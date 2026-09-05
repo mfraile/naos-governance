@@ -1,0 +1,641 @@
+version: "1.0"
+# Gate convergence note:
+# Gates should consume the relevant implemented reports and identify missing,
+# not_configured, stale, waived, residual-risk, and experimental evidence honestly.
+# They are convergence points for preventive review, detective validators,
+# governance-surface self-review, systemic impact/coherence review, spec-readiness
+# routing, research feedback, evidence-pack decisions, and dashboard posture. This
+# manifest does not claim
+# every input is fully automated; profile policy and implemented validators decide
+# enforcement.
+profile_order:
+  - quickstart
+  - lite
+  - standard
+  - assured
+
+gates:
+  - id: G0
+    name: "Install Readiness"
+    purpose: "Confirm the project has enough NAOS scaffold to run advisory checks."
+    profile_behavior:
+      quickstart: "Advisory install check only."
+      lite: "Warn when expected guardrail files are missing."
+      standard: "Require install readiness evidence for governed workflow."
+      assured: "Block when core install evidence is missing."
+    required_inputs:
+      - ".ai/RULES.md"
+    required_evidence:
+      - "naos/maturity_levels.yaml"
+    validators:
+      - id: naos_readiness
+        script: scripts/naos_readiness.py
+        status: available
+    outputs:
+      - "naos/reports/gate_status.json"
+    severity_by_profile:
+      quickstart: advisory
+      lite: warning
+      standard: required
+      assured: blocking
+    maturity_dependency:
+      capability: CAP-GATEKEEPER-MANIFEST
+      minimum_maturity: L1
+    known_limitations:
+      - "Source kit checks may use template fallback instead of generated-project files."
+
+  - id: G1
+    name: "Context Readiness"
+    purpose: "Confirm AI-context, governance rules, and project orientation files are present."
+    profile_behavior:
+      quickstart: "Advisory context reminder."
+      lite: "Warn when context files are incomplete."
+      standard: "Require configured context before governed work."
+      assured: "Block when configured context evidence is missing."
+    required_inputs:
+      - ".ai/RULES.md"
+      - "CLAUDE.md"
+    required_evidence:
+      - "naos/PROJECT_STATUS.md"
+    validators:
+      - id: project_coherence
+        script: scripts/validators/validate_project_coherence.py
+        status: available
+    outputs:
+      - "naos/reports/gate_status.json"
+    severity_by_profile:
+      quickstart: advisory
+      lite: warning
+      standard: required
+      assured: blocking
+    maturity_dependency:
+      capability: CAP-SELF-CONFORMANCE
+      minimum_maturity: L1
+    known_limitations:
+      - "Projects may use equivalent context files; configure manifest paths accordingly."
+
+  - id: G2
+    name: "Planning Gate"
+    purpose: "Confirm task planning, roadmap linkage, and spec-readiness routing exist before implementation."
+    profile_behavior:
+      quickstart: "Advisory planning guidance."
+      lite: "Warn when planning evidence is missing."
+      standard: "Require planning evidence for normal SDLC work."
+      assured: "Block when planning evidence is missing."
+    required_inputs:
+      - "naos/TASK_REGISTRY.yaml"
+      - "naos/PLANNING_BASELINES.yaml"
+    required_evidence:
+      - "naos/reports/roadmap_crosswalk_validation.json"
+      - "naos/reports/systemic_impact_review.json"
+      - "naos/reports/control_plane_review.json"
+      - "naos/reports/ai_surface_context_budget.json"
+      - "naos/reports/memory_context_readiness.json"
+      - "naos/reports/memory_provider_access.json"
+      - "naos/reports/memory_use_policy.json"
+      - "naos/reports/learning_loop_review.json"
+      - "naos/reports/task_context_pack.json"
+      - "naos/reports/local_context_index.json"
+      - "naos/reports/local_context_query.json"
+      - "naos/reports/semantic_candidate_layer.json"
+      - "naos/reports/graph_context_readiness.json"
+      - "naos/reports/graph_context_query.json"
+      - "naos/reports/session_lifecycle.json"
+      - "naos/reports/plan_coherence.json"
+    semantic_requirements:
+      - id: current_implementation_readiness
+        source: plan_coherence_live
+        field: implementation_readiness.status
+        allowed_values: [ready]
+        profiles: [lite, standard, assured]
+    validators:
+      - id: task_registry
+        script: scripts/naos_validate_task_registry.py
+        status: available
+      - id: roadmap_crosswalk
+        script: scripts/naos_validate_roadmap_crosswalk.py
+        status: available
+      - id: systemic_impact_review
+        script: scripts/naos_systemic_impact.py
+        status: available
+      - id: control_plane_review_routing
+        script: scripts/naos_control_plane_review.py
+        status: available
+      - id: ai_surface_context_budget
+        script: scripts/naos_ai_surface_budget.py
+        status: available
+      - id: memory_context_readiness
+        script: scripts/naos_memory_context_readiness.py
+        status: available
+      - id: memory_provider_access
+        script: scripts/naos_memory_provider_access.py
+        status: available
+      - id: memory_use_policy
+        script: scripts/naos_memory_use_policy.py
+        status: available
+      - id: learning_loop_review
+        script: scripts/naos_learning_loop_review.py
+        status: available
+      - id: task_context_pack
+        script: scripts/naos_task_context_pack.py
+        status: available
+      - id: local_context_index
+        script: scripts/naos_local_context_index.py
+        status: available
+      - id: local_context_query
+        script: scripts/naos_local_context_query.py
+        status: available
+      - id: semantic_candidate_layer
+        script: scripts/naos_semantic_candidate_readiness.py
+        status: available
+      - id: graph_context_readiness
+        script: scripts/naos_graph_context_readiness.py
+        status: available
+      - id: graph_context_query
+        script: scripts/naos_graph_context_query.py
+        status: available
+      - id: session_lifecycle
+        script: scripts/naos_session_lifecycle.py
+        status: available
+      - id: plan_coherence
+        script: scripts/naos_plan_coherence.py
+        status: available
+    outputs:
+      - "naos/reports/roadmap_crosswalk_validation.json"
+      - "naos/reports/systemic_impact_review.json"
+      - "naos/reports/control_plane_review.json"
+      - "naos/reports/ai_surface_context_budget.json"
+      - "naos/reports/memory_context_readiness.json"
+      - "naos/reports/memory_provider_access.json"
+      - "naos/reports/memory_use_policy.json"
+      - "naos/reports/learning_loop_review.json"
+      - "naos/reports/task_context_pack.json"
+      - "naos/reports/local_context_index.json"
+      - "naos/reports/local_context_query.json"
+      - "naos/reports/semantic_candidate_layer.json"
+      - "naos/reports/graph_context_readiness.json"
+      - "naos/reports/graph_context_query.json"
+      - "naos/reports/session_lifecycle.json"
+      - "naos/reports/plan_coherence.json"
+    severity_by_profile:
+      quickstart: advisory
+      lite: warning
+      standard: required
+      assured: blocking
+    team_overrides:
+      platform:
+        severity: warning
+        enabled: true
+        rationale: "Example static team-scoped posture: platform may route planning evidence through an alternate review cadence. This is governance configuration, not authorization or approval."
+        review_required: true
+        limitations:
+          - "Team overrides cannot prove team membership, authorize work, satisfy separation of duties, or weaken protected ADR-0010: Control-Plane Advisory Boundaries invariants."
+    maturity_dependency:
+      capability: CAP-ROADMAP-CROSSWALK-VALIDATION
+      minimum_maturity: L2
+    known_limitations:
+      - "Roadmap IDs must be configured for non-NAOS project formats."
+      - "Systemic impact review identifies configured review obligations; it does not prove perfect coherence."
+      - "Control-plane review routing reports structured governance-surface and research-routing items; it does not prove routing completeness."
+      - "Local context index is generated and cache-like; it does not decide truth or replace source artifacts."
+      - "Spec 04 readiness is one example of configured impact review, not the entire capability."
+      - "Implementation-readiness is evaluated live from the planning-baseline ledger; structural readiness and attributed review do not prove semantic completeness or authorize implementation."
+
+  - id: G3
+    name: "Scope Gate"
+    purpose: "Confirm task scope, exclusions, and expected evidence are explicit."
+    profile_behavior:
+      quickstart: "Advisory scope reminder."
+      lite: "Warn when scope evidence is missing."
+      standard: "Require scope evidence before implementation."
+      assured: "Block when scope evidence or exception approval is missing."
+    required_inputs:
+      - "naos/TASK_REGISTRY.yaml"
+    required_evidence:
+      - "naos/TRACEABILITY_MATRIX.md"
+      - "naos/reports/control_plane_review.json"
+      - "naos/reports/ai_surface_context_budget.json"
+      - "naos/reports/memory_context_readiness.json"
+      - "naos/reports/memory_provider_access.json"
+      - "naos/reports/memory_use_policy.json"
+      - "naos/reports/learning_loop_review.json"
+      - "naos/reports/task_context_pack.json"
+      - "naos/reports/local_context_index.json"
+      - "naos/reports/local_context_query.json"
+      - "naos/reports/semantic_candidate_layer.json"
+      - "naos/reports/graph_context_readiness.json"
+      - "naos/reports/graph_context_query.json"
+      - "naos/reports/session_lifecycle.json"
+    validators:
+      - id: truth_validation
+        script: scripts/naos_validate_truth.py
+        status: available
+      - id: control_plane_review_routing
+        script: scripts/naos_control_plane_review.py
+        status: available
+      - id: ai_surface_context_budget
+        script: scripts/naos_ai_surface_budget.py
+        status: available
+      - id: memory_context_readiness
+        script: scripts/naos_memory_context_readiness.py
+        status: available
+      - id: memory_provider_access
+        script: scripts/naos_memory_provider_access.py
+        status: available
+      - id: memory_use_policy
+        script: scripts/naos_memory_use_policy.py
+        status: available
+      - id: learning_loop_review
+        script: scripts/naos_learning_loop_review.py
+        status: available
+      - id: task_context_pack
+        script: scripts/naos_task_context_pack.py
+        status: available
+      - id: local_context_index
+        script: scripts/naos_local_context_index.py
+        status: available
+      - id: local_context_query
+        script: scripts/naos_local_context_query.py
+        status: available
+      - id: semantic_candidate_layer
+        script: scripts/naos_semantic_candidate_readiness.py
+        status: available
+      - id: graph_context_readiness
+        script: scripts/naos_graph_context_readiness.py
+        status: available
+      - id: graph_context_query
+        script: scripts/naos_graph_context_query.py
+        status: available
+      - id: session_lifecycle
+        script: scripts/naos_session_lifecycle.py
+        status: available
+    outputs:
+      - "naos/reports/gate_status.json"
+      - "naos/reports/control_plane_review.json"
+      - "naos/reports/ai_surface_context_budget.json"
+      - "naos/reports/memory_context_readiness.json"
+      - "naos/reports/memory_provider_access.json"
+      - "naos/reports/memory_use_policy.json"
+      - "naos/reports/learning_loop_review.json"
+      - "naos/reports/task_context_pack.json"
+      - "naos/reports/local_context_index.json"
+      - "naos/reports/local_context_query.json"
+      - "naos/reports/semantic_candidate_layer.json"
+      - "naos/reports/graph_context_readiness.json"
+      - "naos/reports/graph_context_query.json"
+      - "naos/reports/session_lifecycle.json"
+    severity_by_profile:
+      quickstart: advisory
+      lite: warning
+      standard: required
+      assured: blocking
+    maturity_dependency:
+      capability: CAP-GATEKEEPER-MANIFEST
+      minimum_maturity: L2
+    known_limitations:
+      - "Scope quality still requires human review."
+      - "Routing reports are structured evidence; they do not automatically approve scope decisions."
+
+  - id: G4
+    name: "Code Gate"
+    purpose: "Confirm code-change readiness, function-index health, canonical module-header review, and duplication evidence."
+    profile_behavior:
+      quickstart: "Advisory anti-duplication reminder."
+      lite: "Warn when function-index evidence is missing."
+      standard: "Require function-index or equivalent code-governance evidence."
+      assured: "Block when configured code-governance evidence is missing."
+    required_inputs:
+      - "src/"
+    required_evidence:
+      - "naos/inventory/FUNCTION_INDEX.yaml"
+      - "naos/reports/function_index_health.json"
+      - "naos/reports/module_header_traceability.json"
+      - "naos/reports/spec_cascade_coherence.json"
+      - "naos/reports/duplicate_function_hygiene.json"
+      - "naos/reports/secret_hygiene.json"
+      - "naos/reports/dependency_integrity.json"
+      - "naos/reports/secure_coding_controls.json"
+    validators:
+      - id: code_quality_audit
+        script: scripts/naos_code_quality_audit.py
+        status: available
+      - id: function_index_health
+        script: scripts/naos_function_index_health.py
+        status: available
+      - id: module_header_traceability
+        script: scripts/naos_module_header_traceability.py
+        status: available
+      - id: spec_cascade_coherence
+        script: scripts/naos_detect_spec_drift.py
+        status: available
+      - id: duplicate_function_hygiene
+        script: scripts/naos_duplicate_function_hygiene.py
+        status: available
+      - id: secret_hygiene
+        script: scripts/naos_secret_hygiene.py
+        status: available
+      - id: dependency_integrity
+        script: scripts/naos_dependency_integrity.py
+        status: available
+      - id: package_reality
+        script: scripts/naos_package_reality.py
+        status: available
+        notes: "Optional package-name, lock-style pin, docs install snippet, and explicit opt-in registry review evidence."
+      - id: pr_risk_classification
+        script: scripts/naos_pr_risk_classification.py
+        status: available
+        notes: "PR-specific deterministic path/diff risk evidence; not required outside PR/review workflows unless adopter policy requires it."
+      - id: secure_coding_controls
+        script: scripts/naos_secure_coding_controls.py
+        status: available
+        notes: "Reports register/route validity and bounded evidence availability/freshness; it does not decide control satisfaction."
+    outputs:
+      - "naos/reports/function_index_health.json"
+      - "naos/reports/module_header_traceability.json"
+      - "naos/reports/spec_cascade_coherence.json"
+      - "naos/reports/duplicate_function_hygiene.json"
+      - "naos/reports/secret_hygiene.json"
+      - "naos/reports/dependency_integrity.json"
+      - "naos/reports/package_reality.json"
+      - "naos/reports/pr_risk_classification.json"
+      - "naos/reports/secure_coding_controls.json"
+    severity_by_profile:
+      quickstart: advisory
+      lite: warning
+      standard: required
+      assured: blocking
+    maturity_dependency:
+      capability: CAP-FUNCTION-INDEX-HEALTH
+      minimum_maturity: L2
+    known_limitations:
+      - "Static function index cannot prove all duplicate behavior is absent."
+      - "Module-header traceability evidence does not prove code correctness or complete source traceability."
+      - "Duplicate-function, secret-hygiene, dependency-integrity, package-reality, and API-symbol reality findings are deterministic hygiene evidence, not semantic correctness, secret-free, API-behavior proof, package-safety, vulnerability-absence, supply-chain assurance, or approval proof."
+      - "The secure-coding control routing report exposes evidence availability and freshness only; it does not prove control satisfaction, security, framework conformance, or approval."
+
+  - id: G5
+    name: "Test Evidence Gate"
+    purpose: "Confirm risk-tiered source-to-test evidence is present where configured."
+    profile_behavior:
+      quickstart: "Advisory only."
+      lite: "Warn when test evidence is missing."
+      standard: "Require test evidence for normal SDLC work."
+      assured: "Block when configured high-risk test evidence is missing."
+    required_inputs:
+      - "tests/"
+    required_evidence:
+      - "naos/reports/test_evidence_health.json"
+      - "naos/reports/test_quality_hygiene.json"
+    validators:
+      - id: test_evidence_map
+        script: scripts/naos_test_evidence_map.py
+        status: available
+      - id: test_evidence_validate
+        script: scripts/naos_validate_test_evidence.py
+        status: available
+      - id: test_quality_hygiene
+        script: scripts/naos_test_quality_hygiene.py
+        status: available
+    outputs:
+      - "naos/reports/test_evidence_health.json"
+      - "naos/reports/test_quality_hygiene.json"
+    severity_by_profile:
+      quickstart: advisory
+      lite: warning
+      standard: required
+      assured: blocking
+    maturity_dependency:
+      capability: CAP-TEST-EVIDENCE
+      minimum_maturity: L2
+    known_limitations:
+      - "This gate must not claim complete coverage unless evidence exists."
+      - "Assertion presence or test-quality hygiene does not prove behavioral correctness."
+
+  - id: G6
+    name: "Evidence Gate"
+    purpose: "Confirm claims, self-check, research feedback routing, waivers, residual risks, and evidence-pack artifacts are ready for review."
+    profile_behavior:
+      quickstart: "Advisory only."
+      lite: "Warn when evidence summaries are missing."
+      standard: "Require configured evidence summaries."
+      assured: "Block when evidence pack or exception approval is missing."
+    required_inputs:
+      - "naos/reports/"
+    required_evidence:
+      - "naos/reports/claims_validation.json"
+      - "naos/reports/self_check.json"
+      - "naos/reports/module_header_traceability.json"
+      - "naos/reports/spec_cascade_coherence.json"
+      - "naos/reports/control_plane_review.json"
+      - "naos/reports/ai_surface_context_budget.json"
+      - "naos/reports/evidence_attestation.json"
+      - "naos/reports/memory_context_readiness.json"
+      - "naos/reports/memory_provider_access.json"
+      - "naos/reports/memory_use_policy.json"
+      - "naos/reports/learning_loop_review.json"
+      - "naos/reports/task_context_pack.json"
+      - "naos/reports/local_context_index.json"
+      - "naos/reports/local_context_query.json"
+      - "naos/reports/semantic_candidate_layer.json"
+      - "naos/reports/graph_context_readiness.json"
+      - "naos/reports/graph_context_query.json"
+      - "naos/reports/duplicate_function_hygiene.json"
+      - "naos/reports/secret_hygiene.json"
+      - "naos/reports/test_quality_hygiene.json"
+      - "naos/reports/dependency_integrity.json"
+      - "naos/reports/secure_coding_controls.json"
+    validators:
+      - id: claims_validation
+        script: scripts/naos_validate_claims.py
+        status: available
+      - id: self_check
+        script: scripts/naos_self_check.py
+        status: available
+      - id: systemic_impact_review
+        script: scripts/naos_systemic_impact.py
+        status: available
+      - id: module_header_traceability
+        script: scripts/naos_module_header_traceability.py
+        status: available
+      - id: spec_cascade_coherence
+        script: scripts/naos_detect_spec_drift.py
+        status: available
+      - id: control_plane_review_routing
+        script: scripts/naos_control_plane_review.py
+        status: available
+      - id: ai_surface_context_budget
+        script: scripts/naos_ai_surface_budget.py
+        status: available
+      - id: evidence_integrity_attestation
+        script: scripts/naos_evidence_attestation.py
+        status: available
+      - id: memory_context_readiness
+        script: scripts/naos_memory_context_readiness.py
+        status: available
+      - id: memory_provider_access
+        script: scripts/naos_memory_provider_access.py
+        status: available
+      - id: memory_use_policy
+        script: scripts/naos_memory_use_policy.py
+        status: available
+      - id: learning_loop_review
+        script: scripts/naos_learning_loop_review.py
+        status: available
+      - id: task_context_pack
+        script: scripts/naos_task_context_pack.py
+        status: available
+      - id: local_context_index
+        script: scripts/naos_local_context_index.py
+        status: available
+      - id: local_context_query
+        script: scripts/naos_local_context_query.py
+        status: available
+      - id: semantic_candidate_layer
+        script: scripts/naos_semantic_candidate_readiness.py
+        status: available
+      - id: graph_context_readiness
+        script: scripts/naos_graph_context_readiness.py
+        status: available
+      - id: graph_context_query
+        script: scripts/naos_graph_context_query.py
+        status: available
+      - id: duplicate_function_hygiene
+        script: scripts/naos_duplicate_function_hygiene.py
+        status: available
+      - id: secret_hygiene
+        script: scripts/naos_secret_hygiene.py
+        status: available
+      - id: test_quality_hygiene
+        script: scripts/naos_test_quality_hygiene.py
+        status: available
+      - id: dependency_integrity
+        script: scripts/naos_dependency_integrity.py
+        status: available
+      - id: package_reality
+        script: scripts/naos_package_reality.py
+        status: available
+        notes: "Optional package-name, lock-style pin, docs install snippet, and explicit opt-in registry review evidence."
+      - id: pr_risk_classification
+        script: scripts/naos_pr_risk_classification.py
+        status: available
+        notes: "PR-specific deterministic path/diff risk evidence; not required outside PR/review workflows unless adopter policy requires it."
+      - id: session_lifecycle
+        script: scripts/naos_session_lifecycle.py
+        status: available
+      - id: secure_coding_controls
+        script: scripts/naos_secure_coding_controls.py
+        status: available
+        notes: "Bounded control/evidence routing report; enforcement and exceptions remain outside the register."
+      - id: evidence_export
+        script: scripts/naos_evidence_export.py
+        status: available
+    outputs:
+      - "naos/reports/claims_validation.json"
+      - "naos/reports/self_check.json"
+      - "naos/reports/module_header_traceability.json"
+      - "naos/reports/control_plane_review.json"
+      - "naos/reports/ai_surface_context_budget.json"
+      - "naos/reports/evidence_attestation.json"
+      - "naos/reports/memory_context_readiness.json"
+      - "naos/reports/memory_provider_access.json"
+      - "naos/reports/memory_use_policy.json"
+      - "naos/reports/learning_loop_review.json"
+      - "naos/reports/task_context_pack.json"
+      - "naos/reports/local_context_index.json"
+      - "naos/reports/local_context_query.json"
+      - "naos/reports/semantic_candidate_layer.json"
+      - "naos/reports/graph_context_readiness.json"
+      - "naos/reports/graph_context_query.json"
+      - "naos/reports/session_lifecycle.json"
+      - "naos/reports/duplicate_function_hygiene.json"
+      - "naos/reports/secret_hygiene.json"
+      - "naos/reports/test_quality_hygiene.json"
+      - "naos/reports/dependency_integrity.json"
+      - "naos/reports/package_reality.json"
+      - "naos/reports/pr_risk_classification.json"
+      - "naos/reports/secure_coding_controls.json"
+      - "naos/evidence/"
+    severity_by_profile:
+      quickstart: advisory
+      lite: warning
+      standard: required
+      assured: blocking
+    maturity_dependency:
+      capability: CAP-EVIDENCE-PACK
+      minimum_maturity: L2
+    known_limitations:
+      - "Evidence supports review and admissibility discussions; it does not prove compliance."
+      - "Research/autoresearch findings are consumed when represented in implemented reports, known gaps, residual risks, task records, or evidence objects."
+      - "Control-plane review routing does not infer routed status from report existence alone."
+      - "Evidence attestation uses local digests and reviewer metadata only; it is not cryptographic signing or tamper-proof storage."
+      - "Memory readiness evaluates advisory recall and access posture; it does not treat memory as evidence, approval, or source of truth."
+      - "Memory-use policy evaluates review metadata, instruction-grade requirements, and recall/audit readiness; it does not write memory, execute recall traces, or make memory authoritative."
+      - "Governed learning lifecycle reports metadata and review posture only; they do not write memory, mutate AI surfaces, approve work, or prove semantic truth."
+      - "Task context packs are derived, bounded context; they are not source of truth, approval, or complete coherence proof."
+      - "Local context index provides bounded retrieval candidates only; source artifacts and deterministic reports remain authoritative."
+      - "Graph context readiness records explicit-link traversal guardrails only; graph links are not source of truth or traversal approval."
+      - "Hygiene reports reduce obvious deterministic risk classes; they do not prove semantic correctness, secret-free code, meaningful test coverage, API behavior, or package safety."
+      - "PR risk classification is PR/review evidence only; it does not approve pull requests, execute sandboxes, perform malware analysis, prove security, prove compliance, or authorize release."
+      - "Secure-coding control routing keeps register validity, evidence availability/freshness, mapping state, and human review separate; no blended security score or automatic control verdict is produced."
+
+  - id: G7
+    name: "Behavioral Gate"
+    purpose: "Track behavioral-evaluation readiness without making PETRI-style evaluation mandatory."
+    profile_behavior:
+      quickstart: "Not required."
+      lite: "Not required."
+      standard: "Advisory only."
+      assured: "Warning unless explicitly configured as stronger."
+    required_inputs:
+      - "task_battery/"
+    required_evidence:
+      - "naos/reports/behavioral_evaluation.json"
+    validators:
+      - id: behavioral_evaluation_readiness
+        status: manual
+        notes: "Future PETRI-compatible scaffold-realistic evaluation."
+    outputs:
+      - "naos/reports/behavioral_evaluation.json"
+    severity_by_profile:
+      quickstart: none
+      lite: advisory
+      standard: advisory
+      assured: warning
+    maturity_dependency:
+      capability: CAP-DIGITAL-TWIN-EVALUATION
+      minimum_maturity: L0
+    known_limitations:
+      - "PETRI-style behavioral evaluation is not fully implemented by this scaffold."
+
+  - id: G8
+    name: "Advanced Architecture Readiness Gate"
+    purpose: "Keep Tier 3 runtime, substrate, graph, and digital-twin tracks explicit and advisory."
+    profile_behavior:
+      quickstart: "Not activated."
+      lite: "Not activated."
+      standard: "Advisory design awareness only."
+      assured: "Advisory readiness review only unless a project deliberately configures it."
+    required_inputs:
+      - "capabilities/runtime_handoff.yaml"
+      - "capabilities/structured_substrate.yaml"
+      - "capabilities/source_test_graph.yaml"
+      - "capabilities/digital_twin_evaluation.yaml"
+    required_evidence:
+      - "naos/reports/advanced_readiness.json"
+    validators:
+      - id: advanced_architecture_readiness
+        status: manual
+        notes: "Architecture review only; no mandatory runtime infrastructure."
+    outputs:
+      - "naos/reports/advanced_readiness.json"
+    severity_by_profile:
+      quickstart: none
+      lite: advisory
+      standard: advisory
+      assured: advisory
+    maturity_dependency:
+      capability: CAP-RUNTIME-HANDOFF
+      minimum_maturity: L0
+    known_limitations:
+      - "Does not introduce a database, daemon, scheduler, graph server, runtime gateway, or external service dependency."
+      - "Tier 3 remains experimental and scaffolded by default."

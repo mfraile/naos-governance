@@ -1,0 +1,321 @@
+schema: naos.ai_surface_context_budget_rules.v1
+version: 1
+
+token_estimation:
+  # Deterministic approximation only. This avoids provider/tokenizer dependency.
+  chars_per_token: 4
+
+baseline:
+  default_path: baselines/ai_surface_health_baseline.json
+  size_drift_warning_pct: 15
+  size_drift_blocking_pct: 30
+  baseline_missing_severity: advisory
+
+profile_footprint:
+  controlled_command: naos ai-surface-budget --fresh-profiles --json
+  baseline_ref: baselines/ai_surface_profile_footprint_baseline.json
+  profiles: [quickstart, lite, standard, assured]
+  default_display_max_rows: 24
+  measurement_contract:
+    project_name: fresh-project
+    archetype: custom
+    quickstart_backend: disabled
+    other_profile_backend: static_only
+    memory: disabled
+    signals: fixed_empty_greenfield
+    finding_count: complete self-check finding occurrences, not unique IDs
+    resident_context_tokens: unique generated files matched by AI-surface family patterns
+    generated_file_count: unique actual files before self-check creates reports
+    cli_command_count: SCRIPT_COMMANDS entries whose mapped script exists in the generated profile
+    global_cli_envelope: reported separately and never counted as profile-specific breadth
+    external_user_machine_state: excluded with a recorded temporary self-check metadata overlay
+  methodology:
+    warning: Any increase above the exact current fresh-profile baseline requires review and justification.
+    stop: More than the minimum one-integer-unit separation above the warning boundary stops expansion pending an explicit reviewed allowance.
+    rationale: Two identical isolated fixed-time replays establish the approved measured base for the current generated profiles. The current Standard and Assured command surface and the current documentation and seed footprint are included in those measurements. Only directly affected baselines move; the strict one-unit warning and two-unit stop behavior remains unchanged, and no further growth is approved.
+    falsifier: Re-derive if the scaffold contract changes, deterministic replay differs, or the maintainer approves a different measured growth allowance.
+  approval:
+    status: approved
+    authority_ref: templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml
+    authority_basis: This portable policy records the maintainer-approved measured baseline. The exact-baseline warning boundary and baseline-plus-one stop boundary remain unchanged; changing either requires explicit human review and never authorizes publication or external action.
+    approved_on: "2026-09-03"
+  candidate_freeze:
+    status: released
+    release_requires:
+      - "one greenfield Standard-profile fixture satisfied the recorded release criteria"
+      - "one brownfield Standard-profile fixture satisfied the recorded release criteria"
+    exemptions:
+      - defect_repair
+      - evidence_deepening
+      - noise_footprint_reduction
+    not_substitutes:
+      - adopter-specific operating-effectiveness evidence
+      - NAOS self-use
+  thresholds:
+    quickstart:
+      fresh_project_finding_count:
+        baseline: 1608
+        warn_above: 1608
+        stop_above: 1609
+        basis: Exact isolated Quickstart baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      resident_context_tokens:
+        baseline: 15764
+        warn_above: 15764
+        stop_above: 15765
+        basis: Exact isolated Quickstart baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      generated_file_count:
+        baseline: 84
+        warn_above: 84
+        stop_above: 85
+        basis: Exact isolated Quickstart baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      cli_command_count:
+        baseline: 0
+        warn_above: 0
+        stop_above: 1
+        basis: Exact isolated Quickstart baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+    lite:
+      fresh_project_finding_count:
+        baseline: 1278
+        warn_above: 1278
+        stop_above: 1279
+        basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      resident_context_tokens:
+        baseline: 60514
+        warn_above: 60514
+        stop_above: 60515
+        basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      generated_file_count:
+        baseline: 416
+        warn_above: 416
+        stop_above: 417
+        basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      cli_command_count:
+        baseline: 94
+        warn_above: 94
+        stop_above: 95
+        basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+    standard:
+      fresh_project_finding_count:
+        baseline: 1264
+        warn_above: 1264
+        stop_above: 1265
+        basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      resident_context_tokens:
+        baseline: 89949
+        warn_above: 89949
+        stop_above: 89950
+        basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      generated_file_count:
+        baseline: 505
+        warn_above: 505
+        stop_above: 506
+        basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      cli_command_count:
+        baseline: 105
+        warn_above: 105
+        stop_above: 106
+        basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+    assured:
+      fresh_project_finding_count:
+        baseline: 1276
+        warn_above: 1276
+        stop_above: 1277
+        basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      resident_context_tokens:
+        baseline: 113170
+        warn_above: 113170
+        stop_above: 113171
+        basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      generated_file_count:
+        baseline: 532
+        warn_above: 532
+        stop_above: 533
+        basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+      cli_command_count:
+        baseline: 105
+        warn_above: 105
+        stop_above: 106
+        basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
+        falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
+
+families:
+  - id: agents
+    label: Agents
+    patterns:
+      - templates/agents/**/*.md
+      - .github/agents/*.md
+      - AGENTS.md
+    warn_tokens: 2000
+    block_tokens: 5000
+  - id: instructions
+    label: Instructions
+    patterns:
+      - templates/instructions/*.md
+      - .github/instructions/*.md
+    warn_tokens: 2500
+    block_tokens: 4000
+  - id: instruction_triple
+    label: Instruction triple
+    patterns:
+      - templates/instruction-triple/*.md
+      - profiles/governance-*/.ai/RULES.md
+      - CLAUDE.md
+      - .github/copilot-instructions.md
+      - .ai/RULES.md
+    warn_tokens: 3500
+    block_tokens: 5500
+  - id: prompts
+    label: Prompts
+    patterns:
+      - templates/prompts/*.md
+      - .github/prompts/*.md
+    warn_tokens: 2500
+    block_tokens: 5000
+  - id: skills
+    label: Skills
+    patterns:
+      - templates/skills/*/SKILL.md
+      - plugins/*/skills/*/SKILL.md
+      - .github/skills/*/SKILL.md
+    warn_tokens: 2500
+    block_tokens: 5000
+  - id: workflows
+    label: Workflows
+    patterns:
+      - templates/workflows/*.yml
+      - templates/workflows/*.yaml
+      - .github/workflows/*.yml
+      - .github/workflows/*.yaml
+    warn_tokens: 2500
+    block_tokens: 5000
+  - id: rules_chain
+    label: Rules chain
+    patterns:
+      - templates/rules-chain/.ai/*
+      - profiles/governance-*/.ai/RULES.md
+      - .ai/*
+    warn_tokens: 2500
+    block_tokens: 4000
+  - id: cursor_rules
+    label: Cursor rules
+    patterns:
+      - templates/cursor-rules/*.mdc
+      - .cursor/rules/*.mdc
+      - .cursorrules
+    warn_tokens: 2500
+    block_tokens: 4000
+
+combined_scenarios:
+  - id: claude_base
+    label: Claude base governance loadout
+    profiles: [lite, standard, assured]
+    files:
+      - {path: templates/instruction-triple/CLAUDE.md, optional: true}
+      - {path: CLAUDE.md, optional: true}
+      - {path: templates/instructions/governance.instructions.md, optional: true}
+      - {path: .github/instructions/governance.instructions.md, optional: true}
+      - {path: templates/instructions/context-pressure.instructions.md, optional: true}
+      - {path: .github/instructions/context-pressure.instructions.md, optional: true}
+    warn_tokens: 12000
+    block_tokens: 18000
+  - id: claude_code_plugin_base
+    label: Claude Code plugin governance loadout
+    profiles: [lite, standard, assured]
+    files:
+      - {path: plugins/naos-governance-claude-code/README.md, optional: true}
+      - {path: plugins/naos-governance-claude-code/skills/naos-adoption-readiness/SKILL.md, optional: true}
+      - {path: plugins/naos-governance-claude-code/skills/naos-forensic-review/SKILL.md, optional: true}
+      - {path: plugins/naos-governance-claude-code/skills/naos-governed-learning/SKILL.md, optional: true}
+      - {path: plugins/naos-governance-claude-code/skills/naos-adapter-coexistence/SKILL.md, optional: true}
+    warn_tokens: 8000
+    block_tokens: 12000
+  - id: copilot_base
+    label: Copilot base governance loadout
+    profiles: [lite, standard, assured]
+    files:
+      - {path: templates/instruction-triple/copilot-instructions.md, optional: true}
+      - {path: .github/copilot-instructions.md, optional: true}
+      - {path: templates/instruction-triple/project-context.md, optional: true}
+      - {path: .github/instructions/project-context.md, optional: true}
+      - {path: templates/instructions/governance.instructions.md, optional: true}
+      - {path: .github/instructions/governance.instructions.md, optional: true}
+      - {path: templates/instructions/context-pressure.instructions.md, optional: true}
+      - {path: .github/instructions/context-pressure.instructions.md, optional: true}
+    warn_tokens: 12000
+    block_tokens: 18000
+  - id: implement_agent
+    label: Implement agent plus task-start prompt
+    profiles: [standard, assured]
+    files:
+      - {path: templates/agents/AGENTS.md, optional: true}
+      - {path: .github/agents/AGENTS.md, optional: true}
+      - {path: templates/agents/naos-implement.agent.md, optional: true}
+      - {path: .github/agents/naos-implement.agent.md, optional: true}
+      - {path: templates/prompts/naos-task-start.prompt.md, optional: true}
+      - {path: .github/prompts/naos-task-start.prompt.md, optional: true}
+      - {path: templates/instructions/governance.instructions.md, optional: true}
+    warn_tokens: 12000
+    block_tokens: 18000
+  - id: review_agent
+    label: Review agent plus task-complete prompt
+    profiles: [standard, assured]
+    files:
+      - {path: templates/agents/AGENTS.md, optional: true}
+      - {path: .github/agents/AGENTS.md, optional: true}
+      - {path: templates/agents/naos-review.agent.md, optional: true}
+      - {path: .github/agents/naos-review.agent.md, optional: true}
+      - {path: templates/prompts/naos-task-complete.prompt.md, optional: true}
+      - {path: .github/prompts/naos-task-complete.prompt.md, optional: true}
+      - {path: templates/instructions/governance.instructions.md, optional: true}
+    warn_tokens: 12000
+    block_tokens: 18000
+  - id: systemic_review
+    label: Systemic review and wiring loadout
+    profiles: [standard, assured]
+    files:
+      - {path: templates/agents/naos-conformance.agent.md, optional: true}
+      - {path: .github/agents/naos-conformance.agent.md, optional: true}
+      - {path: templates/skills/systemic-capability-wiring/SKILL.md, optional: true}
+      - {path: .github/skills/systemic-capability-wiring/SKILL.md, optional: true}
+      - {path: templates/instructions/governance.instructions.md, optional: true}
+      - {path: templates/instructions/context-pressure.instructions.md, optional: true}
+    warn_tokens: 10000
+    block_tokens: 16000
+
+anchors:
+  - id: non_claim_boundary
+    label: Non-claim boundary
+    phrases: ["does not prove", "not approval", "not certification", "not claimed"]
+  - id: human_review_boundary
+    label: Human review boundary
+    phrases: ["human review", "human approval", "human reviewers"]
+  - id: deterministic_boundary
+    label: Deterministic boundary
+    phrases: ["deterministic", "file-first", "no LLM", "no model"]
+  - id: evidence_hierarchy
+    label: Evidence hierarchy
+    phrases: ["source artifacts remain authoritative", "repository evidence", "evidence"]
+  - id: context_pressure
+    label: Context pressure
+    phrases: ["context pressure", "NAOS_CONTEXT_REMAINING_PCT", "checkpoint", "compact"]
+  - id: profile_gate_boundary
+    label: Profile and gate boundary
+    phrases: ["quickstart", "lite", "standard", "assured", "gate"]
+  - id: tool_neutrality
+    label: Tool neutrality
+    phrases: ["tool-neutral", "Claude", "Codex", "Copilot", "Cursor"]

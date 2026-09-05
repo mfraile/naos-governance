@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:package_reality:v1",
+  "title": "NAOS Package Reality Report",
+  "description": "Bounded package-reality report for declared package names, lock-style pins, optional docs install snippets, optional local SBOM/provenance/hash evidence, and explicit opt-in registry metadata checks. Findings are review evidence only and are not package safety, malware detection, vulnerability scanning, supply-chain assurance, SBOM completeness proof, provenance authenticity proof, approval, certification, or proof of compliance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "project_root",
+    "naos_root",
+    "rules_path",
+    "deterministic",
+    "registry_mode",
+    "network_used",
+    "cost_posture",
+    "summary",
+    "scans",
+    "findings",
+    "waivers",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {"const": "naos.package_reality.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "rules_path": {"type": ["string", "null"]},
+    "deterministic": {"type": "boolean"},
+    "registry_mode": {"type": "string", "enum": ["offline", "online"]},
+    "network_used": {"type": "boolean"},
+    "cost_posture": {"$ref": "#/$defs/cost_posture"},
+    "summary": {"type": "object", "additionalProperties": true},
+    "scans": {"type": "object", "additionalProperties": true},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "waivers": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "$defs": {
+    "cost_posture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cost_incurred_by_default",
+        "cost_usd",
+        "external_api_required",
+        "provider_dependency_required",
+        "model_dependency_required",
+        "human_approval_required_before_cost"
+      ],
+      "properties": {
+        "cost_incurred_by_default": {"type": "boolean"},
+        "cost_usd": {"type": "number", "minimum": 0},
+        "external_api_required": {"type": "boolean"},
+        "provider_dependency_required": {"type": "boolean"},
+        "model_dependency_required": {"type": "boolean"},
+        "human_approval_required_before_cost": {"type": "boolean"}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message", "human_review_required", "not_claimed"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string"},
+        "status": {"type": "string"},
+        "message": {"type": "string"},
+        "package": {"type": "string"},
+        "path": {"type": "string"},
+        "line": {"type": "integer", "minimum": 1},
+        "human_review_required": {"type": "boolean"},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

@@ -1,0 +1,98 @@
+id: CAP-API-SYMBOL-REALITY
+name: API Symbol Reality
+description: >
+  Reviews explicitly declared Python API symbols using deterministic local
+  source inspection so package/import checks are not mistaken for proof that a
+  method, class, function, option, endpoint, or symbol exists.
+status: active
+default_maturity: L0
+minimum_profile: standard
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Missing or empty manifest is non-blocking and not symbol proof."
+  lite:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Optional symbol-reality review when explicit API claims are made."
+  standard:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns on unverified explicitly declared API symbols."
+  assured:
+    target_maturity: L2
+    enforcement: required
+    notes: "Expected for dependency/API-sensitive generated code claims."
+authority:
+  may_read:
+    - naos/api_symbol_reality.yaml
+    - repo-local Python source paths explicitly declared in the manifest
+    - installed distribution metadata and Python source files
+  may_write:
+    - naos/reports/api_symbol_reality.json
+  may_block:
+    - "only through configured deterministic gate policy and human review for unresolved symbol-reality findings"
+allowed_resources:
+  - "explicit API symbol manifest"
+  - "repo-local Python source files"
+  - "installed distribution metadata and Python source files"
+prohibited_resources:
+  - "target package imports or execution"
+  - "provider/model/API calls"
+  - "network calls"
+  - "online registry lookup"
+  - "runtime behavior claims"
+  - "package safety or supply-chain assurance claims"
+constraints:
+  - "Must not import or execute target modules/packages."
+  - "Must not call external APIs, package registries, providers, models, or network services."
+  - "Must treat missing or empty manifests as not configured and not proof."
+  - "Must report symbol existence as review evidence only."
+  - "Must include limitations, non-claims, and human-review boundaries."
+required_evidence:
+  - "naos/reports/api_symbol_reality.json"
+validators:
+  - id: api_symbol_reality
+    script: scripts/naos_api_symbol_reality.py
+    status: available
+gatekeepers:
+  - G4
+  - G6
+dashboard_signals:
+  - "api_symbol_reality.status"
+  - "api_symbol_reality.configured"
+  - "api_symbol_reality.verified_symbols"
+  - "api_symbol_reality.unverified_symbols"
+maturity_path:
+  L0: "Capability contract, manifest seed, script, and report schema exist."
+  L1: "Report can be generated from explicit manifest and local source inspection."
+  L2: "Report is wired into CLI, Make, evidence, dashboard, and adapter guidance."
+  L3: "Profile severity and reviewed waivers are applied to unresolved symbol-reality findings."
+  L4: "Projects pair symbol-reality evidence with package-reality and dependency-integrity review for dependency-sensitive work."
+  L5: "Projects pair NAOS symbol evidence with adopter-owned API/runtime compatibility evidence where required."
+known_limitations:
+  - "V1 checks Python source symbols only."
+  - "Dynamic exports, compiled extensions, plugin registration, monkeypatching, and runtime-generated attributes may require human review or external evidence."
+  - "Symbol existence does not prove semantic behavior, option compatibility, endpoint behavior, or implementation correctness."
+  - "Installed distribution inspection depends on the local environment matching the project's intended dependency resolution."
+not_claimed:
+  - "API semantic correctness proof"
+  - "runtime behavior proof"
+  - "option compatibility proof"
+  - "endpoint behavior proof"
+  - "package safety proof"
+  - "malware detection"
+  - "vulnerability scanning"
+  - "supply-chain assurance"
+  - "approval"
+related_docs:
+  - docs/CONTROL_PLANE.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_api_symbol_reality.py
+related_schemas:
+  - schemas/naos/api_symbol_reality_manifest.schema.json
+  - schemas/naos/api_symbol_reality.schema.json

@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:regulatory-claim-source-matrix:v1",
+  "title": "NAOS Regulatory Claim Source Matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "matrix_id",
+    "version",
+    "access_date",
+    "baseline",
+    "claim_boundary",
+    "source_register",
+    "inventory",
+    "review_template",
+    "claims"
+  ],
+  "properties": {
+    "schema": {
+      "const": "urn:naos-governance:regulatory-claim-source-matrix:v1"
+    },
+    "matrix_id": {
+      "const": "NAOS-Q1-Q2-PRIMARY-SOURCE-MATRIX"
+    },
+    "version": {
+      "const": 1
+    },
+    "access_date": {
+      "const": "2026-08-22"
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "history_distributed", "documents"],
+      "properties": {
+        "method": {"const": "current_public_document_sha256"},
+        "history_distributed": {"const": false},
+        "documents": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"$ref": "#/$defs/baselineDocument"}
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proves", "does_not_prove", "numeric_scope"],
+      "properties": {
+        "proves": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "does_not_prove": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "numeric_scope": {"type": "string", "minLength": 1}
+      }
+    },
+    "source_register": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["DORA", "DORA_CORRIGENDA", "OSFI_E23", "OSFI_E23_LETTER"],
+      "properties": {
+        "DORA": {"$ref": "#/$defs/sourceAuthority"},
+        "DORA_CORRIGENDA": {"$ref": "#/$defs/supportingSource"},
+        "OSFI_E23": {"$ref": "#/$defs/sourceAuthority"},
+        "OSFI_E23_LETTER": {"$ref": "#/$defs/supportingSource"}
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total_claim_rows", "rows_by_document", "rows_by_status", "document_claim_rule"],
+      "properties": {
+        "total_claim_rows": {"const": 58},
+        "rows_by_document": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["docs/DORA_MAPPING.md", "docs/OSFI_E23_MAPPING.md"],
+          "properties": {
+            "docs/DORA_MAPPING.md": {"const": 29},
+            "docs/OSFI_E23_MAPPING.md": {"const": 29}
+          }
+        },
+        "rows_by_status": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verified", "unsupported"],
+          "properties": {
+            "verified": {"const": 36},
+            "unsupported": {"const": 22}
+          }
+        },
+        "document_claim_rule": {"type": "string", "minLength": 1}
+      }
+    },
+    "review_template": {"$ref": "#/$defs/review"},
+    "claims": {
+      "type": "array",
+      "minItems": 58,
+      "maxItems": 58,
+      "items": {"$ref": "#/$defs/claim"}
+    }
+  },
+  "$defs": {
+    "baselineDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "frozen_claim_locations"],
+      "properties": {
+        "path": {"enum": ["docs/DORA_MAPPING.md", "docs/OSFI_E23_MAPPING.md"]},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "frozen_claim_locations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "sourceAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuing_authority",
+        "official_title",
+        "official_url",
+        "document_identifier",
+        "version",
+        "publication_date",
+        "effective_date",
+        "application_date",
+        "access_date"
+      ],
+      "properties": {
+        "issuing_authority": {"type": "string", "minLength": 1},
+        "official_title": {"type": "string", "minLength": 1},
+        "official_url": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "document_identifier": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "publication_date": {"type": ["string", "null"]},
+        "effective_date": {"type": ["string", "null"]},
+        "application_date": {"type": ["string", "null"]},
+        "access_date": {"const": "2026-08-22"}
+      }
+    },
+    "supportingSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issuing_authority", "official_title", "official_url", "document_identifier", "access_date", "finding"],
+      "properties": {
+        "issuing_authority": {"type": "string", "minLength": 1},
+        "official_title": {"type": "string", "minLength": 1},
+        "official_url": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "document_identifier": {"type": "string", "minLength": 1},
+        "access_date": {"const": "2026-08-22"},
+        "finding": {"type": "string", "minLength": 1}
+      }
+    },
+    "rowSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuing_authority",
+        "official_title",
+        "official_url",
+        "document_identifier",
+        "version",
+        "publication_date",
+        "effective_date",
+        "application_date",
+        "access_date",
+        "locator"
+      ],
+      "properties": {
+        "issuing_authority": {"type": "string", "minLength": 1},
+        "official_title": {"type": "string", "minLength": 1},
+        "official_url": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "document_identifier": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "publication_date": {"type": ["string", "null"]},
+        "effective_date": {"type": ["string", "null"]},
+        "application_date": {"type": ["string", "null"]},
+        "access_date": {"const": "2026-08-22"},
+        "locator": {"type": "string", "minLength": 1}
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewer", "review_scope", "receipt"],
+      "properties": {
+        "status": {"enum": ["pending", "pass", "fail"]},
+        "reviewer": {"type": "string", "minLength": 1},
+        "review_scope": {"type": "string", "minLength": 1},
+        "receipt": {"type": ["string", "null"]}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"status": {"const": "pass"}},
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "receipt": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      ]
+    },
+    "numericDerivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "reported_value",
+        "unit",
+        "numerator",
+        "denominator",
+        "inputs",
+        "inclusion_rule",
+        "exclusion_rule",
+        "rounding_rule",
+        "computed_result",
+        "derivation_supported"
+      ],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["count", "ratio_percentage", "percentage"]},
+        "reported_value": {"type": "string", "minLength": 1},
+        "unit": {"type": "string", "minLength": 1},
+        "numerator": {"type": ["number", "string", "null"]},
+        "denominator": {"type": ["number", "string", "null"]},
+        "inputs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "inclusion_rule": {"type": "string", "minLength": 1},
+        "exclusion_rule": {"type": "string", "minLength": 1},
+        "rounding_rule": {"type": "string", "minLength": 1},
+        "computed_result": {"type": ["string", "null"]},
+        "derivation_supported": {"type": "boolean"}
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "framework",
+        "document_path",
+        "document_location",
+        "frozen_original_location",
+        "original_claim",
+        "current_claim",
+        "source",
+        "paraphrase",
+        "mapping_interpretation",
+        "bounded_rationale",
+        "status",
+        "document_action",
+        "claim_effect",
+        "numeric_derivations",
+        "reproduction_command",
+        "falsifier",
+        "independent_review"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^(DORA|E23)-[A-Z0-9-]+$"},
+        "framework": {"enum": ["DORA", "OSFI_E23"]},
+        "document_path": {"enum": ["docs/DORA_MAPPING.md", "docs/OSFI_E23_MAPPING.md"]},
+        "document_location": {"type": "string", "minLength": 1},
+        "frozen_original_location": {"type": "string", "minLength": 1},
+        "original_claim": {"type": "string", "minLength": 1},
+        "current_claim": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/$defs/rowSource"},
+        "paraphrase": {"type": "string", "minLength": 1, "maxLength": 900},
+        "mapping_interpretation": {"type": "string", "minLength": 1},
+        "bounded_rationale": {"type": "string", "minLength": 1},
+        "status": {"enum": ["draft", "verified", "deprecated", "unsupported", "inconclusive"]},
+        "document_action": {"enum": ["retained", "corrected_and_retained", "qualified_and_retained", "withdrawn_as_result"]},
+        "claim_effect": {"enum": ["authority_fact", "mapping_interpretation", "limitation", "negative_evidence"]},
+        "numeric_derivations": {"type": "array", "items": {"$ref": "#/$defs/numericDerivation"}},
+        "reproduction_command": {"type": "string", "pattern": "^python3 -B scripts/validators/validate_regulatory_claim_source_matrix.py --claim (DORA|E23)-[A-Z0-9-]+ --json$"},
+        "falsifier": {"type": "string", "minLength": 1},
+        "independent_review": {"$ref": "#/$defs/review"}
+      }
+    }
+  }
+}

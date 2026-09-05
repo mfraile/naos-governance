@@ -1,0 +1,81 @@
+id: CAP-DEPENDENCY-INTEGRITY
+name: Dependency Integrity
+description: >
+  Detects Python imports that are not stdlib, first-party, declared dependency,
+  or explicitly allowlisted, without online registry calls.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: warning
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Advisory undeclared-import hygiene only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warns on undeclared or unresolved imports."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Dependency-integrity report is expected for governed coding."
+  assured:
+    target_maturity: L3
+    enforcement: blocking
+    notes: "Configured undeclared imports can block until reviewed."
+authority:
+  may_read:
+    - pyproject.toml
+    - requirements.txt
+    - requirements/
+    - src/
+    - app/
+    - tests/
+    - naos/dependency_integrity_rules.yaml
+  may_write:
+    - naos/reports/dependency_integrity.json
+allowed_resources:
+  - "repo-local dependency manifests"
+  - "Python AST import declarations"
+prohibited_resources:
+  - "online package registry lookup by default"
+  - "network calls"
+  - "malware scanning claims"
+constraints:
+  - "Must classify imports deterministically and locally."
+  - "Must not claim package safety, vulnerability absence, or supply-chain assurance."
+  - "Must keep online checks out of core defaults."
+required_evidence:
+  - "naos/reports/dependency_integrity.json"
+validators:
+  - id: dependency_integrity
+    script: scripts/naos_dependency_integrity.py
+    status: available
+gatekeepers:
+  - G4
+dashboard_signals:
+  - "dependency_integrity.status"
+  - "dependency_integrity.undeclared_or_unresolved_imports"
+maturity_path:
+  L0: "Capability contract and rules seed exist."
+  L1: "Report can be generated from local source and dependency manifests."
+  L2: "Report is wired into G4 and evidence surfaces."
+  L3: "Profile severity and reviewed allowlists are applied."
+  L4: "Dashboard/SARIF summarize dependency-integrity posture."
+  L5: "Projects pair NAOS hygiene with SCA where required."
+known_limitations:
+  - "Import-name to package-name mapping can require project-specific allowlists."
+  - "Local declaration checks do not prove package safety or freshness."
+not_claimed:
+  - "package supply-chain safety proof"
+  - "malware detection"
+  - "vulnerability scanning"
+  - "dependency freshness proof"
+  - "approval"
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+  - docs/CLAIMS_AND_LIMITATIONS.md
+related_scripts:
+  - scripts/naos_dependency_integrity.py

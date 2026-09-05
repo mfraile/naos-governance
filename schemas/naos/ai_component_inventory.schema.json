@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:ai-component-inventory:v1",
+  "title": "NAOS AI Component Inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "generator_version",
+    "profile",
+    "status",
+    "required_for_profile",
+    "project_root",
+    "naos_root",
+    "format",
+    "decision_supported",
+    "review_owner",
+    "lifecycle",
+    "rules",
+    "model_policy",
+    "applicability",
+    "field_sources",
+    "provenance",
+    "components",
+    "component_counts",
+    "inventory_digest",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.ai_component_inventory.v1"},
+    "generated_at": {"type": "string", "minLength": 1},
+    "generator_version": {"const": "1.0.0"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["current", "review_required"]},
+    "required_for_profile": {"type": "boolean"},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string", "minLength": 1},
+    "format": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "kind", "standard_conformance"],
+      "properties": {
+        "id": {"const": "ai_component_inventory.v1"},
+        "version": {"const": 1},
+        "kind": {"const": "custom_declared_facts_inventory"},
+        "standard_conformance": {"type": "null"}
+      }
+    },
+    "decision_supported": {"type": "string", "minLength": 1},
+    "review_owner": {"type": "string", "minLength": 1},
+    "lifecycle": {"type": "object"},
+    "rules": {"$ref": "#/$defs/source"},
+    "model_policy": {"$ref": "#/$defs/source"},
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generated_adopter_required_profiles", "source_kit_missing_report", "rationale"],
+      "properties": {
+        "generated_adopter_required_profiles": {"const": ["standard", "assured"]},
+        "source_kit_missing_report": {"const": "not_applicable"},
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    },
+    "field_sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component_id", "component_type", "name", "status", "source_file", "source_sha256", "declarations", "redactions"],
+      "properties": {
+        "component_id": {"type": "string", "minLength": 1},
+        "component_type": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "minLength": 1},
+        "source_file": {"type": "string", "minLength": 1},
+        "source_sha256": {"type": "string", "minLength": 1},
+        "declarations": {"type": "string", "minLength": 1},
+        "redactions": {"type": "string", "minLength": 1}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basis", "inputs", "input_set_digest"],
+      "properties": {
+        "basis": {"const": "repo_local_declared_facts"},
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "role", "sha256"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1, "not": {"pattern": "^(?:/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))"}},
+              "role": {"enum": ["inventory_rules", "model_policy", "ai_surface_declaration", "generator_or_normalizer"]},
+              "sha256": {"$ref": "#/$defs/sha256"}
+            }
+          }
+        },
+        "input_set_digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component_id", "component_type", "name", "status", "source_file", "source_sha256", "declarations", "redactions"],
+        "properties": {
+          "component_id": {"type": "string", "minLength": 1},
+          "component_type": {"enum": ["agent", "skill", "instruction", "model_role", "ai_tool", "tool_model_binding"]},
+          "name": {"type": "string", "minLength": 1},
+          "status": {"enum": ["active", "declared_disabled", "unknown"]},
+          "source_file": {"type": "string", "minLength": 1, "not": {"pattern": "^(?:/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))"}},
+          "source_sha256": {"$ref": "#/$defs/sha256"},
+          "declarations": {"type": "object"},
+          "redactions": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "component_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "inventory_digest": {"$ref": "#/$defs/sha256"},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "summary": {
+      "type": "object",
+      "required": ["blocking", "required", "warnings", "advisory", "total_findings", "components", "component_types", "inputs", "required_for_profile"],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "components": {"type": "integer", "minimum": 0},
+        "component_types": {"type": "integer", "minimum": 0},
+        "inputs": {"type": "integer", "minimum": 1},
+        "required_for_profile": {"type": "boolean"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "source", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "not": {"pattern": "^(?:/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))"}},
+        "source": {"enum": ["project", "template", "explicit"]},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

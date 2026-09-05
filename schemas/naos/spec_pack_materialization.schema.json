@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:spec_pack_materialization:v2",
+  "title": "NAOS Spec-Pack Materialization Report",
+  "description": "Report for deterministic copying of missing profile-required spec-pack template files. It does not approve, complete, implement, test, certify, or prove specifications.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "project_root",
+    "naos_root",
+    "source_specs_root",
+    "target_specs_root",
+    "manifest",
+    "dry_run",
+    "force",
+    "summary",
+    "files",
+    "findings",
+    "limitations",
+    "not_claimed",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": ["naos.spec_pack_materialization.v1", "naos.spec_pack_materialization.v2"]
+    },
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "source_specs_root": {"type": "string"},
+    "target_specs_root": {"type": "string"},
+    "manifest": {"type": "string"},
+    "dry_run": {"type": "boolean"},
+    "force": {"type": "boolean"},
+    "apply_allowed": {
+      "type": "boolean",
+      "description": "Whether preflight and spec-file apply completed without a reason to refuse; a later report persistence failure does not retroactively change this value."
+    },
+    "report_output": {"type": ["string", "null"]},
+    "report_write_allowed": {"type": "boolean"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "blocking",
+        "required",
+        "warnings",
+        "advisory",
+        "total_findings",
+        "required_files",
+        "spec_files_required",
+        "support_files_required",
+        "copied",
+        "overwritten",
+        "skipped_existing",
+        "would_copy",
+        "would_overwrite",
+        "missing_source"
+      ],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "required_files": {"type": "integer", "minimum": 0},
+        "spec_files_required": {"type": "integer", "minimum": 0},
+        "support_files_required": {"type": "integer", "minimum": 0},
+        "copied": {"type": "integer", "minimum": 0},
+        "overwritten": {"type": "integer", "minimum": 0},
+        "skipped_existing": {"type": "integer", "minimum": 0},
+        "would_copy": {"type": "integer", "minimum": 0},
+        "would_overwrite": {"type": "integer", "minimum": 0},
+        "missing_source": {"type": "integer", "minimum": 0},
+        "invalid_manifest": {"type": "integer", "minimum": 0},
+        "unsafe_paths": {"type": "integer", "minimum": 0},
+        "copy_failed": {"type": "integer", "minimum": 0},
+        "copy_cleanup_failed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failures removing a copy temporary after its absent destination was successfully installed; the corresponding file action remains copied."
+        },
+        "report_write_failed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failures encountered while persisting the completed materialization report."
+        },
+        "not_applied": {"type": "integer", "minimum": 0},
+        "apply_refused": {
+          "type": "boolean",
+          "description": "Whether spec-file apply was refused before mutation or stopped on a spec-file copy or post-install cleanup failure; false when apply completed and only later report persistence failed."
+        }
+      }
+    },
+    "files": {"type": "array", "items": {"$ref": "#/$defs/materialized_file"}},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "next_actions": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"schema": {"const": "naos.spec_pack_materialization.v2"}},
+        "required": ["schema"]
+      },
+      "then": {
+        "required": ["apply_allowed", "report_output", "report_write_allowed"],
+        "properties": {
+          "summary": {
+            "required": [
+              "invalid_manifest",
+              "unsafe_paths",
+              "copy_failed",
+              "copy_cleanup_failed",
+              "report_write_failed",
+              "not_applied",
+              "apply_refused"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "materialized_file": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["path", "source", "filename", "kind", "existed_before", "action", "dry_run", "force"],
+      "properties": {
+        "path": {"type": "string"},
+        "source": {"type": "string"},
+        "filename": {"type": "string"},
+        "kind": {"type": "string", "enum": ["spec", "support"]},
+        "existed_before": {"type": "boolean"},
+        "action": {
+          "type": "string",
+          "enum": [
+            "copied",
+            "overwritten",
+            "skipped_existing",
+            "would_copy",
+            "would_overwrite",
+            "missing_source",
+            "unsafe_path",
+            "copy_failed",
+            "not_applied"
+          ]
+        },
+        "dry_run": {"type": "boolean"},
+        "force": {"type": "boolean"}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "category", "message", "human_review_required", "not_claimed"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
+        "status": {
+          "type": "string",
+          "enum": ["missing_source", "manifest_load_error", "invalid_manifest", "unsafe_path", "copy_failed", "copy_cleanup_failed", "report_write_failed"]
+        },
+        "category": {"type": "string"},
+        "message": {"type": "string"},
+        "path": {"type": "string"},
+        "expected": {},
+        "actual": {},
+        "required_next_actions": {"type": "array", "items": {"type": "string"}},
+        "human_review_required": {"type": "boolean"},
+        "not_claimed": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

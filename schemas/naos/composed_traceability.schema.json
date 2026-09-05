@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/composed_traceability.schema.json",
+  "title": "NAOS composed traceability report",
+  "type": "object",
+  "$defs": {
+    "canonicalReviewReason": {
+      "enum": [
+        "task_not_found",
+        "recovery_mode_mismatch",
+        "unsupported_legacy_status",
+        "completed_not_delivered",
+        "completion_unverified",
+        "completion_partially_verified",
+        "completion_inconclusive",
+        "completion_failed",
+        "completion_not_applicable",
+        "verification_prerequisites_unmet",
+        "completion_state_inconsistent"
+      ]
+    },
+    "canonicalReviewReasonArray": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/canonicalReviewReason"},
+      "uniqueItems": true
+    },
+    "canonicalChainReview": {
+      "type": "object",
+      "required": ["human_review_required", "review_reasons", "review_posture_source"],
+      "properties": {
+        "human_review_required": {"type": "boolean"},
+        "review_reasons": {"$ref": "#/$defs/canonicalReviewReasonArray"},
+        "review_posture_source": {"const": "canonical_task_lifecycle"}
+      },
+      "additionalProperties": false
+    },
+    "canonicalTaskReview": {
+      "type": "object",
+      "required": ["human_review_required", "tasks_requiring_review", "review_posture_source"],
+      "properties": {
+        "human_review_required": {"type": "boolean"},
+        "tasks_requiring_review": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["task_id", "review_reasons"],
+            "properties": {
+              "task_id": {"type": "string", "pattern": "^(?:[A-Z0-9]+-)*T-[0-9]{3,}$"},
+              "review_reasons": {"$ref": "#/$defs/canonicalReviewReasonArray"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "review_posture_source": {"const": "canonical_task_lifecycle"}
+      },
+      "additionalProperties": false
+    },
+    "traceabilityReviewReason": {
+      "type": "string",
+      "pattern": "^traceability:(?:(?:[A-Z0-9]+-)*T-[0-9]{3,}:(?:unsupported_legacy_status|task_to_requirement|task_to_source|source_to_test|delivered_task_to_completion_history|test_to_evidence|evidence_to_decision)|invalid_task_id|missing_input:(?:task_registry|completed_history|module_header_traceability|source_to_test_map|ac_completion_evidence))$"
+    },
+    "traceabilityReview": {
+      "type": "object",
+      "required": ["human_review_required", "review_reasons", "finding_ids", "missing_inputs", "review_posture_source"],
+      "properties": {
+        "human_review_required": {"type": "boolean"},
+        "review_reasons": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/traceabilityReviewReason"},
+          "uniqueItems": true
+        },
+        "finding_ids": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^composed_traceability[.][a-z0-9_]+$"},
+          "uniqueItems": true
+        },
+        "missing_inputs": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "task_registry",
+              "completed_history",
+              "module_header_traceability",
+              "source_to_test_map",
+              "ac_completion_evidence"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "review_posture_source": {"const": "composed_traceability"}
+      },
+      "additionalProperties": false
+    },
+    "aggregateReviewReason": {
+      "anyOf": [
+        {"$ref": "#/$defs/traceabilityReviewReason"},
+        {
+          "type": "string",
+          "pattern": "^task:(?:[A-Z0-9]+-)*T-[0-9]{3,}:(?:task_not_found|recovery_mode_mismatch|unsupported_legacy_status|completed_not_delivered|completion_unverified|completion_partially_verified|completion_inconclusive|completion_failed|completion_not_applicable|verification_prerequisites_unmet|completion_state_inconsistent)$"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "profile",
+    "status",
+    "project_root",
+    "naos_root",
+    "inputs",
+    "summary",
+    "chains",
+    "findings",
+    "canonical_task_review",
+    "traceability_review",
+    "human_review_required",
+    "review_reasons",
+    "review_posture_source",
+    "limitations",
+    "not_claimed"
+  ],
+  "properties": {
+    "schema": {"const": "naos.composed_traceability.v1"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["not_configured", "pass", "mapped_with_gaps"]},
+    "project_root": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "inputs": {"type": "object"},
+    "summary": {
+      "type": "object",
+      "required": [
+        "tasks",
+        "complete_chains",
+        "chains_with_gaps",
+        "missing_inputs",
+        "total_findings",
+        "advisory",
+        "warning",
+        "required",
+        "blocking",
+        "canonical_tasks_requiring_review",
+        "traceability_findings_requiring_review",
+        "human_review_required"
+      ],
+      "properties": {
+        "tasks": {"type": "integer", "minimum": 0},
+        "complete_chains": {"type": "integer", "minimum": 0},
+        "chains_with_gaps": {"type": "integer", "minimum": 0},
+        "missing_inputs": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "warning": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "blocking": {"type": "integer", "minimum": 0},
+        "canonical_tasks_requiring_review": {"type": "integer", "minimum": 0},
+        "traceability_findings_requiring_review": {"type": "integer", "minimum": 0},
+        "human_review_required": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "chains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "lifecycle_state", "delivery_state", "verification_state", "requirement_refs", "source_links", "completion_links", "link_checks", "relationship_states", "qualifications", "qualification_level", "composed_chain_status", "canonical_task_review"],
+        "properties": {
+          "task_id": {"type": "string", "pattern": "^(?:[A-Z0-9]+-)*T-[0-9]{3,}$"},
+          "title": {"type": ["string", "null"]},
+          "lifecycle_state": {"type": "string"},
+          "delivery_state": {"type": "string"},
+          "verification_state": {"type": "string"},
+          "requirement_refs": {"type": "array", "items": {"type": "string"}},
+          "source_links": {"type": "array", "items": {"type": "object"}},
+          "completed_history": {"type": ["object", "null"]},
+          "completion_links": {
+            "type": "object",
+            "required": ["mapped_test_references", "completed_test_references", "evidence_references", "decision_references", "decision_records"],
+            "properties": {
+              "mapped_test_references": {"type": "array", "items": {"type": "string"}},
+              "completed_test_references": {"type": "array", "items": {"type": "string"}},
+              "evidence_references": {"type": "array", "items": {"type": "string"}},
+              "decision_references": {"type": "array", "items": {"type": "string"}},
+              "decision_records": {"type": "array", "items": {"type": "object"}}
+            },
+            "additionalProperties": false
+          },
+          "relationship_states": {"type": "object"},
+          "qualifications": {"type": "object"},
+          "qualification_level": {"enum": ["gaps_present", "structural_only", "admitted_attributable_chain"]},
+          "link_checks": {
+            "type": "object",
+            "required": ["task_to_requirement", "task_to_source", "source_to_test", "delivered_task_to_completion_history", "test_to_evidence", "evidence_to_decision"],
+            "properties": {
+              "task_to_requirement": {"type": "boolean"},
+              "task_to_source": {"type": "boolean"},
+              "source_to_test": {"type": "boolean"},
+              "delivered_task_to_completion_history": {"type": ["boolean", "null"]},
+              "test_to_evidence": {"type": ["boolean", "null"]},
+              "evidence_to_decision": {"type": ["boolean", "null"]}
+            },
+            "additionalProperties": false
+          },
+          "composed_chain_status": {"enum": ["complete", "gap"]},
+          "canonical_task_review": {"$ref": "#/$defs/canonicalChainReview"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "ac_completion_summary": {"type": ["object", "null"]},
+    "canonical_task_review": {"$ref": "#/$defs/canonicalTaskReview"},
+    "traceability_review": {"$ref": "#/$defs/traceabilityReview"},
+    "human_review_required": {"type": "boolean"},
+    "review_reasons": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/aggregateReviewReason"},
+      "uniqueItems": true
+    },
+    "review_posture_source": {"const": "composed_traceability_aggregate"},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

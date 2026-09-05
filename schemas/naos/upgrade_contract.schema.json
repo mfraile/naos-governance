@@ -1,0 +1,568 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:upgrade_contract:v2",
+  "title": "NAOS Content-Aware Upgrade Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "operation",
+    "status",
+    "project",
+    "profile",
+    "request_inputs",
+    "creation_identity",
+    "source_policy",
+    "manifest",
+    "paths",
+    "ownership_inference",
+    "planning_mutated_target",
+    "apply_requires_separate_digest_bound_invocation",
+    "plan_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "enum": [
+        "naos.upgrade.content_aware_plan.v1",
+        "naos.upgrade.content_aware_plan.v2"
+      ]
+    },
+    "operation": {"type": "string", "minLength": 1},
+    "status": {
+      "type": "string",
+      "enum": ["ready", "no_changes", "diagnostic_only"]
+    },
+    "project": {"$ref": "#/$defs/project"},
+    "profile": {"$ref": "#/$defs/profile"},
+    "request_inputs": {"type": "object"},
+    "selected_paths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "operation_inputs": {"type": "object"},
+    "checks": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/fixed_check"}
+    },
+    "creation_identity": {"$ref": "#/$defs/creation_identity"},
+    "source_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["active", "provenance"],
+      "properties": {
+        "active": {"$ref": "#/$defs/policy_binding"},
+        "provenance": {
+          "oneOf": [
+            {"$ref": "#/$defs/policy_binding"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "manifest": {"$ref": "#/$defs/manifest"},
+    "paths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/path"}
+    },
+    "ownership_inference": {"const": "forbidden"},
+    "planning_mutated_target": {"const": false},
+    "apply_requires_separate_digest_bound_invocation": {"const": true},
+    "plan_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema": {"const": "naos.upgrade.content_aware_plan.v2"}
+        },
+        "required": ["schema"]
+      },
+      "then": {
+        "required": ["selected_paths", "operation_inputs", "checks"]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {"required": ["selected_paths"]},
+            {"required": ["operation_inputs"]}
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sha3_512": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "fixed_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "status", "evidence_sha256"],
+      "properties": {
+        "check_id": {"type": "string", "minLength": 1},
+        "status": {
+          "type": "string",
+          "enum": ["passed", "blocking", "not_applicable"]
+        },
+        "evidence_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "nullable_sha256": {
+      "oneOf": [
+        {"$ref": "#/$defs/sha256"},
+        {"type": "null"}
+      ]
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root_binding", "project_id", "scope_integrity_sha3_512"],
+      "properties": {
+        "root_binding": {"type": "string", "minLength": 1},
+        "project_id": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        },
+        "scope_integrity_sha3_512": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha3_512"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "previous",
+        "requested",
+        "preserved_inputs",
+        "effective_inputs",
+        "input_conflicts"
+      ],
+      "properties": {
+        "previous": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        },
+        "requested": {"type": "string", "minLength": 1},
+        "preserved_inputs": {"type": "object"},
+        "effective_inputs": {
+          "type": "object",
+          "required": ["profile"]
+        },
+        "input_conflicts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "policy_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshot_id", "binding_sha256", "snapshot_sha256"],
+      "properties": {
+        "snapshot_id": {"type": "string", "minLength": 1},
+        "binding_sha256": {"$ref": "#/$defs/sha256"},
+        "snapshot_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "creation_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "policy", "uid", "gid"],
+      "properties": {
+        "schema": {"const": "naos.metadata.creation_identity.v1"},
+        "policy": {"const": "executing_uid_primary_gid"},
+        "uid": {"type": "integer", "minimum": 0},
+        "gid": {"type": "integer", "minimum": 0}
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "snapshot_sha256",
+        "source_schema",
+        "ownership_reclassified",
+        "refusal"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["valid_v1_normalized", "valid_v2", "diagnostic_only"]
+        },
+        "snapshot_sha256": {"$ref": "#/$defs/nullable_sha256"},
+        "source_schema": {
+          "oneOf": [
+            {"const": "naos.upgrade.managed_content_manifest.v1"},
+            {"const": "naos.upgrade.managed_content_manifest.v2"},
+            {"type": "null"}
+          ]
+        },
+        "ownership_reclassified": {"const": false},
+        "refusal": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"status": {"const": "diagnostic_only"}},
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "snapshot_sha256": {"type": "null"},
+              "source_schema": {"type": "null"},
+              "refusal": {"type": "string", "minLength": 1}
+            }
+          },
+          "else": {
+            "properties": {
+              "snapshot_sha256": {"$ref": "#/$defs/sha256"},
+              "refusal": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"status": {"const": "valid_v1_normalized"}},
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "source_schema": {"const": "naos.upgrade.managed_content_manifest.v1"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"status": {"const": "valid_v2"}},
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "source_schema": {"const": "naos.upgrade.managed_content_manifest.v2"}
+            }
+          }
+        }
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["presence", "kind", "mode", "size", "sha256", "metadata_sha256"],
+      "properties": {
+        "presence": {"type": "string", "enum": ["present", "absent", "unknown"]},
+        "kind": {
+          "oneOf": [
+            {"type": "string", "enum": ["file", "directory", "symlink", "special"]},
+            {"type": "null"}
+          ]
+        },
+        "mode": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0, "maximum": 511},
+            {"type": "null"}
+          ]
+        },
+        "size": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0},
+            {"type": "null"}
+          ]
+        },
+        "sha256": {"$ref": "#/$defs/nullable_sha256"},
+        "metadata_sha256": {"$ref": "#/$defs/nullable_sha256"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"presence": {"const": "present"}}},
+          "then": {
+            "properties": {
+              "kind": {"type": "string"},
+              "mode": {"type": "integer"},
+              "size": {"type": "integer"},
+              "sha256": {"$ref": "#/$defs/sha256"},
+              "metadata_sha256": {"$ref": "#/$defs/sha256"}
+            }
+          },
+          "else": {
+            "properties": {
+              "kind": {"type": "null"},
+              "mode": {"type": "null"},
+              "size": {"type": "null"},
+              "sha256": {"type": "null"},
+              "metadata_sha256": {"type": "null"}
+            }
+          }
+        }
+      ]
+    },
+    "xattr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name_base64", "size", "sha256"],
+      "properties": {
+        "name_base64": {"type": "string", "minLength": 1},
+        "size": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "source_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "platform",
+        "machine",
+        "python_minor",
+        "file_type",
+        "mode",
+        "uid",
+        "gid",
+        "flags",
+        "acl_entries",
+        "xattrs"
+      ],
+      "properties": {
+        "schema": {"const": "naos.metadata.darwin_source.v1"},
+        "platform": {"const": "Darwin"},
+        "machine": {"type": "string", "enum": ["arm64", "aarch64"]},
+        "python_minor": {"type": "string", "enum": ["3.11", "3.12", "3.13"]},
+        "file_type": {"const": "regular_file"},
+        "mode": {"type": "integer", "minimum": 0, "maximum": 511},
+        "uid": {"type": "integer", "minimum": 0},
+        "gid": {"type": "integer", "minimum": 0},
+        "flags": {"type": "integer", "minimum": 0},
+        "acl_entries": {"type": "array", "items": {"type": "string"}},
+        "xattrs": {"type": "array", "items": {"$ref": "#/$defs/xattr"}}
+      }
+    },
+    "current_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "platform",
+        "machine",
+        "python_minor",
+        "file_type",
+        "device",
+        "inode",
+        "mode",
+        "uid",
+        "gid",
+        "flags",
+        "acl_entries",
+        "xattrs"
+      ],
+      "properties": {
+        "schema": {"const": "naos.metadata.darwin_create_only.v1"},
+        "platform": {"const": "Darwin"},
+        "machine": {"type": "string", "enum": ["arm64", "aarch64"]},
+        "python_minor": {"type": "string", "enum": ["3.11", "3.12", "3.13"]},
+        "file_type": {"const": "regular_file"},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 0},
+        "mode": {"type": "integer", "minimum": 0, "maximum": 511},
+        "uid": {"type": "integer", "minimum": 0},
+        "gid": {"type": "integer", "minimum": 0},
+        "flags": {"type": "integer", "minimum": 0},
+        "acl_entries": {"type": "array", "items": {"type": "string"}},
+        "xattrs": {"type": "array", "items": {"$ref": "#/$defs/xattr"}}
+      }
+    },
+    "nullable_source_metadata": {
+      "oneOf": [
+        {"$ref": "#/$defs/source_metadata"},
+        {"type": "null"}
+      ]
+    },
+    "nullable_current_metadata": {
+      "oneOf": [
+        {"$ref": "#/$defs/current_metadata"},
+        {"type": "null"}
+      ]
+    },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["before", "after", "source", "creation_policy"],
+      "properties": {
+        "before": {"$ref": "#/$defs/ownership_class"},
+        "after": {"$ref": "#/$defs/ownership_class"},
+        "source": {"type": "string", "minLength": 1},
+        "creation_policy": {"type": "string"}
+      }
+    },
+    "ownership_class": {
+      "type": "string",
+      "enum": [
+        "kit_owned_derived",
+        "adopter_owned",
+        "adopter_adapted_generated",
+        "configuration_choice",
+        "ephemeral_cache",
+        "evidence_bearing_report",
+        "unmanaged"
+      ]
+    },
+    "path_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshot_id", "binding_sha256", "snapshot_sha256", "rule"],
+      "properties": {
+        "snapshot_id": {"type": "string", "minLength": 1},
+        "binding_sha256": {"$ref": "#/$defs/sha256"},
+        "snapshot_sha256": {"$ref": "#/$defs/sha256"},
+        "rule": {"type": "string", "minLength": 1}
+      }
+    },
+    "ancestor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "device", "inode"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 0}
+      }
+    },
+    "metadata_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reason"],
+      "properties": {
+        "status": {"type": "string", "enum": ["supported", "unsupported"]},
+        "reason": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "eligible"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["none", "create", "replace"]},
+        "eligible": {"type": "boolean"}
+      }
+    },
+    "path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "base",
+        "before",
+        "after",
+        "base_metadata",
+        "before_metadata",
+        "after_metadata",
+        "content_state",
+        "ownership",
+        "source_policy",
+        "preservation",
+        "action",
+        "mutation",
+        "metadata_status",
+        "ancestor_identities"
+      ],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "base": {"$ref": "#/$defs/identity"},
+        "before": {"$ref": "#/$defs/identity"},
+        "after": {"$ref": "#/$defs/identity"},
+        "base_metadata": {"$ref": "#/$defs/nullable_source_metadata"},
+        "before_metadata": {"$ref": "#/$defs/nullable_current_metadata"},
+        "after_metadata": {"$ref": "#/$defs/nullable_source_metadata"},
+        "content_state": {
+          "type": "string",
+          "enum": [
+            "REFUSE_PROVENANCE",
+            "NOOP_UNCHANGED",
+            "NOOP_ALREADY_IDENTICAL",
+            "PROPOSE_UPDATE_FROM_UPSTREAM",
+            "PRESERVE_ADOPTER_MODIFICATION",
+            "CONFLICT_PRESERVE",
+            "PRESERVE_ABSENCE",
+            "RETAIN_REMOVED_UPSTREAM",
+            "REMOVAL_CONFLICT_PRESERVE",
+            "NOOP_REMOVED_AND_ABSENT",
+            "PROPOSE_NEW_UPSTREAM_CREATE",
+            "NOOP_IDENTICAL_UNMANAGED",
+            "UNMANAGED_COLLISION_PRESERVE",
+            "UNMANAGED_RETAIN",
+            "PRESERVE_OUT_OF_SCOPE"
+          ]
+        },
+        "ownership": {"$ref": "#/$defs/ownership"},
+        "source_policy": {"$ref": "#/$defs/path_policy"},
+        "preservation": {
+          "type": "string",
+          "enum": ["create_absent", "replace_verified_base", "unchanged", "preserve", "refuse"]
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "REFUSE_PROVENANCE",
+            "UNSUPPORTED_METADATA",
+            "CREATE_NEW_UPSTREAM",
+            "CREATE_NEW_ADOPTER_OWNED",
+            "CREATE_CONFIGURATION_CHOICE",
+            "CREATE_MANAGED_CACHE",
+            "CREATE_IMMUTABLE_REPORT",
+            "UPDATE_FROM_UPSTREAM",
+            "PRESERVE_ADOPTER_CONTENT",
+            "PRESERVE_ADAPTED_CONTENT",
+            "PRESERVE_CONFIGURATION_CHOICE",
+            "REFUSE_CACHE_UPDATE_OUTSIDE_OWNED_ROOT",
+            "PRESERVE_EVIDENCE_REPORT",
+            "REFUSE_UNMANAGED_MUTATION",
+            "NOOP_UNCHANGED",
+            "NOOP_ALREADY_IDENTICAL",
+            "PRESERVE_ADOPTER_MODIFICATION",
+            "CONFLICT_PRESERVE",
+            "PRESERVE_ABSENCE",
+            "RETAIN_REMOVED_UPSTREAM",
+            "REMOVAL_CONFLICT_PRESERVE",
+            "NOOP_REMOVED_AND_ABSENT",
+            "NOOP_IDENTICAL_UNMANAGED",
+            "UNMANAGED_COLLISION_PRESERVE",
+            "UNMANAGED_RETAIN"
+          ]
+        },
+        "mutation": {"$ref": "#/$defs/mutation"},
+        "metadata_status": {"$ref": "#/$defs/metadata_status"},
+        "ancestor_identities": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/ancestor"}
+        }
+      }
+    }
+  }
+}

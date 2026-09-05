@@ -1,0 +1,117 @@
+id: CAP-MODEL-TELEMETRY-EVIDENCE
+name: Model Telemetry Evidence
+description: >
+  Provides deterministic local review evidence for optional model-usage
+  telemetry declarations and local telemetry files, including session/task
+  linkage, model-role linkage, route class, data class, cost and latency
+  thresholds, policy exceptions, sensitive payload field presence, credential
+  field presence, residual risks, and review-required reason codes.
+status: active
+default_maturity: L1
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Optional model telemetry evidence hints only."
+  lite:
+    target_maturity: L1
+    enforcement: warning
+    notes: "Warn when configured telemetry evidence is missing, stale, unlinked, or risky."
+  standard:
+    target_maturity: L1
+    enforcement: required
+    notes: "Route configured telemetry gaps and policy exceptions to human review."
+  assured:
+    target_maturity: L1
+    enforcement: required
+    notes: "First implementation slice remains required review only; blocking requires future validated L3+ maturity and gate wiring."
+authority:
+  may_read:
+    - naos/model_telemetry_evidence.yaml
+    - declared local model telemetry files
+    - naos/model_provider_policy.yaml
+    - naos/reports/model_provider_policy.json
+    - declared session/task/action evidence references
+  may_write:
+    - naos/reports/model_telemetry_evidence.json
+  may_block:
+    - "none in this implementation slice; findings are review evidence only"
+allowed_resources:
+  - "repo-local model telemetry declarations"
+  - "repo-local YAML, JSON, or JSONL telemetry summaries explicitly declared by the project"
+  - "repo-local model-provider policy refs, session ids, task ids, action receipt refs, and evidence refs"
+prohibited_resources:
+  - "provider SDKs, provider credentials, external network calls, API calls, credential validation, gateway startup, local model startup, model downloads, runtime route execution, MCP calls, memory tools, hooks, browser automation, or IDE/tool configuration mutation"
+  - "prompt, response, raw payload, credential, token, secret, private memory, customer, tenant, or regulated payload capture as trusted report content"
+  - "cost accounting, billing proof, route enforcement, model recommendation, provider catalog, approval, certification, attestation, compliance proof, release authority, or publication authority"
+constraints:
+  - "Must remain optional and local-file-first."
+  - "Must not call providers, models, APIs, gateways, local servers, proxies, MCP, memory tools, hooks, networks, browsers, or IDE/tool configuration."
+  - "Must not validate credentials, recommend models, route runtime calls, maintain provider catalogs, or mutate tool configuration."
+  - "Must sanitize known prompt/response/credential payload fields and report their presence as review findings instead of copying payload values into the report."
+  - "Must treat cost and latency as adopter-supplied review evidence, not complete accounting or provider verification."
+  - "Must subordinate role and route interpretation to model-provider policy and human review."
+  - "Must not claim payload safety, route correctness, policy compliance, legal/regulatory assurance, approval, certification, attestation, release authority, or publication authority."
+required_evidence:
+  - naos/model_telemetry_evidence.yaml
+  - naos/reports/model_telemetry_evidence.json
+validators:
+  - id: naos_model_telemetry_evidence
+    script: scripts/naos_model_telemetry_evidence.py
+    status: available
+gatekeepers:
+  - G2
+  - G6
+dashboard_signals: []
+maturity_path:
+  L0: "Candidate design card and challenge exist."
+  L1: "Disabled-by-default local seed, schema, script, capability contract, setup module, CLI/Make dispatch, generated-adopter packaging, focused tests, and bounded control-plane route exist."
+  L2: "Projects may link telemetry findings to model-provider policy, session/task evidence, and action receipts as local review evidence."
+  L3: "Adopter pilots show telemetry review reduces model-use ambiguity without creating false runtime or accounting confidence."
+  L4: "Broader evidence consumers may be considered only after adopter evidence, privacy review, and claim-control review."
+  L5: "Any future provider-specific parser, gateway integration, or runtime routing remains separately approved and non-authoritative by default."
+known_limitations:
+  - "The report does not prove that a model request happened."
+  - "The report does not prove costs are complete, accurate, billable, or provider-verified."
+  - "The report does not inspect prompts, responses, payload semantics, provider state, gateway state, or runtime routing."
+  - "Telemetry records can be stale, incomplete, manually summarized, or exported from tools whose formats drift."
+  - "Path existence and local record shape do not prove route correctness, data classification correctness, policy compliance, model quality, safety, privacy, legality, or release readiness."
+not_claimed:
+  - "LiteLLM integration"
+  - "provider gateway availability"
+  - "provider call"
+  - "model call"
+  - "API call"
+  - "network access"
+  - "MCP activation"
+  - "memory activation"
+  - "credential validation"
+  - "runtime model routing"
+  - "route enforcement"
+  - "model recommendation"
+  - "provider catalog"
+  - "complete cost accounting"
+  - "billing proof"
+  - "payload safety proof"
+  - "route correctness proof"
+  - "policy compliance proof"
+  - "legal or regulatory assurance"
+  - "approval"
+  - "certification"
+  - "attestation"
+  - "release authority"
+  - "publication authority"
+related_docs:
+  - README.md
+  - NAOS_CATALOG.md
+  - docs/CONTROL_PLANE.md
+  - docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
+related_scripts:
+  - scripts/naos_model_telemetry_evidence.py
+  - scripts/naos_control_plane_review.py
+related_schemas:
+  - schemas/naos/model_telemetry_evidence.schema.json
+  - schemas/naos/control_plane_review.schema.json

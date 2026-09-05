@@ -1,0 +1,76 @@
+# NAOS-Governance — Native AI Orchestration for SDLC
+
+AI Coding Governance, Machine-Enforced
+
+Copyright 2026 Marlon Fraile
+<https://github.com/mfraile/naos-governance>
+
+Third-party contributions are copyright their respective contributors and are
+licensed to the project under the Apache License 2.0 through the standard
+Developer Certificate of Origin process.
+
+This product is licensed under the Apache License, Version 2.0 (the "License");
+you may not use this product except in compliance with the License. You may
+obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+A copy of the License is also distributed with this product in the LICENSE
+file.
+
+──────────────────────────────────────────────────────────────────────────────
+Naming
+──────────────────────────────────────────────────────────────────────────────
+
+The public project name is NAOS-Governance. The Apache License 2.0 governs the
+core kit. This NOTICE does not assert trademark ownership in "NAOS" alone.
+Forks and derivative works are welcome under the License; they should avoid
+presenting themselves as the upstream NAOS-Governance project unless they are
+the upstream distribution.
+
+Official NAOS-Governance project domains:
+
+- <https://naos-governance.com>
+- <https://naos-sdlc.com>
+- <https://naos-sdlc.dev>
+
+Additional regional or defensive domains may redirect to the primary project
+site. Domain ownership does not change the Apache License terms; it only helps
+adopters identify official upstream project surfaces.
+
+──────────────────────────────────────────────────────────────────────────────
+Attribution (Apache License §4 — required for redistribution)
+──────────────────────────────────────────────────────────────────────────────
+
+If you distribute NAOS or a derivative work, the Apache License §4 requires:
+
+1. A copy of the License (the LICENSE file in this repository).
+2. This NOTICE file, in at least one of the locations enumerated in §4(d).
+3. Prominent notices on any files you have changed (§4(b)).
+4. All copyright, patent, trademark, and attribution notices from the Source
+   form preserved (§4(c)).
+
+──────────────────────────────────────────────────────────────────────────────
+Attribution request for adopters using NAOS in their own projects
+(social norm; the Apache License §4 already mandates the items above when
+redistributing the kit; this section concerns USE of the kit to govern your
+own project, which is unrestricted)
+──────────────────────────────────────────────────────────────────────────────
+
+If you use NAOS to govern your project (rather than redistribute the kit
+itself), please also include:
+
+A. A visible attribution line in your project README:
+
+     Governance powered by [NAOS-Governance](https://github.com/mfraile/naos-governance)
+     by [Marlon Fraile](https://github.com/mfraile)
+
+B. Or the badge:
+
+     [![Governance: NAOS-Governance](https://img.shields.io/badge/governance-NAOS--Governance-blue)](https://github.com/mfraile/naos-governance)
+
+C. A link to the original repository in any derivative governance kits.
+
+Attribution creates a discovery network: every project using NAOS carries the
+source link, which helps the community grow and improves the governance
+standards available to everyone building with AI coding assistants.

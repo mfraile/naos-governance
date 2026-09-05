@@ -1,0 +1,85 @@
+version: 1
+capability_id: CAP-BEHAVIORAL-GOVERNANCE-READINESS
+enabled: true
+readiness_only: true
+review_input_only: true
+runtime_enabled: false
+provider_allowed: false
+external_api_allowed: false
+model_dependency_allowed: false
+api_keys_allowed: false
+scheduler_or_daemon_enabled: false
+can_create_baseline: false
+can_approve: false
+can_certify: false
+can_prove_compliance: false
+can_promote_maturity: false
+can_replace_deterministic_controls: false
+can_replace_human_review: false
+
+required_reports:
+  - conformance_latest
+  - static_grader_report
+  - grader_assessment_report
+  - llm_grader_readiness_report
+
+optional_reports:
+  - ai_surface_context_budget_report
+  - agent_trace_validation_report
+  - setup_recommendations_report
+  - systemic_impact_report
+
+baseline_state:
+  path: behavioral_baseline_state.yaml
+  auto_create: false
+  max_age_days: 90
+  required_after_days: 180
+
+path_fingerprinting:
+  max_files_per_path: 200
+
+impacter_paths:
+  - naos/behavioral_governance_readiness_rules.yaml
+  - naos/llm_grader_readiness_rules.yaml
+  - naos/ai_surface_context_budget_rules.yaml
+  - naos/agent_trace_events.yaml
+  - configs/naos_autoresearch.yaml
+  - .github/configs/naos_autoresearch.yaml
+  - .github/autoresearch/task_battery
+  - .github/workflows
+  - .claude/settings.json
+  - AGENTS.md
+  - CLAUDE.md
+
+status_policy:
+  missing_required_report: not_ready
+  unsafe_llm_readiness: not_ready
+  no_baseline_ready: ready_to_baseline
+  no_impacters_with_baseline: baseline_current
+  low_impacter: baseline_stale
+  medium_impacter: maintenance_recommended
+  high_impacter: maintenance_required
+  assured_profile_stale_age: maintenance_required
+
+advisory_boundary:
+  static_grader_remains_primary: true
+  llm_grader_readiness_is_input_only: true
+  human_review_required_for_baseline: true
+  human_review_required_for_maintenance: true
+  semantic_drift_inference_allowed: false
+  behavioral_runtime_grading_allowed: false
+  n_run_statistics_allowed: false
+  publication_or_release_authority: false
+
+not_claimed:
+  - behavioral runtime grading
+  - LLM judging
+  - model/API/provider call
+  - baseline creation
+  - N-run statistics
+  - semantic drift inference
+  - approval
+  - certification
+  - compliance proof
+  - publication readiness
+  - release authorization

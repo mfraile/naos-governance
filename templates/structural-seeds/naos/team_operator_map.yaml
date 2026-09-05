@@ -1,0 +1,14 @@
+schema: naos.team_operator_map.v1
+updated_at: null
+teams: []
+operators: []
+limitations:
+  - "Team/operator mapping is local static configuration, not authentication or authorization."
+  - "Team/operator scoped overlays are configuration scopes only; multi-team gatekeeper behavior is handled separately."
+not_claimed:
+  - "identity proof"
+  - "authorization"
+  - "access control"
+  - "separation-of-duties satisfaction"
+  - "task ownership proof"
+human_review_required: true

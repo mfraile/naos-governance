@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:ai_surface_context_budget:v1",
+  "title": "NAOS AI-Surface Context Budget Report",
+  "description": "Deterministic AI-surface context-budget and health report. It is input-quality evidence only and is not behavioral scoring, hallucination prevention, approval, certification, or proof of compliance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "ai_surface_health_posture",
+    "context_budget_posture",
+    "naos_root",
+    "project_root",
+    "deterministic",
+    "advisory",
+    "cycle_safe",
+    "rules",
+    "baseline",
+    "input_sources",
+    "non_inputs",
+    "downstream_consumers",
+    "families",
+    "combined_scenarios",
+    "anchors",
+    "snapshot",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.ai_surface_context_budget.v1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string"},
+    "ai_surface_health_posture": {"type": "string", "enum": ["healthy", "warning", "degraded"]},
+    "context_budget_posture": {"type": "string", "enum": ["healthy", "warning", "degraded"]},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "advisory": {"const": false},
+    "cycle_safe": {"const": true},
+    "rules": {"type": "object", "additionalProperties": true},
+    "baseline": {"type": "object", "additionalProperties": true},
+    "input_sources": {"type": "object", "additionalProperties": true},
+    "non_inputs": {"type": "array", "items": {"type": "string"}},
+    "downstream_consumers": {"type": "array", "items": {"type": "string"}},
+    "families": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+    "combined_scenarios": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+    "anchors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "label", "present", "matched_phrases", "missing_phrases", "required_phrases"],
+        "properties": {
+          "id": {"type": "string"},
+          "label": {"type": "string"},
+          "present": {"type": "boolean"},
+          "matched_phrases": {"type": "array", "items": {"type": "string"}},
+          "missing_phrases": {"type": "array", "items": {"type": "string"}},
+          "required_phrases": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "snapshot": {"type": "object", "additionalProperties": true},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object", "additionalProperties": true}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message", "source"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string"},
+        "status": {"type": "string"},
+        "message": {"type": "string"},
+        "source": {"type": "string"},
+        "human_review_required": {"type": "boolean"}
+      }
+    }
+  }
+}

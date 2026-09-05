@@ -1,0 +1,1 @@
+{"semantic_quality_score": null, "baseline": null, "generated_at": null, "note": "Optional project-configured evidence. Run make -f Makefile.naos semantic-audit only when your project has enabled it."}

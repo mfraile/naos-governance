@@ -1,0 +1,52 @@
+# NAOS Instinct Seed — INS-009
+# Tier 1 seed — stripped of source-project evidence for kit distribution.
+# Set evidence_count ≥ 1 and add your source_sessions as you observe this pattern.
+---
+
+id: INS-009
+title: "API cost formula is theoretical minimum — real cost is 1.3–1.8× due to retries and interrupted runs"
+status: hypothesis
+tier: 1
+
+observed_pattern: >
+  The formula N_runs × cost_per_run consistently under-predicts actual billing costs.
+  Contributing factors observed:
+
+  1. INTERRUPTED RUNS: When a running command is cancelled mid-session (or when
+     the IDE tool call is cancelled while the terminal keeps running), the API calls
+     already issued are fully billed even though the run result is discarded.
+     Runs 1 and 2 of an interrupted 5-run batch are billed but useless for the aggregate.
+
+  2. RETRY OVERHEAD: API 529 (Overloaded) and network timeout errors trigger the
+     runner's exponential backoff retry loop. Each retry attempt that reaches the
+     API provider is billed even if it ultimately fails.
+     Estimated retry overhead: 5–15% of clean-path cost.
+
+  3. BACKGROUND TERMINAL LEAKAGE: IDE tool cancellation kills the agent's
+     observation of the terminal but NOT the spawned process. Background terminals
+     left from prior sessions (or from cancelled tool calls) can continue issuing
+     API calls invisibly. A second run may start immediately after the first
+     completed if the agent lost track of terminal state.
+
+context: >
+  This instinct applies whenever quoting API cost for any behavioral run:
+  (a) the theoretical formula gives the lower bound only — plan for 1.5× overhead;
+  (b) any previously interrupted run may have accumulated billed tokens;
+  (c) always check for orphaned background terminal processes before starting.
+
+mitigation: >
+  1. Budget at 1.5× the theoretical formula: budget = N × cost_per_run × 1.5
+  2. Before any new run, check for orphaned processes: pkill -f "runner.py" (safely)
+  3. After any interrupted run, assume 40-60% of the tokens were billed
+  4. Track session running total explicitly and announce it before each invocation
+  5. If cost exceeds 1.8× theoretical, investigate terminal leakage
+
+evidence_count: 0
+first_observed: null
+last_confirmed: null
+source_sessions: []
+
+confidence: 0.0   # evidence_count = 0 → seed only
+tags: [api-cost, budget, retry-overhead, background-terminal, behavioral-runner]
+promoted_to_rule: null
+dismissed: false

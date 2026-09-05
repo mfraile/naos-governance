@@ -1,0 +1,90 @@
+version: 1
+enabled: false
+object_identity_declared: false
+runtime_enabled: false
+design_tool_calls_allowed: false
+external_api_calls_allowed: false
+tool_mutation_allowed: false
+capability_maturity: L1
+
+profile_posture:
+  quickstart:
+    state: optional
+    severity: advisory
+    notes: "Optional local traceability review only."
+  lite:
+    state: optional
+    severity: warning
+    notes: "Warn when configured object identity declarations have evidence gaps."
+  standard:
+    state: optional
+    severity: required
+    notes: "Route declared object-identity evidence gaps to human review."
+  assured:
+    state: optional
+    severity: required
+    notes: "First implementation slice remains required review only; blocking requires future validated L3+ maturity and gate wiring."
+
+# Enable only for projects that want local UI screen/component object identity
+# review. Optional design refs are references only; they do not prove Figma,
+# html.to.design, MCP, design quality, accessibility, privacy, or brand posture.
+objects: []
+
+# Example object shape. Keep commented until adapted.
+# objects:
+#   - object_id: "screen.checkout.payment_form"
+#     object_type: component
+#     status: implemented
+#     fr_refs:
+#       - "FR-XXX"
+#     nfr_refs:
+#       - "NFR-XXX"
+#     task_refs:
+#       - "T-XXX"
+#     screen_spec_path: "docs/ui/screens/checkout-spec.md"
+#     implementation_paths:
+#       - "frontend/components/checkout/PaymentForm.tsx"
+#     changed_file_refs:
+#       - "frontend/components/checkout/PaymentForm.tsx"
+#       - "tests/frontend/checkout/payment-form.test.tsx"
+#     test_evidence_refs:
+#       - "npm test -- payment-form"
+#     optional_design_refs:
+#       - ref: "[ADAPT: design URL, node id, or exported artifact path]"
+#         kind: "design_reference"
+#         reviewed: false
+#         notes: "Reference only; not proof of design-tool state."
+#     design_ref_reviewed: false
+#     human_review_required: true
+#     review_disposition: null
+#     residual_risks:
+#       - "visual drift still requires human review"
+#     non_claims:
+#       - "design quality proof"
+#       - "accessibility compliance proof"
+
+known_gaps:
+  - "disabled_until_project_declares_ui_object_identity"
+residual_risks: []
+not_claimed:
+  - "automatic code-to-design synchronization"
+  - "automatic design-to-code synchronization"
+  - "Figma availability"
+  - "Figma API access"
+  - "MCP activation"
+  - "html.to.design fidelity"
+  - "design quality proof"
+  - "accessibility compliance proof"
+  - "privacy compliance proof"
+  - "brand compliance proof"
+  - "approval"
+  - "merge approval"
+  - "release authority"
+  - "publication authority"
+  - "certification"
+  - "attestation"
+  - "compliance proof"
+  - "runtime orchestration"
+  - "provider calls"
+  - "model calls"
+  - "memory activation"

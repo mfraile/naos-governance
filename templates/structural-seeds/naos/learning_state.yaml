@@ -1,0 +1,5 @@
+version: "1.0"
+semantics:
+  state: "Active learnings are reviewed guidance scoped by evidence, approval, expiry/review date, and retrieval policy."
+  governance_boundary: "Active learning may guide work only within scope and cannot override repository evidence or human instructions."
+active_learnings: []

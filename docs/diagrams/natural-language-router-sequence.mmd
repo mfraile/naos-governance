@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant User as Human adopter
+    participant Guide as Prompt/agent guidance
+    participant CLI as CLI/Make command
+    participant Report as NAOS report
+    participant Evidence as Gate/evidence/dashboard
+    participant Review as Human review
+
+    User->>Guide: State goal in natural language
+    Guide->>CLI: Recommend visible command sequence
+    alt Material task may split into lanes
+        Guide->>Report: Record advisory lane opportunity and human/project decision
+    end
+    alt Spec, task, source ref, or source traceability changed
+        Guide->>CLI: Include spec-pack/spec-cascade/module-header checks
+    end
+    alt Lanes explicitly declared
+        CLI->>Report: Generate local parallel-lane handoff report
+    end
+    alt Prompt, agent, skill, instruction, workflow, manual, or governance doc changed
+        Guide->>CLI: Include ai-surface-budget
+    end
+    CLI->>Report: Write deterministic report
+    Report->>Evidence: Feed review surfaces
+    Evidence->>Review: Show status, gaps, risks, decisions
+    Review->>Review: Approve, defer, remediate, or waive

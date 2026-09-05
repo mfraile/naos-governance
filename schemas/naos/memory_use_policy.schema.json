@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:memory_use_policy:v1",
+  "title": "NAOS Memory Use Policy Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "rules_path",
+    "rules_hash",
+    "review_items_path",
+    "review_items_present",
+    "memory_trust_ladder",
+    "state_counts",
+    "review_status_counts",
+    "instruction_grade_items",
+    "supporting_context_items",
+    "review_pending_items",
+    "rejected_items",
+    "superseded_items",
+    "unsafe_instruction_grade_claims",
+    "unsafe_supporting_context_claims",
+    "memory_access_prerequisites",
+    "policy_item_access_posture",
+    "source_reference_summary",
+    "provenance_summary",
+    "recall_trace_readiness",
+    "audit_event_readiness",
+    "forbidden_category_policy",
+    "private_payload_policy",
+    "memory_write_back_policy",
+    "cloud_memory_policy",
+    "ci_memory_policy",
+    "integration_points",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "waivers",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": {"const": "naos.memory_use_policy.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {
+      "type": "string",
+      "enum": ["disabled", "readiness_only", "advisory", "review_required", "blocked", "not_configured", "unknown"]
+    },
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "rules_path": {"type": "string"},
+    "rules_hash": {"type": ["string", "null"]},
+    "review_items_path": {"type": "string"},
+    "review_items_present": {"type": "boolean"},
+    "memory_trust_ladder": {"type": "array", "items": {"type": "object"}},
+    "state_counts": {"type": "object"},
+    "review_status_counts": {"type": "object"},
+    "instruction_grade_items": {"type": "array", "items": {"type": "object"}},
+    "supporting_context_items": {"type": "array", "items": {"type": "object"}},
+    "review_pending_items": {"type": "array", "items": {"type": "object"}},
+    "rejected_items": {"type": "array", "items": {"type": "object"}},
+    "superseded_items": {"type": "array", "items": {"type": "object"}},
+    "unsafe_instruction_grade_claims": {"type": "array", "items": {"type": "object"}},
+    "unsafe_supporting_context_claims": {"type": "array", "items": {"type": "object"}},
+    "memory_access_prerequisites": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "required_for_use_grade_items",
+        "joined_status",
+        "memory_readiness_report",
+        "memory_provider_access_report",
+        "provider_or_mcp_calls_performed",
+        "memory_payloads_read",
+        "access_reasons"
+      ],
+      "properties": {
+        "required_for_use_grade_items": {"type": "boolean"},
+        "joined_status": {"enum": ["not_applicable", "unverified", "verified"]},
+        "memory_readiness_report": {"$ref": "#/$defs/upstream_report_join"},
+        "memory_provider_access_report": {"$ref": "#/$defs/upstream_report_join"},
+        "provider_or_mcp_calls_performed": {"const": false},
+        "memory_payloads_read": {"const": false},
+        "access_reasons": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "policy_item_access_posture": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memory_reference_id", "state", "policy_metadata_valid", "joined_status", "access_reasons"],
+        "properties": {
+          "memory_reference_id": {"type": "string"},
+          "state": {"enum": ["supporting_context_memory", "instruction_grade_memory"]},
+          "policy_metadata_valid": {"type": "boolean"},
+          "joined_status": {
+            "enum": [
+              "policy_metadata_invalid",
+              "policy_item_valid_but_access_unverified",
+              "policy_metadata_valid_access_verified"
+            ]
+          },
+          "access_reasons": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "source_reference_summary": {"type": "object"},
+    "provenance_summary": {"type": "object"},
+    "recall_trace_readiness": {"type": "object"},
+    "audit_event_readiness": {"type": "object"},
+    "forbidden_category_policy": {"type": "object"},
+    "private_payload_policy": {"type": "object"},
+    "memory_write_back_policy": {"type": "object"},
+    "cloud_memory_policy": {"type": "object"},
+    "ci_memory_policy": {"type": "object"},
+    "integration_points": {"type": "object"},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "known_gaps": {"type": "array", "items": {"type": "object"}},
+    "residual_risks": {"type": "array", "items": {"type": "object"}},
+    "waivers": {"type": "array", "items": {"type": "object"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}},
+    "human_review_required": {"type": "boolean"},
+    "summary": {"type": "object"}
+  },
+  "$defs": {
+    "upstream_report_join": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "path",
+        "present",
+        "schema_valid",
+        "schema_error_count",
+        "project_root_match",
+        "profile_match",
+        "freshness_status",
+        "newer_declared_inputs",
+        "accepted_for_join",
+        "validation_reasons",
+        "reported_status"
+      ],
+      "properties": {
+        "path": {"type": "string"},
+        "present": {"type": "boolean"},
+        "schema_valid": {"type": "boolean"},
+        "schema_error_count": {"type": "integer", "minimum": 0},
+        "project_root_match": {"type": "boolean"},
+        "profile_match": {"type": "boolean"},
+        "freshness_status": {
+          "enum": ["not_evaluated", "stale", "unverifiable", "no_newer_declared_inputs_detected"]
+        },
+        "newer_declared_inputs": {"type": "array", "items": {"type": "string"}},
+        "accepted_for_join": {"type": "boolean"},
+        "validation_reasons": {"type": "array", "items": {"type": "string"}},
+        "reported_status": {"type": ["string", "null"]}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string", "enum": ["none", "advisory", "warning", "required", "blocking"]},
+        "status": {"type": "string"},
+        "message": {"type": "string"},
+        "required_next_actions": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

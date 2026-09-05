@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:evidence_conflict_detection:v1",
+  "title": "NAOS Evidence Conflict Detection Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "session_id",
+    "operator_id",
+    "generated_by",
+    "input_sources",
+    "artifact_groups_reviewed",
+    "attestation_count",
+    "conflict_count",
+    "conflict_type_counts",
+    "separation_of_duties_warnings",
+    "stale_attestations",
+    "missing_reviewer_metadata",
+    "missing_operator_attribution",
+    "duplicate_attestations",
+    "unrouted_conflicts",
+    "conflicts",
+    "unsupported_sources",
+    "findings",
+    "known_gaps",
+    "residual_risks",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "summary"
+  ],
+  "properties": {
+    "schema": { "const": "naos.evidence_conflict_detection.v1" },
+    "generated_at": { "type": "string" },
+    "profile": {
+      "type": "string",
+      "enum": ["quickstart", "lite", "standard", "assured"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "advisory",
+        "no_attestations",
+        "conflicts_detected",
+        "review_required",
+        "invalid_input",
+        "not_configured",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "naos_root": { "type": "string" },
+    "project_root": { "type": "string" },
+    "session_id": { "type": ["string", "null"] },
+    "operator_id": { "type": ["string", "null"] },
+    "generated_by": { "type": "object" },
+    "input_sources": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "artifact_groups_reviewed": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "attestation_count": { "type": "integer", "minimum": 0 },
+    "conflict_count": { "type": "integer", "minimum": 0 },
+    "conflict_type_counts": { "type": "object" },
+    "separation_of_duties_warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/conflict" }
+    },
+    "stale_attestations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/conflict" }
+    },
+    "missing_reviewer_metadata": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "missing_operator_attribution": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "duplicate_attestations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/conflict" }
+    },
+    "unrouted_conflicts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/conflict" }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/conflict" }
+    },
+    "unsupported_sources": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "known_gaps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "human_review_required": { "type": "boolean" },
+    "summary": { "type": "object" }
+  },
+  "$defs": {
+    "conflict": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "conflict_id",
+        "conflict_type",
+        "severity",
+        "artifact_ref",
+        "artifact_path",
+        "artifact_hashes",
+        "review_outcomes",
+        "reviewers",
+        "operators",
+        "sessions",
+        "source_reports",
+        "source_attestations",
+        "related_tasks",
+        "related_capabilities",
+        "route_status",
+        "recommended_review_action",
+        "limitations",
+        "not_claimed",
+        "human_review_required"
+      ],
+      "properties": {
+        "conflict_id": { "type": "string" },
+        "conflict_type": {
+          "type": "string",
+          "enum": [
+            "same_artifact_conflicting_review_outcome",
+            "same_artifact_multiple_reviewers_disagree",
+            "same_operator_reviews_own_artifact",
+            "stale_attestation",
+            "missing_reviewer_metadata",
+            "missing_operator_attribution",
+            "duplicate_attestation",
+            "unrouted_conflict"
+          ]
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["none", "advisory", "warning", "required", "blocking"]
+        },
+        "artifact_ref": { "type": "string" },
+        "artifact_path": { "type": ["string", "null"] },
+        "artifact_hashes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "review_outcomes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["approved", "rejected", "needs_changes", "waived", "accepted_risk", "not_reviewed", "unknown"]
+          }
+        },
+        "reviewers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "operators": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sessions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "source_reports": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "source_attestations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "related_tasks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "related_capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "route_status": {
+          "type": "string",
+          "enum": ["routed", "unrouted", "unknown"]
+        },
+        "recommended_review_action": { "type": "string" },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "not_claimed": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "human_review_required": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:adapter_propagation_state:v1",
+  "title": "NAOS Adapter Propagation State",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "version",
+    "propagation_reviews",
+    "not_claimed"
+  ],
+  "properties": {
+    "schema": {"const": "naos.adapter_propagation_state.v1"},
+    "version": {"type": "string"},
+    "semantics": {"type": "object"},
+    "propagation_reviews": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/review"}
+    },
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "review": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "link_id",
+        "disposition",
+        "reviewed_at",
+        "reviewer",
+        "rationale",
+        "source_hashes",
+        "target_hashes"
+      ],
+      "properties": {
+        "link_id": {"type": "string"},
+        "disposition": {"type": "string", "enum": ["propagated", "no_impact", "accepted_risk", "deferred"]},
+        "reviewed_at": {"type": "string"},
+        "reviewer": {"type": "string"},
+        "rationale": {"type": "string"},
+        "residual_risk_id": {"type": "string"},
+        "source_hashes": {"type": "object", "additionalProperties": {"type": "string"}},
+        "target_hashes": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    }
+  }
+}

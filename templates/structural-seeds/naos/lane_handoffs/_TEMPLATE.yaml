@@ -1,0 +1,72 @@
+# Optional input template for a declared parallel lane.
+# Copy this file to `naos/lane_handoffs/<lane-id>.yaml` and replace ADAPT
+# values before running `python scripts/naos_parallel_lane_handoff.py --handoff`.
+# Suggested lanes do not activate this route. Use it only after a human/project
+# decision records `parallel_lane_decision: declared`.
+
+parallel_lanes_declared: true
+lane_id: "[ADAPT: lane-id]"
+lane_status: complete_needs_review
+task_id: "T-XXX"
+fr_nfr_refs:
+  - "FR-XXX"
+requirement_refs: []
+
+criticality_context: unspecified
+operator_id: "[ADAPT: operator or team id]"
+operator_source: local_declaration
+session_id: "[ADAPT: session id if available]"
+branch: "[ADAPT: branch name if applicable]"
+worktree_path: "[ADAPT: worktree path if applicable]"
+started_at: "[ADAPT: ISO-8601 timestamp]"
+completed_at: "[ADAPT: ISO-8601 timestamp or omit]"
+
+dependency_state: ready
+dependency_blockers: []
+unlock_evidence:
+  - "[ADAPT: source that proves dependency is ready or explicitly deferred]"
+claim_status: claimed
+claim_conflicts: []
+
+planned_change_paths:
+  - "[ADAPT: src/or/docs/path/**]"
+out_of_scope_paths: []
+changed_files:
+  - "[ADAPT: src/or/docs/path/file.ext]"
+generated_evidence_files:
+  - "[ADAPT: naos/reports/related_report.json]"
+evidence_noise: []
+
+tests:
+  attempted:
+    - "[ADAPT: command that was attempted]"
+  passed:
+    - "[ADAPT: passing command or check]"
+  failed: []
+  unavailable: []
+  skipped: []
+
+naos_reports_generated:
+  - "naos/reports/task_claim_report.json"
+  - "naos/reports/plan_coherence.json"
+  - "naos/reports/pr_risk_classification.json"
+  - "naos/reports/control_plane_review.json"
+
+evidence_conflicts: []
+residual_risks:
+  - "[ADAPT: remaining review risk]"
+human_review_required: true
+handoff_summary: "[ADAPT: concise summary of completed, blocked, or review-needed lane work]"
+recommended_next_review_action: human_review
+
+not_claimed:
+  - approval
+  - merge approval
+  - compliance proof
+  - certification
+  - attestation
+  - runtime orchestration
+  - MCP activation
+  - memory activation
+  - provider calls
+  - model calls

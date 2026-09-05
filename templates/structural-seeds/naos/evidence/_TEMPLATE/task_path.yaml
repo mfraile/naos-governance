@@ -1,0 +1,21 @@
+schema: naos.evidence.task_path.v1
+task:
+  id: ""
+  title: ""
+  profile: quickstart
+  maturity_target: L0
+  project_type: ""
+  scope:
+    included_paths: []
+    excluded_paths: []
+    assumptions: []
+  decision_path:
+    - step: ""
+      evidence: []
+      owner: ""
+  readiness_gates:
+    profile_selected: false
+    required_evidence_identified: false
+    exceptions_recorded: false
+known_gaps: []
+residual_risks: []

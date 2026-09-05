@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:ac_completion_evidence_manifest:v1",
+  "title": "NAOS AC Completion Evidence Manifest",
+  "description": "Project-declared AC/SCEN completion evidence manifest. Declarations are review evidence only and do not prove correctness, complete coverage, approval, certification, or compliance.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "completions"],
+  "properties": {
+    "schema": {"const": "naos.ac_completion_evidence_manifest.v1"},
+    "version": {"type": "string"},
+    "semantics": {"type": "object"},
+    "completions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/completion"}
+    }
+  },
+  "$defs": {
+    "completion": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["ac_id", "status", "evidence"],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "supersedes": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "correction_reason": {"type": ["string", "null"]},
+        "ac_id": {"type": "string", "pattern": "^(AC|SCEN)-[A-Za-z0-9][A-Za-z0-9_.-]*$"},
+        "status": {
+          "type": "string",
+          "enum": ["claimed_complete", "not_claimed", "deferred", "review_only"]
+        },
+        "source_ref": {"type": "string"},
+        "repository_binding": {"$ref": "#/$defs/repository_binding"},
+        "evidence": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/evidence"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["supersedes"],
+            "properties": {"supersedes": {"type": "string"}}
+          },
+          "then": {
+            "required": ["record_id", "correction_reason"],
+            "properties": {
+              "correction_reason": {"type": "string", "minLength": 1},
+              "evidence": {"minItems": 1}
+            }
+          }
+        }
+      ]
+    },
+    "repository_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_commit", "subject_commit", "subject_tree"],
+      "properties": {
+        "base_commit": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
+        },
+        "subject_commit": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
+        },
+        "subject_tree": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type", "outcome"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["test_report", "validator_report", "command_output", "manual_review"]
+        },
+        "path": {"type": "string"},
+        "command": {"type": "string"},
+        "outcome": {"type": "string", "enum": ["pass", "fail", "unknown"]},
+        "generated_at": {"type": "string"},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+schema: naos.duplicate_function_hygiene_rules.v1
+mode: deterministic_local
+scan_roots:
+  - src
+  - app
+  - tests
+exclude_dirs:
+  - dev
+  - dist
+  - build
+  - __pycache__
+exclude_globs: []
+min_normalized_dump_length: 240
+allowed_hashes: []
+human_review_required: true
+not_claimed:
+  - semantic correctness proof
+  - behavioral equivalence proof
+  - complete duplicate elimination
+  - approval
+  - human review replacement

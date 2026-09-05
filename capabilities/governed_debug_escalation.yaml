@@ -1,0 +1,107 @@
+id: CAP-GOVERNED-DEBUG-ESCALATION
+name: Governed Debug Escalation
+description: >
+  Provides an explicit, host-specific activation contract for one top-level
+  VS Code implementation agent to invoke one NAOS debug subagent whose
+  manifest has no direct edit or agent-invocation tools after bounded failed
+  attempts. The default generated implementation agent remains human-mediated
+  and has no agent invocation tool.
+status: experimental
+default_maturity: L0
+minimum_profile: standard
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: not_applicable
+    notes: "Unavailable; Quickstart retains manual handoff."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Readiness may be reviewed, but activation is unavailable."
+  standard:
+    target_maturity: L2
+    enforcement: advisory
+    notes: "Explicit one-level activation is eligible at L2 after configuration, host acknowledgement, and human approval."
+  assured:
+    target_maturity: L3
+    enforcement: required
+    notes: "Explicit one-level activation is eligible at L3 with stronger review evidence; Assured does not grant extra targets or depth."
+authority:
+  may_read:
+    - "naos/governed_debug_escalation.yaml"
+    - "naos/capability_state.yaml"
+    - ".github/agents/naos-implement-with-debug.agent.md"
+    - ".github/agents/naos-debug.agent.md"
+  may_write:
+    - ".github/agents/naos-implement-with-debug.agent.md only through explicit setup-module activation"
+  may_block:
+    - "setup-module activation when profile, maturity, configuration, host acknowledgement, or human approval is insufficient"
+allowed_resources:
+  - "repo-local configuration and capability-state declarations"
+  - "VS Code custom-agent agent tool"
+  - "exact naos-debug child allowlist"
+  - "repo-local read, search, and test evidence"
+prohibited_resources:
+  - "default-agent recursion"
+  - "arbitrary child selection or fan-out"
+  - "child write authority"
+  - "nested child invocation"
+  - "provider, model, API, SaaS, network, MCP, memory, or hook activation"
+  - "branch, worktree, merge, push, release, publication, or deployment automation"
+constraints:
+  - "Must remain opt-in and absent from every default generated profile."
+  - "Must support only the top-level naos-implement-with-debug to naos-debug transition."
+  - "Must require two materially different failed attempts against the same focused reproducer."
+  - "Must allow at most one debug dispatch per task."
+  - "Must keep direct edit/create and agent-invocation tools out of the debug child."
+  - "Must fall back to human-mediated handoff when validation or host support is unavailable."
+  - "Must not interpret profile or maturity as invocation authority."
+required_evidence:
+  - "schemas/naos/governed_debug_escalation.schema.json"
+  - "templates/structural-seeds/naos/governed_debug_escalation.yaml"
+  - "templates/agents/optional/naos-implement-with-debug.agent.md"
+  - "templates/agents/naos-debug.agent.md"
+  - "scripts/validators/validate_governed_debug_escalation.py"
+  - "templates/structural-seeds/naos/setup_module_catalog.yaml"
+validators:
+  - id: governed_debug_escalation
+    script: scripts/validators/validate_governed_debug_escalation.py
+    status: available
+gatekeepers: []
+dashboard_signals: []
+maturity_path:
+  L0: "Capability contract and safe-default boundary exist; activation is unavailable."
+  L1: "Project records dormant configuration, owner, host intent, and human-review boundary."
+  L2: "Standard projects may explicitly install the one-level coordinator after deterministic activation validation."
+  L3: "Assured projects may explicitly install it after stronger maturity and named-review evidence."
+  L4: "Reviewed host-specific pilots measure invocation, fallback, cost, and cascade outcomes without expanding authority."
+  L5: "Audit-style evidence reviews the bounded control; no new target, depth, approval, or release authority is created."
+known_limitations:
+  - "NAOS cannot dynamically remove a tool after an optional custom-agent file is installed."
+  - "The failed-attempt trigger is instruction-mediated, not intercepted by a NAOS runtime."
+  - "Unavailable host tools may be ignored; manual handoff remains required in that case."
+  - "No live GitHub Copilot subagent invocation is exercised by repository tests."
+  - "The debug child retains terminal/test execution for reproduction; the manifest is not a filesystem sandbox, so host approvals, permissions, and sandboxing remain external controls."
+residual_risks:
+  - "A model or adopter may ignore configuration instructions after manually bypassing setup controls."
+  - "A child diagnosis may be wrong or incomplete and must be reproduced by the parent."
+  - "Host behavior or frontmatter semantics may change after the recorded documentation review."
+not_claimed:
+  - "tool-neutral or cross-host delegation"
+  - "runtime interception or authorization"
+  - "deterministic stuck-state detection"
+  - "automatic approval, task closure, merge, release, or publication"
+  - "authentication, identity proof, correctness, safety, certification, attestation, or proof of compliance"
+  - "live invocation proof from configuration or validator output"
+  - "host-enforced read-only filesystem access"
+human_review_required: true
+related_docs:
+  - NAOS_CATALOG.md
+  - templates/agents/AGENTS.md
+  - docs/ASI_AICM_MAPPING.md
+  - docs/COMPLIANCE_MAPPING.md
+related_scripts:
+  - naos_add.py
+  - scripts/validators/validate_governed_debug_escalation.py

@@ -1,0 +1,228 @@
+id: CAP-LOCAL-CONTEXT-INDEX
+name: Local Context Index
+status: active
+default_maturity: L0
+minimum_profile: quickstart
+enforcement_default: advisory
+requires_project_readiness: true
+description: >
+  Builds deterministic, local, generated context from governed repository
+  artifacts and NAOS reports. Its brownfield repository-intelligence mode can
+  establish source-bound immutable SQLite/FTS generations before onboarding and,
+  when executed eligibility evidence supports it, optional NetworkX/GraphML
+  navigation. All generated results remain candidate-only and non-authoritative.
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Can generate a low-noise index; an applicable brownfield prestart plan requires explicit digest-confirmed SQLite/FTS activation before onboarding."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Supports CI-friendly source inventory and bounded candidate lookup without memory access."
+  standard:
+    target_maturity: L2
+    enforcement: required
+    notes: "Expects reviewed index rules, source-family scope, exclusions, generated-state visibility, and named reviewer attribution for brownfield activation."
+  assured:
+    target_maturity: L3
+    enforcement: required
+    notes: "Also requires current source binding and reviewed generation freshness; it does not turn generated candidates into assurance evidence."
+authority:
+  may_read:
+    - "naos/local_context_index_rules.yaml"
+    - "specs/**/*.md"
+    - "naos/TASK_REGISTRY.yaml"
+    - "naos/active/**/*.md"
+    - "capabilities/*.yaml"
+    - "naos/capabilities/*.yaml"
+    - "policies/*.yaml"
+    - "schemas/naos/*.json"
+    - "naos/reports/*.json"
+    - "naos/evidence/*.yaml"
+    - "naos/test_evidence/*.json"
+    - "src/**/*.py as symbol/header summaries only"
+    - "tests/**/*.py as symbol/header summaries only"
+    - "Repository files selected by naos/repository_intelligence_rules.yaml"
+    - "Generated repository-intelligence generations bound to the current project"
+  may_write:
+    - "naos/reports/local_context_index.json"
+    - "naos/context_index/local_context_index.sqlite"
+    - "naos/reports/local_context_query.json"
+    - "naos/reports/graph_context_query.json"
+    - "naos/context_queries/*.md when explicitly requested"
+    - ".naos/upgrade-v1/OWNER.json and provenance/scopes/repository-intelligence.json only through explicit digest-confirmed enrollment"
+    - ".naos/upgrade-v1/locks/control-root-enrollment.lock and repository-intelligence.lock as stable operation locks"
+    - ".naos/upgrade-v1/transactions/repository-intelligence/* journals, staging, and activation receipts"
+    - ".naos/upgrade-v1/state/repository-intelligence/generations/* generated immutable state"
+    - ".naos/upgrade-v1/state/repository-intelligence/active.json and its bounded pending leaf only during validated activation or recovery"
+    - "Explicitly requested repository-intelligence plan and report output paths"
+  may_block:
+    - "only through configured profile gate policy or an applicable brownfield plan with a missing prerequisite, unsupported runtime tuple, source drift, digest mismatch, unsafe path, or failed validation"
+allowed_resources:
+  - "repo-local source artifacts allowed by local_context_index_rules.yaml"
+  - "repo-local deterministic NAOS reports and evidence summaries"
+  - "stdlib sqlite3 generated artifact"
+  - "Python stdlib SQLite/FTS5 as the deterministic brownfield baseline"
+  - "NetworkX 3.6.1 and generated GraphML only when executed multi-hop cross-family evidence makes the adapter applicable"
+  - "RFC 8785 canonicalization through rfc8785 0.1.4"
+  - "bounded chunks, summaries, hashes, provenance, and links"
+prohibited_resources:
+  - "sqlite-vec, embeddings, vector search, semantic scoring, or extension loading without a separately frozen deterministic workload"
+  - "adopter-supplied or unbound GraphML parsing, unrestricted graph traversal, or graph output promoted to truth"
+  - "Engram, MCP, or memory tool calls"
+  - "private memory payload reads"
+  - "cloud memory, provider, model, API, network, database, daemon, or scheduler dependencies"
+  - "automatic context injection"
+  - "automatic dependency installation"
+  - "secrets, customer data, tenant data, dev content, caches, or generated context packs by default"
+constraints:
+  - "Must remain deterministic, local, and file-first."
+  - "Must treat the SQLite artifact as generated/cache-like and non-authoritative."
+  - "Must preserve default exclusions for secrets, private memory payloads, dev files, caches, worktrees, and generated feedback-loop artifacts."
+  - "Brownfield planning and inspection must not mutate the target project."
+  - "Brownfield apply requires the exact plan SHA-256 in a separate invocation."
+  - "Standard and Assured brownfield apply require named reviewer attribution."
+  - "Generated candidates must be revalidated against current source before use."
+  - "Missing search or graph results must never be treated as evidence of absence."
+  - "Graph distance and FTS rank are retrieval metadata, not truth or confidence."
+  - "The repository-intelligence active pointer is published only after immutable generation validation."
+  - "Source artifacts remain authoritative and are never modified by repository intelligence."
+  - "Must surface source hashes, freshness, authority classification, provenance, and bounded links where practical."
+  - "Must not claim source-of-truth status, semantic relevance proof, graph reasoning, memory evidence, or hallucination prevention."
+required_evidence:
+  - naos/local_context_index_rules.yaml
+  - naos/reports/local_context_index.json
+  - naos/reports/local_context_query.json
+  - naos/reports/semantic_candidate_layer.json
+  - naos/reports/graph_context_readiness.json
+  - naos/reports/graph_context_query.json
+  - naos/context_index/local_context_index.sqlite
+  - naos/repository_intelligence_rules.yaml
+  - .naos/upgrade-v1/state/repository-intelligence/active.json
+  - .naos/upgrade-v1/state/repository-intelligence/generations/*/manifest.json
+  - .naos/upgrade-v1/state/repository-intelligence/generations/*/validation_receipt.json
+  - .naos/upgrade-v1/state/repository-intelligence/generations/*/local_context_index.sqlite
+validators:
+  - id: naos_context_index
+    script: scripts/naos_local_context_index.py
+    status: available
+  - id: naos_context_query
+    script: scripts/naos_local_context_query.py
+    status: available
+  - id: naos_semantic_candidate_readiness
+    script: scripts/naos_semantic_candidate_readiness.py
+    status: available
+  - id: naos_graph_context_readiness
+    script: scripts/naos_graph_context_readiness.py
+    status: available
+  - id: naos_graph_context_query
+    script: scripts/naos_graph_context_query.py
+    status: available
+  - id: naos_repository_intelligence
+    script: scripts/naos_repository_intelligence.py
+    status: available
+gatekeepers:
+  - G2
+  - G3
+  - G6
+dashboard_signals:
+  - local_context_index.status
+  - local_context_index.indexed_artifacts
+  - local_context_index.fts_available
+  - local_context_index.excluded_artifacts
+  - local_context_index.future_semantic_layer
+  - local_context_index.future_graph_layer
+  - local_context_query.result_count
+  - local_context_query.query_mode_used
+  - semantic_candidate_layer.status
+  - semantic_candidate_layer.semantic_runtime_enabled
+  - semantic_candidate_layer.sqlite_vec_enabled
+  - semantic_candidate_layer.embeddings_enabled
+  - graph_context_readiness.status
+  - graph_context_readiness.graph_runtime_enabled
+  - graph_context_readiness.explicit_link_traversal_only
+  - graph_context_readiness.global_graph_scan_allowed
+  - graph_context_query.result_count
+  - graph_context_query.traversal_depth_used
+  - graph_context_query.query_mode_used
+  - repository_intelligence.status
+  - repository_intelligence.effective_source_sha256
+  - repository_intelligence.coverage
+  - repository_intelligence.components.sqlite_fts.status
+  - repository_intelligence.components.networkx_graphml.status
+  - repository_intelligence.components.sqlite_vec.status
+maturity_path:
+  L0: Rules and a no-target-mutation digest-bound plan are reviewable.
+  L1: A deterministic report and current immutable SQLite/FTS generation can be validated and activated.
+  L2: Source families, hashes, freshness, bounded chunks, and any applicable source-bound GraphML relationships are reviewed.
+  L3: Teams use bounded candidates for task context, requirements reconstruction, traceability, and change review while repository evidence remains authoritative.
+  L4: Project-specific retrieval policies, coverage, exclusions, ranking, cost, and controlled comparative effectiveness are reviewed.
+  L5: A governed repeatable effectiveness loop remains generated, cache-like, candidate-only, and subordinate to source artifacts.
+known_limitations:
+  - The SQLite artifact is generated and cache-like; it is not authoritative truth.
+  - FTS is exact/keyword candidate retrieval only.
+  - Query reports return candidate references, not answers.
+  - NetworkX/GraphML is enabled only for a repository-intelligence generation
+    whose executed plan proves an eligible relationship workload; the ordinary
+    local-context query remains bounded and does not perform global graph scans.
+  - sqlite-vec, embeddings, vector search, and semantic scoring remain unavailable
+    because no frozen deterministic workload or producer exists.
+  - Semantic candidate readiness is configuration/reporting only; it does not
+    enable sqlite-vec, embeddings, KNN, extension loading, provider/model calls,
+    or semantic/vector search.
+  - Graph context readiness is configuration/reporting only; it does not enable
+    NetworkX, GraphML, graph databases, graph algorithms, global traversal, or
+    graph runtime.
+  - Graph context query reports traverse explicit links only and return
+    relationship candidates, not truth, implementation proof, or source
+    authority.
+  - The index does not read private memory payloads, call Engram, call MCP, or
+    write durable memory.
+  - Generated context packs and generated index files are excluded by default to
+    avoid feedback loops.
+  - Human review is still required for governance disposition and durable changes.
+  - Apply support is limited to runtime metadata tuples backed by executed evidence.
+  - Graph extraction is conservative and incomplete; missing edges do not prove missing relationships.
+  - GraphML is generated interchange and navigation state, not a semantic knowledge authority.
+not_claimed:
+  - source of truth
+  - authoritative truth store
+  - hallucination prevention
+  - semantic relevance proof
+  - graph reasoning
+  - vector search
+  - memory evidence
+  - compliance approval
+  - automatic context injection
+  - complete repository understanding
+  - automatic requirements approval
+  - automatic maturity promotion
+  - readiness or assurance
+  - compliance
+  - sqlite-vec effectiveness
+related_docs:
+  - README.md
+  - INSTALLATION_MANUAL.md
+  - docs/ADOPTION_GUIDE.md
+  - docs/CONTROL_PLANE.md
+  - NAOS_CATALOG.md
+related_scripts:
+  - scripts/naos_local_context_index.py
+  - scripts/naos_local_context_query.py
+  - scripts/naos_semantic_candidate_readiness.py
+  - scripts/naos_graph_context_readiness.py
+  - scripts/naos_graph_context_query.py
+  - scripts/naos_repository_intelligence.py
+related_schemas:
+  - schemas/naos/repository_intelligence_rules.schema.json
+  - schemas/naos/repository_intelligence_plan.schema.json
+  - schemas/naos/repository_intelligence_manifest.schema.json
+  - schemas/naos/repository_intelligence_validation.schema.json
+  - schemas/naos/repository_intelligence_activation_receipt.schema.json
+  - schemas/naos/repository_intelligence_active.schema.json
+  - schemas/naos/repository_intelligence_apply_result.schema.json
+  - schemas/naos/repository_intelligence_context.schema.json
+  - schemas/naos/repository_intelligence_inventory.schema.json
+  - schemas/naos/repository_intelligence_query.schema.json
+  - schemas/naos/repository_intelligence_transaction_journal.schema.json

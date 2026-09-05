@@ -1,0 +1,43 @@
+schema: naos.aivss_assessments.v1
+enabled: true
+format:
+  id: aivss_arithmetic_verification.v1
+  version: 1
+  kind: offline_arithmetic_verification
+rubric:
+  id: AIVSS-Agentic
+  version: "0.8"
+  normative_pdf_url: https://aivss.owasp.org/assets/publications/AIVSS%20Scoring%20System%20For%20OWASP%20Agentic%20AI%20Core%20Security%20Risks%20v0.8.pdf
+  normative_pdf_sha256: a2abbd215f0d7790d273c30a893a09c0dc37a6c109765eb0363c01af897fd9af
+  normative_scope: published_v0.8_pdf_only
+decision:
+  consumer: scripts/naos_control_plane_review.py
+  target_gates: [G2, G6]
+  prompt_bands: [high, critical]
+  behavior: human_review_prompt_only
+assessments: []
+non_claims:
+  - risk assessment
+  - exploitability proof
+  - vulnerability discovery
+  - CVSS calculation or vector validation
+  - runtime observation
+  - mitigation proof
+  - security assurance
+  - compliance evidence
+  - certification
+  - approval
+  - automatic blocking
+  - automatic prioritization
+  - merge authority
+  - release authority
+  - risk acceptance
+  - publication authority
+
+# This optional seed deliberately contains no assessments. Add only
+# assessor-supplied records for already identified findings. Each record must
+# cite the evidence used to select its CVSS v4.0 base score, all ten factor
+# values, threat maturity, and mitigation strength. NAOS recalculates the
+# published v0.8 arithmetic; it does not select or validate those judgments.
+# A computed High or Critical band creates one advisory G2/G6 review prompt.
+# Low, Medium, and the v0.8-unbanded 0.0 result create no score-based prompt.

@@ -1,0 +1,65 @@
+schema: naos.research_record.v1
+id: RESEARCH-YYYYMMDD-001
+revision: 1
+record_state: active_candidate
+supersedes: null
+superseded_by: null
+retirement_reason: null
+profile: quickstart
+question: "[State one bounded research question.]"
+scope:
+  included: ["[Repository path, code path, or document family inspected.]"]
+  excluded: ["[Explicitly excluded systems or claims.]"]
+hypothesis: "[Optional in Quickstart; required in Lite, Standard, and Assured.]"
+sources:
+  - ref: "[Stable short reference used by observations.]"
+    identity: "[Source title, repository artifact identity, or executed command identity.]"
+    locator: "[Stable repository path, URL, or evidence artifact path.]"
+    kind: repository_source
+    inspected_at: "YYYY-MM-DDTHH:MM:SSZ"
+    version_or_date_or_commit: "[Version, publication date, commit, or null when unavailable.]"
+    quality:
+      authority: primary
+      recency: current
+      directness: direct
+observations:
+  - claim: "[What was observed.]"
+    claim_type: verified_fact
+    posture: confirmed
+    uncertainty: low
+    evidence_refs: ["[Source ref above.]"]
+contradictions:
+  - claim: "[Conflicting evidence or interpretation; use an empty list only when none was found.]"
+    evidence_refs: ["[Source ref above.]"]
+    disposition: unresolved
+counterevidence:
+  - "[Evidence that weakens or could falsify the hypothesis; required from Lite upward.]"
+outcome:
+  state: inconclusive
+  rationale: "[Why the available evidence does or does not resolve the question.]"
+  residual_uncertainty: "[What uncertainty remains after weighing contradictions and counterevidence.]"
+review:
+  state: pending_human_review
+  reviewer: null
+  reviewed_at: null
+  disposition_rationale: "[Why the record remains a candidate, was rejected, or was retired.]"
+authority:
+  posture: candidate_only
+  explicit_attributable_transition_required: true
+  transition_record: null
+limitations:
+  - "[Uninspected evidence, environmental limitation, or unresolved uncertainty.]"
+next_action:
+  recommendation: "[Proportionate next action or explicit stop.]"
+  requires_human_review: true
+traceability:
+  task_ids: []
+  spec_refs: []
+  implementation_refs: []
+  test_refs: []
+not_claimed:
+  - implementation correctness
+  - merge or release approval
+  - evidence admission
+  - effectiveness or human usability
+  - instruction-grade memory or active learning

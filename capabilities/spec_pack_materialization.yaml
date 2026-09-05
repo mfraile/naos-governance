@@ -1,0 +1,128 @@
+id: CAP-SPEC-PACK-MATERIALIZATION
+name: Spec-Pack Materialization
+description: >
+  Copies missing manifest-required NAOS spec-pack template files into an
+  adopter project's selected in-project spec root (default: specs/) for the
+  selected profile. This is a bounded
+  missing-file addition or repair, not a profile transition, and it keeps
+  existing regular files unless overwrite is explicit. It validates the
+  manifest schema/profile graph/path inventory and the full selected source and
+  destination plan before changing spec files.
+status: active
+default_maturity: L0
+minimum_profile: lite
+enforcement_default: advisory
+requires_project_readiness: true
+profiles:
+  quickstart:
+    target_maturity: L0
+    enforcement: advisory
+    notes: "Quickstart does not require spec-pack files unless the project opts in."
+  lite:
+    target_maturity: L1
+    enforcement: advisory
+    notes: "Can preview or restore lite-required spec-pack support files."
+  standard:
+    target_maturity: L2
+    enforcement: warning
+    notes: "Can copy missing standard spec files before spec-pack contract review."
+  assured:
+    target_maturity: L2
+    enforcement: warning
+    notes: "Uses the same structural materialization as standard; assurance still requires separate review evidence."
+authority:
+  may_read:
+    - "templates/spec-kit/specs/"
+    - "naos/spec_templates/spec-kit/specs/"
+    - "templates/spec-kit/specs/spec_manifest.yaml"
+    - "naos/spec_templates/spec-kit/specs/spec_manifest.yaml"
+    - "operator-selected local source spec root, its manifest, and selected required files"
+  may_write:
+    - "configured in-project target spec root (default: specs/)"
+    - "configured in-project materialization report sink (default: naos/reports/spec_pack_materialization.json)"
+    - "operator-selected canonical local report sink, including an explicit path outside the project"
+    - "stdout report evidence when no sink is configured or report persistence fails"
+  may_block:
+    - "invalid or unreadable source manifests"
+    - "missing or unsafe source template files"
+    - "out-of-project, symbolic-link, or non-regular destination paths"
+    - "unsafe or unwritable requested report paths"
+    - "apply requests outside the executed macOS/POSIX platform tuple"
+    - "runtime copy failures"
+    - "post-install temporary cleanup failures"
+    - "late report persistence failures"
+allowed_resources:
+  - "repo-local spec template files"
+  - "operator-selected local source spec roots"
+  - "repo-local policy and manifest files"
+  - "configured in-project target spec roots"
+  - "configured or explicit local report sinks and stdout"
+prohibited_resources:
+  - "automatic spec content generation"
+  - "automatic requirement approval"
+  - "semantic model judgement"
+  - "external services"
+  - "runtime governance"
+  - "target-project mutation outside the configured target spec root and configured or explicit report sink"
+constraints:
+  - "Must skip existing project files unless --force is explicit."
+  - "Must treat --force as permission to replace only an in-project regular file; it never relaxes path or file-type checks."
+  - "Must validate the manifest schema/profile graph/path inventory and the complete selected source inventory, destination inventory, and path topology before copying any spec file."
+  - "Must fail closed with blocking evidence and no spec-file mutation for any preflight refusal."
+  - "Must install each copied leaf from a same-directory temporary without following a destination symlink."
+  - "Must report a newly installed target as copied, preserve the temporary residue path as a blocking finding, and stop remaining copies if post-install temporary cleanup fails."
+  - "Must reject symlinked in-project report ancestors, reject non-regular or multiply-hardlinked report leaves, probe basic writability before apply, and preserve truthful stdout evidence if the later report write fails."
+  - "Must fail closed outside the executed macOS/POSIX platform tuple; dry-run/report evaluation may remain available."
+  - "Must support dry-run mode for safe Make and CI use."
+  - "Must emit report evidence for copied, skipped, would-copy, refused, unsafe-path, cleanup-failed, report-write-failed, and missing-source files to the configured or explicit sink and stdout; stdout-only evidence is valid when no sink is configured."
+  - "Must not claim copied files are filled, approved, implemented, tested, or ready."
+  - "Advisory output requires human review before durable decisions or copied templates are treated as governed specs."
+required_evidence:
+  - "materialization report at the configured or explicit sink, or captured stdout report when no sink is configured or persistence fails"
+  - "selected target spec_manifest.yaml when the profile requires it and materialization succeeds, or blocking report findings plus any available per-file plan evidence when apply is refused"
+validators:
+  - id: spec_pack_materialization
+    script: scripts/naos_spec_pack_materialize.py
+    status: available
+gatekeepers:
+  - G4
+  - G6
+dashboard_signals:
+  - "spec_pack_materialization.status"
+  - "spec_pack_materialization.summary.copied"
+  - "spec_pack_materialization.summary.skipped_existing"
+  - "spec_pack_materialization.summary.missing_source"
+  - "spec_pack_materialization.summary.unsafe_paths"
+  - "spec_pack_materialization.summary.copy_cleanup_failed"
+  - "spec_pack_materialization.summary.report_write_failed"
+  - "spec_pack_materialization.summary.apply_refused"
+maturity_path:
+  L0: "CLI, Make target, policy report path, schema, and capability contract exist."
+  L1: "Generated projects include local spec template sources and can run dry-run materialization."
+  L2: "The Standard selection can copy missing spec files and then run spec-pack contract validation."
+  L3: "Profile gates can require reviewed materialization evidence without treating it as transition evidence."
+  L4: "Dashboard tracks materialization history and unresolved missing-source findings."
+  L5: "Project governance has defined acceptance criteria for profile-specific spec-pack contents."
+known_limitations:
+  - "Does not fill [ADAPT] placeholders."
+  - "Does not prove requirements, architecture, API, acceptance, cost, market, integration, or execution content is applicable or complete."
+  - "Does not prove profile readiness; it only restores missing template files."
+  - "Multi-file materialization is sequential and has no rollback; a runtime filesystem, post-install temporary cleanup, or report-write failure can occur after the current or earlier leaf copies were installed."
+  - "Requested report sinks receive in-project ancestor, regular single-link leaf, and basic writability preflight; explicit external paths are canonicalized operator-selected outputs, and a probe cleanup failure can leave a `.naos-spec-pack-report-probe-*` file for manual removal."
+  - "Leaf installation is enabled only on the executed local macOS/POSIX tuple. Linux POSIX mutation is refused because its behavior remains unproven, as do concurrent ancestor replacement, mount or bind-mount changes, network-filesystem semantics, Windows reparse/DACL/ADS behavior, ACL/xattr preservation, and crash consistency."
+  - "Manifest validation does not cross-check files[].required_profiles metadata against every profiles.*.required_files membership; both the materializer and contract execute from the profile required-files lists."
+not_claimed:
+  - "approved specifications"
+  - "complete requirements"
+  - "correct architecture"
+  - "implemented behavior"
+  - "passing tests"
+  - "standard readiness"
+  - "certification or compliance proof"
+related_docs:
+  - docs/ADOPTION_GUIDE.md
+  - docs/CONTROL_PLANE.md
+  - docs/AUDIT_PLAYBOOK.md
+related_scripts:
+  - scripts/naos_spec_pack_materialize.py
+  - scripts/naos_spec_pack_contract.py

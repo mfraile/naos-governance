@@ -1,0 +1,105 @@
+schema: naos.task_lifecycle_contract.v1
+contract_version: 1
+identity:
+  exact_registry_id_authoritative: true
+  plain_pattern: '^T-[0-9]{3,}$'
+  namespaced_pattern: '^(?:[A-Z0-9]+-)*T-[0-9]{3,}$'
+  substring_extraction_forbidden: true
+lifecycle_states:
+  - unknown
+  - planned
+  - active
+  - implementation_complete
+  - completed
+  - deferred
+  - cancelled
+  - absorbed
+  - superseded
+delivery_states:
+  - not_started
+  - in_progress
+  - delivered
+  - not_delivered
+  - excluded
+verification_states:
+  - unverified
+  - partially_verified
+  - verified
+  - inconclusive
+  - failed
+  - not_applicable
+delivered_metric:
+  lifecycle_state: completed
+  delivery_state: delivered
+  verification_state: verified
+  excluded_lifecycle_states: [deferred, cancelled, absorbed, superseded]
+  implemented_without_verification_is_delivered: false
+implemented_actions: [inspect, complete]
+transitions:
+  complete:
+    from: [active, implementation_complete]
+    to: completed
+    preserves_exact_id: true
+    writes_completed_history: true
+    preserves_active_record_or_digest: true
+    verified_delivery_prerequisites:
+      required_reference_kinds: [test, evidence, task_delivery_decision]
+      regular_files_only: true
+      allowed_roots: [project_root, naos_root]
+      fragments_validate_file_portion: true
+      task_delivery_decision:
+        schema: naos.human_decision_record.v1
+        decision_type: task_delivery
+        outcome: approved
+        exact_task_subject_required: true
+        non_placeholder_decided_by_required: true
+        evidence_intersection_required: true
+      failure_status: verification_prerequisites_failed
+      failure_mutates: false
+declared_state_metadata_only:
+  superseded:
+    required_fields: [superseded_by]
+    delivered: false
+  cancelled:
+    required_fields: [cancelled_reason]
+    delivered: false
+  deferred:
+    required_fields: [deferred_reason]
+    delivered: false
+  absorbed:
+    required_fields: [absorbed_into]
+    delivered: false
+recovery_modes: [auto, active, completed]
+unknown_task:
+  status: task_not_found
+  human_review_required: true
+  exit_zero_allowed: false
+unsupported_legacy_status:
+  lifecycle_state: unknown
+  delivery_state: not_delivered
+  verification_state: unverified
+  human_review_required: true
+  completion_allowed: false
+  exit_zero_allowed: false
+authority:
+  task_registry_id: authoritative
+  active_card: authoritative_task_context
+  completed_history: authoritative_completed_context
+  context_reports: derived_non_authoritative
+  completion_does_not_authorize: [merge, release, evidence_admission, exception_closure]
+legacy_status_compatibility:
+  planned: [planned, not_started, unverified]
+  todo: [planned, not_started, unverified]
+  in_progress: [active, in_progress, unverified]
+  active: [active, in_progress, unverified]
+  implemented: [implementation_complete, in_progress, unverified]
+  verified: [completed, delivered, verified]
+  done: [completed, delivered, verified]
+  complete: [completed, delivered, verified]
+  completed: [completed, delivered, verified]
+  deferred: [deferred, not_delivered, not_applicable]
+  cancelled: [cancelled, not_delivered, not_applicable]
+  canceled: [cancelled, not_delivered, not_applicable]
+  absorbed: [absorbed, not_delivered, not_applicable]
+  superseded: [superseded, not_delivered, not_applicable]
+  failed: [active, in_progress, failed]

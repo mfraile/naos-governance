@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:evidence_envelope:v1",
+  "title": "NAOS Evidence Envelope",
+  "description": "DSSE-style signable envelope report over the evidence manifest root. NAOS emits the signable envelope but does not require signing, validate signatures, authenticate identities, hold keys, issue certificates, or provide non-repudiation.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "naos_root",
+    "project_root",
+    "deterministic",
+    "summary",
+    "findings",
+    "limitations",
+    "not_claimed",
+    "human_review_required",
+    "signed"
+  ],
+  "properties": {
+    "schema": {"const": "naos.evidence_envelope.v1"},
+    "generated_at": {"type": "string"},
+    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"type": "string"},
+    "naos_root": {"type": "string"},
+    "project_root": {"type": "string"},
+    "deterministic": {"const": true},
+    "summary": {"type": "object", "additionalProperties": true},
+    "findings": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+    "envelope": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {
+        "payloadType": {"type": "string"},
+        "payload": {"type": "string"},
+        "signatures": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+      }
+    },
+    "payload": {"type": "object", "additionalProperties": true},
+    "identity_binding": {
+      "type": "object",
+      "description": "Compatibility-named best-effort Git HEAD metadata. Git may report signature status and signer text; NAOS applies no independent signature trust or acceptance policy and does not authenticate an identity.",
+      "additionalProperties": true
+    },
+    "signed": {
+      "type": "boolean",
+      "description": "Compatibility field indicating only whether signature entries are present; it is not a signature-validation result."
+    },
+    "signature_entries_present": {"type": "boolean"},
+    "signature_validation_performed": {
+      "const": false,
+      "description": "NAOS performs no envelope or third-party signature validation."
+    },
+    "adopter_signing_required": {
+      "type": "boolean",
+      "description": "Compatibility field. Current NAOS emits false because signing is optional; legacy v1 true values remain schema-valid but do not establish a current kit requirement."
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {
+      "type": "array",
+      "items": {"type": "string"},
+      "contains": {"const": "signature by NAOS"}
+    },
+    "human_review_required": {"type": "boolean"}
+  }
+}

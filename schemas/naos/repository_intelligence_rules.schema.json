@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_rules:v1",
+  "title": "NAOS Repository Intelligence Rules",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "enabled",
+    "capability_id",
+    "artifact_families",
+    "exclude_patterns",
+    "chunking",
+    "fts",
+    "graph",
+    "semantic_vector",
+    "profile_review",
+    "maturity",
+    "ongoing_use_scope",
+    "limitations",
+    "not_claimed"
+  ],
+  "properties": {
+    "version": {"const": 1},
+    "enabled": {"type": "boolean"},
+    "capability_id": {"const": "CAP-LOCAL-CONTEXT-INDEX"},
+    "semantics": {"type": "object"},
+    "artifact_families": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "artifact_type", "authority_level", "include_policy", "chunk_kind", "include_patterns"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "name": {"type": "string", "minLength": 1},
+          "artifact_type": {"type": "string", "minLength": 1},
+          "authority_level": {"type": "string", "minLength": 1},
+          "include_policy": {"type": "string", "minLength": 1},
+          "chunk_kind": {"enum": ["markdown_summary", "bounded_text", "python_symbol_summary", "structured_summary"]},
+          "include_patterns": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+        }
+      }
+    },
+    "exclude_patterns": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "default_exclusions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "forbidden_content_categories": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "chunking": {
+      "type": "object",
+      "required": ["max_artifacts", "max_file_bytes", "max_relationships", "max_chunks_per_artifact", "max_chars_per_chunk", "include_full_source", "include_full_reports"],
+      "properties": {
+        "max_artifacts": {"type": "integer", "minimum": 1},
+        "max_file_bytes": {"type": "integer", "minimum": 1024},
+        "max_relationships": {"type": "integer", "minimum": 1},
+        "max_chunks_per_artifact": {"type": "integer", "minimum": 1},
+        "max_chars_per_chunk": {"type": "integer", "minimum": 1},
+        "include_full_source": {"const": false},
+        "include_full_reports": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "fts": {"type": "object"},
+    "graph": {
+      "type": "object",
+      "required": ["runtime", "exact_version", "format", "directed", "multigraph", "activate_only_with_explicit_source_bound_relationships", "read_generated_graphml_only", "max_query_depth", "max_query_results"],
+      "properties": {
+        "runtime": {"const": "networkx"},
+        "exact_version": {"const": "3.6.1"},
+        "format": {"const": "graphml"},
+        "directed": {"const": true},
+        "multigraph": {"const": true},
+        "activate_only_with_explicit_source_bound_relationships": {"const": true},
+        "read_generated_graphml_only": {"const": true},
+        "max_query_depth": {"type": "integer", "minimum": 1, "maximum": 3},
+        "max_query_results": {"type": "integer", "minimum": 1, "maximum": 100}
+      },
+      "additionalProperties": false
+    },
+    "semantic_vector": {
+      "type": "object",
+      "required": ["status", "sqlite_vec_enabled", "embeddings_enabled", "activation_requires"],
+      "properties": {
+        "status": {"const": "workload_not_defined"},
+        "sqlite_vec_enabled": {"const": false},
+        "embeddings_enabled": {"const": false},
+        "activation_requires": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "profile_review": {
+      "type": "object",
+      "required": ["quickstart", "lite", "standard", "assured"],
+      "properties": {
+        "quickstart": {"const": "digest_confirmation"},
+        "lite": {"const": "digest_confirmation"},
+        "standard": {"const": "digest_confirmation_and_named_review"},
+        "assured": {"const": "digest_confirmation_and_named_review"}
+      },
+      "additionalProperties": false
+    },
+    "maturity": {"type": "object"},
+    "ongoing_use_scope": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "not_claimed": {"type": "array", "items": {"type": "string"}}
+  }
+}
