@@ -13,6 +13,10 @@ All notable public changes to NAOS are summarized here.
   and exclude configured signing outputs from their own evidence subjects.
 - Reconcile model reports with current sources and validate canonical trace
   structure through the CLI and grading consumers.
+- Correct the static MCP descriptor policy's nested and outer integrity pins
+  after portable authority wording changed; activation remains separately gated.
+- Record the maintainer-approved measured profile footprint allowances while
+  preserving the existing warning and stop comparison behavior.
 - Add portable connected regressions and
   [compatibility guidance](docs/CONTRACT_REVALIDATION.md). These changes do not
   change profile enforcement transitions or grant human decision authority.

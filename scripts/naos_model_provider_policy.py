@@ -713,7 +713,6 @@ def build_findings(
     for role_name, raw_role in sorted(roles.items()):
         role = as_mapping(raw_role)
         provider_kind = str(role.get("provider_kind") or "")
-        referenced = role_name in role_refs
         role_is_active = role_name in active
 
         if provider_kind and provider_kind not in ALLOWED_PROVIDER_KINDS:
@@ -1098,7 +1097,6 @@ def build_report(root: Path, naos_root: str, profile: str, governance_policy: di
             "credentials_allowed_in_repo": bool_value(model_policy.get("credentials_allowed_in_repo")),
         }
     )
-    active = active_role_names(roles, references)
     referenced_role_names = {str(ref.get("role")) for ref in references if ref.get("role")}
     status = report_status(policy_source, profile, findings)
 

@@ -51,10 +51,10 @@
       "sha256": "803b6c44203152418dcd6e458e4198033724473959091a29907b1f6c62adb533"
     },
     {
-      "bytes": 12003,
+      "bytes": 12302,
       "mode": "0644",
       "path": "CHANGELOG.md",
-      "sha256": "6ffcafac5d2c681a58a41713c87610fec0215581752d09e8ce4a0ee6f54bc7a3"
+      "sha256": "160ba5009829cee90079ef36337b1c773b032478326adaacb6a7e0272f99d83a"
     },
     {
       "bytes": 6590,
@@ -111,10 +111,10 @@
       "sha256": "cb2874908a80eb7de83088f282e8e8ddf6765b1fbbc7cefe4e2fa5a9a39502d6"
     },
     {
-      "bytes": 9486,
+      "bytes": 9554,
       "mode": "0644",
       "path": "RELEASE_NOTES.md",
-      "sha256": "abdc35c73efe1351aa369430c8e2a27457e5b0893558ede6ae607522d51bc27a"
+      "sha256": "c5f9e6da6de82f4e9402d700eb895828b7aab86a073f1fa4f38aa830c75a715d"
     },
     {
       "bytes": 9573,
@@ -231,10 +231,10 @@
       "sha256": "0536ef35b2e69954da5c94a055e28714d80a6e60334ea59a331057a038e0f2dd"
     },
     {
-      "bytes": 5080595,
+      "bytes": 5091966,
       "mode": "0644",
       "path": "baselines/ai_surface_profile_footprint_baseline.json",
-      "sha256": "93ea4174e2a3a87351eff1eb6fafb2611fea7c8da9e4fec72c7d07b6e9c41a2b"
+      "sha256": "ba637cb881136b64c74ac95f310a0df44e90da05549f4c139fd8d67f0ea70bc5"
     },
     {
       "bytes": 3135,
@@ -717,10 +717,10 @@
       "sha256": "f8530c808995765139f29f4877b917a837a3838af1e597f017267762db5a8f07"
     },
     {
-      "bytes": 7733,
+      "bytes": 8643,
       "mode": "0644",
       "path": "docs/CONTRACT_REVALIDATION.md",
-      "sha256": "b0a4f2ac78d85c4a9de77618a38756761507ebf2064ca5abae5a5b4f46dd2f3a"
+      "sha256": "398e352e712259fefc7019ad28331f8d232dfef3f107cd9a43b088189822b57b"
     },
     {
       "bytes": 122502,
@@ -1896,7 +1896,7 @@
       "bytes": 10038,
       "mode": "0644",
       "path": "schemas/naos/mcp_resource_inventory.schema.json",
-      "sha256": "ba8a0cef4bb89e85ecf060a2e11297ae020fdf7be2277dea9434c488211cdc1e"
+      "sha256": "df4026226eb40ac681ad54a1ba87f7ce497713d483b873c55b619e5a32caadf0"
     },
     {
       "bytes": 4694,
@@ -2418,7 +2418,7 @@
       "bytes": 180286,
       "mode": "0644",
       "path": "scripts/naos_adoption_common.py",
-      "sha256": "fa843bf65a8e8059be4275c0014db2693bc8286047abf738cc43d386efa08477"
+      "sha256": "bf6f2b8258bfce106d9b857a392519f73b9078250d04fd7972e75e8a3882a1a7"
     },
     {
       "bytes": 56656,
@@ -2766,7 +2766,7 @@
       "bytes": 49749,
       "mode": "0644",
       "path": "scripts/naos_mcp_config_registry.py",
-      "sha256": "2bd247b5c2b129a4156fd6ed8ba934c9b4ffb46cb43b9f3fd7bcb361db81cefc"
+      "sha256": "af4841b52e0201b97427c65a479cfb611f509fe80a2ac728ca1ae8ac7a5e2005"
     },
     {
       "bytes": 470,
@@ -2805,10 +2805,10 @@
       "sha256": "96bab50783a6d87ff701af18ae8b82e88905bf9a5ba83ef2dcb0a412d51b6bd4"
     },
     {
-      "bytes": 51441,
+      "bytes": 51347,
       "mode": "0644",
       "path": "scripts/naos_model_provider_policy.py",
-      "sha256": "bddd1dc16c343b7f6bae014b7669a234751bc6fc904f350bd9a2a272512453f7"
+      "sha256": "2c24772a1fefffd76d0fd9963ff9f563add0dd798eece53839bd77cf5e384d9d"
     },
     {
       "bytes": 36113,
@@ -2883,10 +2883,10 @@
       "sha256": "108b9a452dc208aaadba95084679168a7f80b3edac45bc9b97e43e98c97015ec"
     },
     {
-      "bytes": 16831,
+      "bytes": 16808,
       "mode": "0644",
       "path": "scripts/naos_pr_governance_summary.py",
-      "sha256": "0bc81006ce54b0ae47598a84b1a37288e8c62d18a779f09046d4f2234264c55a"
+      "sha256": "2bf4738da8db8aa1d6e1a5043520e3ee846cb8a09fed94bfc975aa2793600f9f"
     },
     {
       "bytes": 25302,
@@ -4323,10 +4323,10 @@
       "sha256": "249e28fd11001fb57c26bb7fb92bc9ff7ef6a5edc2c9a1a8f46b0e9ba54bee60"
     },
     {
-      "bytes": 15297,
+      "bytes": 15273,
       "mode": "0644",
       "path": "templates/structural-seeds/naos/adapter_propagation_state.yaml",
-      "sha256": "f87afab2d201a9a5c1284e4bf3316e601c8384339e36140d5e6e8d8a86c2dc02"
+      "sha256": "d77ea4241642396e2d9be7dfff00e489d0679e8508d9b5f4bd9683baa8292651"
     },
     {
       "bytes": 2545,
@@ -4359,10 +4359,10 @@
       "sha256": "2746ff6b30090d5e02379be6cc8f206950103634dcda444580cfb93eaf7ec060"
     },
     {
-      "bytes": 15716,
+      "bytes": 15861,
       "mode": "0644",
       "path": "templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml",
-      "sha256": "70c5eeb160f4222d33f33182758ec3a3fc837e523307b855aa34c462e8834f2f"
+      "sha256": "0f503d4e2926508a3be03af7ee089c655c05e0af55a153d58211da2a9b654da4"
     },
     {
       "bytes": 489,
@@ -4656,7 +4656,7 @@
       "bytes": 4363,
       "mode": "0644",
       "path": "templates/structural-seeds/naos/memory_mcp_inventory_rules.yaml",
-      "sha256": "8b484a2c13238c49028a502d9f6a8e0b78f9f690b82800f79f801303e1b21ce9"
+      "sha256": "ae2d5788a7be43ad50ff71fd466e9daa7f08fa6906a9399f85ddb7fab78d39c0"
     },
     {
       "bytes": 7700,
@@ -4925,8 +4925,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 14968003,
+  "source_bytes": 14980655,
   "source_file_count": 819,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "6efed9a67bba4b95350c9cd307de0f71f458008d860f039dbc1636594582bad1"
+  "tree_sha256": "1910e7e3b881c62259468de04ac771467d6a1457b88ed20b794db9372dbb1857"
 }

@@ -7,7 +7,8 @@ Public visibility, a tag, a GitHub release, and package upload remain separately
 gated.
 
 The unreleased candidate corrections to task identity, staged Git checks,
-gate inputs, attestations, report freshness, and trace validation are described
+gate inputs, attestations, report freshness, trace validation, static MCP policy
+integrity, and approved profile footprint allowances are described
 in [contract and migration guidance](docs/CONTRACT_REVALIDATION.md). The package
 version remains 1.1.0 while this candidate is reviewed.
 

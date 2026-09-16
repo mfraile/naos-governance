@@ -32,13 +32,13 @@ profile_footprint:
   methodology:
     warning: Any increase above the exact current fresh-profile baseline requires review and justification.
     stop: More than the minimum one-integer-unit separation above the warning boundary stops expansion pending an explicit reviewed allowance.
-    rationale: Two identical isolated fixed-time replays establish the approved measured base for the current generated profiles. The current Standard and Assured command surface and the current documentation and seed footprint are included in those measurements. Only directly affected baselines move; the strict one-unit warning and two-unit stop behavior remains unchanged, and no further growth is approved.
+    rationale: The maintainer approved only the six measured token and file baselines for task and evidence contract repairs on 2026-09-16. Quickstart, finding-count and command-count limits are unchanged. Two identical isolated fixed-time replays must bind the updated allowance to the current generated profiles. The strict one-unit warning and two-unit stop behavior remains unchanged, and no further growth is approved.
     falsifier: Re-derive if the scaffold contract changes, deterministic replay differs, or the maintainer approves a different measured growth allowance.
   approval:
     status: approved
     authority_ref: templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml
-    authority_basis: This portable policy records the maintainer-approved measured baseline. The exact-baseline warning boundary and baseline-plus-one stop boundary remain unchanged; changing either requires explicit human review and never authorizes publication or external action.
-    approved_on: "2026-09-03"
+    authority_basis: The maintainer explicitly approved the measured Lite, Standard and Assured token and file baselines on 2026-09-16 for task and evidence contract repairs. This approval changes only those six baselines. The exact-baseline warning boundary and baseline-plus-one stop boundary remain unchanged; any further change requires explicit human review and never authorizes publication or external action.
+    approved_on: "2026-09-16"
   candidate_freeze:
     status: released
     release_requires:
@@ -85,15 +85,15 @@ profile_footprint:
         basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       resident_context_tokens:
-        baseline: 60514
-        warn_above: 60514
-        stop_above: 60515
+        baseline: 60587
+        warn_above: 60587
+        stop_above: 60588
         basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 416
-        warn_above: 416
-        stop_above: 417
+        baseline: 423
+        warn_above: 423
+        stop_above: 424
         basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:
@@ -110,15 +110,15 @@ profile_footprint:
         basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       resident_context_tokens:
-        baseline: 89949
-        warn_above: 89949
-        stop_above: 89950
+        baseline: 90022
+        warn_above: 90022
+        stop_above: 90023
         basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 505
-        warn_above: 505
-        stop_above: 506
+        baseline: 511
+        warn_above: 511
+        stop_above: 512
         basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:
@@ -135,15 +135,15 @@ profile_footprint:
         basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       resident_context_tokens:
-        baseline: 113170
-        warn_above: 113170
-        stop_above: 113171
+        baseline: 113239
+        warn_above: 113239
+        stop_above: 113240
         basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 532
-        warn_above: 532
-        stop_above: 533
+        baseline: 538
+        warn_above: 538
+        stop_above: 539
         basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:

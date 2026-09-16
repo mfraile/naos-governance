@@ -19,7 +19,6 @@ if str(SCRIPT_DIR) not in sys.path:
 from naos_policy import (  # noqa: E402
     build_generated_by,
     default_naos_root,
-    is_kit_repository,
     load_policy,
     normalize_profile,
     report_output_path,

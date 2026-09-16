@@ -1887,7 +1887,7 @@ def build_mcp_resource_inventory(args: argparse.Namespace, root: Path, profile: 
             "status": "invalid_rules",
             "rules_path": rules_path,
             "rules_sha256": None,
-            "expected_rules_sha256": "2a5b39d7f89673df223f35890393da528ae413b4979e3766be155aea37c30375",
+            "expected_rules_sha256": "aa6abe7a1e3268ecf5c0a7b86c7b2e27b5a19c444ad9e386cbab41df80024e7c",
             "policy_integrity_status": "missing",
             "policy_schema": "naos.mcp_descriptor_review_policy.v1",
             "policy_version": "1.0.0",

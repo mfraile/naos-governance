@@ -126,6 +126,20 @@ approved receipt authenticates a human or proves that an action was authorized.
 
 ## Existing projects and verification
 
+The static MCP descriptor policy now has integrity pins derived from its
+portable authority wording. An exact supported declaration can again receive
+`allowlisted_pending_activation`; policy drift and unsupported declarations
+still require review. This correction does not activate an MCP server or grant
+authentication, tool access or write authority. Customized policy files remain
+subject to the documented upgrade preservation and review path.
+
+The maintainer approved the measured resident-context and generated-file
+baselines for these connected repairs: Lite 60,587 estimated tokens and 423
+files, Standard 90,022 and 511, and Assured 113,239 and 538. The estimate remains
+four characters per token. Warning limits equal these baselines and stop limits
+are one higher, preserving the existing strict comparisons: one unit of further
+growth warns and two units stop. Other profile limits are unchanged.
+
 Use the documented content-aware upgrade: create a plan outside the project,
 review its changes and preservation findings, then apply that exact plan with
 its digest. See [the installation manual](../INSTALLATION_MANUAL.md).

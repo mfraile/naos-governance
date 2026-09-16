@@ -44,12 +44,12 @@ propagation_reviews:
 
   - link_id: ai_surface_health_skill_to_plugins
     disposition: no_impact
-    reviewed_at: "2026-09-05T10:06:54Z"
-    reviewer: naos-maintainer-footprint-review
-    rationale: "The portable footprint policy uses content-addressed provenance for every accepted replay. The mapped plugin skills already describe the generic fresh-profile budget workflow and deliberately do not repeat authority records or numeric baselines, so no target edit is required. Approved numeric baselines and strict one-unit warning/two-unit stop behavior remain unchanged. This review does not auto-tune thresholds, approve expansion, activate a candidate, invoke a scanner/provider/model, enable MCP/memory/network access, or grant gate, merge, release, publication, or external authority."
+    reviewed_at: "2026-09-16T13:37:17Z"
+    reviewer: independent-agent-technical-review
+    rationale: "The maintainer approved six measured token and file baselines for task and evidence contract repairs. Independent technical review confirmed that the mapped plugin skills already use the generic four-profile budget workflow and do not repeat numeric baselines or approval dates. Commands, strict one-unit warning/two-unit stop behavior and all other limits remain unchanged, so target text needs no edit. This technical propagation review records no additional growth, human approval, candidate activation, merge, release, publication or external-action authority."
     source_hashes:
       templates/skills/ai-surface-health-review/SKILL.md: 0df9cac43fa48d9310ca35fa2430328f36065aab740e0d35fcf45b7807178d20
-      templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml: 70c5eeb160f4222d33f33182758ec3a3fc837e523307b855aa34c462e8834f2f
+      templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml: 0f503d4e2926508a3be03af7ee089c655c05e0af55a153d58211da2a9b654da4
     target_hashes:
       plugins/naos-governance/skills/naos-ai-surface-health/SKILL.md: 77d11df5d3d80019ed07a89aa6fe58b93b5b5f0664a527f9fb0fe0099d04596d
       plugins/naos-governance-claude-code/skills/naos-ai-surface-health/SKILL.md: 9b659dff5383bd2d7d6f1305ea243e29d9498060046b92150a8ad4d7c71b4fda
