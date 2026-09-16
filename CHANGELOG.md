@@ -2,7 +2,7 @@
 
 All notable public changes to NAOS are summarized here.
 
-## Unreleased candidate corrections - 2026-09-16
+## [1.1.0] - 2026-09-16
 
 - Preserve exact task ownership across lifecycle operations and revalidate
   persisted decision records in composed traceability.
@@ -17,6 +17,8 @@ All notable public changes to NAOS are summarized here.
   after portable authority wording changed; activation remains separately gated.
 - Record the maintainer-approved measured profile footprint allowances while
   preserving the existing warning and stop comparison behavior.
+- Resolve the reviewed Ruff diagnostics and preserve explicit file, parser and
+  subprocess error boundaries, with portable source/export/installed regressions.
 - Add portable connected regressions and
   [compatibility guidance](docs/CONTRACT_REVALIDATION.md). These changes do not
   change profile enforcement transitions or grant human decision authority.

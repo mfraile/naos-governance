@@ -33573,7 +33573,7 @@
           },
           {
             "path": "scripts/naos_adoption_common.py",
-            "sha256": "01a14b12953027d59b33b69d44eb125554c240e67ff9fecff9f1a063e0358b06"
+            "sha256": "943f885d8dbbffe85fe0ceac3d1495c0a812806e6c8e6d61e1839b1420a99f94"
           },
           {
             "path": "scripts/naos_agent_trace_validate.py",
@@ -33745,7 +33745,7 @@
           },
           {
             "path": "scripts/naos_mcp_config_registry.py",
-            "sha256": "5f832d6434c8aca030fd158c162defce0ab989a7fe5cf7965d8826fd84ab306f"
+            "sha256": "19af926ec78ce7dfbe27961e84156d8fe212b1257255e2de38fb6cc9e4426a3a"
           },
           {
             "path": "scripts/naos_mcp_resource_inventory.py",
@@ -33773,7 +33773,7 @@
           },
           {
             "path": "scripts/naos_model_provider_policy.py",
-            "sha256": "e2b97f6755d41594f82155afa11b5962f1a99f85a4a4220ad8f8e0d8e0d457f7"
+            "sha256": "29947fea380cac9be94c92a09bbe17888e3dbd2f18ef626f0c41bd1b9dfe769e"
           },
           {
             "path": "scripts/naos_model_telemetry_evidence.py",
@@ -33817,7 +33817,7 @@
           },
           {
             "path": "scripts/naos_pr_governance_summary.py",
-            "sha256": "9efc2e0efab5866ad12f5b907a17208b5168e21b8895e1d382d692fc9fd3eec9"
+            "sha256": "4ba84a06271eb6f53e4eb8b53d7d65d37c3a5bf48e55b4dcfebd0e6c3bf9275a"
           },
           {
             "path": "scripts/naos_pr_risk_classification.py",
@@ -34008,7 +34008,7 @@
             "sha256": "924fa63071f1018bc2dcc3649e827c342cf9f4258e741cd6152539389b167ee9"
           }
         ],
-        "content_set_sha256": "2f97b03159600eef6656db1364e1831dad459481925c783de7932102fa268d03",
+        "content_set_sha256": "b2ba714e360a059224e4708eb1931b27835f173d290b6014fb4270071366e0a7",
         "declared_entry_count": 423,
         "declared_unique_count": 423,
         "duplicate_declarations": [],
@@ -60379,7 +60379,7 @@
           },
           {
             "path": "scripts/naos_adoption_common.py",
-            "sha256": "01a14b12953027d59b33b69d44eb125554c240e67ff9fecff9f1a063e0358b06"
+            "sha256": "943f885d8dbbffe85fe0ceac3d1495c0a812806e6c8e6d61e1839b1420a99f94"
           },
           {
             "path": "scripts/naos_agent_trace_validate.py",
@@ -60599,7 +60599,7 @@
           },
           {
             "path": "scripts/naos_mcp_config_registry.py",
-            "sha256": "5f832d6434c8aca030fd158c162defce0ab989a7fe5cf7965d8826fd84ab306f"
+            "sha256": "19af926ec78ce7dfbe27961e84156d8fe212b1257255e2de38fb6cc9e4426a3a"
           },
           {
             "path": "scripts/naos_mcp_resource_inventory.py",
@@ -60627,7 +60627,7 @@
           },
           {
             "path": "scripts/naos_model_provider_policy.py",
-            "sha256": "e2b97f6755d41594f82155afa11b5962f1a99f85a4a4220ad8f8e0d8e0d457f7"
+            "sha256": "29947fea380cac9be94c92a09bbe17888e3dbd2f18ef626f0c41bd1b9dfe769e"
           },
           {
             "path": "scripts/naos_model_telemetry_evidence.py",
@@ -60679,7 +60679,7 @@
           },
           {
             "path": "scripts/naos_pr_governance_summary.py",
-            "sha256": "9efc2e0efab5866ad12f5b907a17208b5168e21b8895e1d382d692fc9fd3eec9"
+            "sha256": "4ba84a06271eb6f53e4eb8b53d7d65d37c3a5bf48e55b4dcfebd0e6c3bf9275a"
           },
           {
             "path": "scripts/naos_pr_risk_classification.py",
@@ -61022,7 +61022,7 @@
             "sha256": "924fa63071f1018bc2dcc3649e827c342cf9f4258e741cd6152539389b167ee9"
           }
         ],
-        "content_set_sha256": "e42604f247c7a43a644437ee066ae9d9eef384a9c1e0d71d297b0de43ae50d2f",
+        "content_set_sha256": "db2ab658938732e4ccbae87ff1c09fdaf22914a4c4f4b03d01010e4b50fe0158",
         "declared_entry_count": 511,
         "declared_unique_count": 511,
         "duplicate_declarations": [],
@@ -87595,7 +87595,7 @@
           },
           {
             "path": "scripts/naos_adoption_common.py",
-            "sha256": "01a14b12953027d59b33b69d44eb125554c240e67ff9fecff9f1a063e0358b06"
+            "sha256": "943f885d8dbbffe85fe0ceac3d1495c0a812806e6c8e6d61e1839b1420a99f94"
           },
           {
             "path": "scripts/naos_agent_trace_validate.py",
@@ -87815,7 +87815,7 @@
           },
           {
             "path": "scripts/naos_mcp_config_registry.py",
-            "sha256": "5f832d6434c8aca030fd158c162defce0ab989a7fe5cf7965d8826fd84ab306f"
+            "sha256": "19af926ec78ce7dfbe27961e84156d8fe212b1257255e2de38fb6cc9e4426a3a"
           },
           {
             "path": "scripts/naos_mcp_resource_inventory.py",
@@ -87843,7 +87843,7 @@
           },
           {
             "path": "scripts/naos_model_provider_policy.py",
-            "sha256": "e2b97f6755d41594f82155afa11b5962f1a99f85a4a4220ad8f8e0d8e0d457f7"
+            "sha256": "29947fea380cac9be94c92a09bbe17888e3dbd2f18ef626f0c41bd1b9dfe769e"
           },
           {
             "path": "scripts/naos_model_telemetry_evidence.py",
@@ -87895,7 +87895,7 @@
           },
           {
             "path": "scripts/naos_pr_governance_summary.py",
-            "sha256": "9efc2e0efab5866ad12f5b907a17208b5168e21b8895e1d382d692fc9fd3eec9"
+            "sha256": "4ba84a06271eb6f53e4eb8b53d7d65d37c3a5bf48e55b4dcfebd0e6c3bf9275a"
           },
           {
             "path": "scripts/naos_pr_risk_classification.py",
@@ -88238,7 +88238,7 @@
             "sha256": "924fa63071f1018bc2dcc3649e827c342cf9f4258e741cd6152539389b167ee9"
           }
         ],
-        "content_set_sha256": "dbcfff873677cdc8eeb3cc047b7f73f9a300c0a999fd3c951f9933b5547712a6",
+        "content_set_sha256": "38dca357ec8d816de423f92c394065ba23f50b7aeb3811cee8dbc76f90cd5aa0",
         "declared_entry_count": 538,
         "declared_unique_count": 538,
         "duplicate_declarations": [],
@@ -113415,7 +113415,7 @@
       "sha256": "0f503d4e2926508a3be03af7ee089c655c05e0af55a153d58211da2a9b654da4"
     }
   },
-  "stable_payload_sha256": "3a3f35447ac881c773e61464cef905402caf9bb55b5531f6dc63061c4d295ea9",
+  "stable_payload_sha256": "e2b46781910efae5d4acaf29ad450877378ba2e35722638b02f41fb23b1b4d0c",
   "status": "pass",
   "summary": {
     "finding_occurrences": 5112,

@@ -51,10 +51,10 @@
       "sha256": "803b6c44203152418dcd6e458e4198033724473959091a29907b1f6c62adb533"
     },
     {
-      "bytes": 12302,
+      "bytes": 12438,
       "mode": "0644",
       "path": "CHANGELOG.md",
-      "sha256": "160ba5009829cee90079ef36337b1c773b032478326adaacb6a7e0272f99d83a"
+      "sha256": "2be3d585397fa1d53c182f6d6b04214c355c7faf0bf3da213f827fd9c5fda4b0"
     },
     {
       "bytes": 6590,
@@ -111,10 +111,10 @@
       "sha256": "cb2874908a80eb7de83088f282e8e8ddf6765b1fbbc7cefe4e2fa5a9a39502d6"
     },
     {
-      "bytes": 9554,
+      "bytes": 9627,
       "mode": "0644",
       "path": "RELEASE_NOTES.md",
-      "sha256": "c5f9e6da6de82f4e9402d700eb895828b7aab86a073f1fa4f38aa830c75a715d"
+      "sha256": "c4997e5758cd0af5d201bcd0db252404e8e97f8544cc9ee28fb1ec6c0710f86e"
     },
     {
       "bytes": 9573,
@@ -234,7 +234,7 @@
       "bytes": 5091966,
       "mode": "0644",
       "path": "baselines/ai_surface_profile_footprint_baseline.json",
-      "sha256": "ba637cb881136b64c74ac95f310a0df44e90da05549f4c139fd8d67f0ea70bc5"
+      "sha256": "05a4a5f6032237e40ecc97a492a52cbbc08bc34336801a17e89d13c6319ab616"
     },
     {
       "bytes": 3135,
@@ -1347,6 +1347,12 @@
       "sha256": "c95579d4083e6c871640d07d2b250f76951ac763e78b5a8b903fa5424b3b80bd"
     },
     {
+      "bytes": 8383,
+      "mode": "0644",
+      "path": "public_tests/test_input_error_boundaries.py",
+      "sha256": "e455cb2d65a069c5d18ab8b8b777c7161931933e36865c951ace4849f4eca0e2"
+    },
+    {
       "bytes": 9287,
       "mode": "0644",
       "path": "public_tests/test_public_candidate.py",
@@ -1365,10 +1371,10 @@
       "sha256": "bb670e3646106cd08adc0675477071046ad957c33a75b3aa3caa9e2c50b18217"
     },
     {
-      "bytes": 4581,
+      "bytes": 4757,
       "mode": "0644",
       "path": "pyproject.toml",
-      "sha256": "7c73b51927ae45ec92bfd0e2a446e3a1c0ebd90e3d3851794e15e17c8d136423"
+      "sha256": "bc2ae1e19280170c6ffb460875debe7adb9a52890ce78733e6538a6abb81de7b"
     },
     {
       "bytes": 873,
@@ -2415,10 +2421,10 @@
       "sha256": "a54bdcbe6f14a3a11ce97db84fd8b9df1358e7fa2770c0626953ed111add6ec0"
     },
     {
-      "bytes": 180286,
+      "bytes": 180285,
       "mode": "0644",
       "path": "scripts/naos_adoption_common.py",
-      "sha256": "bf6f2b8258bfce106d9b857a392519f73b9078250d04fd7972e75e8a3882a1a7"
+      "sha256": "1772270cbc3590072df0b7a33e007523c3c6638359bf56638617169abb6ce1d4"
     },
     {
       "bytes": 56656,
@@ -2763,10 +2769,10 @@
       "sha256": "354ec60f174940f2eaa7d5804b24969fcb2531c5b1be17207cf8c6e7f7fc555f"
     },
     {
-      "bytes": 49749,
+      "bytes": 49752,
       "mode": "0644",
       "path": "scripts/naos_mcp_config_registry.py",
-      "sha256": "af4841b52e0201b97427c65a479cfb611f509fe80a2ac728ca1ae8ac7a5e2005"
+      "sha256": "75e9c8e72d160f627d451319f228cea45519fb26a71786739850d620a496f0cb"
     },
     {
       "bytes": 470,
@@ -2805,10 +2811,10 @@
       "sha256": "96bab50783a6d87ff701af18ae8b82e88905bf9a5ba83ef2dcb0a412d51b6bd4"
     },
     {
-      "bytes": 51347,
-      "mode": "0644",
+      "bytes": 51388,
+      "mode": "0755",
       "path": "scripts/naos_model_provider_policy.py",
-      "sha256": "2c24772a1fefffd76d0fd9963ff9f563add0dd798eece53839bd77cf5e384d9d"
+      "sha256": "4369bfc3844780c5a38ea7c532164ea7e02b21d6a84f99a4f233da9ac0de02a6"
     },
     {
       "bytes": 36113,
@@ -2883,10 +2889,10 @@
       "sha256": "108b9a452dc208aaadba95084679168a7f80b3edac45bc9b97e43e98c97015ec"
     },
     {
-      "bytes": 16808,
-      "mode": "0644",
+      "bytes": 16905,
+      "mode": "0755",
       "path": "scripts/naos_pr_governance_summary.py",
-      "sha256": "2bf4738da8db8aa1d6e1a5043520e3ee846cb8a09fed94bfc975aa2793600f9f"
+      "sha256": "c12d1fba839325aef705f057974ffb68c1dd9d3c761acbb2a3998e1de0dcba2b"
     },
     {
       "bytes": 25302,
@@ -4925,8 +4931,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 14980655,
-  "source_file_count": 819,
+  "source_bytes": 14989563,
+  "source_file_count": 820,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "1910e7e3b881c62259468de04ac771467d6a1457b88ed20b794db9372dbb1857"
+  "tree_sha256": "6fbe374252606508db388229e533579809f012a1f8b457107af7c3fb44acedf2"
 }

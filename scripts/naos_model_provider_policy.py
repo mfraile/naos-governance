@@ -31,7 +31,6 @@ from naos_policy import (  # noqa: E402
     write_report,
 )
 
-
 REPORT_SCHEMA = "naos.model_provider_policy.v1"
 ALLOWED_PROVIDER_KINDS = {
     "declarative_only",
@@ -170,7 +169,7 @@ def safe_digest(path: Path) -> str | None:
 def load_yaml_mapping(path: Path) -> dict[str, Any]:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"Expected YAML mapping: {path}")
+        raise TypeError(f"Expected YAML mapping: {path}")
     return data
 
 
@@ -266,7 +265,7 @@ def collect_llm_grader_role_references(root: Path, naos_root: str) -> list[dict[
         return []
     try:
         data = load_yaml_mapping(path)
-    except Exception:
+    except (OSError, ValueError, TypeError, yaml.YAMLError, RecursionError):
         return []
     references: list[dict[str, Any]] = []
     for container_name in ("future_enablement", "model_policy"):
@@ -294,7 +293,7 @@ def collect_autoresearch_references(root: Path) -> tuple[list[dict[str, Any]], l
         return [], []
     try:
         data = load_yaml_mapping(path)
-    except Exception:
+    except (OSError, ValueError, TypeError, yaml.YAMLError, RecursionError):
         return [], []
     grading = as_mapping(data.get("grading"))
     provider_grader = as_mapping(grading.get("provider_grader"))
@@ -425,13 +424,15 @@ def local_url_is_public(value: Any) -> bool:
     lowered = value.strip().lower()
     if not lowered.startswith(("http://", "https://")):
         return False
-    return not (
-        lowered.startswith("http://localhost")
-        or lowered.startswith("https://localhost")
-        or lowered.startswith("http://127.0.0.1")
-        or lowered.startswith("https://127.0.0.1")
-        or lowered.startswith("http://[::1]")
-        or lowered.startswith("https://[::1]")
+    return not lowered.startswith(
+        (
+            "http://localhost",
+            "https://localhost",
+            "http://127.0.0.1",
+            "https://127.0.0.1",
+            "http://[::1]",
+            "https://[::1]",
+        )
     )
 
 

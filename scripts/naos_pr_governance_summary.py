@@ -26,7 +26,6 @@ from naos_policy import (  # noqa: E402
     write_report,
 )
 
-
 SCHEMA = "naos.pr_governance_summary.v1"
 REPORT_KEYS = {
     "gate_status": "gate_status_report",
@@ -97,7 +96,7 @@ def git_value(root: Path, *args: str) -> str | None:
             stderr=subprocess.DEVNULL,
             check=False,
         )
-    except Exception:
+    except (OSError, subprocess.SubprocessError, UnicodeError):
         return None
     value = result.stdout.strip()
     return value if result.returncode == 0 and value else None
@@ -117,7 +116,7 @@ def load_json(path: Path) -> tuple[dict[str, Any] | None, str | None]:
         return None, None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except (OSError, ValueError, RecursionError) as exc:
         return None, str(exc)
     return data if isinstance(data, dict) else {}, None
 
@@ -144,7 +143,7 @@ def github_event_value() -> str | None:
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError, RecursionError):
         return None
     pr = data.get("pull_request") if isinstance(data, dict) else None
     if isinstance(pr, dict) and pr.get("number") is not None:
