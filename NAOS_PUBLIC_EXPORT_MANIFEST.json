@@ -4323,10 +4323,10 @@
       "sha256": "249e28fd11001fb57c26bb7fb92bc9ff7ef6a5edc2c9a1a8f46b0e9ba54bee60"
     },
     {
-      "bytes": 15499,
+      "bytes": 15297,
       "mode": "0644",
       "path": "templates/structural-seeds/naos/adapter_propagation_state.yaml",
-      "sha256": "a76d09880b723961ea029efb1978c850216d5b179bc9913ea1ec52b10b153746"
+      "sha256": "f87afab2d201a9a5c1284e4bf3316e601c8384339e36140d5e6e8d8a86c2dc02"
     },
     {
       "bytes": 2545,
@@ -4925,8 +4925,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 14968205,
+  "source_bytes": 14968003,
   "source_file_count": 819,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "0781d45a60b4de4b7548984f457584c19f728715d01cd7c5abe6595ff10970f6"
+  "tree_sha256": "6efed9a67bba4b95350c9cd307de0f71f458008d860f039dbc1636594582bad1"
 }

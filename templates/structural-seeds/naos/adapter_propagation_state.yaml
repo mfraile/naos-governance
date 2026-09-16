@@ -95,13 +95,13 @@ propagation_reviews:
 
   - link_id: control_plane_evidence_to_plugins
     disposition: no_impact
-    reviewed_at: "2026-09-05T10:06:54Z"
-    reviewer: naos-maintainer-evidence-review
-    rationale: "The optional external-evidence ingest is a pre-existing-report consumer for `naos control-plane-review`: it emits one advisory prompt per preserved result, plus an assessment prompt only when no result record exists but execution or coverage needs review. The mapped evidence skills already run generic control-plane review and do not enumerate every optional report producer or require an external SARIF source, so no target edit is required. This review adds no scanner execution, raw-message retention, finding verification, vocabulary/control mapping, durable disposition, automatic task/writeback, gate decision, approval, blocking, merge, release, publication, certification, or compliance authority."
+    reviewed_at: "2026-09-16T11:23:10Z"
+    reviewer: independent-agent-technical-review
+    rationale: "Independent agent review of the task and evidence contract remediation confirmed that the mapped plugin commands and bounded evidence guidance remain applicable. Evidence export and dashboard now preserve explicit digest, root, scope and required-coverage dimensions; mapped guidance already distinguishes local digest verification from signature presence and does not claim authentication. This technical no-impact review does not supply human approval, disposition, release or publication authority."
     source_hashes:
       docs/CONTROL_PLANE.md: 742c7b24f8011317175fa972f5a0c6c3568e27abfa9f04b8c263ba23bd1c6e6a
-      scripts/naos_evidence_export.py: 14cf4777ac9e60b4c629a5959e3aecb1c58a3fd92aad63b44ab95d3f82346d86
-      scripts/workflows/generate_naos_dashboard.py: 8d410ca916771dc6117168c487339af4f63dd1064558d0e23767e97e82053bbc
+      scripts/naos_evidence_export.py: b64ded8319cfbdc88033514e272d73dda810564a081260530f3f94bb7141dea0
+      scripts/workflows/generate_naos_dashboard.py: 83b08279163f782da998819cc3861d4d90acc6891bdd24d381373d25f3e413af
     target_hashes:
       plugins/naos-governance/skills/naos-control-plane-evidence/SKILL.md: bce8d554e66737aaeca6f82fd29fa6469dfd4859d1b2098f6dfa53a609d11571
       plugins/naos-governance/references/adapter-coherence.md: 5da00c11ef497d21332636b775881ce5c5694e1b18268a127588820b640ed1cf
