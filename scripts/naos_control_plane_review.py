@@ -75,6 +75,14 @@ except ImportError:  # Absence is not applicable unless input/report evidence ex
     validate_aivss_verification_report = None
 
 
+try:
+    from naos_model_provider_policy import validate_report as validate_model_provider_report
+    from naos_model_telemetry_evidence import validate_report as validate_model_telemetry_report
+except ImportError:
+    validate_model_provider_report = None
+    validate_model_telemetry_report = None
+
+
 GOVERNANCE_SOURCE_TYPES = {
     "governance_surface_change",
     "systemic_impact_finding",
@@ -247,6 +255,13 @@ MODEL_PROVIDER_TARGETS = [
     "next_actions",
 ]
 MODEL_PROVIDER_REASON_ORDER = [
+    "model_provider_schema_invalid",
+    "model_provider_identity_mismatch",
+    "model_provider_source_stale",
+    "model_provider_content_mismatch",
+    "model_provider_consumer_unavailable",
+    "model_provider_report_missing",
+
     "missing_project_policy",
     "runtime_escalation",
     "literal_secret",
@@ -272,6 +287,9 @@ MODEL_PROVIDER_GATES = {
     "local_endpoint_exposure_review": ["G6"],
     "model_provider_review_required": ["G6"],
 }
+MODEL_PROVIDER_GATES.update({"model_provider_" + suffix: ["G2", "G6"] for suffix in
+    ("schema_invalid", "identity_mismatch", "source_stale", "content_mismatch", "consumer_unavailable", "report_missing")})
+
 MODEL_PROVIDER_NOT_CLAIMED = [
     "provider call",
     "local model call",
@@ -295,7 +313,7 @@ MODEL_PROVIDER_NOT_CLAIMED = [
     "publication authority",
 ]
 MODEL_PROVIDER_LIMITATIONS = [
-    "Model-provider reconciliation reads the local model-provider policy report only.",
+    "Model-provider reconciliation validates the local report against its canonical schema and current producer inputs.",
     "The route does not call providers, models, APIs, proxies, local servers, or memory tools.",
     "The route does not inspect, mutate, enable, disable, or configure MCP/Engram; memory/MCP posture remains governed by the dedicated memory commands and reports.",
     "The route does not validate credentials, recommend models, maintain provider catalogs, or route runtime calls.",
@@ -480,6 +498,13 @@ MODEL_TELEMETRY_TARGETS = [
     "next_actions",
 ]
 MODEL_TELEMETRY_REASON_ORDER = [
+    "model_telemetry_schema_invalid",
+    "model_telemetry_identity_mismatch",
+    "model_telemetry_source_stale",
+    "model_telemetry_content_mismatch",
+    "model_telemetry_consumer_unavailable",
+    "model_telemetry_report_missing",
+
     "telemetry_source_unreadable",
     "sensitive_payload_capture",
     "credential_capture",
@@ -515,6 +540,9 @@ MODEL_TELEMETRY_GATES = {
     "provider_runtime_authority_attempt": ["G6"],
     "model_telemetry_review_required": ["G6"],
 }
+MODEL_TELEMETRY_GATES.update({"model_telemetry_" + suffix: ["G2", "G6"] for suffix in
+    ("schema_invalid", "identity_mismatch", "source_stale", "content_mismatch", "consumer_unavailable", "report_missing")})
+
 MODEL_TELEMETRY_NOT_CLAIMED = [
     "LiteLLM integration",
     "provider gateway availability",
@@ -3086,7 +3114,19 @@ def build_model_provider_reconciliation(
         "schema": data.get("schema") if isinstance(data, dict) else None,
         "error": error,
     }
-    if not report.exists():
+    declaration_path = root / naos_root / str(policy.get("paths", {}).get("model_provider_policy") or "model_provider_policy.yaml")
+    declaration = {}
+    declaration_error = None
+    if declaration_path.is_file():
+        try:
+            declaration = yaml.safe_load(declaration_path.read_text(encoding="utf-8"))
+            if not isinstance(declaration, dict):
+                declaration_error = "Declaration must be a mapping"
+                declaration = {}
+        except (OSError, yaml.YAMLError) as exc:
+            declaration_error = str(exc)
+    report_expected = declaration_path.is_file() and (declaration_error is not None or bool(declaration.get("enabled", True)))
+    if not report.exists() and not report_expected:
         return [], [], {
             "status": "not_applicable",
             "summary": {
@@ -3104,8 +3144,24 @@ def build_model_provider_reconciliation(
         }
 
     report_status = str(data.get("status") or "") if isinstance(data, dict) else "parse_error"
-    report_findings = [item for item in data.get("findings") or [] if isinstance(item, dict)] if isinstance(data, dict) else []
+    raw_findings = data.get("findings") if isinstance(data, dict) else None
+    report_findings = [item for item in raw_findings if isinstance(item, dict)] if isinstance(raw_findings, list) else []
     reasons: set[str] = set()
+    validation_reasons: list[str] = []
+    validation_errors: list[str] = []
+    if not report.exists():
+        validation_reasons = ["report_missing"]
+        validation_errors = ["Declared model evidence has no report; run the model producer"]
+    elif validate_model_provider_report is None:
+        validation_reasons = ["consumer_unavailable"]
+        validation_errors = ["Canonical model report validator is unavailable"]
+    else:
+        validation_reasons, validation_errors = validate_model_provider_report(
+            report=data, root=root, profile=profile, naos_root=naos_root, policy=policy,
+        )
+    reasons.update("model_provider_" + reason for reason in validation_reasons)
+    source_report["validation_errors"] = validation_errors
+    source_report["validation_status"] = "unknown" if validation_reasons else "current"
     for report_finding in report_findings:
         append_model_provider_reason(reasons, model_provider_reason_code(report_finding.get("id")))
     if error or report_status in {"review_required", "blocked", "warning", "advisory", "not_configured"}:
@@ -3116,7 +3172,7 @@ def build_model_provider_reconciliation(
         return [], [], {
             "status": "pass",
             "summary": {
-                "report_present": True,
+                "report_present": report.exists(),
                 "findings_seen": len(report_findings),
                 "routes_generated": 0,
                 "human_review_required": 0,
@@ -3190,7 +3246,7 @@ def build_model_provider_reconciliation(
     return [decision], findings, {
         "status": status_from_counts(finding_counts(findings)) if findings else "review_required",
         "summary": {
-            "report_present": True,
+            "report_present": report.exists(),
             "findings_seen": len(report_findings),
             "routes_generated": 1,
             "human_review_required": 1,
@@ -3227,7 +3283,20 @@ def build_model_telemetry_reconciliation(
         "schema": data.get("schema") if isinstance(data, dict) else None,
         "error": error,
     }
-    if not report.exists():
+    declaration_path = root / naos_root / str(policy.get("paths", {}).get("model_telemetry_evidence") or "model_telemetry_evidence.yaml")
+    declaration = {}
+    declaration_error = None
+    if declaration_path.is_file():
+        try:
+            declaration = yaml.safe_load(declaration_path.read_text(encoding="utf-8"))
+            if not isinstance(declaration, dict):
+                declaration_error = "Declaration must be a mapping"
+                declaration = {}
+        except (OSError, yaml.YAMLError) as exc:
+            declaration_error = str(exc)
+    report_expected = declaration_path.is_file() and (declaration_error is not None or bool(declaration.get("enabled", False)))
+    report_expected = report_expected and (declaration_error is not None or bool(declaration.get("telemetry_declared")))
+    if not report.exists() and not report_expected:
         return [], [], {
             "status": "not_applicable",
             "summary": {
@@ -3245,8 +3314,24 @@ def build_model_telemetry_reconciliation(
         }
 
     report_status = str(data.get("status") or "") if isinstance(data, dict) else "parse_error"
-    report_findings = [item for item in data.get("findings") or [] if isinstance(item, dict)] if isinstance(data, dict) else []
+    raw_findings = data.get("findings") if isinstance(data, dict) else None
+    report_findings = [item for item in raw_findings if isinstance(item, dict)] if isinstance(raw_findings, list) else []
     reasons: set[str] = set()
+    validation_reasons: list[str] = []
+    validation_errors: list[str] = []
+    if not report.exists():
+        validation_reasons = ["report_missing"]
+        validation_errors = ["Declared model evidence has no report; run the model producer"]
+    elif validate_model_telemetry_report is None:
+        validation_reasons = ["consumer_unavailable"]
+        validation_errors = ["Canonical model report validator is unavailable"]
+    else:
+        validation_reasons, validation_errors = validate_model_telemetry_report(
+            report=data, root=root, profile=profile, naos_root=naos_root, policy=policy,
+        )
+    reasons.update("model_telemetry_" + reason for reason in validation_reasons)
+    source_report["validation_errors"] = validation_errors
+    source_report["validation_status"] = "unknown" if validation_reasons else "current"
     for report_finding in report_findings:
         append_model_telemetry_reason(reasons, model_telemetry_reason_code(report_finding))
     if error:
@@ -3259,7 +3344,7 @@ def build_model_telemetry_reconciliation(
         return [], [], {
             "status": "pass",
             "summary": {
-                "report_present": True,
+                "report_present": report.exists(),
                 "findings_seen": len(report_findings),
                 "routes_generated": 0,
                 "human_review_required": 0,
@@ -3327,7 +3412,7 @@ def build_model_telemetry_reconciliation(
     return [decision], findings, {
         "status": status_from_counts(finding_counts(findings)) if findings else "review_required",
         "summary": {
-            "report_present": True,
+            "report_present": report.exists(),
             "findings_seen": len(report_findings),
             "routes_generated": 1,
             "human_review_required": 1,

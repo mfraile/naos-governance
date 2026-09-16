@@ -51,7 +51,7 @@ from typing import Dict, List, Optional
 # Shared requirement-header parser (single source of truth across cascade scripts)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import spec_header  # noqa: E402
-from naos_task_lifecycle import is_task_delivered, normalize_task_states  # noqa: E402
+from naos_task_lifecycle import is_task_delivered, normalize_task_states, validate_task_artifact_identity  # noqa: E402
 
 NAOS_ROOT = Path(os.getenv("NAOS_ROOT", "naos"))
 
@@ -399,6 +399,11 @@ def main() -> int:
 
     # Load registry
     tasks = load_registry()
+    try:
+        validate_task_artifact_identity(Path.cwd(), str(NAOS_ROOT), {"tasks": tasks})
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
     if not tasks:
         print("❌ No tasks loaded from registry")
         return 1

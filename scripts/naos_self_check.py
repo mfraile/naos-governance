@@ -622,6 +622,8 @@ def build_report(
             and (Path(__file__).resolve().parent / "naos_aivss_arithmetic_verification.py").is_file()
             else []
         ),
+        run_json_script("naos_model_provider_policy.py", [], profile, policy, naos_root, policy_path),
+        run_json_script("naos_model_telemetry_evidence.py", [], profile, policy, naos_root, policy_path),
         run_json_script("naos_control_plane_review.py", [], profile, policy, naos_root, policy_path),
         run_json_script("naos_validate_claims.py", [], profile, policy, naos_root, policy_path),
         run_json_script("naos_validate_roadmap_crosswalk.py", [], profile, policy, naos_root, policy_path),

@@ -88,11 +88,11 @@ def load_trace_report_or_build(
     trace_report_path: Path,
     trace_file_path: Path,
 ) -> dict[str, Any] | None:
-    trace_report = load_json_report(trace_report_path)
-    if trace_report is not None:
-        return trace_report
+    # A cached report must not override current event bytes. Rebuild read-only
+    # whenever the source is available; imported report-only evidence remains
+    # usable with the grader's declared coverage limitations.
     if not trace_file_path.exists():
-        return None
+        return load_json_report(trace_report_path)
     return trace_validate.build_report(
         root=root,
         profile=profile,

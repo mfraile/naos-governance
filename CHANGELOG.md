@@ -2,6 +2,21 @@
 
 All notable public changes to NAOS are summarized here.
 
+## Unreleased candidate corrections - 2026-09-16
+
+- Preserve exact task ownership across lifecycle operations and revalidate
+  persisted decision records in composed traceability.
+- Validate indexed test and specification bytes together and run the full
+  AC-reference check in generated Standard and Assured CI.
+- Reject malformed gate inputs and unknown selectors with structured errors.
+- Validate attestation inputs, separate integrity from coverage and signatures,
+  and exclude configured signing outputs from their own evidence subjects.
+- Reconcile model reports with current sources and validate canonical trace
+  structure through the CLI and grading consumers.
+- Add portable connected regressions and
+  [compatibility guidance](docs/CONTRACT_REVALIDATION.md). These changes do not
+  change profile enforcement transitions or grant human decision authority.
+
 ## [1.1.0] Publication Candidate - 2026-09-04
 
 ### Added

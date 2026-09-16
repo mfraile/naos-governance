@@ -355,6 +355,13 @@ def main() -> None:
 
     registry = load_registry_document(REGISTRY_PATH)
     tasks = registry_tasks(registry, REGISTRY_PATH)
+    from naos_task_lifecycle import validate_task_artifact_identity
+
+    try:
+        validate_task_artifact_identity(PROJECT_ROOT, str(NAOS_ROOT), {"tasks": tasks})
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
     semantic_errors, semantic_warnings = validate_task_semantics(tasks)
     team_config_result = validate_team_config(registry)
     semantic_errors.extend(

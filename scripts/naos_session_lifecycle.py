@@ -45,10 +45,12 @@ from naos_session_identity import (  # noqa: E402
 )
 from naos_audit_log import write_audit_event  # noqa: E402
 from naos_task_lifecycle import (  # noqa: E402
-    extract_task_ids,
     normalize_task_id,
     normalize_task_states,
     resolve_task_record,
+    find_active_task_card,
+    find_task_compact,
+    task_card_identity,
 )
 
 
@@ -282,7 +284,10 @@ def discover_task_id(root: Path, naos_root: str, explicit_task: str | None) -> d
         for path in sorted(active_dir.glob("*.md")):
             if path.name.startswith("_") or "compact" in path.stem.lower():
                 continue
-            candidates.extend(extract_task_ids(path.name))
+            owners, errors = task_card_identity(path)
+            if errors:
+                raise ValueError(f"Task identity mismatch: {path.name}; {errors}.")
+            candidates.extend(sorted(owners))
 
     registry = task_registry_path(root, naos_root)
     if not candidates and registry.is_file():
@@ -331,28 +336,14 @@ def file_record(root: Path, path: Path | None, freshness_days: int, now: datetim
 
 
 def find_active_card(root: Path, naos_root: str, task_id: str | None) -> Path | None:
-    active_dir = root / naos_root / "active"
-    if not active_dir.is_dir():
-        return None
-    patterns = [f"{task_id}*.md"] if task_id else ["*.md"]
-    for pattern in patterns:
-        for path in sorted(active_dir.glob(pattern)):
-            if path.name.startswith("_") or "compact" in path.stem.lower():
-                continue
-            return path
-    return None
+    if task_id:
+        return find_active_task_card(root, naos_root, task_id)
+    discovered = discover_task_id(root, naos_root, None).get("task_id")
+    return find_active_task_card(root, naos_root, discovered) if discovered else None
 
 
 def find_compact(root: Path, naos_root: str, task_id: str | None) -> Path | None:
-    active_dir = root / naos_root / "active"
-    if not active_dir.is_dir():
-        return None
-    patterns = [f"{task_id}*_compact.md", f"{task_id}*compact*.md"] if task_id else ["*compact*.md"]
-    for pattern in patterns:
-        for path in sorted(active_dir.glob(pattern)):
-            if path.is_file():
-                return path
-    return None
+    return find_task_compact(root, naos_root, task_id) if task_id else None
 
 
 def summarize_active_card(root: Path, card_path: Path | None, freshness_days: int, now: datetime) -> dict[str, Any]:

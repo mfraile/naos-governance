@@ -74,6 +74,7 @@
         "external_evidence_ingest_report": {"type": "string"},
         "evidence_attestation_report": {"type": "string"},
         "evidence_verification_report": {"type": "string"},
+        "evidence_envelope_report": {"type": "string"},
         "evidence_conflict_detection_report": {"type": "string"},
         "evidence_attestation_rules": {"type": "string"},
         "evidence_review_attestations": {"type": "string"},

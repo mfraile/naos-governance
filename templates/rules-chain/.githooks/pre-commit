@@ -241,15 +241,13 @@ if [ "$NAOS_TIER" = "standard" ] || [ "$NAOS_TIER" = "assured" ]; then
   fi
 
   # Check 10c: Test-AC reference validator (test hallucination detection — A6)
-  # enforcement_level: soft (Standard) / hard (Assured)
-  # Cross-refs AC-/SCEN- ids in staged tests against specs/06-acceptance.md.
+  # enforcement_level: hard (Standard and Assured)
+  # Reads test and spec blobs from the same index snapshot; spec edits recheck tests.
   echo "  - Test-AC reference validator..."
-  if [ -f "scripts/validators/validate_test_ac_references.py" ]; then
-    if ! $PYTHON_CMD scripts/validators/validate_test_ac_references.py --staged; then
-      echo -e "${RED}[FAIL]${NC} Test references AC/SCEN ids that don't exist in specs/"
-      echo "  Run: python scripts/validators/validate_test_ac_references.py"
-      VIOLATIONS=$((VIOLATIONS + 1))
-    fi
+  if ! $PYTHON_CMD scripts/validators/validate_test_ac_references.py --staged; then
+    echo -e "${RED}[FAIL]${NC} Test-AC validation failed or its validator is unavailable"
+    echo "  Run: python scripts/validators/validate_test_ac_references.py"
+    VIOLATIONS=$((VIOLATIONS + 1))
   fi
 fi
 

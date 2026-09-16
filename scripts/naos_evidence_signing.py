@@ -32,6 +32,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from jsonschema import Draft202012Validator
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -41,6 +43,10 @@ from naos_policy import (  # noqa: E402
     exit_code_for_summary,
     finding_counts,
     is_kit_repository,
+    kit_root,
+    naos_root_path,
+    report_default_path,
+    safe_policy_path,
     load_policy,
     normalize_profile,
     report_output_path,
@@ -57,6 +63,7 @@ LIMITATIONS = [
     "Tamper-evidence detects post-hoc edits to covered artifacts; it is not a signature or proof of authorship.",
     "The compatibility-named identity_binding field contains best-effort Git-reported HEAD metadata only; it is not identity authentication, authorization, or non-repudiation.",
     "The compatibility-named signed field reports only whether signature entries are present; NAOS does not validate them.",
+    "Digest equality covers only declared subjects. Required coverage is reported separately from integrity and remains governed by evidence attestation.",
 ]
 NOT_CLAIMED = [
     "signature by NAOS",
@@ -88,11 +95,86 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def load_json(path: Path) -> dict[str, Any]:
+def load_json(path: Path) -> Any:
+    """Read JSON without collapsing malformed input into a missing report."""
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def input_finding(status: str, message: str, severity: str) -> dict[str, Any]:
+    return {"id": f"evidence_signing.{status}", "severity": severity,
+            "status": status, "message": message}
+
+
+def load_attestation(root: Path, naos_root: str, policy: dict[str, Any],
+                     severity: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]], str]:
+    path = attestation_path(root, naos_root, policy)
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+        data = load_json(path)
+    except FileNotFoundError:
+        return None, [input_finding("missing_attestation",
+            "No evidence attestation found; run `naos evidence-attestation` first.", severity)], "missing"
+    except (OSError, ValueError) as exc:
+        return None, [input_finding("invalid_attestation", f"Cannot read attestation JSON: {exc}", severity)], "invalid"
+    schema = load_json(kit_root() / "schemas" / "naos" / "evidence_attestation.schema.json")
+    errors = sorted((f"{'.'.join(map(str, error.absolute_path)) or '$'}: {error.message}"
+                     for error in Draft202012Validator(schema).iter_errors(data)))
+    if not errors:
+        seen: set[str] = set()
+        for item in data["artifact_manifest"]:
+            rel = item["path"]
+            candidate = Path(rel)
+            if (not rel.strip() or candidate.is_absolute() or "\\" in rel
+                    or any(part in {"", ".", ".."} for part in rel.split("/"))
+                    or not (root / candidate).resolve().is_relative_to(root.resolve())):
+                errors.append(f"Artifact path must identify a local project file: {rel!r}")
+            if rel in seen:
+                errors.append(f"Duplicate artifact subject: {rel}")
+            seen.add(rel)
+    if errors:
+        return None, [input_finding("invalid_attestation", "; ".join(errors), severity)], "invalid"
+    return data, [], "valid"
+
+
+def attestation_dimensions(att: dict[str, Any] | None, validation: str) -> dict[str, Any]:
+    if att is None:
+        return {"input_validation": validation, "digest_validation": "unavailable",
+                "manifest_root_validation": "unavailable", "scope_status": "unknown",
+                "artifacts_checked": 0, "artifacts_declared": 0, "attestation_status": None,
+                "required_coverage": {"status": "unknown", "missing_count": 0},
+                "attestation_human_review_required": True}
+    state = att["status"]
+    inactive = state in {"disabled", "not_configured"}
+    count = len(att["artifact_manifest"])
+    missing = len(att["missing_artifacts"])
+    return {"input_validation": "valid", "digest_validation": "not_applicable" if inactive or not count else "unavailable",
+            "manifest_root_validation": "not_applicable" if inactive else "not_recorded",
+            "scope_status": state if inactive else "covered" if count else "empty",
+            "artifacts_checked": 0, "artifacts_declared": count, "attestation_status": state,
+            "required_coverage": {"status": "not_applicable" if inactive else "missing" if missing else "complete",
+                                  "missing_count": missing},
+            "attestation_human_review_required": att["human_review_required"]}
+
+
+def coverage_findings(att: dict[str, Any], severity: str) -> list[dict[str, Any]]:
+    if att["status"] in {"disabled", "not_configured"} or not att["missing_artifacts"]:
+        return []
+    source_severities = [item["severity"] for item in att["findings"] if item.get("status") == "missing"]
+    if source_severities:
+        rank = {"none": 0, "advisory": 1, "warning": 2, "required": 3, "blocking": 4}
+        severity = max(source_severities, key=lambda value: rank[value])
+    return [input_finding("missing_required_coverage",
+        f"Attestation declares {len(att['missing_artifacts'])} missing required artifact(s); digest equality does not establish coverage.", severity)]
+
+
+def verification_status(summary: dict[str, int], dimensions: dict[str, Any]) -> str:
+    status = status_from_counts(summary)
+    if status != "pass":
+        return status
+    if dimensions["scope_status"] in {"empty", "disabled", "not_configured"}:
+        return dimensions["scope_status"]
+    if dimensions["manifest_root_validation"] == "not_recorded":
+        return "root_unavailable"
+    return status
 
 
 def manifest_root_digest(pairs: list[tuple[str, str]]) -> str:
@@ -102,14 +184,15 @@ def manifest_root_digest(pairs: list[tuple[str, str]]) -> str:
 
 
 def attestation_path(root: Path, naos_root: str, policy: dict[str, Any]) -> Path:
-    reports_dir = str((policy.get("paths") or {}).get("reports_dir") or "reports")
-    filename = str((policy.get("paths") or {}).get("evidence_attestation_report") or "evidence_attestation.json")
-    return root / naos_root / reports_dir / filename
+    return report_default_path(root, naos_root, policy, "evidence_attestation_report")
 
 
 def envelope_path(root: Path, naos_root: str, policy: dict[str, Any]) -> Path:
-    evidence_dir = str((policy.get("paths") or {}).get("evidence_dir") or "evidence")
-    return root / naos_root / evidence_dir / "evidence_envelope.json"
+    paths = policy.get("paths") or {}
+    return safe_policy_path(naos_root_path(root, naos_root),
+                            paths.get("evidence_dir") or "evidence",
+                            paths.get("evidence_envelope_report") or "evidence_envelope.json",
+                            field="evidence_envelope_report")
 
 
 def git_identity(root: Path) -> dict[str, Any]:
@@ -161,21 +244,22 @@ def git_identity(root: Path) -> dict[str, Any]:
 
 
 def collect_manifest(root: Path, attestation: dict[str, Any]) -> list[dict[str, Any]]:
-    """Recompute on-disk digests for the artifacts the attestation report covers."""
+    """Recompute validated subjects, retaining controlled read failures."""
     items: list[dict[str, Any]] = []
-    for entry in attestation.get("artifact_manifest") or []:
-        rel = str(entry.get("path") or "")
-        if not rel:
-            continue
+    for entry in attestation["artifact_manifest"]:
+        rel = entry["path"]
         abs_path = root / rel
-        recomputed = sha256_file(abs_path) if abs_path.is_file() else None
-        items.append({
-            "path": rel,
-            "recorded_digest": entry.get("digest"),
-            "recomputed_digest": recomputed,
-            "present": abs_path.is_file(),
-            "matches": bool(recomputed and recomputed == entry.get("digest")),
-        })
+        error = None
+        recomputed = None
+        try:
+            if abs_path.is_file():
+                recomputed = sha256_file(abs_path)
+        except OSError as exc:
+            error = str(exc)
+        items.append({"path": rel, "recorded_digest": entry["digest"],
+                      "recomputed_digest": recomputed, "present": abs_path.is_file(),
+                      "read_error": error,
+                      "matches": recomputed is not None and recomputed == entry["digest"]})
     return items
 
 
@@ -201,96 +285,112 @@ def base_report(schema: str, profile: str, naos_root: str, root: Path, status: s
 
 def emit(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> dict[str, Any]:
     severity = "advisory" if is_kit_repository(root, naos_root) else severity_for_profile(profile, policy)
-    findings: list[dict[str, Any]] = []
-    att = load_json(attestation_path(root, naos_root, policy))
-    if not att:
-        findings.append({"id": "evidence_signing.missing_attestation", "severity": severity,
-                         "status": "missing_attestation",
-                         "message": "No evidence_attestation report found; run `naos evidence-attestation` first to build the manifest."})
-        summary = finding_counts(findings)
-        return base_report(ENVELOPE_SCHEMA, profile, naos_root, root, status_from_counts(summary), summary, findings,
-                           envelope=None, identity_binding=git_identity(root), signed=False,
-                           signature_entries_present=False, signature_validation_performed=False,
-                           adopter_signing_required=False)
-    pairs = [(str(i.get("path")), str(i.get("digest"))) for i in att.get("artifact_manifest") or [] if i.get("digest")]
-    root_digest = att.get("manifest_root_digest") or manifest_root_digest(pairs)
-    payload = {
-        "schema": "naos.evidence_payload.v1",
-        "manifest_root_digest": root_digest,
-        "artifact_count": len(pairs),
-        "profile": profile,
-        "generated_at": utc_now_text(),
-        "naos_root": naos_root,
-    }
-    payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    envelope = {
-        "payloadType": PAYLOAD_TYPE,
-        "payload": base64.b64encode(payload_json.encode("utf-8")).decode("ascii"),
-        "signatures": [],  # optionally filled by an external signer; NAOS never signs
-    }
+    att, findings, validation = load_attestation(root, naos_root, policy, severity)
+    dimensions = attestation_dimensions(att, validation)
+    extra: dict[str, Any] = {"envelope": None, "identity_binding": git_identity(root), "signed": False,
+                            "signature_entries_present": False, "signature_validation_performed": False,
+                            "adopter_signing_required": False}
+    if att is not None:
+        findings.extend(coverage_findings(att, severity))
+        if dimensions["scope_status"] not in {"disabled", "not_configured"}:
+            pairs = [(item["path"], item["digest"]) for item in att["artifact_manifest"] if item["digest"]]
+            root_digest = att.get("manifest_root_digest") or manifest_root_digest(pairs)
+            payload = {"schema": "naos.evidence_payload.v1", "manifest_root_digest": root_digest,
+                       "artifact_count": len(pairs), "profile": profile,
+                       "generated_at": utc_now_text(), "naos_root": naos_root}
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            extra.update(payload=payload, envelope={"payloadType": PAYLOAD_TYPE,
+                         "payload": base64.b64encode(payload_json.encode("utf-8")).decode("ascii"),
+                         "signatures": []})
     summary = finding_counts(findings)
-    return base_report(ENVELOPE_SCHEMA, profile, naos_root, root, status_from_counts(summary), summary, findings,
-                       envelope=envelope, payload=payload, identity_binding=git_identity(root), signed=False,
-                       signature_entries_present=False, signature_validation_performed=False,
-                       adopter_signing_required=False)
+    # Emission prepares a payload; it performs neither digest nor root verification.
+    if dimensions["scope_status"] not in {"disabled", "not_configured"}:
+        dimensions["manifest_root_validation"] = "unavailable"
+    status = status_from_counts(summary)
+    if status == "pass" and dimensions["scope_status"] in {"empty", "disabled", "not_configured"}:
+        status = dimensions["scope_status"]
+    return base_report(ENVELOPE_SCHEMA, profile, naos_root, root, status, summary, findings, **dimensions, **extra)
 
 
 def verify(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> dict[str, Any]:
     severity = "advisory" if is_kit_repository(root, naos_root) else severity_for_profile(profile, policy)
-    findings: list[dict[str, Any]] = []
-    att = load_json(attestation_path(root, naos_root, policy))
-    if not att:
-        findings.append({"id": "evidence_signing.missing_attestation", "severity": severity,
-                         "status": "missing_attestation",
-                         "message": "No evidence_attestation report found; nothing to verify."})
-        summary = finding_counts(findings)
-        return base_report(VERIFY_SCHEMA, profile, naos_root, root, status_from_counts(summary), summary, findings,
-                           tamper_evident=False, signed=False, signature_entries_present=False,
-                           signature_validation_performed=False, identity_binding=git_identity(root))
-    manifest = collect_manifest(root, att)
-    mismatches = [m for m in manifest if m["present"] and not m["matches"]]
-    missing = [m for m in manifest if not m["present"]]
-    for m in mismatches:
-        findings.append({"id": f"evidence_signing.digest_mismatch.{m['path']}", "severity": severity,
-                         "status": "tamper_detected",
-                         "message": f"Artifact digest mismatch (possible post-hoc edit): {m['path']}.", "path": m["path"]})
-    for m in missing:
-        findings.append({"id": f"evidence_signing.missing_artifact.{m['path']}", "severity": "warning",
-                         "status": "missing_artifact",
-                         "message": f"Covered artifact is missing on disk: {m['path']}.", "path": m["path"]})
-    recomputed_pairs = [(m["path"], m["recomputed_digest"]) for m in manifest if m["recomputed_digest"]]
-    recomputed_root = manifest_root_digest(recomputed_pairs)
-    recorded_root = att.get("manifest_root_digest")
-    tamper_evident = bool(recorded_root) and recomputed_root == recorded_root and not mismatches
-    if recorded_root and recomputed_root != recorded_root:
-        findings.append({"id": "evidence_signing.root_mismatch", "severity": severity, "status": "tamper_detected",
-                         "message": "Recomputed manifest root does not match the recorded tamper-evidence root."})
-    env = load_json(envelope_path(root, naos_root, policy))
-    envelope_record = env.get("envelope")
-    raw_signatures = (
-        envelope_record.get("signatures")
-        if isinstance(envelope_record, dict)
-        else env.get("signatures")
-    )
-    if raw_signatures is not None and not isinstance(raw_signatures, list):
-        findings.append({
-            "id": "evidence_signing.invalid_signature_container",
-            "severity": severity,
-            "status": "invalid_signature_container",
-            "message": (
-                "Envelope signatures must be an array; the malformed value is ignored for "
-                "signature-entry presence and no signature validation is performed."
-            ),
-        })
-        signature_entries_present = False
-    else:
-        signature_entries_present = bool(raw_signatures)
+    att, findings, validation = load_attestation(root, naos_root, policy, severity)
+    dimensions = attestation_dimensions(att, validation)
+    extra: dict[str, Any] = {"tamper_evident": False, "signed": False,
+                            "signature_entries_present": False, "signature_validation_performed": False,
+                            "identity_binding": git_identity(root), "recorded_root": None, "recomputed_root": None}
+    if att is not None:
+        findings.extend(coverage_findings(att, severity))
+        if dimensions["scope_status"] not in {"disabled", "not_configured"}:
+            manifest = collect_manifest(root, att)
+            checked = [item for item in manifest if item["recomputed_digest"] is not None]
+            dimensions["artifacts_checked"] = len(checked)
+            for item in manifest:
+                if item["matches"]:
+                    continue
+                status = ("unreadable_artifact" if item["read_error"] else "missing_artifact" if not item["present"]
+                          else "digest_unavailable" if item["recorded_digest"] is None else "tamper_detected")
+                finding_name = "digest_mismatch" if status == "tamper_detected" else status
+                findings.append({"id": f"evidence_signing.{finding_name}.{item['path']}", "severity": severity,
+                                 "status": status, "path": item["path"],
+                                 "message": f"Cannot verify covered artifact ({status}): {item['path']}."})
+            if manifest:
+                if all(item["matches"] for item in manifest):
+                    dimensions["digest_validation"] = "valid"
+                elif any(item["recorded_digest"] and item["recomputed_digest"] and not item["matches"] for item in manifest):
+                    dimensions["digest_validation"] = "invalid"
+                else:
+                    dimensions["digest_validation"] = "unavailable"
+            recomputed_root = manifest_root_digest([(i["path"], i["recomputed_digest"]) for i in checked])
+            recorded_root = att.get("manifest_root_digest")
+            root_matches = recorded_root is not None and recomputed_root == recorded_root and len(checked) == len(manifest)
+            dimensions["manifest_root_validation"] = ("not_recorded" if recorded_root is None else "valid" if root_matches else "invalid")
+            if recorded_root is not None and not root_matches:
+                findings.append({"id": "evidence_signing.root_mismatch", "severity": severity,
+                                 "status": "tamper_detected", "message": "Recomputed manifest root does not match the recorded root."})
+            extra.update(tamper_evident=root_matches and all(i["matches"] for i in manifest),
+                         recorded_root=recorded_root, recomputed_root=recomputed_root)
+        try:
+            env = load_json(envelope_path(root, naos_root, policy))
+        except FileNotFoundError:
+            env = {}
+        except (OSError, ValueError) as exc:
+            env = {}
+            findings.append(input_finding("invalid_envelope", f"Cannot read envelope JSON: {exc}", severity))
+        if not isinstance(env, dict):
+            findings.append(input_finding("invalid_envelope", "Envelope input must be an object.", severity))
+        else:
+            envelope_record = env.get("envelope")
+            if "schema" in env:
+                schema = load_json(kit_root() / "schemas" / "naos" / "evidence_envelope.schema.json")
+                if any(Draft202012Validator(schema).iter_errors(env)):
+                    findings.append(input_finding("invalid_envelope", "Envelope report does not match the supported v1 schema.", severity))
+            elif (env and not isinstance(envelope_record, dict) and "signatures" not in env
+                  or "envelope" in env and not isinstance(envelope_record, dict)):
+                findings.append(input_finding("invalid_envelope", "Envelope input must contain a supported envelope or signatures array.", severity))
+            raw_signatures = envelope_record.get("signatures") if isinstance(envelope_record, dict) else env.get("signatures")
+            if raw_signatures is not None and not isinstance(raw_signatures, list):
+                findings.append(input_finding("invalid_signature_container", "Envelope signatures must be an array; no signature validation is performed.", severity))
+            else:
+                extra.update(signed=bool(raw_signatures), signature_entries_present=bool(raw_signatures))
     summary = finding_counts(findings)
-    return base_report(VERIFY_SCHEMA, profile, naos_root, root, status_from_counts(summary), summary, findings,
-                       tamper_evident=tamper_evident, recomputed_root=recomputed_root, recorded_root=recorded_root,
-                       artifacts_checked=len(manifest), signed=signature_entries_present,
-                       signature_entries_present=signature_entries_present, signature_validation_performed=False,
-                       identity_binding=git_identity(root))
+    return base_report(VERIFY_SCHEMA, profile, naos_root, root, verification_status(summary, dimensions),
+                       summary, findings, **dimensions, **extra)
+
+
+def output_overlaps_subjects(output: Path, root: Path, naos_root: str, policy: dict[str, Any]) -> bool:
+    """Do not overwrite covered evidence, including a caller-selected output."""
+    try:
+        att = load_json(attestation_path(root, naos_root, policy))
+    except (OSError, ValueError):
+        return output.resolve() == attestation_path(root, naos_root, policy).resolve()
+    if output.resolve() == attestation_path(root, naos_root, policy).resolve():
+        return True
+    entries = att.get("artifact_manifest") if isinstance(att, dict) else None
+    if not isinstance(entries, list):
+        return False
+    return any(isinstance(item, dict) and isinstance(item.get("path"), str)
+               and (root / item["path"]).resolve() == output.resolve() for item in entries)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -329,6 +429,12 @@ def main(argv: list[str] | None = None) -> int:
         output = envelope_path(root, naos_root, policy) if (root / naos_root).is_dir() and not is_kit_repository(root, naos_root) else None
     else:
         output = report_output_path(root, naos_root, policy, "evidence_verification_report")
+    if output is not None and output_overlaps_subjects(output, root, naos_root, policy):
+        report["findings"].append(input_finding("output_is_subject",
+            "Output would overwrite the attestation or a covered subject. Configure a separate output path before the next attestation, then regenerate the attestation.", "blocking"))
+        report["summary"] = finding_counts(report["findings"])
+        report["status"] = "blocked"
+        output = None
     write_report(output, report)
 
     if args.json:
@@ -349,6 +455,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         for item in report["findings"]:
             print(f"    [{item['severity']}] {item['status']}: {item['message']}")
+    if report["input_validation"] == "invalid" or any(i["status"] == "output_is_subject" for i in report["findings"]):
+        return 1
     return exit_code_for_summary(profile, report["summary"], policy, strict=args.strict)
 
 

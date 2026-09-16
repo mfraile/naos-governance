@@ -1435,7 +1435,9 @@ def summarize_evidence_conflicts(artifact: dict[str, Any]) -> dict[str, Any]:
 
 
 def summarize_evidence_verification(artifact: dict[str, Any]) -> dict[str, Any]:
-    data = artifact.get("data") or {}
+    data = artifact.get("data") if isinstance(artifact, dict) else {}
+    if not isinstance(data, dict):
+        data = {}
     raw_presence = data.get("signature_entries_present")
     legacy_signed = data.get("signed")
     signature_entries_present = (
@@ -1456,6 +1458,14 @@ def summarize_evidence_verification(artifact: dict[str, Any]) -> dict[str, Any]:
         "signature_validation_performed": False,
         "signature_validation_claim_rejected": signature_validation_claim_rejected,
         "artifacts_checked": data.get("artifacts_checked", 0),
+        "artifacts_declared": data.get("artifacts_declared"),
+        "input_validation": data.get("input_validation", "unknown"),
+        "digest_validation": data.get("digest_validation", "unknown"),
+        "manifest_root_validation": data.get("manifest_root_validation", "unknown"),
+        "scope_status": data.get("scope_status", "unknown"),
+        "required_coverage": data.get("required_coverage") or {"status": "unknown", "missing_count": 0},
+        "attestation_status": data.get("attestation_status"),
+        "attestation_human_review_required": data.get("attestation_human_review_required"),
         "identity_binding": data.get("identity_binding") or {},
         "findings": data.get("findings") or [],
         "human_review_required": bool(data.get("human_review_required")),
@@ -4291,7 +4301,7 @@ def render_control_plane_dashboard(control_plane: dict[str, Any] | None) -> list
                 "",
                 "> Evidence verification recomputes local artifact digests and the manifest root, then reports tamper-evidence, signature-entry presence, and best-effort Git HEAD metadata. It does not validate third-party signatures, authenticate identities, sign artifacts for NAOS, approve work, provide non-repudiation, certify controls, or prove compliance.",
                 "",
-                f"Status: `{_table_cell(evidence_verification.get('status'))}`; tamper-evident: `{_table_cell(evidence_verification.get('tamper_evident'))}`; signature entries present: `{_table_cell(evidence_verification.get('signature_entries_present'))}`; envelope signature validated by NAOS: `{_table_cell(evidence_verification.get('signature_validation_performed'))}`; invalid validation claim rejected: `{_table_cell(evidence_verification.get('signature_validation_claim_rejected'))}`; artifacts checked: `{_table_cell(evidence_verification.get('artifacts_checked'))}`; findings: `{_table_cell(verification_summary.get('total_findings'))}`; human review required: `{_table_cell(evidence_verification.get('human_review_required'))}`.",
+                f"Status: `{_table_cell(evidence_verification.get('status'))}`; tamper-evident: `{_table_cell(evidence_verification.get('tamper_evident'))}`; signature entries present: `{_table_cell(evidence_verification.get('signature_entries_present'))}`; envelope signature validated by NAOS: `{_table_cell(evidence_verification.get('signature_validation_performed'))}`; invalid validation claim rejected: `{_table_cell(evidence_verification.get('signature_validation_claim_rejected'))}`; artifacts checked: `{_table_cell(evidence_verification.get('artifacts_checked'))}`; digest result: `{_table_cell(evidence_verification.get('digest_validation'))}`; root result: `{_table_cell(evidence_verification.get('manifest_root_validation'))}`; scope: `{_table_cell(evidence_verification.get('scope_status'))}`; required coverage: `{_table_cell((evidence_verification.get('required_coverage') or {}).get('status'))}`; findings: `{_table_cell(verification_summary.get('total_findings'))}`; human review required: `{_table_cell(evidence_verification.get('human_review_required'))}`.",
                 "",
                 f"Git HEAD metadata (not identity authentication): signature status `{_table_cell(identity.get('signature_status'))}`; signer `{_table_cell(identity.get('signer'))}`; commit `{_table_cell(identity.get('commit'))}`.",
             ]

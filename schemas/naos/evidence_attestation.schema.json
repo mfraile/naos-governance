@@ -50,7 +50,7 @@
     "naos_root": {"type": "string"},
     "project_root": {"type": "string"},
     "digest_algorithm": {"type": "string", "enum": ["sha256"]},
-    "manifest_root_digest": {"type": "string"},
+    "manifest_root_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "rules": {"type": "object"},
     "review_metadata": {"type": "object"},
     "summary": {"type": "object"},
@@ -106,10 +106,10 @@
       "additionalProperties": true,
       "required": ["path", "status", "digest", "size_bytes"],
       "properties": {
-        "path": {"type": "string"},
+        "path": {"type": "string", "minLength": 1},
         "artifact_group": {"type": "string"},
         "status": {"type": "string"},
-        "digest": {"type": ["string", "null"]},
+        "digest": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
         "size_bytes": {"type": ["integer", "null"]},
         "modified_time": {"type": ["string", "null"]},
         "freshness": {"type": "object"}
@@ -120,7 +120,7 @@
       "additionalProperties": true,
       "required": ["path", "artifact_group", "status"],
       "properties": {
-        "path": {"type": "string"},
+        "path": {"type": "string", "minLength": 1},
         "artifact_group": {"type": "string"},
         "status": {"type": "string"}
       }

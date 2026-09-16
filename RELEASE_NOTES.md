@@ -6,6 +6,11 @@ and green hosted CI are not a publication event or release authorization.
 Public visibility, a tag, a GitHub release, and package upload remain separately
 gated.
 
+The unreleased candidate corrections to task identity, staged Git checks,
+gate inputs, attestations, report freshness, and trace validation are described
+in [contract and migration guidance](docs/CONTRACT_REVALIDATION.md). The package
+version remains 1.1.0 while this candidate is reviewed.
+
 ## Changes Since the 1.0.0 Candidate
 
 After the historical 1.0.0 public release-candidate notes were written, NAOS added

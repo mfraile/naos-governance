@@ -11,9 +11,11 @@ import sys
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
+from functools import lru_cache
 from typing import Any
 
 import yaml
+from jsonschema import Draft202012Validator, FormatChecker
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -24,6 +26,7 @@ from naos_policy import (  # noqa: E402
     exit_code_for_summary,
     finding_counts,
     load_policy,
+    kit_root,
     normalize_profile,
     report_output_path,
     severity_for_profile,
@@ -227,15 +230,19 @@ def trace_default_path(root: Path, naos_root: str, policy: dict[str, Any]) -> Pa
 
 def load_trace_events(trace_file: Path) -> tuple[list[dict[str, Any]], str | None]:
     try:
-        data = yaml.safe_load(trace_file.read_text(encoding="utf-8")) or {}
+        data = yaml.safe_load(trace_file.read_text(encoding="utf-8"))
     except Exception as exc:
         return [], str(exc)
+    if data is None:
+        data = {}
     if isinstance(data, list):
         raw_events = data
     elif isinstance(data, dict):
-        raw_events = data.get("events") or []
+        raw_events = data.get("events", [])
     else:
         return [], "trace file must be a mapping with events or a list of events"
+    if not isinstance(raw_events, list):
+        return [], "events must be a list"
     events = [item for item in raw_events if isinstance(item, dict)]
     if len(events) != len(raw_events):
         return events, "trace file contains non-mapping event entries"
@@ -340,47 +347,20 @@ def validate_action_receipt_shape(receipt: Any) -> list[str]:
     return errors
 
 
-def validate_schema_shape(event: dict[str, Any]) -> list[str]:
-    errors: list[str] = []
-    unknown_fields = sorted(set(event) - ALLOWED_EVENT_FIELDS)
-    errors.extend(f"unknown field: {field}" for field in unknown_fields)
-    missing = sorted(field for field in REQUIRED_EVENT_FIELDS if field not in event or event.get(field) in (None, ""))
-    errors.extend(f"missing required field: {field}" for field in missing)
+@lru_cache(maxsize=1)
+def canonical_event_validator() -> Draft202012Validator:
+    # Installed package resources are authoritative; an adopter-local schema copy
+    # must not silently relax the contract used by CLI validation and grading.
+    schema = json.loads((kit_root() / EVENT_SCHEMA_PATH).read_text(encoding="utf-8"))
+    return Draft202012Validator(schema, format_checker=FormatChecker())
 
-    if event.get("generated_at") and not parse_datetime(event.get("generated_at")):
-        errors.append("generated_at must be an ISO 8601 date-time")
-    if event.get("reviewed_at") and not parse_datetime(event.get("reviewed_at")):
-        errors.append("reviewed_at must be an ISO 8601 date-time when present")
-    if event.get("lifecycle_phase") and event.get("lifecycle_phase") not in LIFECYCLE_PHASES:
-        errors.append(f"lifecycle_phase must be one of {sorted(LIFECYCLE_PHASES)}")
-    if event.get("action_type") and event.get("action_type") not in ACTION_TYPES:
-        errors.append(f"action_type must be one of {sorted(ACTION_TYPES)}")
-    if event.get("authority_layer") and event.get("authority_layer") not in AUTHORITY_LAYERS:
-        errors.append(f"authority_layer must be one of {sorted(AUTHORITY_LAYERS)}")
-    if event.get("trace_origin") and event.get("trace_origin") not in TRACE_ORIGINS:
-        errors.append(f"trace_origin must be one of {sorted(TRACE_ORIGINS)}")
-    if event.get("trace_status") and event.get("trace_status") not in TRACE_STATUS_VALUES:
-        errors.append(f"trace_status must be one of {sorted(TRACE_STATUS_VALUES)}")
-    if event.get("review_status") and event.get("review_status") not in REVIEW_STATUS_VALUES:
-        errors.append(f"review_status must be one of {sorted(REVIEW_STATUS_VALUES)}")
-    if "human_review_required" in event and not isinstance(event.get("human_review_required"), bool):
-        errors.append("human_review_required must be boolean")
-    if event.get("confidence") is not None:
-        confidence = event.get("confidence")
-        if not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
-            errors.append("confidence must be a number between 0 and 1")
-    for field in STRING_LIST_FIELDS | {"limitations", "not_claimed"}:
-        if field in event:
-            value = event.get(field)
-            if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
-                errors.append(f"{field} must be a list of strings")
-    for field in {"limitations", "not_claimed"}:
-        if field in event and isinstance(event.get(field), list) and not event.get(field):
-            errors.append(f"{field} must not be empty")
-    if "source_hashes" in event and not isinstance(event.get("source_hashes"), dict):
-        errors.append("source_hashes must be a mapping of source reference to digest")
-    errors.extend(validate_action_receipt_shape(event.get("action_receipt")))
-    return errors
+
+def validate_schema_shape(event: Any) -> list[str]:
+    try:
+        errors = canonical_event_validator().iter_errors(event)
+        return sorted(f"{error.json_path}: {error.message}" for error in errors)
+    except (OSError, ValueError) as exc:
+        return [f"Canonical event schema unavailable: {exc}"]
 
 
 def path_outside_project(value: str) -> bool:
@@ -503,6 +483,17 @@ def validate_event(event: dict[str, Any], profile: str, policy: dict[str, Any]) 
             )
         )
 
+    if schema_errors:
+        # Keep independent semantic findings for usable fields, while preventing
+        # malformed collection/receipt values from reaching typed operations.
+        event = dict(event)
+        for field in STRING_LIST_FIELDS | {"limitations", "not_claimed"}:
+            value = event.get(field)
+            if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+                event[field] = []
+        if any(error.startswith("$.action_receipt") for error in schema_errors):
+            event.pop("action_receipt", None)
+
     phase = str(event.get("lifecycle_phase") or "unknown")
     if phase in TASK_CONTEXT_PHASES and not event.get("task_id"):
         findings.append(
@@ -550,25 +541,26 @@ def validate_event(event: dict[str, Any], profile: str, policy: dict[str, Any]) 
             )
         )
 
-    # AC-AUTONOMY-BOUNDARY-01 (indirect): advisory/record-only authority must not perform a
-    # mutating action in place of deterministic controls or human approval. Deterministic
-    # check over declared trace fields — not a runtime sandbox proof.
+    # AC-AUTONOMY-BOUNDARY-01 (indirect): a declared mutating record needs
+    # deterministic controls or a recorded review obligation/review disposition.
+    # This is a record-completeness check, not completed approval before action.
+    # Action receipts separately check declared approval status when required.
     authority = str(event.get("authority_layer") or "")
     action = str(event.get("action_type") or "")
     mutating = action in {"write", "generate"} or bool(event.get("files_modified"))
     non_authoritative = authority in {"record_only", "advisory_complementary"}
     has_deterministic_controls = bool(event.get("deterministic_controls_used"))
-    human_reviewed = event.get("human_review_required") is True or str(event.get("review_status") or "") == "reviewed"
-    if mutating and non_authoritative and not has_deterministic_controls and not human_reviewed:
+    review_boundary_recorded = event.get("human_review_required") is True or event.get("review_status") == "reviewed"
+    if mutating and non_authoritative and not has_deterministic_controls and not review_boundary_recorded:
         findings.append(
             finding(
                 event_id=event_id,
                 severity=severity,
                 status="autonomy_boundary_violation",
                 message=(
-                    "Advisory/record-only authority performed a mutating action without deterministic "
-                    "controls or human review; model judgement must not replace deterministic controls "
-                    "or human approval (AC-AUTONOMY-BOUNDARY-01)."
+                    "Advisory/record-only trace declares a mutating action without deterministic "
+                    "controls, a recorded human-review obligation, or a recorded reviewed disposition "
+                    "(AC-AUTONOMY-BOUNDARY-01). Recorded review requirements do not establish approval."
                 ),
                 field="authority_layer",
             )
@@ -702,34 +694,39 @@ def build_report(
 
     invalid_event_count = sum(1 for result in schema_results if not result["valid"])
     valid_event_count = len(schema_results) - invalid_event_count
+    summary_events = [event for event, result in zip(events, schema_results) if result["valid"]]
     forbidden_payload_findings = [item for item in findings if item.get("status") == "forbidden_payload_indicator"]
     output_without_source = sum(
         1
-        for event in events
+        for event in summary_events
         if (event.get("output_artifacts") or []) and not (event.get("source_references") or []) and not (event.get("source_hashes") or {})
     )
-    source_hash_count = sum(len(event.get("source_hashes") or {}) for event in events if isinstance(event.get("source_hashes"), dict))
+    source_hash_count = sum(len(event.get("source_hashes") or {}) for event in summary_events if isinstance(event.get("source_hashes"), dict))
     task_refs = unique_list(
-        [str(event.get("task_id")) for event in events if event.get("task_id")]
-        + [ref for event in events for ref in (event.get("referenced_tasks") or [])]
+        [str(event.get("task_id")) for event in summary_events if event.get("task_id")]
+        + [ref for event in summary_events for ref in (event.get("referenced_tasks") or [])]
     )
-    deterministic_controls = unique_list([item for event in events for item in (event.get("deterministic_controls_used") or [])])
-    advisory_controls = unique_list([item for event in events for item in (event.get("advisory_controls_used") or [])])
-    memory_refs = [item for event in events for item in (event.get("memory_refs") or [])]
-    action_receipt_events = sum(1 for event in events if isinstance(event.get("action_receipt"), dict))
+    deterministic_controls = unique_list([item for event in summary_events for item in (event.get("deterministic_controls_used") or [])])
+    advisory_controls = unique_list([item for event in summary_events for item in (event.get("advisory_controls_used") or [])])
+    memory_refs = [item for event in summary_events for item in (event.get("memory_refs") or [])]
+    action_receipt_events = sum(1 for event in summary_events if isinstance(event.get("action_receipt"), dict))
     summary = finding_counts(findings)
     summary.update(
         {
             "events": len(events),
             "valid_events": valid_event_count,
             "invalid_events": invalid_event_count,
+            "trace_file_errors": int(load_error is not None),
+            "review_status_counts": count_values(events, "review_status", "not_reviewed"),
             "forbidden_payload_findings": len(forbidden_payload_findings),
-            "memory_ref_events": sum(1 for event in events if event.get("memory_refs")),
+            "memory_ref_events": sum(1 for event in summary_events if event.get("memory_refs")),
             "action_receipt_events": action_receipt_events,
         }
     )
     if not trace_file_present:
         status = "not_configured"
+    elif load_error:
+        status = "invalid_trace_events"
     elif not events:
         status = "no_events"
     elif invalid_event_count:
@@ -759,14 +756,14 @@ def build_report(
         "agent_surface_counts": count_values(events, "agent_or_surface", "unknown"),
         "task_refs": task_refs,
         "source_reference_summary": {
-            "source_references": sum(len(event.get("source_references") or []) for event in events),
+            "source_references": sum(len(event.get("source_references") or []) for event in summary_events),
             "source_hashes": source_hash_count,
             "events_with_output_without_source_refs": output_without_source,
         },
         "deterministic_controls_used": deterministic_controls,
         "advisory_controls_used": advisory_controls,
         "memory_reference_summary": {
-            "events_with_memory_refs": sum(1 for event in events if event.get("memory_refs")),
+            "events_with_memory_refs": sum(1 for event in summary_events if event.get("memory_refs")),
             "memory_refs": len(memory_refs),
             "advisory_only": True,
         },
@@ -786,7 +783,8 @@ def build_report(
             "Agent trace validation does not capture runtime events.",
             "Agent trace validation does not run commands listed in trace events.",
             "Agent trace validation does not call Engram, MCP, memory tools, models, providers, or external APIs.",
-            "Action receipts are declared metadata only; they do not enforce permissions or prove approval.",
+            "A recorded human-review obligation permits pending/rejected historical records; it does not establish completed review or approval.",
+            "Action receipts separately check declared approval status when approval is required; they do not enforce permissions or prove approval.",
             "Agent trace events are records, not proof, approval, evidence authority, memory writes, legal/compliance/regulatory assurance, or behavioral safety proof.",
         ],
         "not_claimed": [

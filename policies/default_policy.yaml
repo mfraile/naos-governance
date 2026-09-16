@@ -76,6 +76,7 @@ paths:
   external_evidence_ingest_report: external_evidence_ingest.json
   evidence_attestation_report: evidence_attestation.json
   evidence_verification_report: evidence_verification.json
+  evidence_envelope_report: evidence_envelope.json
   evidence_conflict_detection_report: evidence_conflict_detection.json
   evidence_attestation_rules: evidence_attestation_rules.yaml
   evidence_review_attestations: evidence_review_attestations.yaml

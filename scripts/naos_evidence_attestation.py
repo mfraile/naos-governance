@@ -31,6 +31,9 @@ from naos_policy import (  # noqa: E402
     load_policy,
     normalize_profile,
     report_output_path,
+    report_default_path,
+    naos_root_path,
+    safe_policy_path,
     severity_for_profile,
     write_report,
 )
@@ -178,11 +181,31 @@ def default_exclusions(policy: dict[str, Any]) -> list[str]:
     for item in ignored_scan_dirs(policy):
         patterns.append(f"{item}/**")
         patterns.append(f"**/{item}/**")
-    patterns.extend(["*.pyc", "**/*.pyc", ".DS_Store", "naos/reports/evidence_attestation.json"])
+    patterns.extend(["*.pyc", "**/*.pyc", ".DS_Store"])
     return dedupe(patterns)
 
 
-def find_matching_files(root: Path, patterns: list[str], excluded: list[str]) -> list[Path]:
+def generated_output_exclusions(root: Path, naos_root: str, policy: dict[str, Any],
+                                output_path: Path | None = None) -> list[str]:
+    """Derived outputs cannot be subjects, including under preserved legacy rules.
+
+    The evidence pack remains an independent configured snapshot; it is not
+    silently excluded. Explicitly requiring an excluded output remains missing.
+    """
+    paths = policy.get("paths") or {}
+    outputs = [report_default_path(root, naos_root, policy, "evidence_attestation_report"),
+               report_default_path(root, naos_root, policy, "evidence_verification_report"),
+               safe_policy_path(naos_root_path(root, naos_root), paths.get("evidence_dir") or "evidence",
+                                paths.get("evidence_envelope_report") or "evidence_envelope.json",
+                                field="evidence_envelope_report")]
+    if output_path is not None:
+        outputs.append(output_path)
+    return sorted({path.resolve().relative_to(root.resolve()).as_posix() for path in outputs
+                   if path.resolve().is_relative_to(root.resolve())})
+
+
+def find_matching_files(root: Path, patterns: list[str], excluded: list[str],
+                        excluded_exact: set[Path] | None = None) -> list[Path]:
     results: list[Path] = []
     for pattern in patterns:
         try:
@@ -191,7 +214,7 @@ def find_matching_files(root: Path, patterns: list[str], excluded: list[str]) ->
                 if not candidate.is_file():
                     continue
                 rel = candidate.relative_to(root).as_posix()
-                if matches_any(rel, excluded):
+                if candidate.resolve() in (excluded_exact or set()) or matches_any(rel, excluded):
                     continue
                 results.append(candidate)
         except (OSError, ValueError):
@@ -350,11 +373,15 @@ def collect_artifacts(
     rules: dict[str, Any],
     policy: dict[str, Any],
     generated_at: datetime,
+    naos_root: str = "naos",
+    output_path: Path | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     manifest_by_path: dict[str, dict[str, Any]] = {}
     missing: list[dict[str, Any]] = []
     disabled_groups: list[dict[str, Any]] = []
     base_exclusions = dedupe(default_exclusions(policy) + as_list(rules.get("excluded_paths")))
+    output_exclusions = {(root / path).resolve()
+                         for path in generated_output_exclusions(root, naos_root, policy, output_path)}
     default_window = int(rules.get("default_freshness_window_days") or 30)
 
     for group in rules.get("artifact_groups") or []:
@@ -371,7 +398,7 @@ def collect_artifacts(
             + as_list(group.get("required_artifacts"))
             + as_list(group.get("optional_artifacts"))
         )
-        matched = find_matching_files(root, patterns, group_exclusions)
+        matched = find_matching_files(root, patterns, group_exclusions, output_exclusions)
         for path in matched:
             rel = path.relative_to(root).as_posix()
             manifest_by_path[rel] = artifact_entry(
@@ -383,7 +410,7 @@ def collect_artifacts(
             )
 
         for pattern in as_list(group.get("required_artifacts")):
-            if not find_matching_files(root, [pattern], group_exclusions):
+            if not find_matching_files(root, [pattern], group_exclusions, output_exclusions):
                 missing.append(missing_entry(pattern, group_id, required=True))
 
     return (
@@ -422,6 +449,7 @@ def build_report(
     attestations_path: Path,
     attestations_source: str,
     generated_at: datetime | None = None,
+    output_path: Path | None = None,
 ) -> dict[str, Any]:
     generated_at = generated_at or controlled_now_utc()
     rules = load_yaml(rules_path)
@@ -466,6 +494,8 @@ def build_report(
         rules=rules,
         policy=policy,
         generated_at=generated_at,
+        naos_root=naos_root,
+        output_path=output_path,
     )
     stale_artifacts = [item for item in artifact_manifest if item.get("status") == "stale"]
     reviewed = reviewed_paths(attestations, artifact_manifest)
@@ -620,6 +650,7 @@ def build_report(
             "source": rules_source,
             "semantics": rules.get("semantics") or {},
             "excluded_paths": as_list(rules.get("excluded_paths")),
+            "generated_output_exclusions": generated_output_exclusions(root, naos_root, policy, output_path),
         },
         "review_metadata": {
             "path": str(attestations_path),
@@ -666,6 +697,7 @@ def main(argv: list[str] | None = None) -> int:
     rules_path, rules_source = resolve_rules_path(root, naos_root, policy, args.rules)
     attestations_path, attestations_source = resolve_attestations_path(root, naos_root, policy, args.attestations)
     generated_at = parse_datetime(args.generated_at) if args.generated_at else None
+    output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "evidence_attestation_report")
     report = build_report(
         root=root,
         profile=profile,
@@ -676,8 +708,8 @@ def main(argv: list[str] | None = None) -> int:
         attestations_path=attestations_path,
         attestations_source=attestations_source,
         generated_at=generated_at,
+        output_path=output,
     )
-    output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "evidence_attestation_report")
     write_report(output, report)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

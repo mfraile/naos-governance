@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, FormatChecker
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -429,36 +429,83 @@ def load_completed_history(root: Path, naos_root: str) -> tuple[dict[str, Any], 
         return {"schema": HISTORY_SCHEMA, "contract_version": 1, "records": []}, path
     data = load_yaml_mapping(path)
     if not isinstance(data.get("records"), list):
-        data["records"] = []
+        raise ValueError("Task identity history records must be an array.")
+    if data.get("schema", HISTORY_SCHEMA) != HISTORY_SCHEMA or data.get("contract_version", 1) != 1:
+        raise ValueError("Task identity history schema/version is unsupported.")
+    for record in data["records"]:
+        if not isinstance(record, dict) or not record.get("task_id"):
+            raise ValueError("Task identity history record requires an exact task_id.")
+        normalize_task_id(record["task_id"])
     return data, path
 
 
-def registry_task(registry: dict[str, Any], task_id: str) -> dict[str, Any] | None:
+def _unique_task_record(records: Any, key: str, task_id: str) -> dict[str, Any] | None:
     exact = normalize_task_id(task_id)
-    for item in as_list(registry.get("tasks")):
-        if not isinstance(item, dict) or not item.get("id"):
+    matches = []
+    for item in as_list(records):
+        if not isinstance(item, dict) or not item.get(key):
             continue
         try:
-            candidate = normalize_task_id(item.get("id"))
+            candidate = normalize_task_id(item[key])
         except ValueError:
             continue
         if candidate == exact:
-            return item
-    return None
+            matches.append(item)
+    if len(matches) > 1:
+        raise ValueError(f"Task identity ambiguous: duplicate {key} records for {exact}.")
+    return matches[0] if matches else None
+
+
+def registry_task(registry: dict[str, Any], task_id: str) -> dict[str, Any] | None:
+    return _unique_task_record(registry.get("tasks"), "id", task_id)
 
 
 def completed_history_record(history: dict[str, Any], task_id: str) -> dict[str, Any] | None:
-    exact = normalize_task_id(task_id)
-    for item in as_list(history.get("records")):
-        if not isinstance(item, dict) or not item.get("task_id"):
-            continue
+    return _unique_task_record(history.get("records"), "task_id", task_id)
+
+
+def task_card_identity(path: Path, text: str | None = None) -> tuple[set[str], list[str]]:
+    """Read ownership declarations only; related IDs and prose are not owners.
+
+    Historical cards may identify themselves by their filename alone, or by
+    their task heading/Task ID field when their filename has no task prefix.
+    Every ownership declaration that is present must agree.
+    """
+    owners: set[str] = set()
+    errors: list[str] = []
+    filename = TASK_ID_TEXT_PATTERN.match(path.stem)
+    if filename:
+        owners.add(normalize_task_id(filename.group()))
+    if text is None:
         try:
-            candidate = normalize_task_id(item.get("task_id"))
-        except ValueError:
-            continue
-        if candidate == exact:
-            return item
-    return None
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValueError(f"Task identity card cannot be read: {path.name}.") from exc
+    for line in text.splitlines():
+        value = None
+        if line.startswith("|"):
+            cells = [cell.strip().strip("*").strip() for cell in line.strip("|").split("|")]
+            if len(cells) >= 2 and cells[0].lower() == "task id":
+                value = cells[1].strip("` ")
+        elif re.match(r"^#\s+", line):
+            heading = re.sub(r"^#\s+(?:(?:Active|Completed)\s+Task:\s*)?", "", line, flags=re.IGNORECASE)
+            match = TASK_ID_TEXT_PATTERN.match(heading)
+            if match:
+                value = match.group()
+        if value is not None:
+            try:
+                owners.add(normalize_task_id(value))
+            except ValueError:
+                errors.append("invalid explicit Task ID")
+    if len(owners) > 1:
+        errors.append("inconsistent ownership declarations")
+    return owners, errors
+
+
+def require_task_card_identity(path: Path, task_id: str, text: str | None = None) -> None:
+    owners, errors = task_card_identity(path, text)
+    if errors or owners != {normalize_task_id(task_id)}:
+        raise ValueError(f"Task identity mismatch for {task_id}: {path.name}; {', '.join(errors) or 'owner differs or is absent'}.")
 
 
 def _matching_markdown(directory: Path, task_id: str) -> list[Path]:
@@ -469,21 +516,32 @@ def _matching_markdown(directory: Path, task_id: str) -> list[Path]:
     for path in sorted(directory.glob("*.md")):
         if path.name.startswith("_") or "compact" in path.stem.lower():
             continue
-        ids = extract_task_ids(path.name)
-        if exact in ids:
+        owners, errors = task_card_identity(path)
+        if exact in owners:
+            if errors:
+                raise ValueError(f"Task identity mismatch for {exact}: {path.name}; {', '.join(errors)}.")
             matches.append(path)
-            continue
-        try:
-            ids = extract_task_ids(path.read_text(encoding="utf-8", errors="replace"))
-        except OSError:
-            continue
-        if exact in ids:
-            matches.append(path)
+    if len(matches) > 1:
+        raise ValueError(f"Task identity ambiguous: multiple cards own {exact} in {directory.name}.")
     return matches
 
 
 def find_active_task_card(root: Path, naos_root: str, task_id: str) -> Path | None:
     matches = _matching_markdown(resolve_naos_root(root, naos_root) / "active", task_id)
+    return matches[0] if matches else None
+
+
+def find_task_compact(root: Path, naos_root: str, task_id: str) -> Path | None:
+    exact = normalize_task_id(task_id)
+    matches = []
+    for path in sorted((resolve_naos_root(root, naos_root) / "active").glob("*compact*.md")):
+        owners, errors = task_card_identity(path)
+        if exact in owners:
+            if errors:
+                raise ValueError(f"Task identity mismatch in compact context for {exact}: {path.name}.")
+            matches.append(path)
+    if len(matches) > 1:
+        raise ValueError(f"Task identity ambiguous: multiple compact records for {exact}.")
     return matches[0] if matches else None
 
 
@@ -493,12 +551,54 @@ def find_completed_task_card(
     task_id: str,
     history_record: dict[str, Any] | None = None,
 ) -> Path | None:
-    if history_record and history_record.get("completed_card_path"):
-        declared = resolve_portable_path(history_record["completed_card_path"], root, naos_root)
-        if declared is not None and declared.is_file():
-            return declared
     matches = _matching_markdown(resolve_naos_root(root, naos_root) / "completed", task_id)
+    declared = None
+    if history_record and history_record.get("completed_card_path"):
+        if normalize_task_id(history_record.get("task_id")) != normalize_task_id(task_id):
+            raise ValueError(f"Task identity mismatch in completed history for {task_id}.")
+        declared = resolve_portable_path(history_record["completed_card_path"], root, naos_root)
+        if declared is None:
+            raise ValueError(f"Task identity history path is invalid for {task_id}.")
+        # Validate the filename even when intentionally pruned; existing legacy
+        # cards without task-prefixed names are checked by their declarations.
+        filename = TASK_ID_TEXT_PATTERN.match(declared.stem)
+        if filename and normalize_task_id(filename.group()) != normalize_task_id(task_id):
+            raise ValueError(f"Task identity mismatch in history path for {task_id}.")
+        if declared.is_file():
+            require_task_card_identity(declared, task_id)
+            digest = history_record.get("active_record_digest")
+            if digest is not None:
+                if not isinstance(digest, dict) or digest.get("algorithm") != "sha256" or not re.fullmatch(r"[0-9a-f]{64}", str(digest.get("value") or "")):
+                    raise ValueError(f"Task identity archived card digest is malformed for {task_id}.")
+                if safe_digest_bytes(declared.read_bytes()) != digest["value"]:
+                    raise ValueError(f"Task identity archived card digest mismatch for {task_id}.")
+            if matches and declared.resolve() != matches[0].resolve():
+                raise ValueError(f"Task identity ambiguous: history and completed card disagree for {task_id}.")
+            return declared
+        if matches:
+            raise ValueError(f"Task identity mismatch: history points away from completed card for {task_id}.")
     return matches[0] if matches else None
+
+
+def validate_task_artifact_identity(root: Path, naos_root: str, registry: dict[str, Any] | None = None) -> None:
+    """Reject contradictory existing artifacts before derived status writes.
+
+    Legacy registries without cards/history remain supported. This check does
+    not manufacture missing historical completion evidence or approve work.
+    """
+    registry = registry if registry is not None else load_registry(root, naos_root)[0]
+    history = load_completed_history(root, naos_root)[0]
+    ids = {normalize_task_id(item["id"]) for item in as_list(registry.get("tasks"))
+           if isinstance(item, dict) and item.get("id")}
+    ids.update(normalize_task_id(item["task_id"]) for item in as_list(history.get("records"))
+               if isinstance(item, dict) and item.get("task_id"))
+    for task_id in sorted(ids):
+        registry_task(registry, task_id)
+        record = completed_history_record(history, task_id)
+        active = find_active_task_card(root, naos_root, task_id)
+        completed = find_completed_task_card(root, naos_root, task_id, record)
+        if active and (completed or record):
+            raise ValueError(f"Task identity inconsistent: {task_id} has both active and completed context.")
 
 
 def resolve_task_record(
@@ -516,6 +616,8 @@ def resolve_task_record(
     history_entry = completed_history_record(history, exact)
     active_card = find_active_task_card(root, naos_root, exact)
     completed_card = find_completed_task_card(root, naos_root, exact, history_entry)
+    if active_card and (completed_card or history_entry):
+        raise ValueError(f"Task identity inconsistent: {exact} has both active and completed context.")
     states = normalize_task_states(entry or history_entry) if entry or history_entry else {
         "lifecycle_state": "unknown",
         "delivery_state": "not_delivered",
@@ -689,13 +791,16 @@ def inspect_completion_reference(
 
     original = str(reference or "").strip()
     file_part, fragment = _reference_parts(original)
-    raw_path = Path(file_part) if file_part else Path()
-    traversal = ".." in raw_path.parts
+    portable_naos = file_part.startswith("naos_root:")
+    raw_path = Path(file_part.removeprefix("naos_root:")) if file_part else Path()
+    traversal = ".." in raw_path.parts or (portable_naos and raw_path.is_absolute())
     project_root = root.resolve(strict=False)
     sidecar_root = resolve_naos_root(root, naos_root)
     candidates: list[Path] = []
     if file_part:
-        if raw_path.is_absolute():
+        if portable_naos:
+            candidates.append(sidecar_root / raw_path)
+        elif raw_path.is_absolute():
             candidates.append(raw_path)
         else:
             candidates.extend([project_root / raw_path, sidecar_root / raw_path])
@@ -800,6 +905,76 @@ def portable_history_references(references: list[str], root: Path, naos_root: st
     return dedupe(portable)
 
 
+def validate_decision_record(
+    record: dict[str, Any] | None,
+    *,
+    task_id: str,
+    evidence_refs: set[str],
+    root: Path | None = None,
+    naos_root: str = "naos",
+    expected_decision_type: str | None = None,
+    expected_outcome: str | None = None,
+) -> dict[str, Any]:
+    """Apply one structural decision contract at admission and persisted reads.
+
+    Attribution records an identifiable declaration; only the caller's explicit
+    decision type/outcome establishes the corresponding structural authority.
+    This never authenticates the person or admits evidence by itself.
+    """
+    schema = json.loads((kit_root() / "schemas/naos/human_decision_record.schema.json").read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    schema_errors = (sorted(error.message for error in validator.iter_errors(record))
+                     if isinstance(record, dict) else ["Decision reference is not a readable mapping."])
+    record = record if isinstance(record, dict) else {}
+
+    def identities(references: set[str]) -> set[str]:
+        if root is None:
+            return references
+        result = set()
+        for reference in references:
+            receipt, path = inspect_completion_reference(reference, root=root, naos_root=naos_root)
+            if path is not None and not receipt["failures"]:
+                result.add(str(path.resolve()))
+        return result
+
+    record_evidence = identities(set(string_list(record.get("evidence_refs"))))
+    evidence_linked = bool(identities(evidence_refs) & record_evidence)
+    exact_subject = task_id in [str(item).strip() for item in as_list(record.get("subject_refs"))]
+    decided_by_valid = not _placeholder_value(record.get("decided_by"))
+    fields_present = all(str(record.get(field) or "").strip() for field in ("decided_at", "rationale", "authority_scope"))
+    decision_type = str(record.get("decision_type") or "")
+    outcome = str(record.get("outcome") or "")
+    failures = []
+    if schema_errors:
+        failures.append("schema_invalid")
+    if expected_decision_type is not None and decision_type != expected_decision_type:
+        failures.append(f"decision_type_not_{expected_decision_type}")
+    if expected_outcome is not None and outcome != expected_outcome:
+        failures.append(f"outcome_not_{expected_outcome}")
+    if not exact_subject:
+        failures.append("exact_task_subject_missing")
+    if not decided_by_valid:
+        failures.append("decided_by_missing_or_placeholder")
+    if not fields_present:
+        failures.append("decision_authority_fields_missing")
+    if not evidence_linked:
+        failures.append("completion_evidence_not_linked")
+    structural = not schema_errors and exact_subject and decided_by_valid and fields_present
+    return {
+        "schema_valid": not schema_errors,
+        "schema_errors": schema_errors,
+        "decision_type": decision_type or None,
+        "outcome": outcome or None,
+        "exact_task_subject": exact_subject,
+        "decided_by_non_placeholder": decided_by_valid,
+        "authority_fields_present": fields_present,
+        "evidence_linked": evidence_linked,
+        "structurally_attributable": structural,
+        "qualifies_for_verified_delivery": bool(structural and evidence_linked and decision_type == "task_delivery" and outcome == "approved"),
+        "authority_failures": failures,
+    }
+
+
 def validate_completion_verification(
     *,
     root: Path,
@@ -826,81 +1001,17 @@ def validate_completion_verification(
         for index, (receipt, _) in enumerate(pairs):
             failures.extend(f"{kind}_reference_{index}:{failure}" for failure in receipt["failures"])
 
-    schema_path = kit_root() / "schemas" / "naos" / "human_decision_record.schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    validator = Draft202012Validator(schema)
-    supplied_evidence = {
-        str(_receipt_path_identity(receipt))
-        for receipt, _ in evidence_pairs
-        if _receipt_path_identity(receipt) and not receipt.get("failures")
-    }
     decision_receipts: list[dict[str, Any]] = []
     qualifying_decisions = 0
     for index, (reference_receipt, path) in enumerate(decision_pairs):
-        record = _load_reference_mapping(path)
-        schema_errors = (
-            sorted(error.message for error in validator.iter_errors(record))
-            if isinstance(record, dict)
-            else ["Decision reference is not a readable mapping."]
+        decision = validate_decision_record(
+            _load_reference_mapping(path), task_id=task_id, evidence_refs=set(evidence_refs),
+            root=root, naos_root=naos_root,
+            expected_decision_type="task_delivery", expected_outcome="approved",
         )
-        schema_valid = not schema_errors
-        record_evidence: set[str] = set()
-        if isinstance(record, dict):
-            for evidence_ref in string_list(record.get("evidence_refs")):
-                evidence_receipt, _ = inspect_completion_reference(evidence_ref, root=root, naos_root=naos_root)
-                if _receipt_path_identity(evidence_receipt) and not evidence_receipt.get("failures"):
-                    record_evidence.add(str(_receipt_path_identity(evidence_receipt)))
-        exact_task_subject = bool(record) and task_id in [str(item).strip() for item in as_list(record.get("subject_refs"))]
-        decision_type = str((record or {}).get("decision_type") or "")
-        outcome = str((record or {}).get("outcome") or "")
-        decided_by_valid = not _placeholder_value((record or {}).get("decided_by"))
-        required_authority_fields = all(
-            str((record or {}).get(field) or "").strip()
-            for field in ("decided_at", "rationale", "authority_scope")
-        )
-        evidence_linked = bool(supplied_evidence.intersection(record_evidence))
-        structurally_attributable = bool(
-            schema_valid and exact_task_subject and decided_by_valid and required_authority_fields
-        )
-        qualifies = bool(
-            structurally_attributable
-            and decision_type == "task_delivery"
-            and outcome == "approved"
-            and evidence_linked
-        )
-        qualifying_decisions += int(qualifies)
-        authority_failures: list[str] = []
-        if not schema_valid:
-            authority_failures.append("schema_invalid")
-        if decision_type != "task_delivery":
-            authority_failures.append("decision_type_not_task_delivery")
-        if outcome != "approved":
-            authority_failures.append("outcome_not_approved")
-        if not exact_task_subject:
-            authority_failures.append("exact_task_subject_missing")
-        if not decided_by_valid:
-            authority_failures.append("decided_by_missing_or_placeholder")
-        if not required_authority_fields:
-            authority_failures.append("decision_authority_fields_missing")
-        if not evidence_linked:
-            authority_failures.append("completion_evidence_not_linked")
-        failures.extend(f"decision_reference_{index}:{failure}" for failure in authority_failures)
-        decision_receipts.append(
-            {
-                **reference_receipt,
-                "schema_valid": schema_valid,
-                "schema_errors": schema_errors,
-                "decision_type": decision_type or None,
-                "outcome": outcome or None,
-                "exact_task_subject": exact_task_subject,
-                "decided_by_non_placeholder": decided_by_valid,
-                "authority_fields_present": required_authority_fields,
-                "evidence_linked": evidence_linked,
-                "structurally_attributable": structurally_attributable,
-                "qualifies_for_verified_delivery": qualifies,
-                "authority_failures": authority_failures,
-            }
-        )
+        qualifying_decisions += int(decision["qualifies_for_verified_delivery"])
+        failures.extend(f"decision_reference_{index}:{failure}" for failure in decision["authority_failures"])
+        decision_receipts.append({**reference_receipt, **decision})
     if qualifying_decisions == 0:
         failures.append("no_qualifying_task_delivery_decision")
 
@@ -999,6 +1110,7 @@ def complete_task(
     registry_original = registry_path.read_bytes() if registry_path.is_file() else None
     history_original = history_path.read_bytes() if history_path.is_file() else None
     card_text = card_bytes.decode("utf-8", errors="replace")
+    require_task_card_identity(active_path, exact, card_text)
     refs = _reference_sets(card_text)
     requirement = entry.get("requirement")
     spec_refs = refs["spec_refs"] + ([f"specs/03-requirements.md#{str(requirement).lower()}"] if requirement else [])
@@ -1195,6 +1307,13 @@ def complete_task(
     if dry_run:
         return report
 
+    # Recheck the shared invariant at the transaction boundary; do not combine
+    # earlier context with a card/registry/history changed during validation.
+    validate_task_artifact_identity(root, naos_root)
+    if (active_path.read_bytes() != card_bytes
+            or (registry_path.read_bytes() if registry_path.is_file() else None) != registry_original
+            or (history_path.read_bytes() if history_path.is_file() else None) != history_original):
+        raise ValueError("Task identity inputs changed during completion; retry from fresh context.")
     completed_dir.mkdir(parents=True, exist_ok=True)
     completed_temp = completed_path.with_name(f".{completed_path.name}.naos-tmp")
     completed_temp.write_bytes(card_bytes)

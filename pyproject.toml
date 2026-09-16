@@ -112,6 +112,7 @@ naos_governance = [
     "KNOWN_LIMITATIONS.md",
     "docs/COMPLIANCE_MAPPING.md",
     "docs/CONTROL_PLANE.md",
+    "docs/CONTRACT_REVALIDATION.md",
     "docs/SECURE_CODING_CONTROL_MODEL.md",
     "docs/SECURE_CODING_P3_REPORTING.md",
     "docs/CLAIMS_AND_LIMITATIONS.md",

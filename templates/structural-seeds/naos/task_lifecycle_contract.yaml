@@ -5,6 +5,12 @@ identity:
   plain_pattern: '^T-[0-9]{3,}$'
   namespaced_pattern: '^(?:[A-Z0-9]+-)*T-[0-9]{3,}$'
   substring_extraction_forbidden: true
+  card_owner_declarations: [task_prefixed_filename, task_heading, task_id_field]
+  present_owner_declarations_must_agree: true
+  body_references_establish_ownership: false
+  duplicate_registry_history_or_card_owners_forbidden: true
+  existing_archived_card_must_match_history_identity_and_digest: true
+  pruned_archived_card_history_recovery_supported: true
 lifecycle_states:
   - unknown
   - planned

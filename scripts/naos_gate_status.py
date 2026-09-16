@@ -91,10 +91,47 @@ def load_manifest(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"Gatekeeper manifest not found: {path}")
     with path.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle) or {}
-    if not isinstance(data, dict):
-        raise ValueError(f"Gatekeeper manifest must be a mapping: {path}")
+        data = yaml.safe_load(handle)
+    validate_manifest(data)
     return data
+
+
+def validate_manifest(data: Any) -> None:
+    """Enforce the canonical manifest shape before evaluating any gate."""
+    from jsonschema import Draft202012Validator
+
+    schema = json.loads((kit_root() / "schemas/naos/gatekeeper.schema.json").read_text(encoding="utf-8"))
+    errors = sorted(Draft202012Validator(schema).iter_errors(data), key=lambda item: str(list(item.path)))
+    if errors:
+        detail = "; ".join(f"{'.'.join(map(str, item.path)) or '$'}: {item.message}" for item in errors)
+        raise ValueError(f"Invalid gatekeeper manifest: {detail}")
+    identifiers = [gate["id"] for gate in data["gates"]]
+    duplicate = sorted({identifier for identifier in identifiers if identifiers.count(identifier) > 1})
+    if duplicate:
+        raise ValueError(f"Duplicate gate identifiers: {', '.join(duplicate)}")
+
+
+def evaluation_scope(gates: list[dict[str, Any]]) -> dict[str, Any]:
+    status = "empty" if not gates else (
+        "not_applicable" if all(gate["status"] == "not_applicable" for gate in gates) else "evaluated"
+    )
+    return {"status": status, "selected_count": len(gates)}
+
+
+def emit_input_error(exc: Exception, *, output: str | None, json_output: bool) -> int:
+    error = {
+        "schema": "naos.gate_input_error.v1", "status": "invalid_input",
+        "errors": [str(exc)], "human_review_required": True,
+        "findings": [{"id": "gate_input_invalid", "status": "invalid_input",
+                      "severity": "error", "message": str(exc),
+                      "human_review_required": True}],
+    }
+    if output:
+        path = Path(output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(error, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(error, indent=2) if json_output else f"ERROR: {exc}")
+    return 2
 
 
 def normalize_profile(profile: str | None, policy: dict[str, Any] | None = None) -> str:
@@ -2378,9 +2415,8 @@ def evaluate_manifest(
     policy: dict[str, Any] | None = None,
     explicit_team_id: str | None = None,
 ) -> dict[str, Any]:
-    gates = manifest.get("gates") or []
-    if not isinstance(gates, list):
-        raise ValueError("Gatekeeper manifest field 'gates' must be a list")
+    validate_manifest(manifest)
+    gates = manifest["gates"]
 
     policy = policy or load_policy(naos_root=naos_root, root=Path.cwd())
     team_context, team_context_findings = resolve_team_context(
@@ -2432,6 +2468,7 @@ def evaluate_manifest(
     )
     return {
         "schema": "naos.gate_status.v1",
+        "evaluation_scope": evaluation_scope(gate_results),
         "profile": profile,
         "manifest": str(manifest_location.path),
         "manifest_source": manifest_location.source,
@@ -2583,8 +2620,7 @@ def main(argv: list[str] | None = None) -> int:
         manifest = load_manifest(location.path)
         report = evaluate_manifest(manifest, profile, location, args.naos_root, policy, explicit_team_id=args.team_id)
     except Exception as exc:  # pragma: no cover - defensive CLI boundary
-        print(f"ERROR: {exc}")
-        return 2
+        return emit_input_error(exc, output=args.output, json_output=args.json)
 
     output = None
     if args.output:

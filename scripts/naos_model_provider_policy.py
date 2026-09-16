@@ -1144,6 +1144,24 @@ def build_report(root: Path, naos_root: str, profile: str, governance_policy: di
     }
 
 
+def build_expected_report(*, root: Path, profile: str, naos_root: str, policy: dict[str, Any]) -> dict[str, Any]:
+    policy_path, policy_source = resolve_model_policy_path(root, naos_root, policy)
+    if not policy_path.is_file():
+        return missing_report(root, naos_root, profile, policy_path)
+    return build_report(root, naos_root, profile, policy, policy_path, policy_source)
+
+
+def validate_report(*, report: Any, root: Path, profile: str, naos_root: str, policy: dict[str, Any]) -> tuple[list[str], list[str]]:
+    try:
+        from naos_report_contracts import validate_current_report
+    except ImportError:
+        return ['consumer_unavailable'], ['Canonical report validation helper is unavailable; upgrade the installed scripts']
+    return validate_current_report(
+        report, schema_name='model_provider_policy', source_hash_field='policy_hash',
+        expected=lambda: build_expected_report(root=root, profile=profile, naos_root=naos_root, policy=policy),
+    )
+
+
 def missing_report(root: Path, naos_root: str, profile: str, policy_path: Path) -> dict[str, Any]:
     findings = [
         finding(

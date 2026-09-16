@@ -457,29 +457,16 @@ def records_from_parsed_source(parsed: Any, path: Path, root: Path) -> list[dict
     return records
 
 
-def load_declared_model_roles(root: Path, naos_root: str) -> tuple[set[str], list[str]]:
-    refs: list[str] = []
-    reports_path = root / naos_root / "reports" / "model_provider_policy.json"
-    if reports_path.is_file():
-        try:
-            data = json.loads(reports_path.read_text(encoding="utf-8"))
-            roles = {str(item.get("role")) for item in data.get("roles") or [] if isinstance(item, dict) and item.get("role")}
-            refs.append(relative_path(reports_path, root))
-            if roles:
-                return roles, refs
-        except Exception:
-            refs.append(relative_path(reports_path, root))
-    for path in (root / naos_root / "model_provider_policy.yaml", kit_root() / "templates" / "structural-seeds" / "naos" / "model_provider_policy.yaml"):
-        if path.is_file():
-            try:
-                data = load_yaml_mapping(path)
-                roles = set(as_mapping(data.get("roles")).keys())
-                refs.append(relative_path(path, root))
-                if roles:
-                    return {str(role) for role in roles}, refs
-            except Exception:
-                refs.append(relative_path(path, root))
-    return set(), refs
+def load_declared_model_roles(root: Path, naos_root: str, policy: dict[str, Any]) -> tuple[set[str], list[str]]:
+    # Role identity comes from the current configured declaration, never a cached
+    # report whose profile/source may differ. This also honours configured paths.
+    from naos_model_provider_policy import resolve_model_policy_path
+    path, _source = resolve_model_policy_path(root, naos_root, policy)
+    if not path.is_file():
+        return set(), []
+    data = load_yaml_mapping(path)
+    roles = {str(role) for role in as_mapping(data.get('roles'))}
+    return roles, [relative_path(path, root)]
 
 
 def record_id(record: dict[str, Any], index: int) -> str:
@@ -537,6 +524,7 @@ def review_records(
     root: Path,
     naos_root: str,
     declaration: dict[str, Any],
+    policy: dict[str, Any],
     records: list[dict[str, Any]],
     source_metas: list[dict[str, Any]],
     severity: str,
@@ -544,7 +532,7 @@ def review_records(
     findings: list[dict[str, Any]] = []
     sanitized: list[dict[str, Any]] = []
     evidence_refs: list[dict[str, Any]] = []
-    declared_roles, policy_refs = load_declared_model_roles(root, naos_root)
+    declared_roles, policy_refs = load_declared_model_roles(root, naos_root, policy)
     thresholds = as_mapping(declaration.get("thresholds"))
     cost_threshold = number_value(thresholds.get("cost_usd_review_threshold") or thresholds.get("max_cost_usd"))
     latency_threshold = number_value(thresholds.get("latency_ms_review_threshold") or thresholds.get("max_latency_ms"))
@@ -805,6 +793,7 @@ def build_report(
             root=root,
             naos_root=naos_root,
             declaration=declaration,
+            policy=policy,
             records=records,
             source_metas=source_metas,
             severity=severity,
@@ -892,6 +881,23 @@ def build_report(
         "generated_by": build_generated_by(root),
         "summary": summary,
     }
+
+
+def build_expected_report(*, root: Path, profile: str, naos_root: str, policy: dict[str, Any]) -> dict[str, Any]:
+    declaration_path, declaration_source = resolve_declaration_path(root, naos_root, policy)
+    return build_report(root=root, profile=profile, naos_root=naos_root, policy=policy,
+                        declaration_path=declaration_path, declaration_source=declaration_source)
+
+
+def validate_report(*, report: Any, root: Path, profile: str, naos_root: str, policy: dict[str, Any]) -> tuple[list[str], list[str]]:
+    try:
+        from naos_report_contracts import validate_current_report
+    except ImportError:
+        return ['consumer_unavailable'], ['Canonical report validation helper is unavailable; upgrade the installed scripts']
+    return validate_current_report(
+        report, schema_name='model_telemetry_evidence', source_hash_field='declaration_hash',
+        expected=lambda: build_expected_report(root=root, profile=profile, naos_root=naos_root, policy=policy),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
