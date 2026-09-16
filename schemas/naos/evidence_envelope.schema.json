@@ -45,6 +45,22 @@
       "description": "Compatibility-named best-effort Git HEAD metadata. Git may report signature status and signer text; NAOS applies no independent signature trust or acceptance policy and does not authenticate an identity.",
       "additionalProperties": true
     },
+    "input_validation": {"enum": ["valid", "invalid", "missing"]},
+    "digest_validation": {"enum": ["valid", "invalid", "unavailable", "not_applicable"]},
+    "manifest_root_validation": {"enum": ["valid", "invalid", "unavailable", "not_applicable", "not_recorded"]},
+    "scope_status": {"enum": ["covered", "empty", "disabled", "not_configured", "unknown"]},
+    "artifacts_declared": {"type": "integer", "minimum": 0},
+    "attestation_status": {"type": ["string", "null"]},
+    "attestation_human_review_required": {"type": "boolean"},
+    "required_coverage": {
+      "type": "object",
+      "required": ["status", "missing_count"],
+      "properties": {
+        "status": {"enum": ["complete", "missing", "not_applicable", "unknown"]},
+        "missing_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "artifacts_checked": {"type": "integer", "minimum": 0},
     "signed": {
       "type": "boolean",
       "description": "Compatibility field indicating only whether signature entries are present; it is not a signature-validation result."

@@ -112,6 +112,7 @@ naos_governance = [
     "KNOWN_LIMITATIONS.md",
     "docs/COMPLIANCE_MAPPING.md",
     "docs/CONTROL_PLANE.md",
+    "docs/CONTRACT_REVALIDATION.md",
     "docs/SECURE_CODING_CONTROL_MODEL.md",
     "docs/SECURE_CODING_P3_REPORTING.md",
     "docs/CLAIMS_AND_LIMITATIONS.md",
@@ -141,3 +142,8 @@ naos_governance = [
     "schemas/naos/public_export_manifest.schema.json",
     "scripts/naos_public_export.py",
 ]
+
+[tool.ruff.lint]
+# CLI modules intentionally bootstrap their sibling imports; keep E402 and
+# its existing targeted noqa directives checked together.
+extend-select = ["E402"]

@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -35,6 +37,9 @@ jobs:
 
       - name: Run NAOS control-plane readiness chain
         run: |
+          case "$NAOS_PROFILE" in
+            standard|assured) python scripts/validators/validate_test_ac_references.py ;;
+          esac
           naos claims --profile "$NAOS_PROFILE"
           naos setup-recommendations --profile "$NAOS_PROFILE"
           naos governance-bypass-posture --profile "$NAOS_PROFILE"
@@ -53,6 +58,8 @@ jobs:
           naos spec-pack-materialize . --profile "$NAOS_PROFILE" --dry-run
           naos spec-assembly-worksheet . --profile "$NAOS_PROFILE"
           naos spec-cascade --profile "$NAOS_PROFILE"
+          naos model-policy --profile "$NAOS_PROFILE"
+          naos model-telemetry --profile "$NAOS_PROFILE"
           naos control-plane-review --profile "$NAOS_PROFILE"
           naos ai-surface-budget --profile "$NAOS_PROFILE"
           naos self-check --profile "$NAOS_PROFILE"

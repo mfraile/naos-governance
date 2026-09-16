@@ -40,6 +40,7 @@ from naos_task_lifecycle import (  # noqa: E402
     extract_task_ids,
     normalize_task_id,
     resolve_task_record,
+    find_task_compact,
 )
 
 
@@ -292,15 +293,7 @@ def find_task_card(root: Path, naos_root: str, task_id: str) -> Path | None:
 
 
 def compact_path_for(root: Path, naos_root: str, task_id: str) -> Path | None:
-    active_dir = root / naos_root / "active"
-    if not active_dir.is_dir():
-        return None
-    for path in sorted(active_dir.glob(f"{task_id.upper()}*_compact.md")):
-        return path
-    for path in sorted(active_dir.glob("*compact.md")):
-        if task_id.upper() in path.name.upper():
-            return path
-    return None
+    return find_task_compact(root, naos_root, task_id)
 
 
 def parse_task_card(path: Path | None, max_chars: int, max_items: int) -> dict[str, Any]:

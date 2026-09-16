@@ -24,6 +24,8 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from naos_gate_status import (  # noqa: E402
     evaluate_manifest,
+    evaluation_scope,
+    emit_input_error,
     load_manifest,
     normalize_profile,
     print_text,
@@ -51,6 +53,9 @@ def filter_gates(report: dict, selected: list[str] | None) -> dict:
     if not selected:
         return report
     wanted = {gate.upper() for gate in selected}
+    unknown = wanted - {gate["id"] for gate in report["gates"]}
+    if unknown:
+        raise ValueError(f"Unknown selected gate identifiers: {', '.join(sorted(unknown))}")
     gates = [gate for gate in report["gates"] if gate["id"] in wanted]
     summary = {
         "ready": sum(1 for gate in gates if gate["status"] == "ready"),
@@ -64,6 +69,7 @@ def filter_gates(report: dict, selected: list[str] | None) -> dict:
     filtered = dict(report)
     filtered["summary"] = summary
     filtered["gates"] = gates
+    filtered["evaluation_scope"] = evaluation_scope(gates)
     filtered["selected_gates"] = sorted(wanted)
     return filtered
 
@@ -80,8 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         report = evaluate_manifest(manifest, profile, location, args.naos_root, policy, explicit_team_id=args.team_id)
         report = filter_gates(report, args.gate)
     except Exception as exc:  # pragma: no cover - defensive CLI boundary
-        print(f"ERROR: {exc}")
-        return 2
+        return emit_input_error(exc, output=args.output, json_output=args.json)
 
     if args.output:
         output = Path(args.output)

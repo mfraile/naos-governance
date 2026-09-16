@@ -1595,6 +1595,12 @@ def scaffold_files(
             "evidence_classification_report.schema.json",
             "gate_status.schema.json",
             "gate_evaluation.schema.json",
+            "gatekeeper.schema.json",
+            "gate_input_error.schema.json",
+            "agent_trace_event.schema.json",
+            "evidence_attestation.schema.json",
+            "evidence_envelope.schema.json",
+            "evidence_verification.schema.json",
             "claims_validation.schema.json",
             "capability_maturity_report.schema.json",
             "evidence_pack.schema.json",
@@ -2172,6 +2178,8 @@ def scaffold_files(
             "metrics_snapshot.py",
             "make_admissibility_pack.py",
         }
+        # Shared source-bound report checks are required by copied Lite consumers.
+        lite_scripts.add("naos_report_contracts.py")
 
         for script_file in scripts_src.iterdir():
             if not script_file.is_file():

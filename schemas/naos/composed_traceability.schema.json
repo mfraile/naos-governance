@@ -57,7 +57,7 @@
     },
     "traceabilityReviewReason": {
       "type": "string",
-      "pattern": "^traceability:(?:(?:[A-Z0-9]+-)*T-[0-9]{3,}:(?:unsupported_legacy_status|task_to_requirement|task_to_source|source_to_test|delivered_task_to_completion_history|test_to_evidence|evidence_to_decision)|invalid_task_id|missing_input:(?:task_registry|completed_history|module_header_traceability|source_to_test_map|ac_completion_evidence))$"
+      "pattern": "^traceability:(?:(?:[A-Z0-9]+-)*T-[0-9]{3,}:(?:decision_validation|task_identity|unsupported_legacy_status|task_to_requirement|task_to_source|source_to_test|delivered_task_to_completion_history|test_to_evidence|evidence_to_decision)|history_identity|invalid_task_id|missing_input:(?:task_registry|completed_history|module_header_traceability|source_to_test_map|ac_completion_evidence))$"
     },
     "traceabilityReview": {
       "type": "object",

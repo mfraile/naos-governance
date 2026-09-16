@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Canonical, metadata-only MCP config discovery for NAOS.
 
 This module deliberately does not install clients, call MCP servers, inspect
@@ -11,11 +10,11 @@ import hashlib
 import json
 import stat
 import tomllib
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 from urllib.parse import urlsplit
-
 
 SECRET_KEY_MARKERS = (
     "api_key",
@@ -39,7 +38,7 @@ ENGRAM_TOOL_NAMES = {
 MAX_CONFIG_BYTES = 1_000_000
 DESCRIPTOR_REVIEW_SCHEMA = "naos.mcp_descriptor_review_policy.v1"
 DESCRIPTOR_REVIEW_VERSION = "1.0.0"
-DESCRIPTOR_POLICY_SHA256 = "2a5b39d7f89673df223f35890393da528ae413b4979e3766be155aea37c30375"
+DESCRIPTOR_POLICY_SHA256 = "aa6abe7a1e3268ecf5c0a7b86c7b2e27b5a19c444ad9e386cbab41df80024e7c"
 DESCRIPTOR_REVIEW_DISPOSITIONS = {
     "allowlisted_pending_activation",
     "review_required",
@@ -1359,12 +1358,12 @@ def resolve_engram_project(
 
 
 __all__ = [
-    "MCPConfigDescriptor",
     "USER_CLIENT_POLICY_CONFIGS",
     "USER_SERVER_CONFIGS",
     "WORKSPACE_CLIENT_POLICY_CONFIGS",
     "WORKSPACE_PROJECT_CONFIGS",
     "WORKSPACE_SERVER_CONFIGS",
+    "MCPConfigDescriptor",
     "config_descriptors",
     "resolve_engram_project",
     "scan_mcp_configs",

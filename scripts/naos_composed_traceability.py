@@ -37,6 +37,8 @@ from naos_task_lifecycle import (  # noqa: E402
     normalize_task_id,
     normalize_task_states,
     task_review_posture,
+    validate_decision_record,
+    resolve_task_record,
 )
 
 
@@ -141,32 +143,32 @@ def attributable_decision(
     root: Path | None = None,
     naos_root: str = "naos",
 ) -> bool:
-    if not record or record.get("schema") != "naos.human_decision_record.v1":
-        return False
-    if task_id not in {str(item).upper() for item in record.get("subject_refs") or []}:
-        return False
-    record_evidence = {str(item) for item in record.get("evidence_refs") or []}
-    if root is not None:
-        supplied_identities = {
-            str(path.resolve(strict=False))
-            for reference in evidence_refs
-            for path in [history_reference_path(root, naos_root, reference)]
-            if path is not None and path.is_file()
-        }
-        record_identities = {
-            str(path.resolve(strict=False))
-            for reference in record_evidence
-            for path in [history_reference_path(root, naos_root, reference)]
-            if path is not None and path.is_file()
-        }
-        evidence_linked = bool(supplied_identities.intersection(record_identities))
-    else:
-        evidence_linked = bool(evidence_refs.intersection(record_evidence))
-    return bool(
-        str(record.get("decided_by") or "").strip()
-        and str(record.get("decided_at") or "").strip()
-        and record.get("outcome") in {"approved", "rejected", "deferred"}
-        and evidence_linked
+    validation = validate_decision_record(
+        record, task_id=task_id, evidence_refs=evidence_refs, root=root, naos_root=naos_root,
+    )
+    return not validation["authority_failures"]
+
+
+def persisted_decision_validation(
+    root: Path, naos_root: str, task_id: str, evidence_refs: set[str],
+    reference: str, record: dict[str, Any] | None, completion: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Bind native typed receipts while preserving older untyped visibility."""
+    expected_type = None
+    expected_outcome = None
+    path = history_reference_path(root, naos_root, reference)
+    receipts = ((completion or {}).get("completion_verification") or {}).get("decision_references") or []
+    for receipt in receipts:
+        if not isinstance(receipt, dict):
+            continue
+        receipt_path = history_reference_path(root, naos_root, str(receipt.get("portable_reference") or ""))
+        if path is not None and receipt_path == path:
+            expected_type = receipt.get("decision_type")
+            expected_outcome = receipt.get("outcome")
+            break
+    return validate_decision_record(
+        record, task_id=task_id, evidence_refs=evidence_refs, root=root, naos_root=naos_root,
+        expected_decision_type=expected_type, expected_outcome=expected_outcome,
     )
 
 
@@ -181,7 +183,12 @@ def build_report(
     ac_report_path: Path,
 ) -> dict[str, Any]:
     registry, registry_path = load_registry(root, naos_root)
-    history, history_path = load_completed_history(root, naos_root)
+    history_error = None
+    try:
+        history, history_path = load_completed_history(root, naos_root)
+    except ValueError as exc:
+        history, history_path = {"records": []}, Path(naos_root) / "completed_history.yaml"
+        history_error = str(exc)
     module_report = load_json(module_header_report_path)
     test_report = load_json(test_map_path)
     ac_report = load_json(ac_report_path)
@@ -208,6 +215,8 @@ def build_report(
 
     chains: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
+    if history_error:
+        findings.append({"id": "composed_traceability.history_identity", "status": "gap", "message": history_error})
     for entry in registry.get("tasks") or []:
         if not isinstance(entry, dict) or not entry.get("id"):
             continue
@@ -288,17 +297,23 @@ def build_report(
             }
             for decision_ref in decision_refs
         ]
-        attributable_records = [
-            item
-            for item in decision_records
-            if attributable_decision(
-                item["record"],
-                task_id=task_id,
-                evidence_refs=set(evidence_refs),
-                root=root,
-                naos_root=naos_root,
+        for item in decision_records:
+            item["validation"] = persisted_decision_validation(
+                root, naos_root, task_id, set(evidence_refs), item["reference"], item["record"], completed,
             )
-        ]
+            if item["validation"]["authority_failures"]:
+                findings.append({
+                    "id": "composed_traceability.decision_validation", "task_id": task_id, "status": "gap",
+                    "message": "Persisted decision is invalid or no longer matches its completion binding.",
+                    "reference": item["reference"], "validation": item["validation"],
+                })
+        attributable_records = [item for item in decision_records if not item["validation"]["authority_failures"]]
+        try:
+            resolve_task_record(root, naos_root, task_id)
+        except ValueError as exc:
+            findings.append({"id": "composed_traceability.task_identity", "task_id": task_id,
+                             "status": "gap", "message": str(exc)})
+            attributable_records = []
         admitted_records = [
             item
             for item in attributable_records

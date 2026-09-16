@@ -178,7 +178,7 @@
             {"type": "string", "pattern": "^[0-9a-f]{64}$"}
           ]
         },
-        "expected_rules_sha256": {"const": "2a5b39d7f89673df223f35890393da528ae413b4979e3766be155aea37c30375"},
+        "expected_rules_sha256": {"const": "aa6abe7a1e3268ecf5c0a7b86c7b2e27b5a19c444ad9e386cbab41df80024e7c"},
         "policy_integrity_status": {"enum": ["valid", "missing", "invalid", "drifted"]},
         "policy_schema": {"const": "naos.mcp_descriptor_review_policy.v1"},
         "policy_version": {"const": "1.0.0"},

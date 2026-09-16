@@ -249,9 +249,19 @@ class StaticGrader:
         trace_report_path: Path | None,
         trace_file_path: Path | None,
     ) -> dict[str, Any]:
+        # Direct library callers receive the same canonical structural check as
+        # the CLI. A supplied report cannot conceal malformed current events.
+        try:
+            from scripts.naos_agent_trace_validate import validate_schema_shape
+        except ImportError:
+            from naos_agent_trace_validate import validate_schema_shape
+        declared_event_count = len(trace_events)
+        current_schema_errors = [validate_schema_shape(event) for event in trace_events]
+        current_invalid_count = sum(bool(errors) for errors in current_schema_errors)
+        trace_events = [event for event in trace_events if isinstance(event, dict)]
         del policy
         trace_source = str(trace_report_path) if trace_report else str(trace_file_path) if trace_file_path else "not_configured"
-        no_trace_inputs = trace_report is None and not trace_events
+        no_trace_inputs = trace_report is None and declared_event_count == 0
         findings: list[dict[str, Any]] = []
         dimensions: list[dict[str, Any]] = []
         severity = severity_for_profile(profile)
@@ -270,8 +280,10 @@ class StaticGrader:
             )
 
         trace_status = str(trace_report.get("status")) if trace_report else "not_configured"
-        invalid_event_count = int(trace_report.get("invalid_event_count") or 0) if trace_report else 0
-        event_count = int(trace_report.get("event_count") or len(trace_events)) if trace_report else len(trace_events)
+        invalid_event_count = max(current_invalid_count, int(trace_report.get("invalid_event_count") or 0) if trace_report else 0)
+        if "invalid_trace_file" in statuses_from_trace(trace_report):
+            invalid_event_count = max(1, invalid_event_count)
+        event_count = max(declared_event_count, int(trace_report.get("event_count") or 0) if trace_report else 0)
         trace_statuses = statuses_from_trace(trace_report)
         ai_surface_health = ai_surface_health_from_inputs(input_reports)
 
@@ -296,6 +308,23 @@ class StaticGrader:
                     status="forbidden_payload_findings",
                     message="Agent trace validation found forbidden/private payload indicators.",
                     dimension_id="forbidden_payload_absence",
+                    source=trace_source,
+                )
+            )
+
+        receipt_findings = [item for item in (trace_report or {}).get("findings", [])
+                            if str(item.get("status", "")).startswith("action_receipt_")]
+        approval_findings = sorted({str(item.get("status")) for item in receipt_findings})
+        if approval_findings:
+            receipt_severity = next((level for level in ("blocking", "required", "warning", "advisory")
+                                     if any(item.get("severity") == level for item in receipt_findings)), severity)
+            findings.append(
+                compact_finding(
+                    finding_id="STATICGRADER_ACTION_RECEIPT_REVIEW",
+                    severity=receipt_severity,
+                    status="action_receipt_review_required",
+                    message="Declared action receipt requires review: " + ", ".join(approval_findings),
+                    dimension_id="non_claim_boundary_presence",
                     source=trace_source,
                 )
             )
@@ -433,7 +462,7 @@ class StaticGrader:
             dimension(
                 dimension_id="D1_structural_conformance",
                 name="Structural Conformance",
-                status="not_evaluated" if no_trace_inputs else "pass" if trace_report and trace_status in {"ready", "no_events", "not_configured"} else "review_required",
+                status="not_evaluated" if no_trace_inputs else "failed" if invalid_event_count else "pass" if trace_report and trace_status in {"ready", "no_events", "not_configured"} else "review_required",
                 passed=None if no_trace_inputs else not bool(invalid_event_count),
                 findings=[item for item in findings if item.get("dimension_id") == "D1_structural_conformance"],
                 input_sources=[trace_source],
@@ -454,8 +483,8 @@ class StaticGrader:
             dimension(
                 dimension_id="trace_schema_conformance",
                 name="Trace Schema Conformance",
-                status="not_evaluated" if trace_report is None else "pass" if invalid_event_count == 0 else "failed",
-                passed=None if trace_report is None else invalid_event_count == 0,
+                status="failed" if invalid_event_count else "not_evaluated" if trace_report is None and not trace_events else "pass",
+                passed=False if invalid_event_count else None if trace_report is None and not trace_events else True,
                 findings=[item for item in findings if item.get("dimension_id") == "trace_schema_conformance"],
                 input_sources=[trace_source],
             )
@@ -528,6 +557,7 @@ class StaticGrader:
         ]
 
         summary = finding_counts(findings)
+        summary["review_status_counts"] = dict(sorted(Counter(str(event.get("review_status") or "not_reviewed") for event in trace_events).items()))
         status = status_from_findings(profile, findings, no_trace_inputs)
         deterministic_results = dimensions
 

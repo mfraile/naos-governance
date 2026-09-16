@@ -78,6 +78,7 @@ additional runtime capabilities and do not change command semantics.
 | --- | --- |
 | [`README.md`](../README.md) | Product overview, profile selection, measurement posture, philosophy |
 | [`INSTALLATION_MANUAL.md`](../INSTALLATION_MANUAL.md) | Full install walkthrough across IDEs and tiers |
+| [`docs/CONTRACT_REVALIDATION.md`](CONTRACT_REVALIDATION.md) | Task identity, commit snapshots, evidence validation, repeatable attestation, and existing-project migration |
 | [`MAINTENANCE_PLAYBOOK.md`](../MAINTENANCE_PLAYBOOK.md) | Six maintenance cadences (on-demand conformance, monthly drift, quarterly assessment, dependency audit, toolchain upgrade, AI quality review) |
 | [`NAOS_CATALOG.md`](../NAOS_CATALOG.md) | Lifecycle catalog: 16 prompts, 7 agents, 25 skills, CLI commands |
 | [`docs/CONTROL_PLANE.md`](CONTROL_PLANE.md) | Capability maturity, gatekeepers G0-G8, validator/evidence/dashboard flow, and AI tool activation-surface status |

@@ -49,7 +49,7 @@ SCRIPT_DIR = Path(__file__).resolve().parents[1]
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from naos_task_lifecycle import is_task_delivered, normalize_task_states  # noqa: E402
+from naos_task_lifecycle import is_task_delivered, normalize_task_states, validate_task_artifact_identity  # noqa: E402
 from naos_validate_task_registry import (  # noqa: E402
     TeamConfigValidationError,
     require_valid_team_config,
@@ -798,6 +798,11 @@ def main() -> None:
     print("=" * 60)
 
     registry = load_registry()
+    try:
+        validate_task_artifact_identity(Path.cwd(), str(NAOS_ROOT), registry)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(2)
     tasks = get_tasks(registry)
     metrics = get_metrics(registry)
 

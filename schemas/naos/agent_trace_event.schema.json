@@ -81,13 +81,14 @@
       }
     },
     "review_status": {
+      "description": "Declared review disposition, separate from required review and from any action-receipt approval status; it does not authenticate a reviewer.",
       "type": "string",
       "enum": ["not_reviewed", "review_pending", "reviewed", "rejected", "unknown"]
     },
     "reviewer": {"type": ["string", "null"]},
     "reviewed_at": {"type": ["string", "null"], "format": "date-time"},
     "action_receipt": {"$ref": "#/$defs/action_receipt"},
-    "human_review_required": {"type": "boolean"},
+    "human_review_required": {"type": "boolean", "description": "Records a review obligation for this declared event; true is not completed review or approval. Pending and rejected historical records remain valid review inputs."},
     "limitations": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "not_claimed": {"type": "array", "minItems": 1, "items": {"type": "string"}}
   },
@@ -141,6 +142,7 @@
         "permission_scope": {"type": ["string", "null"]},
         "approval_required": {"type": "boolean"},
         "approval_status": {
+          "description": "Declared action approval disposition. Side effects with approval_required true require approved here; a human_review_required obligation alone does not satisfy this check. This declaration is not proof of authentic approval.",
           "type": "string",
           "enum": ["not_required", "required_pending", "approved", "denied", "expired", "unknown"]
         },

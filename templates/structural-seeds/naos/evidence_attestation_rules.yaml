@@ -30,6 +30,10 @@ excluded_paths:
   - ".pytest_cache/**"
   - ".DS_Store"
   - "naos/reports/evidence_attestation.json"
+  - "naos/reports/evidence_verification.json"
+  - "naos/evidence/evidence_envelope.json"
+  # Runtime also excludes resolved output paths under configured roots/directories.
+  # Existing adopter-owned rules gain that boundary when executable scripts upgrade.
 
 artifact_groups:
   - id: control_plane_reports

@@ -33,6 +33,7 @@
   ],
   "properties": {
     "schema": {"const": "naos.gate_status.v1"},
+    "evaluation_scope": {"type": "object", "additionalProperties": false, "required": ["status", "selected_count"], "properties": {"status": {"enum": ["empty", "not_applicable", "evaluated"]}, "selected_count": {"type": "integer", "minimum": 0}}},
     "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
     "manifest": {"type": "string"},
     "manifest_source": {"type": "string", "enum": ["explicit", "project", "template"]},
