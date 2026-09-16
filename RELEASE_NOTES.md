@@ -1,16 +1,18 @@
-# NAOS-Governance 1.1.0 Public Release Candidate Notes
+# NAOS-Governance 1.1.0 Release Notes
 
-These notes describe the sanitized NAOS 1.1.0 publication candidate prepared
-for history-free repository import and hosted verification. Repository staging
-and green hosted CI are not a publication event or release authorization.
-Public visibility, a tag, a GitHub release, and package upload remain separately
-gated.
+These notes describe the sanitized NAOS 1.1.0 distribution. Its release assets
+contain the canonical export archive and SHA-256 checksums. The distribution
+preserves a separate Git history from the private maintainer repository.
+Passing checks establish their recorded results; they do not authenticate
+signatures, certify compliance or grant authority to adopter projects.
 
-The unreleased candidate corrections to task identity, staged Git checks,
+The corrections to task identity, staged Git checks,
 gate inputs, attestations, report freshness, trace validation, static MCP policy
 integrity, and approved profile footprint allowances are described
-in [contract and migration guidance](docs/CONTRACT_REVALIDATION.md). The package
-version remains 1.1.0 while this candidate is reviewed.
+in [contract and migration guidance](docs/CONTRACT_REVALIDATION.md). Reviewed
+Ruff cleanup also makes expected file, parser and subprocess errors explicit
+while allowing unexpected programming errors to surface. The package version
+is 1.1.0.
 
 ## Changes Since the 1.0.0 Candidate
 
@@ -150,7 +152,6 @@ decisions through deterministic artifacts and explicit human-review boundaries.
 
 ## Deferred Work
 
-- Public publication, tag, and GitHub release.
 - Optional wheel/sdist publication decision.
 - Live MCP/Engram introspection.
 - Durable memory write-back.
@@ -163,7 +164,7 @@ decisions through deterministic artifacts and explicit human-review boundaries.
 
 ## Publication Package Decision
 
-This candidate keeps the sanitized archive as the primary public package:
+This release uses the sanitized archive as the primary public package:
 `dist/naos-public-export.tar.gz`. Wheel and sdist artifacts are optional/manual
 inspection artifacts unless a later publication decision explicitly includes
 them. SHA-256 checksums are integrity metadata only; they are not signatures,

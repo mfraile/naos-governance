@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Shared deterministic helpers for NAOS professional adoption commands."""
 
 from __future__ import annotations
@@ -43,24 +42,28 @@ from naos_policy import (  # noqa: E402
 )
 
 try:
-    from naos_mcp_config_registry import scan_mcp_configs as _registry_scan_mcp_configs  # noqa: E402
+    from naos_mcp_config_registry import (
+        scan_mcp_configs as _registry_scan_mcp_configs,
+    )
 except ImportError:  # pragma: no cover - generated adopters may predate the shared registry
     _registry_scan_mcp_configs = None
 
 try:
-    from naos_mcp_config_registry import review_mcp_descriptors as _review_mcp_descriptors  # noqa: E402
+    from naos_mcp_config_registry import (
+        review_mcp_descriptors as _review_mcp_descriptors,
+    )
 except ImportError:  # pragma: no cover - generated adopters may predate descriptor review
     _review_mcp_descriptors = None
 
 try:
-    from naos_setup_recommendations import (  # noqa: E402
+    from naos_setup_recommendations import (
         build_repository_intelligence_guidance,
     )
 except ImportError:  # pragma: no cover - generated adopters may predate this integration
     build_repository_intelligence_guidance = None
 
 try:
-    from naos_repository_intelligence import (  # noqa: E402
+    from naos_repository_intelligence import (
         RepositoryIntelligenceError,
         assert_repository_intelligence_binding_unchanged,
         read_active_repository_intelligence_snapshot,
@@ -306,7 +309,7 @@ def latest_session_id(root: Path, naos_root: str, policy: dict[str, Any]) -> str
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError, RecursionError):
         return None
     value = data.get("latest_session_id") if isinstance(data, dict) else None
     return str(value) if value else None
@@ -320,7 +323,7 @@ def load_structured(path: Path) -> dict[str, Any]:
             data = json.loads(path.read_text(encoding="utf-8"))
         else:
             data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except Exception:
+    except (OSError, ValueError, yaml.YAMLError, RecursionError):
         return {}
     return data if isinstance(data, dict) else {}
 
@@ -496,7 +499,7 @@ def should_ignore(path: Path) -> bool:
 def relpath(root: Path, path: Path) -> str:
     try:
         return str(path.resolve().relative_to(root.resolve()))
-    except Exception:
+    except (OSError, RuntimeError, ValueError):
         return str(path)
 
 
@@ -521,7 +524,7 @@ def run_git(root: Path, *args: str) -> tuple[int, str]:
             check=False,
             timeout=10,
         )
-    except Exception:
+    except (OSError, subprocess.SubprocessError, UnicodeError):
         return 127, ""
     return result.returncode, result.stdout.strip()
 
@@ -544,10 +547,10 @@ def detect_project_signals(root: Path) -> dict[str, Any]:
         frameworks.append("fastapi")
     if any("next" in item for item in lower_files):
         frameworks.append("nextjs")
-    docs = sorted(item for item in files if item.lower().endswith((".md", ".rst", ".txt")) and (item.startswith("docs/") or item.lower() == "readme.md" or item.startswith("specs/")))[:50]
+    docs = sorted(item for item in files if item.lower().endswith((".md", ".rst", ".txt")) and (item.startswith(("docs/", "specs/")) or item.lower() == "readme.md"))[:50]
     tests = sorted(item for item in files if item.startswith("tests/") or "/test_" in item or item.endswith("_test.py"))[:50]
     source = sorted(item for item in files if item.startswith(("src/", "app/", "lib/")) or item.endswith((".py", ".ts", ".tsx", ".js", ".go", ".java")))[:80]
-    workflows = sorted(item for item in files if item.startswith(".github/workflows/") or item.startswith(".gitlab/"))[:30]
+    workflows = sorted(item for item in files if item.startswith((".github/workflows/", ".gitlab/")))[:30]
     return {
         "files_scanned": len(files),
         "frameworks": sorted(set(frameworks)),
@@ -882,9 +885,12 @@ def ai_artifacts(root: Path) -> list[dict[str, Any]]:
     for path in list_files(root, max_files=5000):
         rel = relpath(root, path)
         lower = rel.lower()
-        if any(token in lower for token in ["prompt", "rule", "workflow"]) and rel not in {item["path"] for item in artifacts}:
-            if lower.endswith((".md", ".yaml", ".yml", ".json", ".txt")):
-                artifacts.append(ai_artifact_entry(root, path, "custom_ai_artifact", "user-owned", "review_required"))
+        if (
+            any(token in lower for token in ["prompt", "rule", "workflow"])
+            and rel not in {item["path"] for item in artifacts}
+            and lower.endswith((".md", ".yaml", ".yml", ".json", ".txt"))
+        ):
+            artifacts.append(ai_artifact_entry(root, path, "custom_ai_artifact", "user-owned", "review_required"))
     return sorted(artifacts, key=lambda item: item["path"])
 
 
@@ -893,7 +899,7 @@ def ai_artifact_entry(root: Path, path: Path, artifact_type: str, owner: str, st
     lower_rel = rel.lower()
     try:
         sample = path.read_text(encoding="utf-8", errors="ignore")[:12000].lower()
-    except Exception:
+    except OSError:
         sample = ""
     likely_naos = rel.startswith(("naos/", "templates/")) or "naos" in sample[:2000] or "NAOS" in path.name
     stale_signal = any(token in lower_rel or token in sample for token in ["stale", "deprecated", "legacy", "archive", "old instructions"])
@@ -1675,7 +1681,7 @@ def _validated_persisted_memory_inventory(
         return None, "schema_unavailable", current_observation
     try:
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
         return None, "schema_unavailable", current_observation
     if any(Draft202012Validator(schema).iter_errors(inventory)):
         return None, "schema_validation_failed", current_observation
@@ -2194,7 +2200,7 @@ AGENT_LOOP_AUTOMATION_TOKENS = [
 def read_small_text(root: Path, rel: str, limit: int = 8000) -> str:
     try:
         return (root / rel).read_text(encoding="utf-8", errors="ignore")[:limit]
-    except Exception:
+    except OSError:
         return ""
 
 
@@ -2206,7 +2212,7 @@ def contains_any_token(text: str, tokens: list[str]) -> bool:
 def workflow_trigger_names(text: str) -> list[str]:
     try:
         loaded = yaml.safe_load(text) or {}
-    except Exception:
+    except (ValueError, yaml.YAMLError, RecursionError):
         loaded = {}
     workflow_on: Any = None
     if isinstance(loaded, dict):
@@ -2216,9 +2222,7 @@ def workflow_trigger_names(text: str) -> list[str]:
     names: list[str] = []
     if isinstance(workflow_on, str):
         names.append(workflow_on)
-    elif isinstance(workflow_on, list):
-        names.extend(str(item) for item in workflow_on)
-    elif isinstance(workflow_on, dict):
+    elif isinstance(workflow_on, (list, dict)):
         names.extend(str(item) for item in workflow_on)
     lower = text.lower()
     if "workflow_dispatch" in lower and "workflow_dispatch" not in names:
@@ -2307,7 +2311,7 @@ def detect_agent_loop_signals(root: Path) -> dict[str, Any]:
         text = read_small_text(root, "package.json", limit=12000)
         try:
             package_data = json.loads(text)
-        except Exception:
+        except (ValueError, RecursionError):
             package_data = {}
         scripts = package_data.get("scripts") if isinstance(package_data, dict) else {}
         if isinstance(scripts, dict):
@@ -2955,8 +2959,7 @@ def build_install_decision_record(args: argparse.Namespace, root: Path, profile:
     ]
     assumptions = []
     for report in reports.values():
-        for item in report.get("assumptions", []) if isinstance(report, dict) else []:
-            assumptions.append(item)
+        assumptions.extend(report.get("assumptions", []) if isinstance(report, dict) else [])
     for challenge in challenge_reports:
         for item in challenge.get("assumptions_detected", []):
             assumptions.append({"id": safe_slug(str(item)), "description": item, "source": challenge["report_id"], "status": "review_required"})
@@ -3682,8 +3685,7 @@ def build_adopt(args: argparse.Namespace, root: Path, profile: str, policy: dict
                     for label, sink in sink_bindings
                     if sink is not None
                     and (
-                        label.startswith("install_decision_record.")
-                        or label.startswith("adopt.")
+                        label.startswith(("install_decision_record.", "adopt."))
                     )
                 ]
                 report["files_planned"] = [

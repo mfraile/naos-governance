@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Canonical, metadata-only MCP config discovery for NAOS.
 
 This module deliberately does not install clients, call MCP servers, inspect
@@ -11,11 +10,11 @@ import hashlib
 import json
 import stat
 import tomllib
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 from urllib.parse import urlsplit
-
 
 SECRET_KEY_MARKERS = (
     "api_key",
@@ -1359,12 +1358,12 @@ def resolve_engram_project(
 
 
 __all__ = [
-    "MCPConfigDescriptor",
     "USER_CLIENT_POLICY_CONFIGS",
     "USER_SERVER_CONFIGS",
     "WORKSPACE_CLIENT_POLICY_CONFIGS",
     "WORKSPACE_PROJECT_CONFIGS",
     "WORKSPACE_SERVER_CONFIGS",
+    "MCPConfigDescriptor",
     "config_descriptors",
     "resolve_engram_project",
     "scan_mcp_configs",
