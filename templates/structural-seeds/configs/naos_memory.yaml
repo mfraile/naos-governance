@@ -1,7 +1,10 @@
 # naos_memory.yaml — NAOS memory onboarding state
 #
 # Engram runtime data lives under data_dir; the database is derived as
-# <data_dir>/engram.db. ENGRAM_DATA_DIR overrides the declared path at runtime.
+# <data_dir>/engram.db. ENGRAM_DATA_DIR overrides the declared path at runtime for a
+# direct Engram invocation. A managed naos-engram-memories wrapper accepts it only
+# when it resolves to the declared data_dir and refuses any other store with exit 64,
+# so provider maintenance cannot back up or probe a database Engram does not open.
 # The maintained replication profile is local. NAOS does not configure Git sync.
 # Never store credentials, API keys, tokens, connection strings, PII, customer data,
 # or regulated data in memory configuration or memory checkpoints.
@@ -12,7 +15,7 @@ memory:
   disposition: defer     # configure-local | use-existing | defer | decline
   provider: engram       # Engram is the recommended durable memory provider
   scope: none            # none | user-centralized
-  data_dir: ~/.engram    # Engram derives <data_dir>/engram.db; ENGRAM_DATA_DIR wins at runtime
+  data_dir: ~/.engram    # Engram derives <data_dir>/engram.db; a managed wrapper accepts ENGRAM_DATA_DIR only when it names this same store
   replication_profile: local # no Git memory synchronization
   mcp_namespace: null    # Set after `naos memory check` confirms the real MCP namespace
   mcp_project: null      # Exact registered ID/alias only; never derive from the folder name or set globally
