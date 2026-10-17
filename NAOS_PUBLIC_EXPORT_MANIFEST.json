@@ -57,10 +57,10 @@
       "sha256": "4fe55e0422d7a4ac2a1bb4fe6188933f1e5ca2496f7e0778dba0cabe322820d2"
     },
     {
-      "bytes": 134658,
+      "bytes": 137985,
       "mode": "0644",
       "path": "INSTALLATION_MANUAL.md",
-      "sha256": "61da1eac63ea58bf838e1d286d9033205369f1125e750eebb54351534b043e32"
+      "sha256": "7e178ffc9013b873a48b07246dcff2a7c0ce170794a13419f3b29591ee714f8f"
     },
     {
       "bytes": 35265,
@@ -81,10 +81,10 @@
       "sha256": "401bd5ca3841e7b986b92daf7fa0e7a1c922059b66011f64e464d9fb9406905b"
     },
     {
-      "bytes": 2267,
+      "bytes": 2458,
       "mode": "0644",
       "path": "MANIFEST.in",
-      "sha256": "fe595e228b8608b233caab10fdc803415842c2f9893f69ebe88eadfb6379557e"
+      "sha256": "771f5261dc0fb263443141f5203692382c43b08d1c43e930f47761492bc057c9"
     },
     {
       "bytes": 75224,
@@ -678,7 +678,7 @@
       "bytes": 144780,
       "mode": "0644",
       "path": "configs/source_modes.json",
-      "sha256": "c98323b8f139a8bdc4cfbef9a2f190c05427ceb7fc7b8495049dc6472a51a1e3"
+      "sha256": "bcdf2f359f18ba91597ca716d7a34902a5ea2d0838bd6dd87f31d70c3fccbd6b"
     },
     {
       "bytes": 5756,
@@ -855,10 +855,10 @@
       "sha256": "ada284c0136e8b772a21f73cb2de75252a7fcbad5d0e25d8dc7160f5001d4979"
     },
     {
-      "bytes": 97966,
+      "bytes": 98003,
       "mode": "0644",
       "path": "docs/PLATFORM_ADAPTERS.md",
-      "sha256": "c7b7f2fcea37d69e7b68f9e9ec2e5e8d743654c532edea899e1df493cea3d780"
+      "sha256": "4711c5eddf5e5430b8bc4d71948201e01cd3fd2bda0c307cc54ee5f2462e7a84"
     },
     {
       "bytes": 1702,
@@ -1701,10 +1701,10 @@
       "sha256": "5cc1934cee3534a787d4375f1863dcc28f2b0f26ed1583b6e9e4960063f74b19"
     },
     {
-      "bytes": 5725,
+      "bytes": 5911,
       "mode": "0644",
       "path": "pyproject.toml",
-      "sha256": "56cf58e1b442ddc4f88c541ecd42c42a9344e1421abb4dd1a7606143d6273287"
+      "sha256": "1a36edb49a5fb796fa9f6d9b8c74aa621b2b0a46345b4a67aec188526687480b"
     },
     {
       "bytes": 893,
@@ -6185,8 +6185,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 20853541,
+  "source_bytes": 20857282,
   "source_file_count": 1029,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "f12a176201bc28d6f2de13b1c4be678ad36eda29149bdbef8d1e312a6ce2cdf0"
+  "tree_sha256": "7953fbaf9b1cc59d6237efcf02045310a74777e599844b2063d78de1651591f6"
 }

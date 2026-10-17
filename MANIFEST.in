@@ -26,6 +26,11 @@ recursive-exclude * __pycache__
 recursive-exclude * *.pyc
 recursive-exclude docs *
 include docs/PLATFORM_ADAPTERS.md
+include docs/AI_METADATA_SCOPE.md
+include docs/COMPLETED_CARD_INTEGRITY.md
+include docs/LANGUAGE_COVERAGE.md
+include docs/PROJECT_CONTEXT_FACTS.md
+include docs/UPGRADE_RECOVERY_BOUNDARIES.md
 include docs/COMPLIANCE_MAPPING.md
 include docs/OSFI_E23_MAPPING.md
 include docs/DORA_MAPPING.md

@@ -1,8 +1,8 @@
 # NAOS Portable Governance Kit — Installation Manual
 
 **Version**: 1.1.0
-**Status**: Publication candidate
-**Last Updated**: 2026-10-15
+**Status**: Remediated source candidate; not a new published release
+**Last Updated**: 2026-10-17
 
 ---
 
@@ -15,6 +15,16 @@ complex enterprise software, including highly regulated projects. Select a
 profile and configure evidence for the development workflow and review needs
 of the project; installation does not establish regulatory compliance.
 
+**Select the matching runtime before following this manual.** The commands and
+boundaries below describe the remediated source candidate. The existing public
+v1.1.0 release predates these changes, despite sharing the `1.1.0` package version.
+Installing that release does not provide the newer provenance inspection,
+receiving/rebind, legacy migration, applicability or CI-readiness procedures.
+For this candidate, use an artifact whose reviewed build receipt identifies the
+source and SHA-256; the version string alone cannot identify it. See
+[Artifact acquisition](#artifact-acquisition). Publication of source changes
+does not replace an existing release asset or qualify a new artifact.
+
 Installing NAOS activates a profile and scaffolds governance files. It does not cause every capability to become mature immediately. Capability maturity depends on project readiness, configuration, validator outputs, evidence freshness, gatekeeper status, and human review. See [docs/CONTROL_PLANE.md](docs/CONTROL_PLANE.md) for the capability/policy/evidence model, [docs/AUDIT_PLAYBOOK.md](docs/AUDIT_PLAYBOOK.md) for deterministic audit checks, and [docs/ASSURED_PROFILE_ACTIVATION.md](docs/ASSURED_PROFILE_ACTIVATION.md) before relying on the `assured` profile.
 
 ---
@@ -23,17 +33,21 @@ Installing NAOS activates a profile and scaffolds governance files. It does not 
 
 1. [Prerequisites](#prerequisites)
 2. [NAOS Lifecycle Overview](#naos-lifecycle-overview)
-3. [Installation via `naos init`](#installation-via-naos-init)
-4. [Progressive Enhancement via `naos add`](#progressive-enhancement-via-naos-add)
-5. [Minimum Tooling Requirements](#minimum-tooling-requirements)
-6. [Manual Installation](#manual-installation)
-7. [Naming Conventions](#naming-conventions)
-8. [AGENTS.md Porting Checklist](#agentsmd-porting-checklist)
-9. [Profile Reference](#profile-reference)
-10. [Claude Code Hooks (Enhancement Layer)](#claude-code-hooks-enhancement-layer)
-11. [Codex Plugin Adapter (Optional)](#codex-plugin-adapter-optional)
-12. [Claude Code Plugin Adapter (Optional)](#claude-code-plugin-adapter-optional)
+3. [Installation via `naos-governance init`](#installation-via-naos-governance-init)
+4. [Managed Upgrade and Recovery](#managed-upgrade-and-recovery)
+5. [Memory Setup (Recommended: Engram)](#memory-setup-recommended-engram)
+6. [Progressive Enhancement via `naos add`](#progressive-enhancement-via-naos-add)
+7. [Minimum Tooling Requirements](#minimum-tooling-requirements)
+8. [Manual Installation](#manual-installation)
+9. [Naming Conventions](#naming-conventions)
+10. [AGENTS.md Porting Checklist](#agentsmd-porting-checklist)
+11. [Profile Reference](#profile-reference)
+12. [Claude Code Hooks (Enhancement Layer)](#claude-code-hooks-enhancement-layer)
 13. [Customisation Reference](#customisation-reference)
+14. [Professional Adoption Engine](#professional-adoption-engine)
+15. [Codex Plugin Adapter (Optional)](#codex-plugin-adapter-optional)
+16. [Claude Code Plugin Adapter (Optional)](#claude-code-plugin-adapter-optional)
+17. [Validate a disposable brownfield overlay](#validate-a-disposable-brownfield-overlay)
 
 ---
 
@@ -76,10 +90,10 @@ flowchart LR
 | (Optional) Engram MCP server | Local memory provider pattern for authorized `mem_context`, `mem_search`, `mem_save`, compact recovery, and memory-based hooks |
 | (Optional) Claude Code | Can use optional hook templates; not required for NAOS core |
 
-> **Platform boundary:** The selected D5 baseline dated 17 October 2026 is
+> **Platform boundary:** The selected baseline dated 17 October 2026 is
 > recorded in [platform implementation and verification](docs/PLATFORM_ADAPTERS.md#selected-current-d5-baseline-17-october-2026).
-> Its current status applies only after root accepts all nine same-scenario J2
-> cells across macOS, Ubuntu and Windows 11 with CPython 3.11–3.13. It covers the
+> Its nine native OS/Python cells were accepted across macOS ARM64/APFS,
+> Ubuntu x86_64/ext4 and Windows 11 x64/NTFS with CPython 3.11–3.13. It covers the
 > specific installed artifact, ordinary managed-chain and receiving/recovery
 > routes listed there; it does not qualify every profile, history or metadata
 > branch. Preview generation and package installation alone do not qualify
@@ -208,7 +222,14 @@ does not establish native activation/upgrade support; the platform boundary
 above still applies. Dependencies and build tools use your configured package
 index and are not fully locked by the NAOS artifact hash.
 
-The existing public v1.1.0 archive has this verified acquisition identity:
+Choose the artifact for the intended workflow:
+
+| Intended use | Artifact requirement |
+| --- | --- |
+| Follow the remediated procedures in this manual | A compatible candidate wheel or sdist with a reviewed source/build receipt and SHA-256; use the local candidate route below. |
+| Reproduce the older published v1.1.0 baseline | The historical archive identified below; it cannot run the candidate-only procedures. |
+
+The older public v1.1.0 archive has this verified acquisition identity:
 
 - Public source commit: `2711cafbef34f7f2c07e1764862d926541efc4e7`.
 - Artifact: `naos-public-export.tar.gz` on the
@@ -228,14 +249,28 @@ page and checksum establish provenance only to the extent that you trust their
 publisher; a checksum is not independent review or a signature.
 
 For a locally supplied candidate, retain its source commit, artifact filename
-and reviewed checksum from the build receipt. Install its absolute file URI
+and reviewed checksum from the build receipt. Obtain that artifact and receipt
+from the maintainer before continuing; there is no new release download implied
+by this manual. Install its absolute file URI
 with the same `#sha256=<reviewed-64-hex-digest>` suffix. Obtain a correctly escaped
 URI (including spaces and Unicode) with:
 
 ```text
 python -c "import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve().as_uri())" "/absolute/path/to/naos_governance-1.1.0-py3-none-any.whl"
 python -m pip install --no-cache-dir "<printed-file-uri>#sha256=<reviewed-64-hex-digest>"
+python -m pip check
+python -m naos_governance doctor
 ```
+
+Replace the example path with the artifact's native absolute path, such as
+`C:\Downloads\naos_governance-1.1.0-py3-none-any.whl` on Windows. Use the same
+selected environment's Python for all commands. Retain the receipt with the
+installation record. `doctor` diagnoses the environment; it does not validate
+the receipt or prove artifact qualification. Before a candidate-only operation,
+check its options using `python -m naos_governance upgrade --help`,
+`python -m naos_governance add --help` or
+`python -m naos_governance ci-readiness --help` as applicable. Available options
+confirm the CLI surface, not successful execution of the workflow.
 
 Both `naos` and `naos-governance` launch the installed CLI. `doctor` diagnoses
 that environment and command resolution; it does not certify governance or
@@ -1447,33 +1482,34 @@ another system (e.g., Copilot Workspace, Claude Projects, or a pre-NAOS custom s
 1. **Inventory existing agents**
    - [ ] List all named agents/personas from your current setup
    - [ ] Map each to the nearest NAOS role (`@naos-plan`, `@naos-implement`, etc.)
-   - [ ] Identify any custom agents that do not map (they become custom stubs in AGENTS.md)
+   - [ ] Identify custom roles that do not map; add reviewed host-specific definitions under `.github/agents/<name>.agent.md` when that host supports them, and list them in `.github/NAOS_AGENTS.md`
 
 2. **Map model assignments**
-   - [ ] Fill in `model:` for each agent in AGENTS.md
-   - [ ] Cross-check against `configs/ai_models.yaml` (or your project's equivalent)
+   - [ ] Keep `model:` omitted by default; map each agent's `naos_model_role` to the generated `naos/model_provider_policy.yaml`
+   - [ ] If an explicit selector is needed, verify the active host's supported syntax and review the actual provider, availability, cost and data exposure before adding it to that agent's `.agent.md` frontmatter
    - [ ] Note which agents use local models vs API-hosted models
 
 3. **Port governance constraints**
-   - [ ] Identify which existing rules map to NAOS rules (check `portability_tags.yaml` mapping)
+   - [ ] Compare existing constraints with the selected profile's `.ai/RULES.md` and installed instruction files; retain any project-specific constraints not covered there
    - [ ] Move project-specific rules to ADAPT stubs in `.ai/RULES.md`
    - [ ] Flag rules that need human customisation with `# ADAPT: <description>`
 
 4. **Port handoff protocols**
-   - [ ] Map your existing agent handoff triggers to NAOS trigger format
-   - [ ] Verify handoff targets (`to:`) exist in the NAOS agent roster
+   - [ ] Describe existing handoff triggers and required evidence in the relevant role files; the default handoff remains human-mediated
+   - [ ] Verify each named handoff target exists in the installed profile's agent roster
    - [ ] Preserve advisory `next_action` hints where they clarify the next command or agent target
-   - [ ] Document any skipped handoffs with `_skip_reason`
+   - [ ] Record skipped handoffs and their rationale in the task or review record; no automatic dispatcher is implied
 
 5. **Port skill definitions** (if applicable)
    - [ ] List existing reusable instruction fragments (prompt templates, system prompt snippets)
-   - [ ] Place them in `.github/skills/<skill-name>/SKILL.md`
-   - [ ] Reference them from relevant agent definitions in AGENTS.md
+   - [ ] Use the documented `naos add skill <name> --dry-run` route for kit skills; review the resulting host routes before applying
+   - [ ] For custom skills, use the active host's supported discovery location and link them from the relevant `.agent.md` role files and portable index where installed; editing the root router alone does not install a skill
 
 6. **Validate**
    - [ ] Run `make -f Makefile.naos validate-all` (if installed for the selected profile)
+   - [ ] Review model declarations with `python -m naos_governance model-policy --profile <profile>` when installed; this does not authorize provider calls or enforce the host's model picker
    - [ ] Manually test each agent invocation (one representative task per agent)
-   - [ ] Verify that AGENTS.md loads cleanly in your primary AI tool
+   - [ ] Verify the root `AGENTS.md` router and selected role/skill files are actually loaded by your primary AI tool
 
 ### Cross-Tool Compatibility Notes
 
@@ -1499,7 +1535,9 @@ The NAOS kit has two governance tiers:
 | **Portable Baseline** | Pre-commit hook plus repository prompt/instruction files | Git behavior is explicit; AI-host loading is manual or host-dependent |
 | **Claude Code Enhancement** | Session lifecycle hooks (`PreCompact`, `PostCompact`, `SessionStart`, etc.) | Claude Code only |
 
-**Your AGENTS.md should document both tiers.** Mark Claude Code-only features with `_claude_code_only: true` in your agent definitions to prevent confusion when using other tools.
+Document applicable layers in the relevant role and integration files. Label
+Claude Code-only hooks explicitly in their instructions; NAOS does not translate
+them into another host's permissions or enforce a custom portability flag.
 
 Prompt and handoff `next_action` hints are portable text, but a host must first
 load the containing file. They remain advisory and are not tool-specific hooks.

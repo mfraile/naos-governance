@@ -36,10 +36,11 @@ diagnostic, profile-default or report-path changes.
 
 ## Selected current D5 baseline (17 October 2026)
 
-This baseline is current only after root has accepted all nine same-scenario
-D5 J2 cells: macOS, Ubuntu and Windows 11, each on CPython 3.11, 3.12 and 3.13.
-Do not describe the nine-cell gate as complete while any cell lacks root
-acceptance. The selected D5 source map covers 2,094 paths and has SHA-256
+All nine same-scenario D5 J2 cells were accepted on 17 October 2026:
+macOS ARM64/APFS, Ubuntu x86_64/ext4 and Windows 11 x64/NTFS, each on
+CPython 3.11, 3.12 and 3.13. This is acceptance of the bounded scenarios and
+artifact identities below, not every operation on those hosts.
+The selected D5 source map covers 2,094 paths and has SHA-256
 `3baec3862d7bdd3cf8f067ed4137c7561162720a1cbda6b241eb5c7dc55a4fb3`. Its
 accepted wheel is `5f7415ad826f3b9353c02b55775572815c669e53d1dff3ae072ea84c74d33932`;
 its accepted sdist is `48ff5d3c7a5cb3cfd88e0d1415ca0c62721e21925b36be57f4d648e2aa00a52b`.
