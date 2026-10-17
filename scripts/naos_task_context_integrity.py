@@ -209,6 +209,8 @@ def freeze_selection(root: Path, naos_root: str, policy: dict[str, Any], *,
                         'size_bytes': len(raw) if raw is not None else None,
                         'expected_output': reference in expected_outputs})
     binding = association(root, naos_root, policy, project_id, report.get('task_id'), session_id, report['profile'])
+    if binding == 'unsafe':
+        raise ValueError('Unsafe project identity URL; no frozen selection was written.')
     selection = {
         'schema': SELECTION_SCHEMA, 'project_id': project_id, 'task_id': report.get('task_id'),
         'session_id': session_id, 'profile': report['profile'], 'naos_root': naos_root,

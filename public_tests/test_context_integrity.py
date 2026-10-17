@@ -103,6 +103,13 @@ class ContextIntegrityTests(unittest.TestCase):
             ('session_id', None, 'unknown'), ('manifest_sha256', '0' * 64, 'scope_mismatch')]:
             with self.subTest(field=key):
                 self.assertEqual(self.check(**{key: value})['status'], expected)
+        for identity in ['https://fixture-user:fixture-value@example.test/synthetic.git',
+                         'ssh://fixture-user:fixture-value@example.test/synthetic.git']:
+            with self.subTest(unsafe_identity=True), self.assertRaises(ValueError):
+                integrity.freeze_selection(
+                    self.root, 'naos', self.policy, report=self.pack, project_id=identity,
+                    session_id=SESSION, inputs=['specs/requirements.md'],
+                    expected_outputs=[], rules_path=self.rules)
         self.git('remote', 'set-url', 'origin', 'https://example.test/wrong/project.git')
         self.assertEqual(self.check()['status'], 'scope_mismatch')
 
@@ -278,6 +285,12 @@ class ContextIntegrityTests(unittest.TestCase):
         self.assertNotIn('pack_sha256', pack['context_integrity'])
         self.assertEqual(run().returncode, 2)
         self.assertNotIn('markdown_output', pack)
+        args[args.index(ORIGIN)] = 'https://fixture-user:fixture-value@example.test/synthetic.git'
+        args[args.index('naos/another-frozen.json')] = 'naos/unsafe-frozen.json'
+        rejected = run()
+        self.assertEqual(rejected.returncode, 2)
+        self.assertFalse((self.root / 'naos/unsafe-frozen.json').exists())
+        self.assertNotIn('fixture-value', rejected.stdout + rejected.stderr)
 
     def test_report_and_selected_binding_schemas(self):
         import jsonschema

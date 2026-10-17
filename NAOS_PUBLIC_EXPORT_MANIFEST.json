@@ -678,7 +678,7 @@
       "bytes": 145293,
       "mode": "0644",
       "path": "configs/source_modes.json",
-      "sha256": "a09b9f40ee793e0a5326634b3edea27c5c4b5c91e1658d25fdb83fe04b536003"
+      "sha256": "af22893ab65f0621c414c2a69d8c97cd37514e4a4741240f36c4b44ed9d84947"
     },
     {
       "bytes": 5756,
@@ -1563,10 +1563,10 @@
       "sha256": "f60724cd359866840373da5a6f26aa2380e543c8f72f7b4c52778265a63d2092"
     },
     {
-      "bytes": 19043,
+      "bytes": 19985,
       "mode": "0644",
       "path": "public_tests/test_context_integrity.py",
-      "sha256": "d96eaf8d6d4fb108bd68063247230909ba1feb8498f866354f414f9ceb629974"
+      "sha256": "fed8f49c9fbde4955d3a00041645f63b11a4cc161b1be81cb8b51aac7b95d7a5"
     },
     {
       "bytes": 1815,
@@ -3633,10 +3633,10 @@
       "sha256": "0f5c759a54edf7dcea3be475f8521afb3af305ffc61a68206b61b5ace60e2a27"
     },
     {
-      "bytes": 18838,
+      "bytes": 18956,
       "mode": "0644",
       "path": "scripts/naos_task_context_integrity.py",
-      "sha256": "b21d287ab694c20bdfc73d66b697a4b363b905c30197aeb64efcd81754783e29"
+      "sha256": "c861f0b1237e03eb40c65bc230cb1876cf6a0edfeb82b0a52e3a39d2fedafffc"
     },
     {
       "bytes": 73168,
@@ -6209,8 +6209,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 20927430,
+  "source_bytes": 20928490,
   "source_file_count": 1033,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "9136b20eb5db8e70beb2a15c8ac95dce29f6890c9ea5a0b5c305de4793306d82"
+  "tree_sha256": "e65115bead427e475040f81d4152a8e36778cffd0fe7952d63fa8cf8c4396b61"
 }
