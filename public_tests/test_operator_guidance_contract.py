@@ -75,14 +75,14 @@ class OperatorGuidanceTests(unittest.TestCase):
             if path.is_file()
         }
 
-    def cli(self, *args):
+    def cli(self, *args, timeout=90):
         return subprocess.run(
             [sys.executable, "-B", str(KIT / "cli.py"), *map(str, args)],
             cwd=self.base,
             env=self.env,
             capture_output=True,
             text=True,
-            timeout=90,
+            timeout=timeout,
         )
 
     def test_setup_guidance_does_not_become_enforced_finding(self):
@@ -438,6 +438,10 @@ class OperatorGuidanceTests(unittest.TestCase):
             "--backend",
             "static_only",
             "--activate",
+            # Assured's complete durable journal took 82 seconds on the native
+            # Ubuntu diagnostic. Give this integration call headroom while
+            # retaining the other command bounds and all refusal assertions.
+            timeout=180 if profile == "assured" else 90,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(

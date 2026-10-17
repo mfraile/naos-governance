@@ -621,10 +621,10 @@
       "sha256": "d40ef7f467224a1612f1df98f96fc6be3ee82b5a36ad0c21f270596f95341017"
     },
     {
-      "bytes": 6136,
+      "bytes": 6327,
       "mode": "0644",
       "path": ".github/workflows/ci.yml",
-      "sha256": "76439af4470beb62eb753290228913856e6fad84b180e62ffa4ae15751471e75"
+      "sha256": "b0c37247e762cccfe1a466738bbc65810dbd6b9840a93a58fdc796578cc86e16"
     },
     {
       "bytes": 89,
@@ -678,7 +678,7 @@
       "bytes": 144780,
       "mode": "0644",
       "path": "configs/source_modes.json",
-      "sha256": "bcdf2f359f18ba91597ca716d7a34902a5ea2d0838bd6dd87f31d70c3fccbd6b"
+      "sha256": "14df2765026976fb78cd1519c1ef3178f9025949def12c654eb3814f1460a31a"
     },
     {
       "bytes": 5756,
@@ -1593,10 +1593,10 @@
       "sha256": "6b65a733328eaba021e634a30ec8349f682d4273fa5a33c7f835e9b3d303179d"
     },
     {
-      "bytes": 26741,
+      "bytes": 27046,
       "mode": "0644",
       "path": "public_tests/test_operator_guidance_contract.py",
-      "sha256": "75fcb1ab829b112b60e212b35eee8f197c9538c0f9b63162e582e2b6182020bd"
+      "sha256": "0f537ac4344848037b5c4caf818720e0f3bfd01851ea21095bc5bdc464c12fbc"
     },
     {
       "bytes": 11414,
@@ -6185,8 +6185,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 20857282,
+  "source_bytes": 20857778,
   "source_file_count": 1029,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "7953fbaf9b1cc59d6237efcf02045310a74777e599844b2063d78de1651591f6"
+  "tree_sha256": "3c12ef6679db97c0df968c002e339e392a437557339e888cf70718d5ca0d2395"
 }

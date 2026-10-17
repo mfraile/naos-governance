@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Child interpreters must preserve the exact exported tree too; -B is local
+  # to its parent process and does not suppress bytecode in those children.
+  PYTHONDONTWRITEBYTECODE: "1"
+
 concurrency:
   group: public-candidate-ci-${{ github.ref }}
   cancel-in-progress: true
