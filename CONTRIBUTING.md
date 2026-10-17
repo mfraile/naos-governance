@@ -65,7 +65,8 @@ The kit governs other projects; it must hold itself to its own standards. Before
    Pytest is optional for contributors; when installed, run `python -B -m pytest -q`.
    The public-root `pytest.ini` selects `public_tests/test_*.py`; verify collection
    with `python -B -m pytest --collect-only -q`. Files under `dev/`, `templates/`,
-   or `plugins/` are not public implementation tests.
+   or `plugins/` are not public implementation tests. Synthetic projects under
+   `public_tests/fixtures/` are test inputs and are excluded from collection.
 
 2. **Update affected documentation** in the same PR — `ROADMAP.md`, `docs/INDEX.md`, `docs/GLOSSARY.md`, or other public docs if you changed public behavior or vocabulary.
 3. **Keep commit messages factual** — what changed, why, and which files. The branch's commit history is the kit's own audit trail.

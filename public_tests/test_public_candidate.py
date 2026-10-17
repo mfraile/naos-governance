@@ -95,6 +95,7 @@ class PublicCandidateTests(unittest.TestCase):
         self.assertEqual(config["pytest"]["testpaths"].split(), ["public_tests"])
         self.assertEqual(config["pytest"]["python_files"].split(), ["test_*.py"])
         self.assertEqual(config["pytest"]["addopts"].split(), ["-p", "no:cacheprovider"])
+        self.assertIn("fixtures", config["pytest"]["norecursedirs"].split())
         self.assertFalse((ROOT / "tests").exists())
 
     def test_release_identity_and_repository_urls_are_current(self) -> None:

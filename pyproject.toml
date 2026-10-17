@@ -57,7 +57,7 @@ naos-governance = "naos_governance.cli:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-norecursedirs = ["dev", "templates", "plugins", ".git", ".naos-preview", "__pycache__"]
+norecursedirs = ["dev", "templates", "plugins", "fixtures", ".git", ".naos-preview", "__pycache__"]
 
 # ---------------------------------------------------------------------------
 # Setuptools configuration

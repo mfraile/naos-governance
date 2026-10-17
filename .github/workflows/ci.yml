@@ -40,7 +40,8 @@ jobs:
 
       - name: Validate the exported receipt and public contract
         run: |
-          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check -r requirements.txt "pytest==9.1.1"
+          python -B -m pytest --collect-only -q
           python -B -m unittest discover -s public_tests -p 'test_*.py'
 
       - name: Build wheel and source distribution

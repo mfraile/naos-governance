@@ -51,10 +51,10 @@
       "sha256": "bf07246fc8dd24aed48e1352a13f268d71abc22b834b4e6da2dfaa49ee770bf7"
     },
     {
-      "bytes": 6600,
+      "bytes": 6703,
       "mode": "0644",
       "path": "CONTRIBUTING.md",
-      "sha256": "4fe55e0422d7a4ac2a1bb4fe6188933f1e5ca2496f7e0778dba0cabe322820d2"
+      "sha256": "ede8c87df90f320e13e3925a6412783278a24964168c4e7725ab44d9e392ff99"
     },
     {
       "bytes": 137985,
@@ -621,10 +621,10 @@
       "sha256": "d40ef7f467224a1612f1df98f96fc6be3ee82b5a36ad0c21f270596f95341017"
     },
     {
-      "bytes": 6327,
+      "bytes": 6391,
       "mode": "0644",
       "path": ".github/workflows/ci.yml",
-      "sha256": "b0c37247e762cccfe1a466738bbc65810dbd6b9840a93a58fdc796578cc86e16"
+      "sha256": "a4810c1c1babc3929f71ab0f182dca3ff75cf56d141bec1dd22433fb3fa093a1"
     },
     {
       "bytes": 89,
@@ -639,10 +639,10 @@
       "sha256": "3fe66496c79e18243ecb9849704af2fc74b42bea49138813d5ea9b07e07afade"
     },
     {
-      "bytes": 158,
+      "bytes": 167,
       "mode": "0644",
       "path": "pytest.ini",
-      "sha256": "00ca814e2f6b84cbd54d084ee699258dc323d056d871a41626e0dfa39327c340"
+      "sha256": "7927936dd55399996197b55048d28edf8770f18e61ba6ccb733709bd0c663c80"
     },
     {
       "bytes": 14386,
@@ -678,7 +678,7 @@
       "bytes": 144780,
       "mode": "0644",
       "path": "configs/source_modes.json",
-      "sha256": "14df2765026976fb78cd1519c1ef3178f9025949def12c654eb3814f1460a31a"
+      "sha256": "99beacf43e690f539f6ce4f6e7376fead526f94a65f4ba858dc30f092ea8c008"
     },
     {
       "bytes": 5756,
@@ -1599,10 +1599,10 @@
       "sha256": "c2314bc0065f2e485d9e9771b7bde464ee1d3fc471898a6c207852fd723d91f4"
     },
     {
-      "bytes": 11414,
+      "bytes": 11491,
       "mode": "0644",
       "path": "public_tests/test_public_candidate.py",
-      "sha256": "c13d3fa5460c83ae1a47c322838e8dcd13662f7565acec8ccf63b7c1d1a1f994"
+      "sha256": "979fb6fceed5a7d8313d24f6dd2a087e55a184f156d1ac7027f3f19ea4659efd"
     },
     {
       "bytes": 28539,
@@ -1701,10 +1701,10 @@
       "sha256": "5cc1934cee3534a787d4375f1863dcc28f2b0f26ed1583b6e9e4960063f74b19"
     },
     {
-      "bytes": 5911,
+      "bytes": 5923,
       "mode": "0644",
       "path": "pyproject.toml",
-      "sha256": "1a36edb49a5fb796fa9f6d9b8c74aa621b2b0a46345b4a67aec188526687480b"
+      "sha256": "d46b2c24484d60eebac7af8175113af7c50e0711c353a1b8c35ab7057574f68a"
     },
     {
       "bytes": 893,
@@ -6185,8 +6185,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 20857816,
+  "source_bytes": 20858081,
   "source_file_count": 1029,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "d6ec3d5b22bbbb20048bd20bed059a788ee810f67455affe13b4f1fdb2f83dba"
+  "tree_sha256": "753ac1a7eb7703f15f4966a1152c18caaee1ac8b5c9480204b2e5b7dd33480a7"
 }
