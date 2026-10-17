@@ -37,6 +37,160 @@
     "summary"
   ],
   "properties": {
+    "context_revalidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "status",
+        "phase",
+        "path",
+        "pack_sha256",
+        "manifest_sha256",
+        "inputs",
+        "reason_codes",
+        "evidence_dimensions",
+        "scope"
+      ],
+      "properties": {
+        "schema": {
+          "const": "naos.task_context_revalidation.v1"
+        },
+        "status": {
+          "enum": [
+            "matched",
+            "changed",
+            "expected_changed",
+            "missing",
+            "unsafe",
+            "unreadable",
+            "oversized",
+            "partial",
+            "scope_mismatch",
+            "superseded",
+            "unknown"
+          ]
+        },
+        "phase": {
+          "enum": [
+            "checkpoint",
+            "completion",
+            "end"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pack_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manifest_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "status"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "matched",
+                  "changed",
+                  "expected_changed",
+                  "missing",
+                  "unsafe",
+                  "unreadable",
+                  "oversized",
+                  "partial",
+                  "scope_mismatch",
+                  "superseded",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issuer",
+            "observable",
+            "host_delivery",
+            "model_use",
+            "behavioral_effectiveness"
+          ],
+          "properties": {
+            "issuer": {
+              "const": "local_deterministic_cli"
+            },
+            "observable": {
+              "const": "selected_bytes_at_check_time"
+            },
+            "host_delivery": {
+              "const": "not_observed"
+            },
+            "model_use": {
+              "const": "unknown"
+            },
+            "behavioral_effectiveness": {
+              "const": "not_evaluated"
+            }
+          }
+        },
+        "scope": {
+          "const": "explicit_selected_inputs_and_rules_at_check_time"
+        },
+        "rules_status": {
+          "enum": [
+            "matched",
+            "changed",
+            "expected_changed",
+            "missing",
+            "unsafe",
+            "unreadable",
+            "oversized",
+            "partial",
+            "scope_mismatch",
+            "superseded",
+            "unknown"
+          ]
+        }
+      }
+    },
     "schema": {"const": "naos.session_lifecycle.v1"},
     "generated_at": {"type": "string"},
     "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},

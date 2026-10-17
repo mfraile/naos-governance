@@ -42,6 +42,7 @@ from naos_policy import (  # noqa: E402
 from naos_local_context_query import validated_collection_coverage  # noqa: E402
 import spec_header  # noqa: E402
 import naos_pre_implementation_alignment_review as pia  # noqa: E402
+import naos_task_context_integrity as integrity  # noqa: E402
 from naos_task_lifecycle import (  # noqa: E402
     extract_acceptance_criteria,
     extract_task_ids,
@@ -1413,6 +1414,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--policy", help="Optional policy file.")
     parser.add_argument("--rules", help="Optional task_context_pack_rules.yaml path.")
     parser.add_argument("--output", help="Optional JSON report output path.")
+    parser.add_argument("--freeze-context", action="store_true", help="Freeze explicit selected inputs in a new --output pack; opt-in byte integrity only.")
+    parser.add_argument("--project-id", help="Exact https/ssh Git origin URL for the selected local project binding (not authentication).")
+    parser.add_argument("--session-id", help="Existing active session associated with this task/profile.")
+    parser.add_argument("--context-input", action="append", default=[], help="Selected project-relative POSIX file; repeat for each input.")
+    parser.add_argument("--expected-output", action="append", default=[], help="Selected input allowed to change at completion/end only.")
+    parser.add_argument("--supersedes-pack-sha256", help="Predecessor pack identity retained by a refreshed selection.")
+    parser.add_argument("--check-context", help="Revalidate this exact frozen pack; stdout only, no pack/session writes.")
+    parser.add_argument("--pack-sha256", help="Expected SHA256 of complete saved pack bytes, supplied outside the pack.")
     parser.add_argument("--write-markdown", "--markdown", action="store_true", help="Write derived Markdown pack under NAOS_ROOT/context_packs/.")
     parser.add_argument("--no-markdown", action="store_true", help="Suppress rules-driven Markdown output.")
     parser.add_argument("--strict", action="store_true", help="Use strict profile exit-code behavior.")
@@ -1426,6 +1435,32 @@ def main(argv: list[str] | None = None) -> int:
     policy = load_policy(args.policy, args.naos_root, root)
     naos_root = args.naos_root or default_naos_root(policy)
     profile = normalize_profile(args.profile, policy)
+    if args.check_context:
+        if args.output or args.freeze_context or args.context_input or args.expected_output or args.write_markdown:
+            print("ERROR: --check-context is stdout-only and cannot generate a pack", file=sys.stderr)
+            return 2
+        result = integrity.check_context(
+            root, naos_root, policy, path=args.check_context, pack_sha256=args.pack_sha256,
+            project_id=args.project_id, task_id=normalize_task_id(args.task) if args.task else None,
+            session_id=args.session_id, profile=profile,
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return exit_code_for_summary(profile, finding_counts([] if result["status"] == "matched" else [
+            {"severity": severity_for_profile(profile, policy)}]), policy, strict=args.strict)
+    if not args.freeze_context and any((args.project_id, args.session_id, args.context_input,
+                                        args.expected_output, args.supersedes_pack_sha256, args.pack_sha256)):
+        print("ERROR: integrity selection flags require --freeze-context or --check-context", file=sys.stderr)
+        return 2
+    if args.freeze_context:
+        if not all((args.output, args.project_id, args.session_id, args.task, args.context_input)):
+            print("ERROR: freezing requires --output, --project-id, --session-id, --task and --context-input", file=sys.stderr)
+            return 2
+        output_path = Path(args.output)
+        if (output_path.exists() or output_path.is_symlink()
+                or integrity.path_parts(args.output) is None
+                or args.output in args.context_input):
+            print("ERROR: frozen output must be a new project-relative file outside its selected inputs", file=sys.stderr)
+            return 2
     rules_path, rules_source = resolve_rules_path(root, naos_root, policy, args.rules)
     rules = load_yaml_mapping(rules_path)
 
@@ -1441,6 +1476,22 @@ def main(argv: list[str] | None = None) -> int:
             rules_source,
             args.recovery_mode,
         )
+        if args.freeze_context:
+            report["context_integrity"] = integrity.freeze_selection(
+                root, naos_root, policy, report=report, project_id=args.project_id,
+                session_id=args.session_id, inputs=args.context_input,
+                expected_outputs=args.expected_output, rules_path=rules_path,
+                supersedes=args.supersedes_pack_sha256,
+            )
+            if report["context_integrity"]["status"] != "matched":
+                report["findings"].append({
+                    "id": "task_context_pack.selected_context", "severity": severity_for_profile(profile, policy),
+                    "status": report["context_integrity"]["status"],
+                    "message": "Explicit context selection is incomplete or misbound; review its per-input states.",
+                })
+                report["summary"].update(finding_counts(report["findings"]))
+                report["status"] = "review_required"
+                report["summary"]["status"] = report["status"]
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
@@ -1451,9 +1502,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.task
         else None
     )
-    write_report(output, report)
+    try:
+        write_report(output, report, strict_parent_topology=args.freeze_context)
+    except (ValueError, OSError, RuntimeError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
 
-    write_markdown = bool(args.write_markdown or (rules.get("include_markdown_output") and not args.no_markdown))
+    write_markdown = not args.freeze_context and bool(args.write_markdown or (rules.get("include_markdown_output") and not args.no_markdown))
     if write_markdown and report.get("task_id"):
         markdown_path = markdown_output_path(root, naos_root, policy, str(report.get("task_id")))
         if markdown_path is not None:

@@ -31,6 +31,7 @@ from naos_policy import (  # noqa: E402
     status_from_counts,
     write_report,
 )
+from naos_task_context_integrity import completion_context  # noqa: E402
 
 SCHEMA = "naos.ac_completion_evidence.v1"
 MANIFEST_SCHEMA = "naos.ac_completion_evidence_manifest.v1"
@@ -1156,6 +1157,20 @@ def build_report(
                 )
             )
 
+        context_result = completion_context(
+            root, naos_root, policy, profile,
+            manifest.get("selected_context"), raw_completion.get("context_binding"),
+            selected_present="selected_context" in manifest,
+            binding_present="context_binding" in raw_completion,
+        )
+        if context_result.get("required") and context_result["status"] != "matched":
+            deterministic_satisfied = False
+            findings.append(make_finding(
+                finding_id=f"{ac_id or index}:context_binding", severity=record_severity,
+                status="context_" + context_result["status"],
+                message="Selected context comparison or completion identity join requires review.",
+                ac_id=ac_id or None, record_id=record_id,
+            ))
         completions.append(
             {
                 "record_id": record_id,
@@ -1167,6 +1182,7 @@ def build_report(
                 "status": status,
                 "source_ref": raw_completion.get("source_ref"),
                 "repository_binding": normalized_binding,
+                "context_binding": context_result,
                 "evidence": normalized_evidence,
                 "deterministic_completion_evidence_present": deterministic_satisfied,
             }

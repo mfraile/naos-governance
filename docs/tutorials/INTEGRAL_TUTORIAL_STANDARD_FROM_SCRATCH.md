@@ -255,6 +255,9 @@ naos dashboard --profile standard --json
 make -f Makefile.naos naos-conformance
 ```
 
+For an optional frozen selection and checkpoint/completion comparison, follow [Selected task-context integrity](../TASK_CONTEXT_INTEGRITY.md). Select relevant inputs and intended output changes explicitly; the default tutorial does not require this contract or establish host delivery.
+
+
 Record the initial dashboard/evidence posture in `naos/PROJECT_STATUS.md`. This is your baseline.
 
 If conformance reports frontmatter failures, fix the reported `.agent.md`,

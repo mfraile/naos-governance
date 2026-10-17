@@ -2690,6 +2690,7 @@ def scaffold_files(
             "policy_override_merge.schema.json",
             "adapter_coherence_report.schema.json",
             "task_context_pack.schema.json",
+            "task_context_revalidation.schema.json",
             "test_evidence_health.schema.json",
             "task_registry.schema.json",
             "capability_maturity_report.schema.json",
@@ -2785,6 +2786,7 @@ def scaffold_files(
     evidence_docs = {
         "ADMISSIBILITY.md",
         "TOOL_NEUTRAL_USAGE.md",
+        "TASK_CONTEXT_INTEGRITY.md",
         "HOST_CONTEXT_BUDGET.md",
         "CLAIMS_AND_LIMITATIONS.md",
         "CONFIGURATION_POSTURE_REVIEW.md",
@@ -3325,6 +3327,7 @@ def scaffold_files(
             "naos_memory_provider_access.py",
             "naos_memory_use_policy.py",
             "naos_task_context_pack.py",
+            "naos_task_context_integrity.py",
             "naos_task_lifecycle.py",
             "naos_research_record.py",
             "naos_composed_traceability.py",

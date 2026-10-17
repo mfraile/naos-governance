@@ -128,6 +128,7 @@ naos_governance = [
     "docs/HOST_CONTEXT_BUDGET.md",
     "docs/SYSTEMIC_CAPABILITY_WIRING.md",
     "docs/TOOL_NEUTRAL_USAGE.md",
+    "docs/TASK_CONTEXT_INTEGRITY.md",
     "docs/decisions/ADR-0010-control-plane-advisory-boundaries.md",
     "docs/tutorials/README.md",
     "docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md",

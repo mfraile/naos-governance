@@ -3891,6 +3891,7 @@ modules:
           - "Review naos/task_context_pack_rules.yaml before using packs for AI handoff."
           - "Run naos task-context --task <TASK-ID> --profile <profile>."
     post_install_next_actions:
+      - "Optional --freeze-context / --check-context: explicit selected bytes and task/session binding; see docs/TASK_CONTEXT_INTEGRITY.md in the kit."
       - "Keep active task cards and TASK_REGISTRY.yaml current before relying on task packs."
       - "Use Markdown output only as derived handoff context; JSON and source artifacts remain the review trail."
     profile_default:

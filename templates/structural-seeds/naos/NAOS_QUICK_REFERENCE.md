@@ -973,7 +973,7 @@ AI artifact inventory treats `legacy`/`deprecated`/`archive` mentions as review 
 ### Planning, task, and session
 | Command | Use when | Writes / updates | Boundary |
 | --- | --- | --- | --- |
-| `naos task-context --task T-XXX` | Build bounded task context pack | `task_context_pack.json` | Bounded aid, not authority |
+| `naos task-context --task T-XXX` | Build bounded task context pack; optional `--freeze-context` / `--check-context` for explicitly selected bytes | `task_context_pack.json` or explicit new frozen path | Bounded aid; no host delivery/model-use proof. See `docs/TASK_CONTEXT_INTEGRITY.md` in the kit. |
 | `naos task-lifecycle --task T-XXX` | Inspect exact active/completed lifecycle | `task_lifecycle.json` | Unknown, unsupported legacy status, or recovery mismatch is non-zero |
 | `naos task-complete --task T-XXX` | Record native completion | completed history + registry/card transition | Verified delivery requires existing test/evidence plus approved exact-task `task_delivery`; not merge/release/evidence authority |
 | `naos research-record RECORD` | Validate candidate research | `research_record_validation.json` | Candidate-only; explicit transition required |
