@@ -10,7 +10,7 @@ import re
 import sys
 from collections import Counter
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from functools import lru_cache
 from typing import Any
 
@@ -32,6 +32,8 @@ from naos_policy import (  # noqa: E402
     severity_for_profile,
     write_report,
 )
+
+from naos_secret_patterns import redact_sensitive_text, secret_content_reason, sanitize_report_value  # noqa: E402
 
 
 REPORT_SCHEMA = "naos.agent_trace_validation.v1"
@@ -183,15 +185,11 @@ PATH_FIELDS = {
     "evidence_refs",
     "source_references",
 }
-SECRET_PATTERNS = [
+PROHIBITED_REFERENCE_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
         r"\bOPENAI" + r"_API_KEY\b",
         r"\bANTHROPIC" + r"_API_KEY\b",
-        r"\bAPI key\b",
-        r"\bpassword\b",
-        r"\btoken\b",
-        r"\bprivate key\b",
         r"\.env(?:\b|$)",
         r"\bengram\.db\b",
         r"\bprivate memory payload\b",
@@ -199,6 +197,8 @@ SECRET_PATTERNS = [
         r"\bBEGIN CERTIFICATE\b",
     ]
 ]
+NARRATIVE_CREDENTIAL_WORDS = re.compile(r"\b(?:API key|password|token|private key)\b", re.IGNORECASE)
+
 OVERCLAIM_PATTERNS = [
     ("trace_claims_proof", re.compile(r"\b(proof|prove|proves|proven)\b", re.IGNORECASE)),
     ("trace_claims_approval", re.compile(r"\b(approval|approved|approves|approve)\b", re.IGNORECASE)),
@@ -252,7 +252,9 @@ def load_trace_events(trace_file: Path) -> tuple[list[dict[str, Any]], str | Non
 def event_scalar_values(value: Any, path: str = "$") -> list[tuple[str, str]]:
     values: list[tuple[str, str]] = []
     if isinstance(value, dict):
-        for key, child in value.items():
+        for index, (key, child) in enumerate(value.items()):
+            if secret_content_reason(str(key)):
+                values.append((f"{path}.<key:{index}>", str(key)))
             values.extend(event_scalar_values(child, f"{path}.{key}"))
     elif isinstance(value, list):
         for index, child in enumerate(value):
@@ -270,7 +272,11 @@ def finding(
     message: str,
     field: str | None = None,
 ) -> dict[str, Any]:
+    event_id = redact_sensitive_text(event_id) if event_id else None
+    field = redact_sensitive_text(field) if field else None
     finding_id = f"{event_id or 'trace_event'}.{status}"
+    if field:
+        finding_id += f".{field}"
     result = {"id": finding_id, "severity": severity, "status": status, "message": message}
     if event_id:
         result["event_id"] = event_id
@@ -364,10 +370,14 @@ def validate_schema_shape(event: Any) -> list[str]:
 
 
 def path_outside_project(value: str) -> bool:
-    path = Path(value)
-    if path.is_absolute():
-        return True
-    return ".." in path.parts
+    posix, windows = PurePosixPath(value), PureWindowsPath(value)
+    return bool(posix.is_absolute() or windows.drive or windows.root
+                or ".." in posix.parts or ".." in windows.parts)
+
+
+def path_typed_field(field_path: str) -> bool:
+    return (any(field_path.startswith(f"$.{field}[") for field in PATH_FIELDS)
+            or ".evidence_refs[" in field_path)
 
 
 def validate_action_receipt_semantics(event_id: str | None, receipt: dict[str, Any], severity: str) -> list[dict[str, Any]]:
@@ -469,6 +479,7 @@ def validate_action_receipt_semantics(event_id: str | None, receipt: dict[str, A
 
 
 def validate_event(event: dict[str, Any], profile: str, policy: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    payload_values = event_scalar_values(event)
     event_id = str(event.get("event_id")) if event.get("event_id") else None
     severity = severity_for_profile(profile, policy)
     schema_errors = validate_schema_shape(event)
@@ -583,21 +594,22 @@ def validate_event(event: dict[str, Any], profile: str, policy: dict[str, Any]) 
                     )
                 )
 
-    for field_path, text in event_scalar_values(event):
-        for pattern in SECRET_PATTERNS:
-            if pattern.search(text):
-                findings.append(
-                    finding(
-                        event_id=event_id,
-                        severity=severity,
-                        status="forbidden_payload_indicator",
-                        message=f"Trace event contains a forbidden/private payload indicator at {field_path}.",
-                        field=field_path,
-                    )
-                )
+    for field_path, text in payload_values:
         bounded_nonclaim_field = ".not_claimed" in field_path or ".limitations" in field_path
+        path_field = path_typed_field(field_path)
+        reason = secret_content_reason(text)
+        prohibited_reference = any(pattern.search(text) for pattern in PROHIBITED_REFERENCE_PATTERNS)
+        narrative_indicator = (not path_field and not bounded_nonclaim_field
+                               and NARRATIVE_CREDENTIAL_WORDS.search(text))
+        if reason or prohibited_reference or narrative_indicator:
+            kind = "credential-like value" if reason else "prohibited credential-reference or private-payload indicator"
+            findings.append(finding(
+                event_id=event_id, severity=severity, status="forbidden_payload_indicator",
+                message=f"Trace event contains a {kind} at {field_path}; pattern review is not proof of disclosure.",
+                field=field_path,
+            ))
         controlled_receipt_metadata = field_path in ACTION_RECEIPT_CONTROLLED_METADATA_PATHS
-        if bounded_nonclaim_field or controlled_receipt_metadata:
+        if bounded_nonclaim_field or controlled_receipt_metadata or path_field:
             continue
         for status, pattern in OVERCLAIM_PATTERNS:
             if pattern.search(text):
@@ -738,7 +750,7 @@ def build_report(
     else:
         status = "ready"
 
-    return {
+    return sanitize_report_value({
         "schema": REPORT_SCHEMA,
         "generated_at": utc_now_text(),
         "profile": profile,
@@ -804,7 +816,7 @@ def build_report(
         ],
         "human_review_required": bool(findings or events),
         "summary": summary,
-    }
+    })
 
 
 def build_parser() -> argparse.ArgumentParser:

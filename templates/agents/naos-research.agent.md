@@ -1,6 +1,6 @@
 ---
 name: naos-research
-model: "[ADAPT: e.g. claude-sonnet-4-5 | gpt-4o | gemini-1.5-pro]"
+# Model omitted: adopter host selection applies; this does not pin or approve a model.
 naos_model_role: research
 description: Codebase and document research agent for NAOS-governed projects.
 tools:

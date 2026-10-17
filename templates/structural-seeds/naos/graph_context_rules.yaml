@@ -233,13 +233,29 @@ human_review_requirements:
 
 known_gaps:
   - id: GCR-KG-001
-    summary: "No graph runtime, graph database, graph export, or graph algorithm is implemented in core NAOS."
+    evidence_classification: confirmed
+    classification_scope: shipped_graph_readiness_limit
+    human_review_required: true
+    summary: "This readiness control has no optional graph database or general-purpose graph runtime; bounded explicit-link graph query is a separate shipped command."
   - id: GCR-KG-002
-    summary: "Relationship traversal is represented as readiness posture only; explicit links remain source references."
+    evidence_classification: confirmed
+    classification_scope: shipped_graph_readiness_limit
+    human_review_required: true
+    summary: "This command reports readiness posture; the separate graph query traverses bounded explicit local links, which remain candidate source references."
 residual_risks:
   - id: GCR-RR-001
+    evidence_classification: hypothesized
+    classification_scope: possible_future_graph_risk
+    human_review_required: true
+    hypothesis_reason: "Future traversal could be over-trusted without visible provenance; no current misuse is asserted."
+    next_review_step: "Review any future traversal result against source paths, hashes, freshness, and authority."
     summary: "Future graph traversal may be over-trusted unless source paths, hashes, freshness, and authority remain visible."
   - id: GCR-RR-002
+    evidence_classification: hypothesized
+    classification_scope: possible_future_graph_risk
+    human_review_required: true
+    hypothesis_reason: "Derived graph sources could feed back into themselves; no current feedback loop is asserted."
+    next_review_step: "Review graph source allowlists and generated-artifact exclusions before enabling traversal."
     summary: "Generated artifacts can create feedback loops unless graph sources stay allowlisted and reviewed."
 waivers: []
 limitations:

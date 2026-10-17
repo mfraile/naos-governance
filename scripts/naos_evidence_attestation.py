@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from naos_self_check_inspection import inspection_candidates, inspection_read_path
+
 import argparse
 import fnmatch
 import hashlib
@@ -30,17 +32,22 @@ from naos_policy import (  # noqa: E402
     kit_root,
     load_policy,
     normalize_profile,
+    nonnegative_integer_setting,
     report_output_path,
     report_default_path,
     naos_root_path,
     safe_policy_path,
     severity_for_profile,
+    validate_operator_value,
     write_report,
 )
+
+from naos_evidence_contracts import _json_value, evidence_subject_parts, local_evidence_subject  # noqa: E402
 
 
 REPORT_SCHEMA = "naos.evidence_attestation.v1"
 SUPPORTED_DIGESTS = {"sha256"}
+ATTRIBUTION_METADATA_MAX_BYTES = 1024 * 1024
 STATUS_VALUES = {
     "ready",
     "review_required",
@@ -166,9 +173,9 @@ def profile_bool(mapping: Any, profile: str, default: bool = False) -> bool:
 
 
 def matches_any(path_text: str, patterns: list[str]) -> bool:
-    normalized = path_text.replace("\\", "/").lstrip("./")
+    normalized = path_text.replace("\\", "/").removeprefix("./")
     for pattern in patterns:
-        normalized_pattern = str(pattern).replace("\\", "/").lstrip("./")
+        normalized_pattern = str(pattern).replace("\\", "/").removeprefix("./")
         if fnmatch.fnmatch(normalized, normalized_pattern):
             return True
         if normalized_pattern.endswith("/**") and normalized.startswith(normalized_pattern[:-3].rstrip("/") + "/"):
@@ -208,13 +215,16 @@ def find_matching_files(root: Path, patterns: list[str], excluded: list[str],
                         excluded_exact: set[Path] | None = None) -> list[Path]:
     results: list[Path] = []
     for pattern in patterns:
+        if evidence_subject_parts(pattern, glob_allowed=True) is None:
+            raise ValueError(f"Artifact pattern must be a canonical project-relative path: {pattern!r}")
         try:
-            candidates = root.glob(pattern)
+            candidates = inspection_candidates(root, pattern, root.glob(pattern))
             for candidate in candidates:
-                if not candidate.is_file():
-                    continue
                 rel = candidate.relative_to(root).as_posix()
-                if candidate.resolve() in (excluded_exact or set()) or matches_any(rel, excluded):
+                resolved = local_evidence_subject(root, rel)
+                if resolved is None or not inspection_read_path(resolved).is_file():
+                    continue
+                if resolved in (excluded_exact or set()) or matches_any(rel, excluded):
                     continue
                 results.append(candidate)
         except (OSError, ValueError):
@@ -245,16 +255,82 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def artifact_content_snapshot(path: Path, *, metadata_suffix: str | None = None) -> tuple[str, int, dict[str, Any], dict[str, Any]]:
+    """Bind declared producer metadata to exactly the bytes hashed, not the collector."""
+    digest = hashlib.sha256()
+    size_bytes = 0
+    content: bytearray | None = bytearray()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+            size_bytes += len(chunk)
+            if content is not None:
+                if size_bytes <= ATTRIBUTION_METADATA_MAX_BYTES:
+                    content.extend(chunk)
+                else:
+                    content = None
+    content_digest = digest.hexdigest()
+    generated_by = {"operator_id": None, "operator_source": None}
+    attribution = {
+        "status": "unknown", "source": "none", "reason": "missing_metadata",
+        "content_sha256": content_digest, "authenticated": False,
+    }
+    suffix = (path.suffix if metadata_suffix is None else metadata_suffix).lower()
+    if suffix not in {".json", ".yaml", ".yml"}:
+        attribution["reason"] = "unsupported_format"
+    elif content is None:
+        attribution["reason"] = "metadata_too_large"
+    else:
+        try:
+            if suffix == ".json":
+                artifact = _json_value(path, data=bytes(content))
+            else:
+                class UniqueMappingLoader(yaml.SafeLoader):
+                    pass
+
+                def unique_mapping(loader, node):
+                    pairs = loader.construct_pairs(node, deep=True)
+                    result = {}
+                    for key, value in pairs:
+                        if key in result:
+                            raise ValueError("Duplicate attribution metadata key")
+                        result[key] = value
+                    return result
+
+                UniqueMappingLoader.add_constructor(
+                    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, unique_mapping,
+                )
+                artifact = yaml.load(bytes(content), Loader=UniqueMappingLoader)
+            producer = artifact.get("generated_by") if isinstance(artifact, dict) else None
+            if isinstance(producer, dict) and "operator_id" in producer:
+                raw = producer["operator_id"]
+                operator, invalid, _ = validate_operator_value(raw, "artifact_generated_by") if isinstance(raw, str) else (None, None, False)
+                if operator and not invalid:
+                    generated_by["operator_id"] = operator
+                    source = producer.get("operator_source")
+                    generated_by["operator_source"] = source if isinstance(source, str) else None
+                    attribution.update(status="declared", source="artifact.generated_by.operator_id", reason="content_metadata")
+                else:
+                    attribution["reason"] = "invalid_operator_id"
+        except (OSError, UnicodeError, ValueError, TypeError, RecursionError, yaml.YAMLError):
+            attribution["reason"] = "invalid_metadata"
+    return content_digest, size_bytes, generated_by, attribution
+
+
 def freshness_for(path: Path, generated_at: datetime, window_days: int | None) -> dict[str, Any]:
+    """Measure receiving-file age, never upstream content or source currency."""
     modified = datetime.fromtimestamp(path.stat().st_mtime, UTC)
+    basis = {"basis": "file_mtime", "source_freshness": "not_established"}
     if window_days is None or window_days < 0:
         return {
+            **basis,
             "status": "unknown",
             "window_days": window_days,
             "age_days": None,
         }
     age_days = max(0, (generated_at - modified).days)
     return {
+        **basis,
         "status": "stale" if generated_at - modified > timedelta(days=window_days) else "fresh",
         "window_days": window_days,
         "age_days": age_days,
@@ -270,14 +346,24 @@ def artifact_entry(
     freshness_window_days: int | None,
 ) -> dict[str, Any]:
     rel = path.relative_to(root).as_posix()
-    freshness = freshness_for(path, generated_at, freshness_window_days)
+    subject = local_evidence_subject(root, rel)
+    if subject is None or not inspection_read_path(subject).is_file():
+        raise ValueError(f"Artifact no longer identifies a local project file: {rel!r}")
+    subject = inspection_read_path(subject)
+    freshness = freshness_for(subject, generated_at, freshness_window_days)
+    try:
+        digest, size_bytes, generated_by, creator_attribution = artifact_content_snapshot(subject, metadata_suffix=path.suffix)
+    except OSError as exc:
+        raise ValueError(f"Cannot read local artifact snapshot {rel!r}: {exc}") from exc
     return {
         "path": rel,
         "artifact_group": group_id,
         "status": "stale" if freshness.get("status") == "stale" else "ready",
-        "digest": sha256_file(path),
-        "size_bytes": path.stat().st_size,
-        "modified_time": timestamp_text(datetime.fromtimestamp(path.stat().st_mtime, UTC)),
+        "digest": digest,
+        "size_bytes": size_bytes,
+        **({"generated_by": generated_by} if generated_by["operator_id"] is not None else {}),
+        "creator_attribution": creator_attribution,
+        "modified_time": timestamp_text(datetime.fromtimestamp(subject.stat().st_mtime, UTC)),
         "freshness": freshness,
     }
 
@@ -382,17 +468,33 @@ def collect_artifacts(
     base_exclusions = dedupe(default_exclusions(policy) + as_list(rules.get("excluded_paths")))
     output_exclusions = {(root / path).resolve()
                          for path in generated_output_exclusions(root, naos_root, policy, output_path)}
-    default_window = int(rules.get("default_freshness_window_days") or 30)
+    default_window = nonnegative_integer_setting(
+        rules, "default_freshness_window_days", 30, context="attestation_rules",
+    )
+    groups = rules.get("artifact_groups")
+    if not isinstance(groups, list) or any(not isinstance(group, dict) for group in groups):
+        raise ValueError("attestation_rules.artifact_groups must be a list of mappings")
+    windows = [nonnegative_integer_setting(
+        group, "freshness_window_days", default_window,
+        context=f"artifact_groups[{index}]",
+    ) for index, group in enumerate(groups)]
+    for group in groups:
+        for key in ("included_paths", "required_artifacts", "optional_artifacts", "excluded_paths"):
+            for pattern in as_list(group.get(key)):
+                if evidence_subject_parts(pattern, glob_allowed=True) is None:
+                    raise ValueError(f"Artifact pattern must be a canonical project-relative path: {pattern!r}")
+    for pattern in as_list(rules.get("excluded_paths")):
+        if evidence_subject_parts(pattern, glob_allowed=True) is None:
+            raise ValueError(f"Artifact pattern must be a canonical project-relative path: {pattern!r}")
+    selected: list[tuple[Path, str, int]] = []
+    memberships: dict[str, list[str]] = {}
 
-    for group in rules.get("artifact_groups") or []:
-        if not isinstance(group, dict):
-            continue
+    for group, group_window in zip(groups, windows):
         group_id = str(group.get("id") or "unknown_group")
         if group.get("enabled") is False:
             disabled_groups.append({"artifact_group": group_id, "status": "disabled"})
             continue
         group_exclusions = dedupe(base_exclusions + as_list(group.get("excluded_paths")))
-        group_window = int(group.get("freshness_window_days") or default_window)
         patterns = dedupe(
             as_list(group.get("included_paths"))
             + as_list(group.get("required_artifacts"))
@@ -401,17 +503,23 @@ def collect_artifacts(
         matched = find_matching_files(root, patterns, group_exclusions, output_exclusions)
         for path in matched:
             rel = path.relative_to(root).as_posix()
-            manifest_by_path[rel] = artifact_entry(
-                root=root,
-                path=path,
-                group_id=group_id,
-                generated_at=generated_at,
-                freshness_window_days=group_window,
-            )
+            memberships.setdefault(rel, []).append(group_id)
+            selected.append((path, group_id, group_window))
 
         for pattern in as_list(group.get("required_artifacts")):
             if not find_matching_files(root, [pattern], group_exclusions, output_exclusions):
                 missing.append(missing_entry(pattern, group_id, required=True))
+
+    overlaps = [f"{path}: {', '.join(sorted(group_ids))}"
+                for path, group_ids in sorted(memberships.items()) if len(group_ids) > 1]
+    if overlaps:
+        raise ValueError("Ambiguous attestation artifact groups; assign each artifact to one enabled group: "
+                         + "; ".join(overlaps))
+    for path, group_id, group_window in selected:
+        manifest_by_path[path.relative_to(root).as_posix()] = artifact_entry(
+            root=root, path=path, group_id=group_id, generated_at=generated_at,
+            freshness_window_days=group_window,
+        )
 
     return (
         sorted(manifest_by_path.values(), key=lambda item: str(item.get("path"))),
@@ -614,6 +722,8 @@ def build_report(
             "artifact_groups": len([group for group in rules.get("artifact_groups") or [] if isinstance(group, dict)]),
             "disabled_groups": len(disabled_groups),
             "artifacts_hashed": len(artifact_manifest),
+            "artifacts_declared_creator": sum(item["creator_attribution"]["status"] == "declared" for item in artifact_manifest),
+            "artifacts_unknown_creator": sum(item["creator_attribution"]["status"] == "unknown" for item in artifact_manifest),
             "missing_artifacts": len(missing_artifacts),
             "stale_artifacts": len(stale_artifacts),
             "uncovered_artifacts": len(uncovered_artifacts),
@@ -698,18 +808,22 @@ def main(argv: list[str] | None = None) -> int:
     attestations_path, attestations_source = resolve_attestations_path(root, naos_root, policy, args.attestations)
     generated_at = parse_datetime(args.generated_at) if args.generated_at else None
     output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "evidence_attestation_report")
-    report = build_report(
-        root=root,
-        profile=profile,
-        naos_root=naos_root,
-        policy=policy,
-        rules_path=rules_path,
-        rules_source=rules_source,
-        attestations_path=attestations_path,
-        attestations_source=attestations_source,
-        generated_at=generated_at,
-        output_path=output,
-    )
+    try:
+        report = build_report(
+            root=root,
+            profile=profile,
+            naos_root=naos_root,
+            policy=policy,
+            rules_path=rules_path,
+            rules_source=rules_source,
+            attestations_path=attestations_path,
+            attestations_source=attestations_source,
+            generated_at=generated_at,
+            output_path=output,
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
     write_report(output, report)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

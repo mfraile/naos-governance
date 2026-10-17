@@ -1,7 +1,8 @@
 ---
-name: "naos-governed-learning"
-description: "Use NAOS governed learning lifecycle from Codex when lessons might change future skills, prompts, workflows, baselines, gates, instructions, or adapter content."
-parameters: []
+name: naos-governed-learning
+description: Use NAOS governed learning lifecycle from Codex when lessons might change future skills, prompts, workflows, baselines, gates, instructions, or adapter content.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # NAOS Governed Learning

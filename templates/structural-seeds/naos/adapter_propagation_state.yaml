@@ -1,144 +1,195 @@
 schema: naos.adapter_propagation_state.v1
-version: "1.0"
+version: '1.0'
 semantics:
-  purpose: "Hash-backed critic record for reviewed propagation from canonical NAOS sources to plugin and adapter guidance."
-  authority: "Repository source artifacts remain authoritative; this file records review state only."
-  flow: "source changes -> adapter-coherence flags stale review -> update targets or record no-impact/risk -> refresh hashes"
-
+  purpose: Hash-backed critic record for reviewed propagation from canonical NAOS
+    sources to plugin and adapter guidance.
+  authority: Repository source artifacts remain authoritative; this file records review
+    state only.
+  flow: source changes -> adapter-coherence flags stale review -> update targets or
+    record no-impact/risk -> refresh hashes
 propagation_reviews:
-  - link_id: systemic_wiring_skill_to_plugins
-    disposition: propagated
-    reviewed_at: "2026-09-05T10:06:54Z"
-    reviewer: naos-maintainer-systemic-review
-    rationale: "Canonical systemic-wiring guidance now requires one exact changed-path review on a stable card diff, evidence-backed disposition of every emitted obligation, explicit unresolved preservation, and strict separation between NAOS-governance kit sources and portable adopter-generated files. The same command and boundary guidance was propagated to both Codex and Claude Code systemic-wiring plugin skills. This remains deterministic routing and human review evidence only; it does not infer Git changes, edit artifacts, install or invoke agents, activate providers/models/MCP/memory/network integrations, approve, merge, release, certify, attest, prove semantic completeness, or prove compliance."
-    source_hashes:
-      templates/skills/systemic-wiring/SKILL.md: d160333ba07e88f2e1c1eff30e4e97696c8562085b66419386d39dc1a21e537b
-      templates/skills/systemic-capability-wiring/SKILL.md: f060dd7b84a90c5be35c57b53229661c62bc820a23c906d46646f03b62422051
-    target_hashes:
-      plugins/naos-governance/skills/naos-systemic-wiring/SKILL.md: 1c12ec84532421404d7c8d9c72bfe0d93de6db7efd7a0ac2d9256715bf36ec5b
-      plugins/naos-governance-claude-code/skills/naos-systemic-wiring/SKILL.md: 1c12ec84532421404d7c8d9c72bfe0d93de6db7efd7a0ac2d9256715bf36ec5b
+- link_id: systemic_wiring_skill_to_plugins
+  disposition: propagated
+  reviewed_at: "2026-10-16"
+  reviewer: "Codex automated bounded propagation-renewal proposal"
+  rationale: "Automated bounded source-target review for metadata integration: The two canonical systemic skill bodies and both mapped plugin bodies are byte-exact C4. Source target/depth records and the Codex wrapper target/depth/profile records decode exactly to their prior names, descriptions, required flags and defaults. The Codex manual base reference remains systemic-wiring. Only standard frontmatter transport changes; the unchanged Claude procedural defaults/base guidance remains coherent. No target body update or authority expansion is required. Compared exact recorded-review preimages, current C4 and proposed O bytes; per-path hashes, body/decoded-metadata evidence and prior-source diffs are in the private propagation-renewal receipt. This is a static technical proposal for root/independent review, not authenticated human approval, runtime acceptance, external standards/host qualification, a waiver or programme closure. Prior retained rationale (historical): Bounded D06 portable-format review for naos-systemic-wiring: reviewed the named current canonical sources and both selected plugin snapshots. Claude-only unsupported extends/parameters metadata is translated into procedural defaults plus explicit base-resolution/missing-base stop; name, description and the complete prior instructional body are preserved. Codex target unchanged. Earlier source hash drift is newly reviewed at these exact snapshots, not attributed to this format change. This records source-supported compatibility and human review only; it proves no host discovery, invocation, semantic completeness, runtime enforcement, approval or compliance."
+  source_hashes:
+    templates/skills/systemic-wiring/SKILL.md: 8c5f802b937918039b35b11af07c6de6de42b35317c4fe70378e5a00a3f9dbf4
+    templates/skills/systemic-capability-wiring/SKILL.md: fe0dd3962f9455449813599a4f03f18fd948dca6ce32884fb096de911bd2633c
+  target_hashes:
+    plugins/naos-governance/skills/naos-systemic-wiring/SKILL.md: 3566861d4e1b26b6e706870519336fa40544eb3d54d9f27f8416bfa886077658
+    plugins/naos-governance-claude-code/skills/naos-systemic-wiring/SKILL.md: 10503338ab8986d5d113520a3f5d898e966368064a53548a378397333e419afa
+- link_id: forensic_audit_skill_to_plugins
+  disposition: no_impact
+  reviewed_at: "2026-10-16"
+  reviewer: "Codex automated bounded propagation-renewal proposal"
+  rationale: "Automated bounded source-target review for metadata integration: The canonical forensic-audit header and Codex wrapper move their distinct existing parameter lists and the wrapper forensic-audit manual base into string-valued metadata. Exact decoded records/types match the reviewed C4 preimages; all mapped skill bodies and the Claude header are unchanged. The existing source-to-wrapper summary distinction, manual base resolution and human-review boundaries remain unchanged. No target body update is required. Compared exact recorded-review preimages, current C4 and proposed O bytes; per-path hashes, body/decoded-metadata evidence and prior-source diffs are in the private propagation-renewal receipt. This is a static technical proposal for root/independent review, not authenticated human approval, runtime acceptance, external standards/host qualification, a waiver or programme closure. Prior retained rationale (historical): Bounded D06 portable-format review for naos-forensic-audit: reviewed the named current canonical sources and both selected plugin snapshots. Claude-only unsupported extends/parameters metadata is translated into procedural defaults plus explicit base-resolution/missing-base stop; name, description and the complete prior instructional body are preserved. Codex target unchanged. Earlier source hash drift is newly reviewed at these exact snapshots, not attributed to this format change. This records source-supported compatibility and human review only; it proves no host discovery, invocation, semantic completeness, runtime enforcement, approval or compliance."
+  source_hashes:
+    templates/skills/forensic-audit/SKILL.md: 63c65a8f7ff9869b9fc366159bfd2a6e077e05c50ec72a2cd8f8ef381d907675
+  target_hashes:
+    plugins/naos-governance/skills/naos-forensic-audit/SKILL.md: 4c4d6ec273b7bde0df74f0a4817b02aad99dfc89d721bc0fea56e925e95e2327
+    plugins/naos-governance-claude-code/skills/naos-forensic-audit/SKILL.md: 21dc297c559a28fc7c89ea02f79458cc1e1af2990b9da67564d732fae15606d2
+- link_id: governed_learning_skill_to_plugins
+  disposition: no_impact
+  reviewed_at: "2026-10-16"
+  reviewer: "Codex automated bounded propagation-renewal proposal"
+  rationale: "Automated bounded source-target review for metadata integration: Canonical and Codex empty input declarations become metadata JSON empty lists with exact semantic identity and unchanged bodies. The learning-loop rules, Claude skill and Claude governed-learning reference match all previously reviewed hashes. Proposal-only capture, reviewed promotion and follow-up checks therefore retain their exact reviewed content. No new learning/memory operation or target body edit is required. Compared exact recorded-review preimages, current C4 and proposed O bytes; per-path hashes, body/decoded-metadata evidence and prior-source diffs are in the private propagation-renewal receipt. This is a static technical proposal for root/independent review, not authenticated human approval, runtime acceptance, external standards/host qualification, a waiver or programme closure. Prior retained rationale (historical): Exact prior pinned rules recovered from f5e59c4409657b64c5168216c03adab5bc04fa46. Only two YAML comments added, documenting Assured selected-policy severity minimum and unchanged kit/lower-profile posture. No rule value, lifecycle command, learning promotion, memory write or human-review authority changes. Three targets already preserve proposal-only capture, reviewed promotion, canonical evidence and explicit follow-up checks. Automated technical review only; not human approval, native host qualification or acceptance closure."
+  source_hashes:
+    templates/skills/governed-learning-lifecycle/SKILL.md: 9a8bc3b9ae0620c9fca090351e5fe8bbdddec01aa7f9df53d9e1898cf5681be8
+    templates/structural-seeds/naos/learning_loop_rules.yaml: d9b2015e265b59e79439a858d75a23acad2f15028e1f77aced63a772cc6fe679
+  target_hashes:
+    plugins/naos-governance/skills/naos-governed-learning/SKILL.md: 18fd1b026240f8e019f6fc394f7b1bb3aa915d0865adcef5f63e4d570b0d67ab
+    plugins/naos-governance-claude-code/skills/naos-governed-learning/SKILL.md: 1f6efcb06746c0ed4097d8826da420f5f8e7c321f10aeab79cc445ef9ed047a7
+    plugins/naos-governance-claude-code/references/governed-learning.md: 631dc8ffc62e404ed6c6dc5f9b9cfec349e1a5fe775f2028db02770db4e21875
+- link_id: ai_surface_health_skill_to_plugins
+  disposition: no_impact
+  reviewed_at: "2026-10-16"
+  reviewer: "Codex automated bounded propagation-renewal proposal"
+  rationale: "Technical source-target review: the maintainer explicitly approved only measured generated-file caps Quickstart95/Lite560/Standard696/Assured750 and LiteCLI99 on2026-10-16, retaining token/finding/otherCLI limits and no extra headroom. Both unchanged mapped summaries route current fresh-profile inspection and prohibit automatic threshold tuning or baseline approval, so no target-body update is required. Actual complete double replay and later acceptance remain pending. This renewal records source coherence, not human authentication or runtime acceptance. Prior retained review (historical): Automated bounded source-target review for metadata integration: Canonical and Codex skill changes are lossless empty-input metadata transport with exact C4 bodies; the Claude target is unchanged. The separate previously unrenewed budget-rule delta is exactly two optional loaded-context inputs renamed from .github/agents/AGENTS.md to .github/NAOS_AGENTS.md, with all thresholds, profiles, other inputs and policy values unchanged. Both mapped summaries route current singleton/fresh-profile measurement, preserve anchors and forbid threshold/baseline approval; neither hardcodes the old index location. No target body update is required. This renewal does not validate observed provider token counts or general metric accuracy. Compared exact recorded-review preimages, current C4 and proposed O bytes; per-path hashes, body/decoded-metadata evidence and prior-source diffs are in the private propagation-renewal receipt. This is a static technical proposal for root/independent review, not authenticated human approval, runtime acceptance, external standards/host qualification, a waiver or programme closure. Prior retained rationale (historical): Codex technical review: current budget rules retain deterministic approximation, separate complete fresh-profile measurements, exact reviewed baseline allowances and explicit review for further growth. Both plugin summaries already route singleton/fresh-profile commands, preserve anchors, forbid threshold tuning and automatic baseline approval, and keep results non-authoritative. They do not reproduce stale numeric allowances or grant expansion. No mapped target change is needed. This technical source-to-summary review does not approve any budget warning, baseline, candidate, pilot, human decision, release or runtime action."
+  source_hashes:
+    templates/skills/ai-surface-health-review/SKILL.md: 37336d5df8af13ef5534e55cecab1df0ddc403897ec4f7ec62e169a8f93a3ad4
+    templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml: "a719f2c368d4e99f3439cb33b1cbfe30eb9d22dc17b6664f9b01532e0551cda6"
+  target_hashes:
+    plugins/naos-governance/skills/naos-ai-surface-health/SKILL.md: cee4fd0490afafe2682c6ada23cf0a63437746f458cef77cc55d418d65a9ff05
+    plugins/naos-governance-claude-code/skills/naos-ai-surface-health/SKILL.md: 9b659dff5383bd2d7d6f1305ea243e29d9498060046b92150a8ad4d7c71b4fda
+- link_id: adapter_command_map_to_plugins
+  disposition: propagated
+  reviewed_at: '2026-10-16T16:16:05.843016+00:00'
+  reviewer: Codex independent bounded source-target review (declared agent metadata,
+    not authenticated human approval)
+  rationale: 'Propagated: the two optional integration README targets now use operation/candidate-scoped
+    platform qualification and explicitly defer exact limits to the installation/platform
+    manuals. All ten mapped target bodies retain canonical project/kit authority,
+    explicit CLI routing, separate plugin installation/cache state, no auto hook/MCP/memory/provider
+    activation, no dispatch/merge/release authority, and reviewed propagation. Both
+    command maps retain generated host-route/manual fallbacks and no runtime discovery
+    qualification. Both adapter-coherence references correctly distinguish kit hashes
+    from project review and describe reviewer metadata as unauthenticated declarations.
+    The source docs and inspector implement those same scope and stale-review boundaries.
+    No additional target edit is required for these source bodies. This is automated
+    bounded technical review, not authenticated human approval, native qualification,
+    activation or programme closure. Prior review is preserved in the exact preparation
+    preimage. Review SHA256: 4804ede2017da5d1b5cd1c169028546b855bf4ed1e6547890730f9f62865c443'
+  source_hashes:
+    docs/CODEX_PLUGIN_AND_MCP.md: eae799b7d6aa1ef6c4a875b124a60599b2f50abab181a12641138173c951418e
+    docs/TOOL_NEUTRAL_USAGE.md: e1511331621de3dface7355cec3250f28eb1a5cc8df63a1ad3a045c554bcb1d4
+    scripts/naos_adapter_coherence.py: b0ac09781c8a6178b343c3ff57dbfa7b5792388ea427efd8d7d5e839a40336b6
+    templates/structural-seeds/naos/adapter_coherence_rules.yaml: ffb7bf2f2fc3679108dbf0286f9ea813abba9ace04bac0452a65b10d220e923d
+  target_hashes:
+    plugins/naos-governance-claude-code/references/adapter-coherence.md: fdf758c390a2ed4e56a0b22944256e7dbc7caaf89ae9bb5f0630b2674a30124f
+    plugins/naos-governance-claude-code/references/boundaries.md: 564fe65bf0c7c64607715f662b6bdb2aea4512939c4d33959a5e374e4aa86936
+    plugins/naos-governance-claude-code/references/command-map.md: 93babd7f2383a5f2e8458fbf267efcc78933ba08c637714b9e6b0200061752c6
+    plugins/naos-governance-claude-code/skills/naos-adapter-coexistence/SKILL.md: 8fa1735e4bc88887a465a0558e2ab0f10b3961dced13cfd892667e1c4149e020
+    plugins/naos-governance/references/adapter-coherence.md: a979fc5b05d1b20cc8fae5b42ff685d5932761d5aab0b8054c14a3a32838d0ed
+    plugins/naos-governance/references/boundaries.md: fbe2241e729bd863c23fbd0b8658f66fa52550cc6b3324b6014dd82a4a78bb87
+    plugins/naos-governance/references/command-map.md: b6f838e5f1592733e264ffd0d3cbf56dd00e03a0e7757d32bdc3addd80a1139c
+    plugins/naos-governance/skills/naos-adapter-coexistence/SKILL.md: 4b5e99b5c83a4df99375777823c477e8ff8eabbdaa3e7c7b71d0e1b4ca8702b1
+    templates/integrations/claude-code-plugin/README.md: ee4d52877c10fbcaaacbe8ee994745fd9578084c6fadd004da7600465d9deff8
+    templates/integrations/codex-plugin/README.md: 07d4ff3e5dd68ee477116d822b98eb119e225bb78544cb155c5db31cc62dd4cf
+- link_id: adoption_readiness_to_plugins
+  disposition: propagated
+  reviewed_at: '2026-10-16T19:57:00.145453+00:00'
+  reviewer: Codex independent bounded technical review (not authenticated human approval)
+  rationale: 'Automated bounded technical source-target review of the exact six unchanged adoption summaries
+    against the candidate installation-manual hook-cadence correction and two setup-catalogue rationale
+    labels. Manual-only hook selection/activation, no automatic settings mutation, advisory outputs and
+    purpose-selected setup modules remain coherent. Neither summary asserts the old Stop→session-end mapping,
+    automatic session closure, unchanged runtime cadence or measured host performance. They defer detailed
+    installation/native limits to canonical guidance; hook details need not be duplicated in adoption
+    summaries. The catalogue replaces Group21 with this module in exactly two non-installable-module reason
+    values and changes no operations, dependencies, provider/service boundary or install authority. All
+    six target hashes remain exact. No body change is needed. This technical review grants no human approval,
+    authenticated identity, runtime qualification, activation, waiver, baseline allowance or programme
+    closure. Preserve prior record/rationale in the exact preimage. Supplemental automated bounded technical
+    source-target review: the ADOPTION_GUIDE delta distinguishes completed Windows add/setup source inspection
+    from initialization/plan/apply authority. A dry-run without managed initialization and without --plan-out
+    records PLAN-BLOCKED after real source validation, with no plan/content creation; mutation and external
+    plan still refuse. Surrounding first-run continues writing its existing review reports. The six unchanged
+    adoption summaries already distinguish no-write evaluation from potentially report-writing dry-run,
+    require explicit reviewed installation/managed plan-and-exact-digest apply, preserve collision/force
+    refusal, keep integrations optional, and defer detailed current boundaries to canonical adoption/install
+    guidance. None promises every completed dry-run is ready or grants blocked inspection installation
+    authority. Earlier reviewed SessionEnd/manual migration and two catalogue rationale-label compatibility
+    remains unchanged. No target body update is needed; retain exact six target hashes and prior record
+    history. This is automated technical review, not authenticated human approval, runtime/platform qualification,
+    waiver, activation or programme closure. Supplemental review SHA256: 3f534bb94f3e130d0c29bfffa44e8c6bee292a07f94a631fb810f7e2ab597096
+    Review SHA256: 1786580a7dff2a09df74c5c826c5521f2bea21f801b5428ebecc83a30268cab7'
+  source_hashes:
+    INSTALLATION_MANUAL.md: 2080778b14ffe0d1aad6aba507ff9d6ac1a098c720a83a9252362867ddb379e3
+    docs/ADOPTION_GUIDE.md: 3a5eefaf96d13bc005c407113ca1675e702a5360ef3c964d2229c20dbe2a412c
+    templates/structural-seeds/naos/setup_module_catalog.yaml: a070f6636d7a4cd3846cc3ea9ef78c1fa9f3de280122c724d6da052a805eaeb3
+  target_hashes:
+    plugins/naos-governance-claude-code/references/greenfield-brownfield.md: 49069b139e0808bd4cbdb2d77e54f943d78b94d099c275ee2315888d54eeb07d
+    plugins/naos-governance-claude-code/skills/naos-adoption-readiness/SKILL.md: a058c81611ab0ec93ab645c2903fe6c1b4c68cde5e7ee7933f68d12b81d5fad1
+    plugins/naos-governance/references/greenfield-brownfield.md: 5fceee4fb0c59cb3a3a9a408684fca1e986d9e86c41562b1bb83912b91666379
+    plugins/naos-governance/skills/naos-adoption-readiness/SKILL.md: fef11f1da1cea955127ccec2885af3f3f76883acc977e375105429edf74b196e
+    templates/integrations/claude-code-plugin/README.md: ee4d52877c10fbcaaacbe8ee994745fd9578084c6fadd004da7600465d9deff8
+    templates/integrations/codex-plugin/README.md: 07d4ff3e5dd68ee477116d822b98eb119e225bb78544cb155c5db31cc62dd4cf
+- link_id: control_plane_evidence_to_plugins
+  disposition: propagated
+  reviewed_at: '2026-10-16'
+  reviewer: Codex root automated bounded source-to-target integration
+  rationale: 'Technical source/target review of the six-observation consumer bundle: The complete CONTROL_PLANE delta adds
+    static CLI coverage inventory, project/kit report authority and historical-scope limits, and bounded AGENTS.override inventory.
+    Both coherence references need the same scope correction as adapter_command_map_to_plugins. Both evidence skills remain
+    command/review-routing summaries: they promise neither an exhaustive host-file list nor native host loading, do not prescribe
+    implementation-reality token extraction, and preserve structural evidence, missing/adverse evidence and no approval/native
+    qualification. No evidence skill correction is needed. Both control-plane-evidence skills route local evidence commands,
+    subordinate summaries to current source/manuals and reports, and preserve baseline, complete-readiness and authority limitations.
+    Neither specifies a stale CLI-inventory algorithm, fixed AGENTS-only discovery scope, nor universal host/runtime proof.
+    New documentation detail does not conflict with their adapter_summary contract. Final combined source review f2234bb4530a2ca950a778e6b32c49e6dd6f51fbfd480782fcc9c03c73294526
+    binds the R2 payloads, documented Cursor/MCP metadata-only inventory and shared required-host correction; two adapter
+    references carry the reviewed project/kit attribution. This is automated technical review, not authenticated human approval,
+    native acceptance, provider activation, installed-artifact qualification or programme closure. Earlier review remains
+    in the exact base preimage.'
+  source_hashes:
+    docs/CONTROL_PLANE.md: 3c0618c1a91d8e6f3ffcefdca08820c71acd4eba0c06b413dddaade965290a17
+    scripts/naos_evidence_export.py: dca2f7085e271e070cdb767d413740b47241733fa438658926c5641ac0138cf7
+    scripts/workflows/generate_naos_dashboard.py: 045e99becc2b9114a2a568f22f22e18693ffad2d3632b48bc937b39f6715558e
+  target_hashes:
+    plugins/naos-governance/skills/naos-control-plane-evidence/SKILL.md: e5ae9a7fa316899c7f5e59475e5aa17d81b26e574dfaf4aee0ab89b0bac4f73c
+    plugins/naos-governance/references/adapter-coherence.md: a979fc5b05d1b20cc8fae5b42ff685d5932761d5aab0b8054c14a3a32838d0ed
+    plugins/naos-governance-claude-code/skills/naos-control-plane-evidence/SKILL.md: c2061882570fda78fd4a4eb423569dfcda3a205387dc8376142aad4cc908ca1c
+    plugins/naos-governance-claude-code/references/adapter-coherence.md: fdf758c390a2ed4e56a0b22944256e7dbc7caaf89ae9bb5f0630b2674a30124f
 
-  - link_id: forensic_audit_skill_to_plugins
-    disposition: no_impact
-    reviewed_at: "2026-08-26T15:10:38Z"
-    reviewer: naos-maintainer-source-truth-review
-    rationale: "The canonical forensic-audit source uses duplicate-risk review wording rather than promising duplicate prevention. Neither plugin forensic-audit extension repeats the displaced guarantee; both remain evidence-review routes, so no target edit is required. This records no runtime governance, provider/model/MCP/memory activation, hook activation, approval, merge, release, publication, certification, attestation, compliance proof, or live installation proof."
-    source_hashes:
-      templates/skills/forensic-audit/SKILL.md: e9517b9bcccb24ccd739775578904e48f158595e1a3be2cf1b72a75a1fa7feff
-    target_hashes:
-      plugins/naos-governance/skills/naos-forensic-audit/SKILL.md: edcb697d19c8b12086d62ab2e3338df14b9210bca17aec5b39f20e9f7ff108a3
-      plugins/naos-governance-claude-code/skills/naos-forensic-audit/SKILL.md: edcb697d19c8b12086d62ab2e3338df14b9210bca17aec5b39f20e9f7ff108a3
-
-  - link_id: governed_learning_skill_to_plugins
-    disposition: propagated
-    reviewed_at: "2026-07-09T03:45:00Z"
-    reviewer: naos-maintainers
-    rationale: "Failure-mode observations can now inform governed-learning review scoping without writing learning records. Codex and Claude governed-learning plugin guidance was updated to mention `naos failure-mode-observations` as optional review input and to preserve proposal-only boundaries: no automatic learning records, prompt/skill/workflow mutation, MCP/memory/provider/model activation, approval, or repository-evidence replacement."
-    source_hashes:
-      templates/skills/governed-learning-lifecycle/SKILL.md: e00243733f84bc1e19f05be1f3738bc84a019c47507d9f60beb200cd3803848b
-      templates/structural-seeds/naos/learning_loop_rules.yaml: b5a7ee5dcef88de435490e756d0386ac75453c754d4bde95d11501ebbb089357
-    target_hashes:
-      plugins/naos-governance/skills/naos-governed-learning/SKILL.md: 8c83d9729ced5aae99264491947c231fcd68dadce9435eb1a2cc627f8a3cb43a
-      plugins/naos-governance-claude-code/skills/naos-governed-learning/SKILL.md: 1f6efcb06746c0ed4097d8826da420f5f8e7c321f10aeab79cc445ef9ed047a7
-      plugins/naos-governance-claude-code/references/governed-learning.md: 631dc8ffc62e404ed6c6dc5f9b9cfec349e1a5fe775f2028db02770db4e21875
-
-  - link_id: ai_surface_health_skill_to_plugins
-    disposition: no_impact
-    reviewed_at: "2026-09-16T13:37:17Z"
-    reviewer: independent-agent-technical-review
-    rationale: "The maintainer approved six measured token and file baselines for task and evidence contract repairs. Independent technical review confirmed that the mapped plugin skills already use the generic four-profile budget workflow and do not repeat numeric baselines or approval dates. Commands, strict one-unit warning/two-unit stop behavior and all other limits remain unchanged, so target text needs no edit. This technical propagation review records no additional growth, human approval, candidate activation, merge, release, publication or external-action authority."
-    source_hashes:
-      templates/skills/ai-surface-health-review/SKILL.md: 0df9cac43fa48d9310ca35fa2430328f36065aab740e0d35fcf45b7807178d20
-      templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml: 0f503d4e2926508a3be03af7ee089c655c05e0af55a153d58211da2a9b654da4
-    target_hashes:
-      plugins/naos-governance/skills/naos-ai-surface-health/SKILL.md: 77d11df5d3d80019ed07a89aa6fe58b93b5b5f0664a527f9fb0fe0099d04596d
-      plugins/naos-governance-claude-code/skills/naos-ai-surface-health/SKILL.md: 9b659dff5383bd2d7d6f1305ea243e29d9498060046b92150a8ad4d7c71b4fda
-
-  - link_id: adapter_command_map_to_plugins
-    disposition: propagated
-    reviewed_at: "2026-09-05T09:11:49Z"
-    reviewer: naos-maintainer-adapter-review
-    rationale: "The optional Assured `naos agent-orchestration-plan` command is a local proposal surface and cannot launch agents or clients, write client configuration, mutate tasks or claims, or authorize dispatch. The tool-neutral guide uses OpenCode's documented direct per-agent `reasoningEffort` field, while plugin command maps and integration READMEs remain independent of client field paths. Both integration READMEs also state the evidenced preview-versus-activation platform boundary without changing command-routing semantics. The remaining mapped adapter references and coexistence skills preserve the explicit-command and no-automatic-mutation boundaries, so no further target content change is required. This review does not install or invoke a client, agent, provider, model, MCP, memory, hook, or external tool; mutate configuration, tasks, claims, or worktrees; approve or close work; or grant merge, push, release, publication, certification, evidence-admission, or compliance authority."
-    source_hashes:
-      docs/CODEX_PLUGIN_AND_MCP.md: eae799b7d6aa1ef6c4a875b124a60599b2f50abab181a12641138173c951418e
-      docs/TOOL_NEUTRAL_USAGE.md: 2e629c14f117f5ed65c0e1c2a26b55c1e7096c1b98814029efa039e3ab66aa1f
-      templates/structural-seeds/naos/adapter_coherence_rules.yaml: 249e28fd11001fb57c26bb7fb92bc9ff7ef6a5edc2c9a1a8f46b0e9ba54bee60
-      scripts/naos_adapter_coherence.py: 6480f543aaea9a41eada5cf4eb1332429abb9ed4cc4a1cc05f23dc4de0cfc9f0
-    target_hashes:
-      plugins/naos-governance/references/command-map.md: 440759f9fceb759d1a1013c7f4990c77fa136b8017d8eb681746a7114a193a42
-      plugins/naos-governance/references/adapter-coherence.md: 5da00c11ef497d21332636b775881ce5c5694e1b18268a127588820b640ed1cf
-      plugins/naos-governance/references/boundaries.md: fbe2241e729bd863c23fbd0b8658f66fa52550cc6b3324b6014dd82a4a78bb87
-      plugins/naos-governance/skills/naos-adapter-coexistence/SKILL.md: a005e4cd304ff2470c64190173a148d7a3a3c8623abefed8233b08a3b983ddcc
-      plugins/naos-governance-claude-code/references/command-map.md: 92debe9f29549fcea0ae152f0548ac475cf116795c7c092c20cd5426c68bd8bb
-      plugins/naos-governance-claude-code/references/adapter-coherence.md: 96e3d3c630aee2a7a0b8292fd82ff9c4c0016d7432e79a071ac02337f0769a7f
-      plugins/naos-governance-claude-code/references/boundaries.md: 564fe65bf0c7c64607715f662b6bdb2aea4512939c4d33959a5e374e4aa86936
-      plugins/naos-governance-claude-code/skills/naos-adapter-coexistence/SKILL.md: 8fa1735e4bc88887a465a0558e2ab0f10b3961dced13cfd892667e1c4149e020
-      templates/integrations/codex-plugin/README.md: 9d761f3fa36539356390218cce55eeb6fcd26e9929e8da854533ba091ac411a3
-      templates/integrations/claude-code-plugin/README.md: 87e3421d292e6af91a14ad083afcdbd096fae0c53cb1d8ae8ad0ce861f780204
-
-  - link_id: adoption_readiness_to_plugins
-    disposition: propagated
-    reviewed_at: "2026-09-05T09:07:46Z"
-    reviewer: naos-maintainer-adoption-review
-    rationale: "The installation manual, adoption skills, greenfield/brownfield references, and adopter integration READMEs preserve fresh-project `--new` semantics and the tested platform boundary: preview generation is portable and exercised on Linux/Python 3.11, while `init --activate` remains limited to the executed Darwin ARM64 CPython 3.11-3.13 tuple. This review does not add or relax a platform adapter, execute a scanner, activate network/provider/model/MCP/memory access, verify findings or assessed-scope completeness, or grant automatic risk decision, approval, blocking, merge, release, publication, certification, or compliance authority."
-    source_hashes:
-      docs/ADOPTION_GUIDE.md: 8f3ade094e4f76c57465a029182a00c00d4be4cef9488c8a487f46b49437be39
-      INSTALLATION_MANUAL.md: c8eb87357483a8a6ccc28b44b9ef6c41c1d08514eb97b876674286d66fb22783
-      templates/structural-seeds/naos/setup_module_catalog.yaml: 0b2f4249c353cd883b32bcf55516f75867509619c716ff4f8983f0d3981cdb5f
-    target_hashes:
-      plugins/naos-governance/skills/naos-adoption-readiness/SKILL.md: a24ac70ba45cce2dee180169540bd4dbd79f60fbc4bc69fb15c625f56ba015de
-      plugins/naos-governance/references/greenfield-brownfield.md: 4d05af9e8cf71072329c3f8d3dad0181f285cb7eacead2feb086346ee4e948d1
-      plugins/naos-governance-claude-code/skills/naos-adoption-readiness/SKILL.md: 8d6362402d6724403692f2232226b80a399afcb0bdeb5e560504fde95d9bd5a6
-      plugins/naos-governance-claude-code/references/greenfield-brownfield.md: e74d6c7097250e4b211608b46a34d9f3638928342ed35c4b2bed70c2178af44c
-      templates/integrations/codex-plugin/README.md: 9d761f3fa36539356390218cce55eeb6fcd26e9929e8da854533ba091ac411a3
-      templates/integrations/claude-code-plugin/README.md: 87e3421d292e6af91a14ad083afcdbd096fae0c53cb1d8ae8ad0ce861f780204
-
-  - link_id: control_plane_evidence_to_plugins
-    disposition: no_impact
-    reviewed_at: "2026-09-16T11:23:10Z"
-    reviewer: independent-agent-technical-review
-    rationale: "Independent agent review of the task and evidence contract remediation confirmed that the mapped plugin commands and bounded evidence guidance remain applicable. Evidence export and dashboard now preserve explicit digest, root, scope and required-coverage dimensions; mapped guidance already distinguishes local digest verification from signature presence and does not claim authentication. This technical no-impact review does not supply human approval, disposition, release or publication authority."
-    source_hashes:
-      docs/CONTROL_PLANE.md: 742c7b24f8011317175fa972f5a0c6c3568e27abfa9f04b8c263ba23bd1c6e6a
-      scripts/naos_evidence_export.py: b64ded8319cfbdc88033514e272d73dda810564a081260530f3f94bb7141dea0
-      scripts/workflows/generate_naos_dashboard.py: 83b08279163f782da998819cc3861d4d90acc6891bdd24d381373d25f3e413af
-    target_hashes:
-      plugins/naos-governance/skills/naos-control-plane-evidence/SKILL.md: bce8d554e66737aaeca6f82fd29fa6469dfd4859d1b2098f6dfa53a609d11571
-      plugins/naos-governance/references/adapter-coherence.md: 5da00c11ef497d21332636b775881ce5c5694e1b18268a127588820b640ed1cf
-      plugins/naos-governance-claude-code/skills/naos-control-plane-evidence/SKILL.md: a9b46d40daef22f6c4a8d7e0072896f6ef92334f7d9e2ba9130edefe9025cf4a
-      plugins/naos-governance-claude-code/references/adapter-coherence.md: 96e3d3c630aee2a7a0b8292fd82ff9c4c0016d7432e79a071ac02337f0769a7f
-
-  - link_id: forensic_review_to_plugins
-    disposition: no_impact
-    reviewed_at: "2026-09-05T10:06:54Z"
-    reviewer: naos-maintainer-forensic-review
-    rationale: "The bounded public test directory is classified under the existing tests, fixtures, graders, and evaluation-battery changed-path family. The mapped forensic-review skills already require complete governed-path classification, exact changed-path review, systemic impact, control-plane review, and adapter coherence and deliberately do not enumerate individual test directories, so no target edit is required. This review adds no plugin execution, scanner or provider/model/MCP/network/memory action, finding verification, automatic task/writeback, gate authority, approval, blocking, merge, release, publication, certification, semantic-completeness claim, or compliance authority."
-    source_hashes:
-      templates/skills/systemic-capability-wiring/SKILL.md: f060dd7b84a90c5be35c57b53229661c62bc820a23c906d46646f03b62422051
-      templates/structural-seeds/naos/control_plane_review_rules.yaml: b66fc9294b4aa876107a80966ad16001acf15992b7beb3b566f5f843e0de904f
-      templates/structural-seeds/naos/systemic_impact_rules.yaml: 4018e680d596e79821ce8cb3da24f17b27118b166e887010c408584cf5c0e511
-    target_hashes:
-      plugins/naos-governance/skills/naos-forensic-review/SKILL.md: 7c974f87a6e05cc35e119a276c6f7ee5070bda6f322eccadcfaaeb314a818eb9
-      plugins/naos-governance-claude-code/skills/naos-forensic-review/SKILL.md: 5a85311c52409a55465fc4e400339ad62f4d2c85c9f657577385fccb567ddeeb
-  - link_id: claude_runtime_boundary_to_plugin
-    disposition: no_impact
-    reviewed_at: "2026-07-03T13:05:00Z"
-    reviewer: naos-maintainers
-    rationale: "Pre-pilot toolchain friction hardening updates Codex/plugin command examples but does not change Claude plugin runtime boundaries. Current Claude plugin source remains skills-only: no displayName, hooks, MCP servers, LSP servers, output styles, user config, channels, dependencies, monitors, binaries, settings mutation, provider calls, signing, approval, release, publication, or compliance authority. No runtime-boundary target content change is required."
-    source_hashes:
-      docs/CODEX_PLUGIN_AND_MCP.md: eae799b7d6aa1ef6c4a875b124a60599b2f50abab181a12641138173c951418e
-      templates/integrations/claude-code/README.md: 1c3cca47b1901475afadef4540f3863c0c6636b8198142c66b39c8ddc1f7f0d3
-      templates/structural-seeds/naos/adapter_coherence_rules.yaml: 249e28fd11001fb57c26bb7fb92bc9ff7ef6a5edc2c9a1a8f46b0e9ba54bee60
-    target_hashes:
-      plugins/naos-governance-claude-code/.claude-plugin/plugin.json: 006fe3ea06a20784a6c91b54ac199657c7db0d3e13c45d64750af57cfa2420f1
-      plugins/naos-governance-claude-code/references/boundaries.md: 564fe65bf0c7c64607715f662b6bdb2aea4512939c4d33959a5e374e4aa86936
-      plugins/naos-governance-claude-code/references/claude-code-hooks.md: 13b90019fac3e1bf9d23072e7c85f8143b1cf445cce8782aa11730da3cf007c2
-
+- link_id: forensic_review_to_plugins
+  disposition: no_impact
+  reviewed_at: "2026-10-17T11:14:10.721800+00:00"
+  reviewer: Codex root bounded technical source-target review (not authenticated human approval)
+  rationale: "Reviewed the single exact maintainer source-pattern addition .github/windows_test_job.py to route_workflows_hooks beside run_test_shard.py. It adds workflow/test/security/docs/release-gate impact routing without changing runtime behavior, generated path membership, unknown-path treatment or approval authority. Both unchanged plugin forensic summaries continue to require source-first topology, deterministic checks and explicit remediation; neither enumerates maintainer helper paths. No target edit is needed. This is a bounded automated technical review, not human authentication, platform execution or programme closure; prior review is preserved in the exact preimage."
+  source_hashes:
+    templates/skills/systemic-capability-wiring/SKILL.md: fe0dd3962f9455449813599a4f03f18fd948dca6ce32884fb096de911bd2633c
+    templates/structural-seeds/naos/control_plane_review_rules.yaml: d8013fdf51da9480453a6c08d76046d8a4f3605a29e9b527fbd242bb29ad0881
+    templates/structural-seeds/naos/systemic_impact_rules.yaml: "53f5e7e7741aca279bb13b9b81a72bb4172bdbec822d35540574b8c6f3045ee4"
+  target_hashes:
+    plugins/naos-governance-claude-code/skills/naos-forensic-review/SKILL.md: 5a85311c52409a55465fc4e400339ad62f4d2c85c9f657577385fccb567ddeeb
+    plugins/naos-governance/skills/naos-forensic-review/SKILL.md: d9495365bb546737f7f087062ac1683db4d8aecca2d93dde2a88fc7964fed8a3
+- link_id: claude_runtime_boundary_to_plugin
+  disposition: propagated
+  reviewed_at: '2026-10-16T19:57:00.145453+00:00'
+  reviewer: Codex independent bounded technical review (not authenticated human approval)
+  rationale: 'Automated bounded technical source-target review of the exact three unchanged Claude plugin
+    targets against candidate canonical README SessionEnd→session-end, nonwriting legacyStop, manual migration
+    removing oldNAOSStop, no --close-session, and disclosed optional pertool report writes/cost. The manifest
+    remains skills-only without hooks; boundaries forbid hook activation/settings mutation and keep human
+    decisions separate. claude-code-hooks.md has no oldStop mapping and explicitly requires reading the
+    canonical README before activation, reviewing copied files, manually merging only reviewed hooks,
+    and separately testing host registration. Its unchanged literalargv, advisory failure/timeout/success
+    and non-authorization summary still matches; it need not duplicate canonical migration/cadence details.
+    No target body change is needed; renew only exact source hash and review metadata/rationale, keeping
+    target hashes and prior record history. This is automated technical review, not human activation approval,
+    authenticated identity, livehost/performance proof or programme closure. Review SHA256: 1786580a7dff2a09df74c5c826c5521f2bea21f801b5428ebecc83a30268cab7'
+  source_hashes:
+    docs/CODEX_PLUGIN_AND_MCP.md: eae799b7d6aa1ef6c4a875b124a60599b2f50abab181a12641138173c951418e
+    templates/integrations/claude-code/README.md: 5092e11b8b676da72ab3e0948a2488503b35ce3eadad2768f85e127449e5e215
+    templates/structural-seeds/naos/adapter_coherence_rules.yaml: ffb7bf2f2fc3679108dbf0286f9ea813abba9ace04bac0452a65b10d220e923d
+  target_hashes:
+    plugins/naos-governance-claude-code/.claude-plugin/plugin.json: 006fe3ea06a20784a6c91b54ac199657c7db0d3e13c45d64750af57cfa2420f1
+    plugins/naos-governance-claude-code/references/boundaries.md: 564fe65bf0c7c64607715f662b6bdb2aea4512939c4d33959a5e374e4aa86936
+    plugins/naos-governance-claude-code/references/claude-code-hooks.md: eba8b74d2e2f865ef907fdb3da8e72512e55127091fff0021a49e82410cb04eb
 not_claimed:
-  - automatic plugin propagation
-  - automatic stale-content repair
-  - semantic equivalence proof
-  - live plugin installation proof
-  - approval
-  - certification
-  - proof of compliance
+  - "Authenticated human approval"
+  - "Automatic adapter propagation"
+  - "Complete workflow readiness"
+  - "Native platform or installed-artifact qualification"
+  - "Release or publication authority"

@@ -1,7 +1,8 @@
 ---
-name: "cookbook-ui"
-description: "If-then recipes for UI/UX design. Invoke when designing screens, choosing colors, adding interactive elements, or displaying user-supplied content."
-parameters: []
+name: cookbook-ui
+description: If-then recipes for UI/UX design. Invoke when designing screens, choosing colors, adding interactive elements, or displaying user-supplied content.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Cookbook: UI Design

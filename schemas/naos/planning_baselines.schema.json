@@ -50,7 +50,7 @@
       "required": ["path", "digest_kind", "sha256"],
       "properties": {
         "path": {"type": "string", "minLength": 1},
-        "digest_kind": {"const": "file_sha256"},
+        "digest_kind": {"enum": ["file_sha256", "text_lf_sha256_v1"]},
         "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
       }
     },
@@ -70,7 +70,7 @@
       "required": ["path", "digest_kind", "sha256", "applicability"],
       "properties": {
         "path": {"type": "string", "minLength": 1},
-        "digest_kind": {"const": "file_sha256"},
+        "digest_kind": {"enum": ["file_sha256", "text_lf_sha256_v1"]},
         "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
         "applicability": {
           "enum": ["required_by_profile", "not_applicable_by_profile"]
@@ -84,7 +84,7 @@
       "properties": {
         "path": {"type": "string", "minLength": 1},
         "required_by_profile": {"type": "boolean"},
-        "digest_kind": {"const": "file_sha256"},
+        "digest_kind": {"enum": ["file_sha256", "text_lf_sha256_v1"]},
         "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
       }
     },

@@ -73,8 +73,7 @@
         "compare_status",
         "compare_finding_ids",
         "compare_source_categories",
-        "compare_summary_counts",
-        "ignore_fields"
+        "compare_summary_counts"
       ],
       "properties": {
         "compare_schema": {"type": "boolean"},
@@ -82,7 +81,12 @@
         "compare_finding_ids": {"type": "boolean"},
         "compare_source_categories": {"type": "boolean"},
         "compare_summary_counts": {"type": "boolean"},
-        "ignore_fields": {"type": "array", "items": {"type": "string"}}
+        "ignore_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["generated_at", "session_id", "operator_id", "run_id", "absolute_paths"]},
+          "description": "Deprecated legacy declaration. These fixed metadata fields are outside the comparisons; this setting does not suppress any comparison."
+        }
       }
     },
     "not_claimed": {"type": "array", "items": {"type": "string"}},

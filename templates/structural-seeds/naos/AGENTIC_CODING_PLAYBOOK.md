@@ -31,8 +31,8 @@ commands, Make targets, schemas, reports, gates, and human review.
 
 Pull context is the bounded material an operator or assistant reads before work:
 
-- `naos/NAOS_QUICK_REFERENCE.md`
-- `naos/active/*.md`
+- the exact active task card under `naos/active/`
+- the relevant task/profile section of `naos/NAOS_QUICK_REFERENCE.md`; annexes are on-demand, not a whole-file prerequisite
 - `naos/TASK_REGISTRY.yaml`
 - `naos/AGENTIC_CODING_PLAYBOOK.md`
 - `naos/PRE_IMPLEMENTATION_ALIGNMENT.md`

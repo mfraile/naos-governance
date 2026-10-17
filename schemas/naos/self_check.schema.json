@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:self_check:v1",
+  "title": "NAOS Self Check Report",
+  "description": "Aggregate of locally selected checks. Nested findings retain their producers' distinct fields and meanings.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "generated_at", "profile", "project_root", "naos_root", "status", "summary", "checks", "limitations"],
+  "properties": {
+    "schema": {"const": "naos.self_check.v1"},
+    "generated_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "project_root": {"type": "string", "minLength": 1},
+    "naos_root": {"type": "string", "minLength": 1},
+    "status": {"enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "summary": {"$ref": "#/$defs/summary"},
+    "checks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check"}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["blocking", "required", "warnings", "advisory", "total_findings", "checks"],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0},
+        "checks": {"type": "integer", "minimum": 1}
+      }
+    },
+    "check": {
+      "type": "object", "additionalProperties": true,
+      "required": ["id", "status", "findings"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "minLength": 1},
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+        "summary": {"type": "object"},
+        "returncode": {"type": "integer"},
+        "applicability": {"type": "string"}
+      }
+    },
+    "finding": {
+      "type": "object", "additionalProperties": true,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"type": "string"},
+        "status": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}

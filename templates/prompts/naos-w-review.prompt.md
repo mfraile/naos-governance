@@ -52,11 +52,11 @@ Use the weekly review findings to seed next week's plan or open a focused task f
 
 ```yaml
 next_action:
-	label: "Convert review findings into next-week priorities."
-	preferred_command: "/naos-w-plan"
-	preferred_agent: "@naos-plan"
-	reason: "Review findings should become planned work, not informal memory."
-	constraints:
-		- "Add or update TASK_REGISTRY.yaml only through the normal governance flow."
-		- "Keep retrospective notes distinct from committed task status."
+  label: "Convert review findings into next-week priorities."
+  preferred_command: "/naos-w-plan"
+  preferred_agent: "@naos-plan"
+  reason: "Review findings should become planned work, not informal memory."
+  constraints:
+    - "Add or update TASK_REGISTRY.yaml only through the normal governance flow."
+    - "Keep retrospective notes distinct from committed task status."
 ```

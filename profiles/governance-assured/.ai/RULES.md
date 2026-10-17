@@ -10,93 +10,90 @@
 >
 > **Source**: `configs/profile_rules_source.yaml` (kit/package source; not installed).
 
----
+> **H: Human-review obligation**: Each `[H]` table row/heading binds the full rule and its `Review Rn [H]` evidence. Human reviewers must verify all applicable rule requirements and listed evidence, withholding approval until verified; waivers require existing project-policy authority. Deterministic triggers/refusals remain; passing checks does not prove full rule satisfaction.
 
 ## Quick Reference
 
-| Rule | Summary | Rule posture |
-|------|---------|:-----------:|
-| 1 | Update existing files, never create new ones | 🔴 blocking |
-| 2 | No archive folders (use `git rm`) | 🔴 blocking |
-| 5 | `docs/exploration/` is exploration only | 🔴 blocking |
-| 6 | Refresh README before pushing to main | 🔴 blocking |
-| 7 | **Deep Analysis Protocol** — Evidence-first, exhaustive, multi-alternative, full documentation | 🔴 blocking |
-| 8 | **Bulk Migration Safety** — Scope verify, context-aware replace, AST validate, multi-backend test | 🔴 blocking |
-| 9 | **Enhancement Protocol** — Scope control, impact map, alternatives, fallback chain, governance updates | 🔴 blocking |
-| 10 | **License Review** — copyleft-risk dependencies require approval | 🔴 blocking |
-| 11 | **Anti-Duplication Protocol** — Function index must exist before activating | 🔴 blocking |
-| 13 | **Resilience & Retry Conventions** | 🔴 blocking |
-| 14 | **Event Schema Evolution** | 🔴 blocking |
-| 18 | **Agent & Skill Governance** — Two-layer arch, ≤100L instructions, AGENTS.md | 🔴 blocking |
-| 19 | **Memory Governance Protocol** — PII/credentials blocked | 🔴 blocking |
-| 20 | **Dependency Declaration** | 🔴 blocking |
-| 21 | **ML Model Governance** — Test separation, metadata, bias testing, HITL | 🔴 blocking |
-| 22 | **Artifact & Resource Management** — Max 3 checkpoints, no >10 MB in Git | 🔴 blocking |
-| 24 | **WI Context Brief Protocol** | 🔴 blocking |
-| 25 | **Instinct Recording Protocol** — Sprint review before each sprint close | 🔴 blocking |
-| 26 | **Cognitive Checkpoint Protocol** — Checkpoint at every phase transition | 🔴 blocking |
+|Rule|Rule posture|
+|------|:-----------:|
+|1|🔴 blocking [H]|
+|2|🔴 blocking [H]|
+|5|🔴 blocking [H]|
+|6|🔴 blocking [H]|
+|7|🔴 blocking [H]|
+|8|🔴 blocking [H]|
+|9|🔴 blocking [H]|
+|10|🔴 blocking [H]|
+|11|🔴 blocking [H]|
+|13|🔴 blocking [H]|
+|14|🔴 blocking [H]|
+|18|🔴 blocking [H]|
+|19|🔴 blocking [H]|
+|20|🔴 blocking [H]|
+|21|🔴 blocking [H]|
+|22|🔴 blocking [H]|
+|24|🔴 blocking [H]|
+|25|🔴 blocking [H]|
+|26|🔴 blocking [H]|
 
 > Rules 3, 4, 12, 15, 16, 17, 23 require project-specific adaptation — see ADAPT stubs below.
 > Blocking is posture, not automation. Hook source defines its checks; it has no
 > licence scanner, and init does not install `license-scan.yml`.
 
----
-
 ## Human Sign-Off Gates (Assured only)
 
 The following events require explicit human approval before proceeding:
 
-| Trigger | Required Evidence |
+|Trigger|Required Evidence|
 |---------|-------------------|
-| Architecture decision | Decision matrix with ≥3 alternatives evaluated |
-| New dependency | License verified at source (pip show / PyPI); security audit (osv.dev) |
-| Drift regression >5 percentage points | Root cause documented; instinct record updated |
-| Rule exception request | Written rationale; time-bounded; peer review |
+|Architecture decision|Decision matrix with ≥3 alternatives evaluated|
+|New dependency|License verified at source (pip show / PyPI); security audit (osv.dev)|
+|Drift regression >5 percentage points|Root cause documented; instinct record updated|
+|Rule exception request|Written rationale; time-bounded; peer review|
 
----
+## Rule 1: Update Existing Files 🔴 blocking [H]
+> **Review R1 [H]**: Document searches; new-file justification/index; stated exceptions.
 
-## Rule 1: Update Existing Files 🔴 blocking
+Update existing files, never create new ones (exceptions below).
 
 ```
 ❌ FORBIDDEN: docs/analysis_2025-XX-XX.md, notes/session_summary.md, draft_*.md
 ✅ REQUIRED: Update existing docs (STATUS.md, CHANGELOG.md, README.md)
 ```
 
-**Policy-review patterns** (not comprehensively checked by pre-commit):
+Policy-review patterns (not comprehensively checked by pre-commit):
 `*_SUMMARY.md`, `*_ANALYSIS.md`, `*_PLAN.md`, `*_FINAL*.md`; hook source is narrower.
 
-**Exception**: `docs/exploration/` is exempt for exploratory work (see Rule 5).
-**Exception (Story Cards)**: Creating/updating story cards under active task directory is allowed.
-**If new file needed**: Add to docs index first, justify in commit message.
+Exception: `docs/exploration/` is exempt for exploratory work (see Rule 5).
+Exception (Story Cards): Creating/updating story cards under active task directory is allowed.
+If new file needed: Add to docs index first, justify in commit message.
 
----
+## Rule 2: No Archive Folders 🔴 blocking [H]
 
-## Rule 2: No Archive Folders 🔴 blocking
+> **Review R2 [H]**: Changed paths; obsolete-file removal through Git.
 
-```
-❌ FORBIDDEN: */archive/
-✅ REQUIRED: git rm path/to/obsolete_file.md
-```
+Do not retain obsolete files in shadow history folders; use normal Git removal
+and review instead. Legitimate archive/backup domain code is allowed, including
+`src/archive/domain.py` and `db_backup.py`.
 
----
+**Generated-hook scope**: blocks top-level `archive/`, `docs/archive/`, and
+`<NAOS_ROOT>/archive/` (default `naos/archive/`), plus `.bak`/`.backup` file
+extensions. Other obsolete copies remain subject to Review R2; a passing
+filename check does not establish their absence.
+
 
 ## Rule 3: [PROJECT] PM Infrastructure — ADAPT 🔧
-
 > **⚠️ ADAPT REQUIRED**: Document your canonical PM locations.
 > Replace with your `[PROJECT_DIR]/STATUS.md`, `DASHBOARD.md`, `TASK_REGISTRY.yaml`.
 > Include the atomic update protocol for PM state transitions.
 > AI agents MUST know the single source of truth for task status.
 
----
-
 ## Rule 4: [PROJECT] Documentation Impact Checklist — ADAPT 🔧
-
 > **⚠️ ADAPT REQUIRED**: List the documentation files that must be checked before
 > any code change. Include root docs, specs, and operations guides.
 
----
-
-## Rule 5: Exploration Notes Only 🔴 blocking
+## Rule 5: Exploration Notes Only 🔴 blocking [H]
+> **Review R5 [H]**: Exploration authority; research-card gates, exclusions and artifact paths.
 
 ```yaml
 docs/exploration/:
@@ -108,9 +105,8 @@ docs/exploration/:
 Research story card body MUST include: Rule 7 completion gate evidence, explicit
 out-of-scope list, output artifact location.
 
----
-
-## Rule 6: Refresh README Before Push 🔴 blocking
+## Rule 6: Refresh README Before Push 🔴 blocking [H]
+> **Review R6 [H]**: README/change comparison and refresh before push.
 
 ```bash
 make readme-refresh   # or update README.md manually
@@ -119,23 +115,22 @@ git add README.md && git commit --amend --no-edit && git push origin main
 
 No pre-push hook ships; README freshness is blocking review posture in Assured.
 
----
+## Rule 7: Deep Analysis Protocol (MANDATORY) 🔴 blocking [H]
+> **Review R7 [H]**: All seven principles and every completion-gate item.
 
-## Rule 7: Deep Analysis Protocol (MANDATORY) 🔴 blocking
+Every task MUST follow the 7 Non-Negotiable Principles:
 
-Every task MUST follow the **7 Non-Negotiable Principles**:
-
-| # | Principle | Description |
+|#|Principle|Description|
 |---|-----------|-------------|
-| 1 | **Evidence-First** | Validate on real project data. Never assume. |
-| 2 | **Exhaustive Impact Search** | Find ALL affected files via grep/find/semantic search. |
-| 3 | **Verify Claims at Source** | `pip show`, read LICENSE files. Never trust README badges. |
-| 4 | **Multi-Alternative Evaluation** | Test ≥3 alternatives. SELECTED / REJECTED / BLOCKED with evidence. |
-| 5 | **Fallback Chain Design** | Design graceful degradation. Nothing breaks during migration. |
-| 6 | **Full Scope Documentation** | motivation → evidence → decision → risks → checklist. |
-| 7 | **No Drift** | Stay within task scope. Defer adjacent problems explicitly. |
+|1|Evidence-First|Validate on real project data. Never assume.|
+|2|Exhaustive Impact Search|Find ALL affected files via grep/find/semantic search.|
+|3|Verify Claims at Source|`pip show`, read LICENSE files. Never trust README badges.|
+|4|Multi-Alternative Evaluation|Test ≥3 alternatives. SELECTED / REJECTED / BLOCKED with evidence.|
+|5|Fallback Chain Design|Design graceful degradation. Nothing breaks during migration.|
+|6|Full Scope Documentation|motivation → evidence → decision → risks → checklist.|
+|7|No Drift|Stay within task scope. Defer adjacent problems explicitly.|
 
-**Completion Gate**:
+Completion Gate:
 ```
 □ Tested on REAL project data
 □ Found ALL affected files
@@ -147,30 +142,27 @@ Every task MUST follow the **7 Non-Negotiable Principles**:
 □ No scope drift
 ```
 
----
-
-## Rule 8: Bulk Code Migration Safety Protocol 🔴 blocking
+## Rule 8: Bulk Code Migration Safety Protocol 🔴 blocking [H]
+> **Review R8 [H]**: Trigger scope and executed evidence for all five migration gates.
 
 Triggers when change touches >10 files or replaces a pattern across modules.
 
-**5 Safety Gates**: (1) Scope Verification — enumerate ALL occurrences via `grep -rn`.
+5 Safety Gates: (1) Scope Verification — enumerate ALL occurrences via `grep -rn`.
 (2) Context-Aware Replacement — classify CODE / DATA / EDGE CASE.
 (3) AST Verification — `python -c "import ast; ast.parse(open('f.py').read())"`.
 (4) Import Hygiene — `ruff check --select F401` after removals.
 (5) Multi-Backend Testing — SQLite (CI) AND production DB.
 
----
-
-## Rule 9: Ultra Deep Analysis Protocol for Enhancements 🔴 blocking
+## Rule 9: Ultra Deep Analysis Protocol for Enhancements 🔴 blocking [H]
+> **Review R9 [H]**: Trigger scope; impact map, alternatives, fallback and same-PR governance.
 
 Applies to scope expansion, multi-surface changes, new capabilities, compliance work.
 
 Requires: Evidence validation, exhaustive impact map, alternatives matrix,
 fallback chain, no drift, governance surface update in the same PR.
 
----
-
-## Rule 10: License Review — Copyleft-Risk Approval 🔴 blocking posture
+## Rule 10: License Review — Copyleft-Risk Approval 🔴 blocking posture [H]
+> **Review R10 [H]**: Licence verification at source; copyleft-risk/unknown/custom human sign-off.
 
 Copyleft-risk dependencies require source verification and human sign-off;
 obligations depend on use and legal context. This is not legal advice.
@@ -183,11 +175,10 @@ COMMON DEFAULTS: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, PSF-2.0, CC0-
 Verify via `pip show <package-name>`. Never trust README.
 No licence scanner is installed automatically; the optional workflow must be
 reviewed, configured, installed, and validated separately.
----
+## Rule 11: Anti-Duplication Protocol 🔴 blocking [H]
+> **Review R11 [H]**: Index setup, queries/searches, task-card reuse and post-creation refresh.
 
-## Rule 11: Anti-Duplication Protocol 🔴 blocking
-
-**Function index MUST be set up before activating Assured profile.**
+Function index MUST be set up before activating Assured profile.
 
 Before creating any function:
 1. Query function index: `python scripts/naos_function_index_query.py --package <target>`
@@ -196,97 +187,79 @@ Before creating any function:
 
 After creating: `python scripts/naos_code_quality_audit.py --generate-index`
 
----
-
 ## Rule 12: [PROJECT] Data Flow Invariants — ADAPT 🔧
-
 > **⚠️ ADAPT REQUIRED**: Encode all data flow invariants for your project.
 > Include: schema boundaries, invariants, domain isolation rules, convergence points, lifecycle routing rules.
 
----
+## Rule 13: Resilience & Retry Conventions 🔴 blocking [H]
+> **Review R13 [H]**: All external/error paths: configured timeouts, jitter, fail-fast, handling.
 
-## Rule 13: Resilience & Retry Conventions 🔴 blocking
+4 Principles (ALL external calls and error paths):
 
-**4 Principles (ALL external calls and error paths)**:
+1. Config-driven timeouts — read from `configs/*.yaml`, never hardcode
+2. Exponential backoff with jitter: `delay = min(base × 2^n × jitter[0.75–1.25], max_delay)`
+3. Fail-fast on non-transient: RETRY 5xx/429/timeouts; FAIL-FAST 4xx/validation/auth
+4. Never silently swallow errors: re-raise OR log WARNING+ OR DLQ. Bare `except: pass` FORBIDDEN.
 
-1. **Config-driven timeouts** — read from `configs/*.yaml`, never hardcode
-2. **Exponential backoff with jitter**: `delay = min(base × 2^n × jitter[0.75–1.25], max_delay)`
-3. **Fail-fast on non-transient**: RETRY 5xx/429/timeouts; FAIL-FAST 4xx/validation/auth
-4. **Never silently swallow errors**: re-raise OR log WARNING+ OR DLQ. Bare `except: pass` FORBIDDEN.
-
----
-
-## Rule 14: Event Schema Evolution Protocol 🔴 blocking
+## Rule 14: Event Schema Evolution Protocol 🔴 blocking [H]
+> **Review R14 [H]**: Event validation, additive changes, golden tests and breaking-version retention.
 
 For event-driven systems with Pydantic (or equivalent):
 
 1. `extra="allow"` on all event models
-2. `model_validate()` — never `Event(**raw_dict)`
+2. `model_validate()` — never `Event(raw_dict)`
 3. Additive-only changes within a version
 4. Golden snapshot tests must pass or be explicitly updated
 5. Breaking changes → new version class (V2), keep V1 for 2 releases
 
----
-
 ## Rule 15: [PROJECT] Module Boundary Protocol — ADAPT 🔧
-
 > **⚠️ ADAPT REQUIRED**: Document your module topology and boundary rules.
 > Include: layering rules (routes → services → db), bounded contexts,
 > cross-context communication rules, async constraints for heavy operations.
 
----
-
 ## Rule 16: [PROJECT] Spec Alignment Protocol — ADAPT 🔧
-
 > **⚠️ ADAPT REQUIRED**: Traceability headers linking code to requirements.
 > Every function/module declares `Implements: [REQ-ID]` and `Task: [TASK-ID]`.
 > The hook warns on missing `Implements: FR-XXX`; it does not cross-check registries/specs.
 
----
-
 ## Rule 17: [PROJECT] Pre-Coding Context Protocol — ADAPT 🔧
-
 > **⚠️ ADAPT REQUIRED**: "Check before creating" discipline with tooling.
 > Requires: function index with semantic search, pre-coding workflow in story card template,
 > "Existing Code to Use" section populated before any new function is written.
 
----
-
-## Rule 18: Agent & Skill Governance 🔴 blocking
+## Rule 18: Agent & Skill Governance 🔴 blocking [H]
+> **Review R18 [H]**: Portable boundaries, model field, scope/budgets, handoffs and skill registration.
 
 Two-layer portable architecture: agnostic layer (agents + instructions referencing
 `project-context.md`) + project-specific layer (`project-context.md` only).
 
-**7 Principles — ALL blocking in Assured**:
+7 Principles — ALL blocking in Assured:
 - Agents reference `project-context.md`, never hardcode project details
 - Model pinning via YAML frontmatter `model` field
 - Scoped instructions use `applyTo` globs, ≤100 lines each
 - Agent handoff chain documented in `AGENTS.md`
 - Skills have YAML frontmatter + documented in `AGENTS.md`
-- Cumulative instruction budget ≤400L for worst-case co-firing (**blocking posture**).
+- Cumulative instruction budget ≤400L for worst-case co-firing (blocking posture).
 
 The hook reads caller-supplied `NAOS_CONTEXT_REMAINING_PCT`: unset is a no-op,
 `<35` warns, `<25` rejects. It does not measure instruction lines or prove ≤400L.
 
----
-
-## Rule 19: Memory Governance Protocol 🔴 blocking
+## Rule 19: Memory Governance Protocol 🔴 blocking [H]
+> **Review R19 [H]**: Memory sensitive-content exclusions and governance authority.
 
 Permitted: decisions/rationale, library findings, bug notes, session progress.
-**FORBIDDEN**: PII, credentials, connection strings, customer data, security bypass instructions.
+FORBIDDEN: PII, credentials, connection strings, customer data, security bypass instructions.
 
 ROM Immutability: Governance files are ROM. Memory is RAM. RAM never overwrites ROM.
 
----
-
-## Rule 20: Dependency Declaration 🔴 blocking
+## Rule 20: Dependency Declaration 🔴 blocking [H]
+> **Review R20 [H]**: Import/declaration parity, exact pins and clean-environment validation.
 
 Every import in `src/` → `requirements.txt`.
 Every import in `tests/`/`scripts/` → `requirements-dev.txt`.
 Pin exact versions (`==X.Y.Z`). Clean-env validation required.
----
-
-## Rule 21: ML Model Governance 🔴 blocking
+## Rule 21: ML Model Governance 🔴 blocking [H]
+> **Review R21 [H]**: AI test paths, metadata, pre-production bias, critical HITL and UI labels.
 
 - AI tests in `tests/manual/` named `test_*.py` (never `validate_*.py` in `scripts/`)
 - Checkpoints require `metadata.json` (dataset, hyperparameters, metrics, date)
@@ -294,70 +267,59 @@ Pin exact versions (`==X.Y.Z`). Clean-env validation required.
 - HITL path required for critical AI decisions
 - AI-generated content labeled in UI
 
----
-
-## Rule 22: Artifact & Resource Management 🔴 blocking
+## Rule 22: Artifact & Resource Management 🔴 blocking [H]
+> **Review R22 [H]**: Checkpoint limits/cleanup, large-file storage and secret-loading paths.
 
 - Maximum 3 checkpoints; cleanup pipeline required
 - Files > 10 MB forbidden in Git (use LFS / S3)
 - Secrets only via `os.getenv("SECRET_NAME")` — hardcoded values strictly forbidden
 
----
-
 ## Rule 23: [PROJECT] File Registration & Tagging — ADAPT 🔧
-
 > **⚠️ ADAPT REQUIRED**: Governance header convention for all source files.
 > Define headers/inventory; no generated hook rejects unregistered files.
 > Re-init is not a profile transition.
 
----
-
-## Rule 24: WI Context Brief Protocol 🔴 blocking
+## Rule 24: WI Context Brief Protocol 🔴 blocking [H]
+> **Review R24 [H]**: Every multi-step WI: brief ≤7 lines; prerequisites, files, goal, constraint.
 
 Every WI in a multi-step task card MUST include a Context Brief block (≤7 lines):
 prerequisites, key files, one-sentence goal, critical constraint.
 
 Blocking review posture in Assured; no generated hook checks Context Briefs.
 
----
+## Rule 25: Instinct Recording Protocol 🔴 blocking [H]
+> **Review R25 [H]**: Sprint-close patterns/tiers and human sign-off before rule promotion.
 
-## Rule 25: Instinct Recording Protocol 🔴 blocking
-
-**Instinct review required before each sprint close (Assured profile).**
+Instinct review required before each sprint close (Assured profile).
 
 Record recurring agent behavioral patterns after ≥3 observations:
 - `.github/instincts/INS-NNN.yaml` following `schema.yaml`
 - 3-tier: project (≥3 obs) → user (≥5, ≥2 sessions) → universal (≥10, ≥2 projects)
-- **NEVER auto-promote to Rule** without human sign-off
+- NEVER auto-promote to Rule without human sign-off
 
----
-
-## Rule 26: Cognitive Checkpoint Protocol 🔴 blocking
+## Rule 26: Cognitive Checkpoint Protocol 🔴 blocking [H]
+> **Review R26 [H]**: All triggers/fields/brackets and stop/handoff; supplied context is not proof.
 
 Five mandatory triggers: T1 Phase transition, T2 Non-obvious discovery, T3 ≥5 tool calls,
 T4 ≥20 messages, T5 Pre-handoff.
 
-Checkpoint must answer: **What** / **Why** / **Files** / **Remaining** / **Gotchas** (≥3 of 5 fields).
+Checkpoint must answer: What / Why / Files / Remaining / Gotchas (≥3 of 5 fields).
 
-**PAUL Context Brackets (blocking in Assured).** Every checkpoint MUST pre-declare the active bracket:
-
-| Bracket | Headroom remaining | Behavioral change | Trigger interplay |
-|---|---|---|---|
-| **FRESH** | >75% | Normal cadence. Speculative exploration permitted. | T1-T5 fire as written. |
-| **MODERATE** | 35-75% | Prefer focused tool calls; summarise verbose tool outputs before continuing. | T3 frequency raised: checkpoint every 4 tool calls. |
-| **DEEP** | 25-35% | No new exploration branches. Compact memory before any new agent invocation. Pre-handoff (T5) becomes mandatory before any sub-task. | Force a T1 + T5 checkpoint as soon as DEEP is entered. |
-| **CRITICAL** | <25% | Save a full checkpoint, then hand off. | Normative stop; hook cannot intercept tools. |
-
-The `cognitive-checkpoint` skill remains the canonical checkpoint template.
+PAUL Context Brackets (blocking in Assured). Use the normative table and
+checkpoint template in the installed `cognitive-checkpoint` skill. Attribute
+caller or host-display estimates; absent or unusable percentages are UNKNOWN,
+not FRESH. For the same supplied signal, used = 100 - remaining: 60% used /
+40% remaining is MODERATE, while 70% used / 30% remaining is DEEP. The skill
+retains the T1-T5 trigger and bracket behavior contract; this text does not
+measure model context or change checkpoint cadence.
 
 The hook reads caller-supplied `NAOS_CONTEXT_REMAINING_PCT`: unset does nothing,
 `<35%` warns and `<25%` rejects a commit; it cannot verify checkpoints or stop tools.
 
----
+## PGR Rule 27: PII Data Governance 🔴 blocking [H]
+> **Review R27 [H]**: Data/LLM changes: PII storage restrictions and prompt stripping.
 
-## PGR Rule 27: PII Data Governance 🔴 blocking
-
-**Critical**: PII MUST NEVER be stored in the discovery/analytics schema.
+Critical: PII MUST NEVER be stored in the discovery/analytics schema.
 
 PII includes: names, emails, phone numbers, physical addresses, national IDs, IP addresses tied to
 individuals. Safe: organization UUIDs, company names, aggregates, hashes, anonymized data.
@@ -365,16 +327,14 @@ individuals. Safe: organization UUIDs, company names, aggregates, hashes, anonym
 Pre-commit checklist: (1) Does change touch data layer? If yes → does it store PII?
 (2) Does change send data to LLM? If yes → is PII stripped from prompts?
 
----
-
-## PGR Rule 28: Documentation Requirements 🔴 blocking
+## PGR Rule 28: Documentation Requirements 🔴 blocking [H]
+> **Review R28 [H]**: External-change impact review and documentation adequacy.
 
 External changes require documented impact review. This is blocking review posture;
 no generated hook judges documentation adequacy.
 
----
-
-## PGR Rule 29: Architectural Change Documentation 🔴 blocking
+## PGR Rule 29: Architectural Change Documentation 🔴 blocking [H]
+> **Review R29 [H]**: Architecture decision, diagram, migration/rollback and human sign-off.
 
 Architectural changes require decision, diagram, migration/rollback, and sign-off
 evidence. This is blocking review posture; optional validation does not prove sign-off.

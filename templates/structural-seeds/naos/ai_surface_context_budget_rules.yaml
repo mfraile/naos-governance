@@ -32,13 +32,13 @@ profile_footprint:
   methodology:
     warning: Any increase above the exact current fresh-profile baseline requires review and justification.
     stop: More than the minimum one-integer-unit separation above the warning boundary stops expansion pending an explicit reviewed allowance.
-    rationale: The maintainer approved only the six measured token and file baselines for task and evidence contract repairs on 2026-09-16. Quickstart, finding-count and command-count limits are unchanged. Two identical isolated fixed-time replays must bind the updated allowance to the current generated profiles. The strict one-unit warning and two-unit stop behavior remains unchanged, and no further growth is approved.
+    rationale: The 2026-09-16 maintainer decision approved six measured Lite, Standard and Assured token and file baselines for task and evidence contract repairs. On 2026-10-16 the maintainer explicitly approved only generated-file limits Quickstart95, Lite560, Standard696, Assured750 and Lite CLI99 in the current root chat, conditioned on two complete reproducible builds and later validation. All other token, finding and CLI limits remain unchanged. No extra headroom is approved; warn_above equals the approved baseline and stop_above equals baseline plus one. Two identical complete isolated fixed-time measurement projections on the final source and rules are required before allowance acceptance.
     falsifier: Re-derive if the scaffold contract changes, deterministic replay differs, or the maintainer approves a different measured growth allowance.
   approval:
     status: approved
     authority_ref: templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml
-    authority_basis: The maintainer explicitly approved the measured Lite, Standard and Assured token and file baselines on 2026-09-16 for task and evidence contract repairs. This approval changes only those six baselines. The exact-baseline warning boundary and baseline-plus-one stop boundary remain unchanged; any further change requires explicit human review and never authorizes publication or external action.
-    approved_on: "2026-09-16"
+    authority_basis: "Historical decision on 2026-09-16: The maintainer explicitly approved the measured Lite, Standard and Assured token and file baselines on 2026-09-16 for task and evidence contract repairs. This approval changes only those six baselines. The exact-baseline warning boundary and baseline-plus-one stop boundary remain unchanged; any further change requires explicit human review and never authorizes publication or external action. Current decision on 2026-10-16: the maintainer explicitly approved in the current root chat only generated-file limits Quickstart95, Lite560, Standard696, Assured750 and Lite CLI99, retaining all token/finding limits, other CLI limits and no extra headroom. Approval is conditioned on two complete reproducible builds plus later validation; no repeatability or acceptance is claimed here. This records the explicit maintainer decision, not authenticated identity or an invented approval hash. It never authorizes publication or external action."
+    approved_on: "2026-10-16"
   candidate_freeze:
     status: released
     release_requires:
@@ -66,9 +66,9 @@ profile_footprint:
         basis: Exact isolated Quickstart baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 84
-        warn_above: 84
-        stop_above: 85
+        baseline: 95
+        warn_above: 95
+        stop_above: 96
         basis: Exact isolated Quickstart baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:
@@ -91,15 +91,15 @@ profile_footprint:
         basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 423
-        warn_above: 423
-        stop_above: 424
+        baseline: 560
+        warn_above: 560
+        stop_above: 561
         basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:
-        baseline: 94
-        warn_above: 94
-        stop_above: 95
+        baseline: 99
+        warn_above: 99
+        stop_above: 100
         basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
     standard:
@@ -116,9 +116,9 @@ profile_footprint:
         basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 511
-        warn_above: 511
-        stop_above: 512
+        baseline: 696
+        warn_above: 696
+        stop_above: 697
         basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:
@@ -141,9 +141,9 @@ profile_footprint:
         basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 538
-        warn_above: 538
-        stop_above: 539
+        baseline: 750
+        warn_above: 750
+        stop_above: 751
         basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:
@@ -263,7 +263,7 @@ combined_scenarios:
     profiles: [standard, assured]
     files:
       - {path: templates/agents/AGENTS.md, optional: true}
-      - {path: .github/agents/AGENTS.md, optional: true}
+      - {path: .github/NAOS_AGENTS.md, optional: true}
       - {path: templates/agents/naos-implement.agent.md, optional: true}
       - {path: .github/agents/naos-implement.agent.md, optional: true}
       - {path: templates/prompts/naos-task-start.prompt.md, optional: true}
@@ -276,7 +276,7 @@ combined_scenarios:
     profiles: [standard, assured]
     files:
       - {path: templates/agents/AGENTS.md, optional: true}
-      - {path: .github/agents/AGENTS.md, optional: true}
+      - {path: .github/NAOS_AGENTS.md, optional: true}
       - {path: templates/agents/naos-review.agent.md, optional: true}
       - {path: .github/agents/naos-review.agent.md, optional: true}
       - {path: templates/prompts/naos-task-complete.prompt.md, optional: true}
@@ -312,7 +312,11 @@ anchors:
     phrases: ["source artifacts remain authoritative", "repository evidence", "evidence"]
   - id: context_pressure
     label: Context pressure
-    phrases: ["context pressure", "NAOS_CONTEXT_REMAINING_PCT", "checkpoint", "compact"]
+    phrases: ["context pressure", "checkpoint", "compact"]
+  - id: caller_context_signal
+    label: Caller-supplied hook context signal
+    profiles: [standard, assured]
+    phrases: ["NAOS_CONTEXT_REMAINING_PCT"]
   - id: profile_gate_boundary
     label: Profile and gate boundary
     phrases: ["quickstart", "lite", "standard", "assured", "gate"]

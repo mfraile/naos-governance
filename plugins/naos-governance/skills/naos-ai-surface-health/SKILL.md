@@ -1,7 +1,8 @@
 ---
-name: "naos-ai-surface-health"
-description: "Review NAOS AI/governance instruction surface size, duplication, anchor coverage, and adapter loadout health from Codex."
-parameters: []
+name: naos-ai-surface-health
+description: Review NAOS AI/governance instruction surface size, duplication, anchor coverage, and adapter loadout health from Codex.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # NAOS AI Surface Health

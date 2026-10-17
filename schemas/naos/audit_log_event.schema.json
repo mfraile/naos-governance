@@ -37,6 +37,12 @@
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@+-]{7,160}$"
     },
+    "event_id_scheme": { "const": "naos.audit_log_event.public_id.v1" },
+    "event_nonce": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,38})$",
+      "description": "Public UUID4 occurrence discriminator as canonical ASCII decimal text; the pure validator also bounds the value below 2**128. This is correlation metadata, not authentication."
+    },
     "event_type": {
       "type": "string",
       "enum": [
@@ -98,5 +104,13 @@
       "type": "array",
       "items": { "type": "string" }
     }
-  }
+  },
+  "dependentRequired": {
+    "event_id_scheme": ["event_nonce"],
+    "event_nonce": ["event_id_scheme"]
+  },
+  "allOf": [{
+    "if": { "required": ["event_id_scheme"] },
+    "then": { "properties": { "event_id": { "pattern": "^audit-sha256-[0-9a-f]{64}$" } } }
+  }]
 }

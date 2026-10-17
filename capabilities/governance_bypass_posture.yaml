@@ -30,6 +30,10 @@ authority:
     - .git/config
     - .githooks/pre-commit
     - .github/workflows/
+    - .gitlab-ci.yml
+    - azure-pipelines.yml
+    - azure-pipelines.yaml
+    - Jenkinsfile
     - local git commit messages
   may_write:
     - naos/reports/governance_bypass_posture.json
@@ -78,6 +82,7 @@ not_claimed:
   - "proof of compliance"
   - "certification"
 related_docs:
+  - docs/CI_DECLARATION_POSTURE.md
   - docs/AUDIT_PLAYBOOK.md
   - docs/CLAIMS_AND_LIMITATIONS.md
 related_scripts:

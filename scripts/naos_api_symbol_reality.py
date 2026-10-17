@@ -57,6 +57,7 @@ LIMITATIONS = [
     "V1 reads local Python source files and installed distribution file metadata; it does not import or execute target modules.",
     "Dynamic exports, compiled extensions, plugin registration, monkeypatching, and runtime-generated attributes may require human review or a project-specific source path.",
     "Symbol existence does not prove semantic behavior, option compatibility, endpoint behavior, package safety, or implementation correctness.",
+    "The legacy verified status means a source declaration was found, not that it executes or remains bound at runtime. Static absence is limited to the supported AST model; conditions and dynamic exports are not evaluated.",
 ]
 
 
@@ -171,17 +172,87 @@ def assignment_target_names(target: ast.AST) -> list[str]:
     return []
 
 
+def unresolved_binding_reason(body: list[ast.stmt], name: str) -> str | None:
+    """Recognize uncertain bindings in this scope without entering nested scopes.
+
+    This is deliberately not an evaluator of conditions, imports or dynamic
+    Python. A found declaration elsewhere is not proof of runtime availability.
+    """
+    possible: set[str] = set()
+    reasons: set[str] = set()
+
+    class ScopeVisitor(ast.NodeVisitor):
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            possible.add(node.name)
+            if node.name in {"__getattr__", "__getattribute__"}:
+                reasons.add("dynamic_exports_not_static")
+
+        visit_AsyncFunctionDef = visit_FunctionDef
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            possible.add(node.name)
+
+        def visit_Lambda(self, node: ast.Lambda) -> None:
+            pass
+
+        def visit_Name(self, node: ast.Name) -> None:
+            if isinstance(node.ctx, (ast.Store, ast.Del)):
+                possible.add(node.id)
+
+        def visit_Import(self, node: ast.Import) -> None:
+            possible.update(alias.asname or alias.name.split(".")[0] for alias in node.names)
+
+        def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+            for alias in node.names:
+                if alias.name == "*":
+                    reasons.add("star_export_not_static")
+                else:
+                    possible.add(alias.asname or alias.name)
+
+        def visit_MatchAs(self, node: ast.MatchAs) -> None:
+            if node.name:
+                possible.add(node.name)
+            self.generic_visit(node)
+
+        visit_MatchStar = visit_MatchAs
+
+        def visit_MatchMapping(self, node: ast.MatchMapping) -> None:
+            if node.rest:
+                possible.add(node.rest)
+            self.generic_visit(node)
+
+        def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
+            if node.name:
+                possible.add(node.name)
+            self.generic_visit(node)
+
+        def visit_Call(self, node: ast.Call) -> None:
+            if isinstance(node.func, ast.Name) and node.func.id in {"exec", "eval", "globals", "locals", "vars", "setattr"}:
+                reasons.add("dynamic_exports_not_static")
+            self.generic_visit(node)
+
+    visitor = ScopeVisitor()
+    for statement in body:
+        visitor.visit(statement)
+    if name in possible:
+        return "conditional_or_computed_binding"
+    return sorted(reasons)[0] if reasons else None
+
+
 def lookup_symbol(body: list[ast.stmt], parts: list[str]) -> tuple[bool, int | None, str | None]:
     if not parts:
         return False, None, "empty_symbol"
     names = direct_names_in_body(body)
     node = names.get(parts[0])
     if node is None:
-        return False, None, "symbol_not_found"
+        return False, None, unresolved_binding_reason(body, parts[0]) or "symbol_not_found"
     if len(parts) == 1:
         return True, getattr(node, "lineno", None), None
     if isinstance(node, ast.ClassDef):
-        return lookup_symbol(node.body, parts[1:])
+        found, line, reason = lookup_symbol(node.body, parts[1:])
+        if reason == "symbol_not_found" and (node.bases or node.keywords or node.decorator_list):
+            return False, getattr(node, "lineno", None), "inherited_member_not_static"
+        return found, line, reason
     return False, getattr(node, "lineno", None), "nested_symbol_not_static"
 
 
@@ -310,7 +381,7 @@ def build_report(
                     manifest_path=relative(manifest_path, root),
                 )
             )
-        configured = bool(entries)
+        configured = bool(entries) or bool(entries_error)
 
     for index, entry in enumerate(entries, start=1):
         entry_id = str(entry.get("id") or f"entry_{index}")
@@ -369,20 +440,22 @@ def build_report(
                     source_path=entry.get("source_path"),
                 )
             )
-            checked_symbols.append({**base_record, "status": "unverified", "reason": status})
+            checked_symbols.append({**base_record, "status": "unverified", "static_resolution": "unresolved", "reason": status})
             continue
 
         exists, line, reason = inspect_source(source_path, symbol)
         if exists:
-            checked_symbols.append({**base_record, "status": "verified", "line": line})
+            checked_symbols.append({**base_record, "status": "verified", "static_resolution": "declaration_found", "line": line})
             continue
         status = str(reason or "symbol_not_found")
+        absent = status == "symbol_not_found"
         findings.append(
             finding(
                 f"api_symbol_reality.{status}.{entry_id}",
                 severity,
                 status,
-                f"API symbol '{module}.{symbol}' was not found by static AST inspection.",
+                (f"API symbol '{module}.{symbol}' was not found within the supported static declaration scope."
+                 if absent else f"API symbol '{module}.{symbol}' could not be resolved by static AST inspection: {status}. Human review is required; absence is not established."),
                 entry_id=entry_id,
                 package=entry.get("package"),
                 module=module,
@@ -392,18 +465,22 @@ def build_report(
                 line=line,
             )
         )
-        checked_symbols.append({**base_record, "status": "unverified", "reason": status, "line": line})
+        checked_symbols.append({**base_record, "status": "unverified", "static_resolution": "absent_in_supported_scope" if absent else "unresolved", "reason": status, "line": line})
 
     summary = finding_counts(findings)
     summary.update(
         {
             "configured": configured,
+            "verification_scope": "source_declarations_only",
             "manifest_present": manifest_present,
             "declared_symbols": len(entries),
             "checked_symbols": len(checked_symbols),
             "verified_symbols": sum(1 for item in checked_symbols if item.get("status") == "verified"),
             "unverified_symbols": sum(1 for item in checked_symbols if item.get("status") == "unverified"),
             "invalid_entries": sum(1 for item in checked_symbols if item.get("status") == "invalid"),
+            "statically_found_symbols": sum(1 for item in checked_symbols if item.get("static_resolution") == "declaration_found"),
+            "statically_absent_symbols": sum(1 for item in checked_symbols if item.get("static_resolution") == "absent_in_supported_scope"),
+            "statically_unresolved_symbols": sum(1 for item in checked_symbols if item.get("static_resolution") == "unresolved"),
             "imports_executed": 0,
             "network_used": False,
         }
@@ -412,7 +489,7 @@ def build_report(
         "schema": SCHEMA,
         "generated_at": utc_now(),
         "profile": profile,
-        "status": status_from_counts(summary),
+        "status": "not_configured" if not configured and not findings else status_from_counts(summary),
         "configured": configured,
         "project_root": str(root),
         "naos_root": naos_root,

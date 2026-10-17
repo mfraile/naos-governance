@@ -11,6 +11,7 @@ scan_categories:
   - source
   - workflows
   - naos_artifacts
+# Additional single path components; mandatory exclusions remain active.
 ignored_parts:
   - .git
   - .venv
@@ -19,6 +20,9 @@ ignored_parts:
   - dist
   - build
   - __pycache__
+# Upper bound on inspected regular file paths, including unselected categories.
+scan_limits:
+  max_files: 5000
 decision_states:
   - keep
   - merge

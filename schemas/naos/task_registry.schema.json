@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:task_registry:v1",
+  "title": "NAOS Task Registry",
+  "description": "The supported mapping and legacy list registry shapes. Task state values follow naos_task_lifecycle.py.",
+  "type": [
+    "object",
+    "array"
+  ],
+  "if": {
+    "type": "object"
+  },
+  "then": {
+    "type": "object",
+    "required": [
+      "tasks"
+    ],
+    "properties": {
+      "tasks": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/task"
+        }
+      }
+    },
+    "additionalProperties": true
+  },
+  "else": {
+    "items": {
+      "$ref": "#/$defs/task"
+    }
+  },
+  "$defs": {
+    "task": {
+      "type": "object",
+      "required": [
+        "id",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(?:[A-Z0-9]+-)*T-[0-9]{3,}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "absorbed",
+            "active",
+            "canceled",
+            "cancelled",
+            "complete",
+            "completed",
+            "deferred",
+            "done",
+            "failed",
+            "implemented",
+            "in_progress",
+            "planned",
+            "superseded",
+            "todo",
+            "verified"
+          ]
+        },
+        "lifecycle_state": {
+          "enum": [
+            "absorbed",
+            "active",
+            "cancelled",
+            "completed",
+            "deferred",
+            "implementation_complete",
+            "planned",
+            "superseded",
+            "unknown"
+          ]
+        },
+        "delivery_state": {
+          "enum": [
+            "delivered",
+            "excluded",
+            "in_progress",
+            "not_delivered",
+            "not_started"
+          ]
+        },
+        "verification_state": {
+          "enum": [
+            "failed",
+            "inconclusive",
+            "not_applicable",
+            "partially_verified",
+            "unverified",
+            "verified"
+          ]
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

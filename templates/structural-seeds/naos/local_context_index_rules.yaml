@@ -18,8 +18,8 @@ include_patterns:
   - naos/evidence/**/*.json
   - naos/test_evidence/**/*.json
   - naos/inventory/FUNCTION_INDEX.yaml
-  - src/**/*.py
-  - tests/**/*.py
+  - "@inferred-adopter-python"
+  - "@inferred-adopter-implementation"
 exclude_patterns:
   - .git/**
   - "**/.venv/**"
@@ -163,7 +163,7 @@ artifact_families:
     name: Source Metadata
     artifact_type: source_file
     include_patterns:
-      - src/**/*.py
+      - "@inferred-adopter-python"
     authority_level: current_git_state
     include_policy: module_header_and_symbol_summary_only
     chunk_kind: python_symbol_summary
@@ -171,10 +171,18 @@ artifact_families:
     name: Test Metadata
     artifact_type: test_file
     include_patterns:
-      - tests/**/*.py
+      - "@inferred-adopter-python"
     authority_level: current_git_state
     include_policy: module_header_and_symbol_summary_only
     chunk_kind: python_symbol_summary
+  - id: implementation_metadata
+    name: Non-Python Implementation Metadata
+    artifact_type: implementation_file
+    include_patterns:
+      - "@inferred-adopter-implementation"
+    authority_level: current_git_state
+    include_policy: path_language_size_hash_only
+    chunk_kind: implementation_metadata
   - id: deterministic_reports
     name: Deterministic NAOS Reports
     artifact_type: deterministic_report
@@ -291,9 +299,17 @@ human_review_required:
   required_for_future_semantic_or_graph_enablement: true
 known_gaps:
   - id: LCI-KG-001
-    summary: Semantic/vector retrieval and graph traversal are intentionally deferred.
+    evidence_classification: confirmed
+    classification_scope: shipped_local_index_limit
+    human_review_required: true
+    summary: Semantic/vector retrieval and graph traversal are not performed by this local index; bounded explicit-link graph query is a separate shipped command.
 residual_risks:
   - id: LCI-RR-001
+    evidence_classification: hypothesized
+    classification_scope: possible_local_index_risk
+    human_review_required: true
+    hypothesis_reason: "Exact keyword matching does not guarantee complete or fresh retrieval; no specific missed artifact is asserted."
+    next_review_step: "Compare candidate results with current source artifacts for the active task."
     summary: Exact keyword retrieval can miss relevant artifacts or surface stale candidates.
 limitations:
   - The local context index is generated, derived, and cache-like.

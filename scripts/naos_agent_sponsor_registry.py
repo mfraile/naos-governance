@@ -26,14 +26,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from naos_emit_capabilities import CapabilityEmissionError, emit_catalogue  # noqa: E402
+from naos_emit_capabilities import CapabilityEmissionError, emit_catalogue, METADATA_SCOPE_PATH  # noqa: E402
+from naos_resource_boundary import select_resource  # noqa: E402
+
 from naos_policy import (  # noqa: E402
     controlled_now_utc,
     controlled_utc_now_text,
     default_naos_root,
     exit_code_for_summary,
     finding_counts,
-    kit_root,
     load_policy,
     normalize_profile,
     report_output_path,
@@ -231,12 +232,12 @@ def load_json_mapping(path: Path) -> dict[str, Any]:
 
 def registry_schema_path(root: Path) -> Path:
     project = root / "schemas" / "naos" / "agent_sponsor_registry.schema.json"
-    return project if project.is_file() else kit_root() / "schemas" / "naos" / project.name
+    return select_resource(root, project, f"schemas/naos/{project.name}")
 
 
 def report_schema_path(root: Path) -> Path:
     project = root / "schemas" / "naos" / "agent_sponsor_registry_report.schema.json"
-    return project if project.is_file() else kit_root() / "schemas" / "naos" / project.name
+    return select_resource(root, project, f"schemas/naos/{project.name}")
 
 
 def resolve_registry_path(
@@ -368,6 +369,7 @@ def _agent_catalogue(root: Path) -> tuple[list[dict[str, Any]], str | None]:
         catalogue = emit_catalogue(root)
     except CapabilityEmissionError as exc:
         return [], str(exc)
+    # Host declarations are separate records and cannot satisfy NAOS sponsor requirements.
     agents = [
         item
         for item in catalogue.get("capabilities") or []
@@ -409,8 +411,6 @@ def build_expected_report(
 
     schema_path = registry_schema_path(root)
     output_schema = report_schema_path(root)
-    relative_bounded_path(schema_path, root)
-    relative_bounded_path(output_schema, root)
     schema_errors = (
         schema_error_metadata(registry_data, schema_path)
         if configured and parse_ok
@@ -462,6 +462,9 @@ def build_expected_report(
         source = root / str(agent.get("source_file") or "")
         if source.is_file():
             inputs.append(input_record(source, root, "agent_declaration"))
+    scope_path = root / METADATA_SCOPE_PATH
+    if agent_error is None and scope_path.is_file():
+        inputs.append(input_record(scope_path, root, "metadata_scope"))
     for helper in (
         root / "scripts" / "naos_agent_sponsor_registry.py",
         root / "scripts" / "naos_emit_capabilities.py",
@@ -784,10 +787,11 @@ def main(argv: list[str] | None = None) -> int:
             root, naos_root, policy, "agent_sponsor_registry_report"
         )
     )
-    if not output.is_absolute():
+    if output is not None and not output.is_absolute():
         output = root / output
     try:
-        preflight_bounded_output(output, root)
+        if output is not None:
+            preflight_bounded_output(output, root)
         expected = build_expected_report(
             root=root,
             profile=profile,
@@ -800,7 +804,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.check:
-        if not output.is_file():
+        if output is None or not output.is_file():
             print(
                 f"NAOS agent sponsor registry: FAIL — missing report: {output}",
                 file=sys.stderr,

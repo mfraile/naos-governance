@@ -4,42 +4,31 @@
 ---
 
 id: INS-009
-title: "API cost formula is theoretical minimum — real cost is 1.3–1.8× due to retries and interrupted runs"
+title: "Account for interrupted runs before estimating API costs"
 status: hypothesis
 tier: 1
 
 observed_pattern: >
-  The formula N_runs × cost_per_run consistently under-predicts actual billing costs.
-  Contributing factors observed:
-
-  1. INTERRUPTED RUNS: When a running command is cancelled mid-session (or when
-     the IDE tool call is cancelled while the terminal keeps running), the API calls
-     already issued are fully billed even though the run result is discarded.
-     Runs 1 and 2 of an interrupted 5-run batch are billed but useless for the aggregate.
-
-  2. RETRY OVERHEAD: API 529 (Overloaded) and network timeout errors trigger the
-     runner's exponential backoff retry loop. Each retry attempt that reaches the
-     API provider is billed even if it ultimately fails.
-     Estimated retry overhead: 5–15% of clean-path cost.
-
-  3. BACKGROUND TERMINAL LEAKAGE: IDE tool cancellation kills the agent's
-     observation of the terminal but NOT the spawned process. Background terminals
-     left from prior sessions (or from cancelled tool calls) can continue issuing
-     API calls invisibly. A second run may start immediately after the first
-     completed if the agent lost track of terminal state.
+  Hypothesis: an interrupted observation may leave an authorized child process
+  active, and retries or partial work may affect billed usage. This seed has no
+  confirming sessions. Billing treatment and overhead must be established from
+  the actual provider terms and authorized usage receipts, not assumed ratios.
 
 context: >
-  This instinct applies whenever quoting API cost for any behavioral run:
-  (a) the theoretical formula gives the lower bound only — plan for 1.5× overhead;
-  (b) any previously interrupted run may have accumulated billed tokens;
-  (c) always check for orphaned background terminal processes before starting.
+  Applies when planning or accounting for separately authorized behavioral runs.
+  Cancellation of an observation is not evidence that its child process stopped.
+  Reconcile the current task's recorded process state and usage before another
+  invocation; this instruction grants no additional execution or cost authority.
 
 mitigation: >
-  1. Budget at 1.5× the theoretical formula: budget = N × cost_per_run × 1.5
-  2. Before any new run, check for orphaned processes: pkill -f "runner.py" (safely)
-  3. After any interrupted run, assume 40-60% of the tokens were billed
-  4. Track session running total explicitly and announce it before each invocation
-  5. If cost exceeds 1.8× theoretical, investigate terminal leakage
+  Before another run, inspect only the recorded handle or PID from this task's
+  own launch evidence and verify its launch identity and ownership. Request a
+  stop through the originating tool or controller for that exact owned process,
+  then retain its terminal status and raw logs. Never terminate by process name,
+  command substring or a global process pattern. If ownership or identity is
+  unknown, do not stop any process or start a replacement run; preserve evidence
+  and request human resolution. Reconcile actual authorized usage receipts and
+  report known costs plus unresolved usage before requesting another invocation.
 
 evidence_count: 0
 first_observed: null

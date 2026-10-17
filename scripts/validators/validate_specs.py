@@ -32,8 +32,11 @@ from pathlib import Path
 # Shared requirement-header parser (single source of truth across cascade scripts)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import spec_header  # noqa: E402
+from naos_console import configure_console_output  # noqa: E402
 from source_roots import (  # noqa: E402
     existing_source_roots,
+    implementation_source_files,
+    IMPLEMENTATION_SUFFIXES,
     resolve_source_roots,
     source_roots_display,
 )
@@ -69,15 +72,6 @@ DRAFT_MARKERS = ("[ADAPT", "ADAPT:", "TODO", "TBD")
 def configured_source_roots() -> list[Path]:
     """Return explicit or inferred source roots for brownfield adopters."""
     return resolve_source_roots(Path.cwd())
-
-
-def iter_source_python_files(roots: list[Path]) -> list[Path]:
-    files: list[Path] = []
-    for root in roots:
-        if not root.exists():
-            continue
-        files.extend(sorted(root.rglob("*.py")))
-    return files
 
 
 def validate_spec_files() -> bool:
@@ -124,7 +118,11 @@ def validate_requirements() -> bool:
         print(f"{YELLOW}⚠ No source roots found — checked {checked}; skipping{RESET}")
         return True
 
-    text = req_file.read_text(encoding="utf-8", errors="ignore")
+    try:
+        text = req_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        print(f"NOT_ASSESSED: {req_file}: {type(error).__name__}")
+        return False
     requirements = sorted(spec_header.canonical_frs(text))
 
     if not requirements:
@@ -144,14 +142,20 @@ def validate_requirements() -> bool:
 
     print(f"Found {len(requirements)} functional requirements")
     print(f"Searching source roots: {source_roots_display(roots)}")
-    source_files = iter_source_python_files(roots)
-    missing = []
-    for req_id in requirements:
-        found = any(
-            req_id in py.read_text(errors="ignore") for py in source_files
-        )
-        if not found:
-            missing.append(req_id)
+    source_files = implementation_source_files(roots)
+    print("Reference scan suffixes: " + ", ".join(sorted(IMPLEMENTATION_SUFFIXES)))
+    print("Other suffixes are NOT_ASSESSED; textual references do not prove implementation.")
+    referenced: set[str] = set()
+    unreadable = False
+    for source_file in source_files:
+        try:
+            referenced.update(spec_header.fr_tokens(source_file.read_text(encoding="utf-8")))
+        except (OSError, UnicodeError) as error:
+            print(f"NOT_ASSESSED: {source_file}: {type(error).__name__}")
+            unreadable = True
+    if unreadable:
+        return False
+    missing = [req_id for req_id in requirements if req_id not in referenced]
 
     if missing:
         print(f"{RED}✗ Missing implementations:{RESET}")
@@ -159,7 +163,7 @@ def validate_requirements() -> bool:
             print(f"  - {req}")
         return False
 
-    print(f"{GREEN}✓ All {len(requirements)} requirements have implementations{RESET}")
+    print(f"{GREEN}✓ All {len(requirements)} requirements have source references{RESET}")
     return True
 
 
@@ -289,7 +293,7 @@ def validate_spec_traceability() -> bool:
         )
         for f in without_trace[:5]:
             print(f"  - {f}")
-        print(f"  Add '# Implements FR-XXX from specs/03-requirements.md' comments")
+        print("  Add '# Implements FR-XXX from specs/03-requirements.md' comments")
     if with_trace:
         print(f"{GREEN}✓ {len(with_trace)}/{total} files have traceability{RESET}")
     return True  # Advisory only
@@ -346,6 +350,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_console_output()
     args = build_parser().parse_args(argv)
     profile = normalize_profile(args.profile)
     strict_quality_requested = args.strict_spec_quality or os.getenv("NAOS_STRICT_SPEC_QUALITY") == "1"

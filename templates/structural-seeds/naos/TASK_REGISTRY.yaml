@@ -12,13 +12,17 @@
 #   3. Stage the source and reviewed derived files, then commit
 #
 # OPTIONAL PRE-COMMIT ASSISTANCE (only after explicit hook activation):
-#   - Detects staged TASK_REGISTRY.yaml changes and attempts sync_from_registry.py
-#   - Best-effort stages BACKLOG.md, DASHBOARD.md, and PROJECT_STATUS.md
-#   - Does not fail when sync/staging fails; review and stage outputs manually
+#   - Detects staged TASK_REGISTRY.yaml changes and reminds you to review derived files
+#   - Does not regenerate files or change the Git index
+#   - Run sync explicitly after preserving manual edits; review and stage intended outputs
 #   - Task-registry validation is profile/installation dependent
 #
 # STRUCTURE:
-#   Each task has:
+#   Required by the registry schema: id and title.
+#   Other fields below are declared metadata; richer planning is recommended.
+#   Sync shows absent requirement/phase/priority as unspecified; it does not
+#   invent requirement links, phase membership, priority or delivery status.
+#   Each rich task may declare:
 #     - id: Exact unique identifier (T-XXX or a namespaced ID such as LKB-T-XXX)
 #     - title: Short description
 #     - requirement: FR-XXX or NFR-XXX it implements

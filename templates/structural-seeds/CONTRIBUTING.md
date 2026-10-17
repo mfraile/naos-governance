@@ -6,7 +6,7 @@ Thank you for considering contributing! This guide covers the development workfl
 
 - [ADAPT: list required tools and versions]
 - Follow the setup in [QUICK_START.md](QUICK_START.md)
-- Install git hooks: `git config core.hooksPath .githooks`
+- Review the copied hook and existing Git hook configuration using [QUICK_START.md](QUICK_START.md); preserve existing integration. Copying does not activate or execute hooks.
 
 ## Development Workflow
 
@@ -40,8 +40,9 @@ make -f Makefile.naos gov-refresh
 ```
 
 After you explicitly activate the provided **pre-commit hook**, it will:
-- Attempt a best-effort sync of derived PM files if `TASK_REGISTRY.yaml` changed;
-  review and stage the result because sync failure does not block the commit
+- Remind you to review derived PM files when `TASK_REGISTRY.yaml` is staged;
+  run sync explicitly after preserving manual edits, then review and stage only
+  intended changes. The hook does not regenerate files or alter the Git index
 - Block archive folders, backup files, and session summaries
 - Warn if new docs aren't in `docs/DOCS_INDEX.md`
 

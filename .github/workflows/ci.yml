@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Child interpreters must preserve the exact exported tree too; -B is local
+  # to its parent process and does not suppress bytecode in those children.
+  PYTHONDONTWRITEBYTECODE: "1"
+
 concurrency:
   group: public-candidate-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -35,7 +40,8 @@ jobs:
 
       - name: Validate the exported receipt and public contract
         run: |
-          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check -r requirements.txt "pytest==9.1.1"
+          python -B -m pytest --collect-only -q
           python -B -m unittest discover -s public_tests -p 'test_*.py'
 
       - name: Build wheel and source distribution

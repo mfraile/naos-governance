@@ -57,10 +57,11 @@ LIMITATIONS = [
     "It does not fill, approve, validate, implement, test, certify, or prove specifications.",
     "Existing files are skipped unless --force is explicit.",
     "Invalid manifests and unsafe source or destination paths block before spec files are changed.",
-    "Apply is enabled only for the executed macOS/POSIX adapter tuple; every other platform tuple fails closed.",
+    "Apply implements native macOS, Linux and Windows leaf operations on CPython 3.11-3.13; other runtime families fail closed.",
     "Requested report paths receive in-project ancestor, regular single-link leaf, and basic writability preflight, but a later report-write failure can occur after spec files were copied; stdout then carries the blocked evidence.",
+    "POSIX copies permission bits; Windows copies the read-only attribute and inherits destination-directory ACLs. Existing Windows read-only destinations are not made writable for --force.",
     "Multi-file materialization is sequential and has no rollback; a runtime filesystem or post-install cleanup failure can leave the current and earlier same-directory leaf copies in place.",
-    "Executed filesystem evidence is macOS-local only; Linux, network filesystems, hostile concurrent ancestor changes, and crash recovery are not proven.",
+    "Qualification is bounded to the recorded native test hosts; network filesystems, hostile concurrent ancestor changes, and crash recovery are not proven.",
 ]
 NOT_CLAIMED = [
     "approved specifications",
@@ -157,6 +158,13 @@ def lstat_or_none(path: Path) -> os.stat_result | None:
         return None
 
 
+def is_link_or_reparse(value: os.stat_result) -> bool:
+    """Refuse Windows junctions and other reparse points as well as symlinks."""
+    return stat.S_ISLNK(value.st_mode) or bool(
+        getattr(value, "st_file_attributes", 0) & 0x400
+    )
+
+
 def file_identity(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
     return (
         value.st_dev,
@@ -164,7 +172,11 @@ def file_identity(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
         value.st_mode,
         value.st_size,
         value.st_mtime_ns,
-        value.st_ctime_ns,
+        # Windows lstat historically exposes creation time as ctime; fstat
+        # can expose change time on 3.12+. Compare explicit birthtime where
+        # available so both APIs refer to the same native identity field.
+        (getattr(value, "st_birthtime_ns", value.st_ctime_ns)
+         if os.name == "nt" else value.st_ctime_ns),
     )
 
 
@@ -229,7 +241,7 @@ def map_in_project_path(
 def validate_directory_chain(root: Path, directory: Path, *, field: str, allow_missing: bool) -> None:
     relative = require_within(directory, root, field=field, allow_root=True)
     root_state = lstat_or_none(root)
-    if root_state is None or stat.S_ISLNK(root_state.st_mode) or not stat.S_ISDIR(root_state.st_mode):
+    if root_state is None or is_link_or_reparse(root_state) or not stat.S_ISDIR(root_state.st_mode):
         raise MaterializationRefusal(f"{field} root must be an existing non-symlink directory: {root}")
     current = root
     for part in relative.parts:
@@ -239,7 +251,7 @@ def validate_directory_chain(root: Path, directory: Path, *, field: str, allow_m
             if allow_missing:
                 continue
             raise MaterializationRefusal(f"{field} directory is missing: {current}")
-        if stat.S_ISLNK(state.st_mode):
+        if is_link_or_reparse(state):
             raise MaterializationRefusal(f"{field} directory must not be a symbolic link: {current}")
         if not stat.S_ISDIR(state.st_mode):
             raise MaterializationRefusal(f"{field} path component must be a directory: {current}")
@@ -249,7 +261,7 @@ def validate_source_root(candidate: Path) -> Path:
     state = lstat_or_none(candidate)
     if state is None:
         raise MissingSource(f"Source spec root is missing: {candidate}")
-    if stat.S_ISLNK(state.st_mode) or not stat.S_ISDIR(state.st_mode):
+    if is_link_or_reparse(state) or not stat.S_ISDIR(state.st_mode):
         raise MaterializationRefusal(f"Source spec root must be a non-symlink directory: {candidate}")
     return candidate.resolve(strict=True)
 
@@ -259,7 +271,7 @@ def inspect_source_file(source_root: Path, source: Path) -> tuple[int, int, int,
     state = lstat_or_none(source)
     if state is None:
         raise MissingSource(f"Required source template is missing: {source}")
-    if stat.S_ISLNK(state.st_mode) or not stat.S_ISREG(state.st_mode):
+    if is_link_or_reparse(state) or not stat.S_ISREG(state.st_mode):
         raise MaterializationRefusal(f"Required source template must be a regular non-symlink file: {source}")
     return file_identity(state)
 
@@ -272,7 +284,7 @@ def inspect_target_file(
     state = lstat_or_none(target)
     if state is None:
         return False, None
-    if stat.S_ISLNK(state.st_mode) or not stat.S_ISREG(state.st_mode):
+    if is_link_or_reparse(state) or not stat.S_ISREG(state.st_mode):
         raise MaterializationRefusal(f"Target must be absent or a regular non-symlink file: {target}")
     return True, file_identity(state)
 
@@ -304,7 +316,7 @@ def validate_report_output(
         )
     state = lstat_or_none(output)
     if state is not None:
-        if stat.S_ISLNK(state.st_mode) or not stat.S_ISREG(state.st_mode):
+        if is_link_or_reparse(state) or not stat.S_ISREG(state.st_mode):
             raise MaterializationRefusal(f"Report output must be absent or a regular non-symlink file: {output}")
         if state.st_nlink != 1:
             raise MaterializationRefusal(
@@ -339,7 +351,7 @@ def ensure_report_parent(parent: Path) -> None:
             break
         current = current.parent
     state = lstat_or_none(current)
-    if state is None or stat.S_ISLNK(state.st_mode) or not stat.S_ISDIR(state.st_mode):
+    if state is None or is_link_or_reparse(state) or not stat.S_ISDIR(state.st_mode):
         raise MaterializationRefusal(f"Report output ancestor must be a non-symlink directory: {current}")
     for directory in reversed(missing):
         try:
@@ -347,12 +359,12 @@ def ensure_report_parent(parent: Path) -> None:
         except FileExistsError:
             pass
         state = lstat_or_none(directory)
-        if state is None or stat.S_ISLNK(state.st_mode) or not stat.S_ISDIR(state.st_mode):
+        if state is None or is_link_or_reparse(state) or not stat.S_ISDIR(state.st_mode):
             raise MaterializationRefusal(
                 f"Report output directory chain became unsafe: {directory}"
             )
     parent_state = lstat_or_none(parent)
-    if parent_state is None or stat.S_ISLNK(parent_state.st_mode) or not stat.S_ISDIR(parent_state.st_mode):
+    if parent_state is None or is_link_or_reparse(parent_state) or not stat.S_ISDIR(parent_state.st_mode):
         raise MaterializationRefusal(f"Report output parent must be a non-symlink directory: {parent}")
 
 
@@ -414,7 +426,7 @@ def probe_report_output(
 def load_manifest_schema() -> dict[str, Any]:
     schema_path = Path(__file__).resolve().parents[1] / MANIFEST_SCHEMA_RELATIVE
     schema_state = lstat_or_none(schema_path)
-    if schema_state is None or stat.S_ISLNK(schema_state.st_mode) or not stat.S_ISREG(schema_state.st_mode):
+    if schema_state is None or is_link_or_reparse(schema_state) or not stat.S_ISREG(schema_state.st_mode):
         raise MaterializationRefusal(f"Trusted manifest schema must be a regular file: {schema_path}")
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
@@ -637,7 +649,12 @@ def is_spec_file(filename: str) -> bool:
 
 def platform_supports_apply() -> bool:
     """Return whether the implemented leaf-install adapter is available."""
-    return os.name == "posix" and sys.platform == "darwin"
+    return (
+        sys.implementation.name == "cpython"
+        and (3, 11) <= sys.version_info[:2] <= (3, 13)
+        and ((os.name == "posix" and sys.platform in {"darwin", "linux"})
+             or (os.name == "nt" and sys.platform == "win32"))
+    )
 
 
 def safe_mkdir_chain(root: Path, directory: Path) -> None:
@@ -652,7 +669,7 @@ def safe_mkdir_chain(root: Path, directory: Path) -> None:
             except FileExistsError:
                 pass
             state = lstat_or_none(current)
-        if state is None or stat.S_ISLNK(state.st_mode) or not stat.S_ISDIR(state.st_mode):
+        if state is None or is_link_or_reparse(state) or not stat.S_ISDIR(state.st_mode):
             raise MaterializationRefusal(f"Target directory chain became unsafe: {current}")
 
 
@@ -670,7 +687,11 @@ def copy_template_file(
     if current_target_identity != target_identity:
         raise MaterializationRefusal(f"Target changed after preflight: {target}")
 
-    source_flags = os.O_RDONLY
+    source_leaf = lstat_or_none(source)
+    if (source_leaf is None or is_link_or_reparse(source_leaf)
+            or file_identity(source_leaf) != source_identity):
+        raise MaterializationRefusal(f"Source changed after preflight: {source}")
+    source_flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_CLOEXEC"):
         source_flags |= os.O_CLOEXEC
     if hasattr(os, "O_NOFOLLOW"):
@@ -696,25 +717,38 @@ def copy_template_file(
             source_fd = -1
             temp_fd = -1
             shutil.copyfileobj(source_handle, target_handle)
-            os.fchmod(target_handle.fileno(), stat.S_IMODE(source_state.st_mode))
+            if os.name == "posix":
+                os.fchmod(target_handle.fileno(), stat.S_IMODE(source_state.st_mode))
             target_handle.flush()
             os.fsync(target_handle.fileno())
         os.utime(
             temp_path,
             ns=(source_state.st_atime_ns, source_state.st_mtime_ns),
-            follow_symlinks=False,
+            # Windows 3.11 cannot set timestamps with follow_symlinks=False.
+            # This is our unpublished temporary, never the existing target.
+            follow_symlinks=(os.name == "nt"),
         )
 
+        if os.name == "nt":
+            # Windows chmod preserves only the read-only attribute. ACLs are
+            # inherited by the same-directory temporary, not copied from source.
+            os.chmod(temp_path, stat.S_IMODE(source_state.st_mode))
         _, current_target_identity = inspect_target_file(project_root, target)
         if current_target_identity != target_identity:
             raise MaterializationRefusal(f"Target changed while copying: {target}")
         if target_identity is None:
             try:
-                os.link(temp_path, target, follow_symlinks=False)
+                if os.name == "nt":
+                    # Unlike POSIX rename, Windows rename refuses any existing
+                    # destination. No hardlink/unlink pair for read-only files.
+                    os.rename(temp_path, target)
+                else:
+                    os.link(temp_path, target, follow_symlinks=False)
             except FileExistsError as exc:
                 raise MaterializationRefusal(f"Target appeared while copying: {target}") from exc
             try:
-                temp_path.unlink()
+                if os.name != "nt":
+                    temp_path.unlink()
             except OSError as exc:
                 residue = temp_path
                 temp_path = None
@@ -733,6 +767,10 @@ def copy_template_file(
             os.close(temp_fd)
         if temp_path is not None:
             try:
+                if os.name == "nt" and temp_path.exists():
+                    # Only the unpublished temporary; never clear destination
+                    # read-only protection to make --force succeed.
+                    os.chmod(temp_path, stat.S_IREAD | stat.S_IWRITE)
                 temp_path.unlink(missing_ok=True)
             except OSError as exc:
                 raise MaterializationRefusal(
@@ -864,9 +902,9 @@ def build_report(
 
     if not platform_supports_apply() and not args.dry_run:
         add_finding(
-            status="unsafe_path",
+            status="unsupported_platform",
             category="unsupported_platform",
-            message="Spec-pack mutation is available only for the executed macOS/POSIX adapter tuple.",
+            message="Spec-pack mutation requires native macOS, Linux or Windows with CPython 3.11-3.13.",
             actual={"os_name": os.name, "sys_platform": sys.platform},
         )
 
@@ -1297,7 +1335,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             current_output_state = lstat_or_none(output)
             if current_output_state is not None and (
-                stat.S_ISLNK(current_output_state.st_mode)
+                is_link_or_reparse(current_output_state)
                 or not stat.S_ISREG(current_output_state.st_mode)
             ):
                 raise MaterializationRefusal(f"Report output became unsafe: {output}")

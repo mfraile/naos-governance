@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:report_source_reference:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "composition_kind",
+    "source_schema",
+    "source_generated_at",
+    "source_reference",
+    "source_sha256",
+    "source_size_bytes",
+    "detail_availability",
+    "detail_reason"
+  ],
+  "properties": {
+    "label": {
+      "type": "string"
+    },
+    "path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source": {
+      "type": "string"
+    },
+    "required_for_pack": {
+      "type": "boolean"
+    },
+    "exists": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string"
+    },
+    "format": {
+      "type": "string"
+    },
+    "error": {
+      "type": "string"
+    },
+    "report_status": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "freshness": {
+      "type": "object"
+    },
+    "external_references": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evidence_result": {
+      "type": "object"
+    },
+    "projection_error": {
+      "type": "object"
+    },
+    "collection_witness": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "urn:naos-governance:schemas:naos:capability_maturity_collection_witness:v1",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "source_schema",
+        "source_generated_at",
+        "status",
+        "profile",
+        "naos_root",
+        "project_root",
+        "schema",
+        "source_sha256",
+        "source_size_bytes",
+        "capabilities"
+      ],
+      "properties": {
+        "state": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "source_schema": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_generated_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "naos_root": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "project_root": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema": {
+          "const": "naos.capability_maturity_collection_witness.v1"
+        },
+        "source_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_size_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "capability_id",
+              "enabled",
+              "current_maturity",
+              "target_maturity",
+              "evaluated_status",
+              "ready_for_promotion",
+              "human_approval_required",
+              "promotion_recorded",
+              "missing_evidence",
+              "stale_evidence",
+              "waivers",
+              "required_next_actions",
+              "evidence_results"
+            ],
+            "properties": {
+              "capability_id": {
+                "type": "string"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "current_maturity": {
+                "type": "string"
+              },
+              "target_maturity": {
+                "type": "string"
+              },
+              "evaluated_status": {
+                "type": "string"
+              },
+              "ready_for_promotion": {
+                "type": "boolean"
+              },
+              "human_approval_required": {
+                "type": "boolean"
+              },
+              "promotion_recorded": {
+                "type": "boolean"
+              },
+              "missing_evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "stale_evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "waivers": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "required_next_actions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence_results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "reference",
+                    "availability",
+                    "applicability",
+                    "applicability_reason",
+                    "applicability_source",
+                    "validation",
+                    "scope",
+                    "producer_outcome",
+                    "requirement_outcome",
+                    "content_sha256",
+                    "generation_age",
+                    "requirement_contract",
+                    "stage",
+                    "candidates"
+                  ],
+                  "properties": {
+                    "reference": {},
+                    "availability": {},
+                    "applicability": {},
+                    "applicability_reason": {},
+                    "applicability_source": {},
+                    "validation": {},
+                    "scope": {},
+                    "producer_outcome": {},
+                    "requirement_outcome": {},
+                    "content_sha256": {},
+                    "generation_age": {},
+                    "requirement_contract": {},
+                    "stage": {
+                      "const": "L2"
+                    },
+                    "candidates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "reference",
+                          "content_sha256",
+                          "availability",
+                          "requirement_outcome"
+                        ],
+                        "properties": {
+                          "reference": {},
+                          "content_sha256": {},
+                          "availability": {},
+                          "requirement_outcome": {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "naos.report_source_reference.v1"
+    },
+    "composition_kind": {
+      "const": "source_reference"
+    },
+    "source_schema": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_generated_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_reference": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_size_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "detail_availability": {
+      "enum": [
+        "source_bound",
+        "unavailable"
+      ]
+    },
+    "detail_reason": {
+      "enum": [
+        "collected_bytes_required",
+        "source_missing",
+        "unsafe_source_reference"
+      ]
+    }
+  }
+}

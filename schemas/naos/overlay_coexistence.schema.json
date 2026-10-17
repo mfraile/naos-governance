@@ -16,6 +16,7 @@
     "target_snapshot_before": {"type": "object"},
     "target_snapshot_after": {"type": "object"},
     "target_unchanged": {"type": ["boolean", "null"]},
+    "disposable_prerequisites": {"type": "object"},
     "compatibility_preflight": {"type": ["object", "null"]},
     "activation_outcome": {"enum": ["blocked_before_activation", "activated_in_disposable_checkout", "failed"]},
     "disposable_target_snapshot_before_activation": {"type": "object"},

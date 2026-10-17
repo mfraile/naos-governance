@@ -23,7 +23,7 @@ import unicodedata
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from string import Template
 from typing import Any, Callable, Iterator, Literal
 
@@ -31,6 +31,10 @@ import yaml
 from jsonschema import Draft202012Validator
 
 try:
+    from .scripts.validators.validate_governed_debug_escalation import (
+        load_agent_frontmatter,
+        tool_scope_findings,
+    )
     from .upgrade_contract.canonical import (
         CanonicalizationUnavailable,
         canonical_sha256,
@@ -50,6 +54,7 @@ try:
         MANAGED_CONTENT_TRANSACTIONS_RELATIVE,
         ProvenanceError,
         commit_managed_content_enrollment,
+        managed_content_creator_identity,
         inspect_managed_content_manifest,
         inspect_managed_content_scope,
     )
@@ -58,6 +63,7 @@ try:
         metadata_preservation_matches,
         source_metadata_contract,
     )
+    from .upgrade_contract.source_origins import SourceOrigins
     from .upgrade_contract.transaction import (
         TransactionPrimitiveError,
         apply_create_only_plan,
@@ -69,6 +75,10 @@ except ImportError:  # Direct checkout execution: python naos_add.py ...
     _KIT_IMPORT_ROOT = Path(__file__).resolve().parent
     if str(_KIT_IMPORT_ROOT) not in sys.path:
         sys.path.insert(0, str(_KIT_IMPORT_ROOT))
+    from scripts.validators.validate_governed_debug_escalation import (
+        load_agent_frontmatter,
+        tool_scope_findings,
+    )
     from upgrade_contract.canonical import (  # type: ignore[no-redef]
         CanonicalizationUnavailable,
         canonical_sha256,
@@ -88,6 +98,7 @@ except ImportError:  # Direct checkout execution: python naos_add.py ...
         MANAGED_CONTENT_TRANSACTIONS_RELATIVE,
         ProvenanceError,
         commit_managed_content_enrollment,
+        managed_content_creator_identity,
         inspect_managed_content_manifest,
         inspect_managed_content_scope,
     )
@@ -96,6 +107,7 @@ except ImportError:  # Direct checkout execution: python naos_add.py ...
         metadata_preservation_matches,
         source_metadata_contract,
     )
+    from upgrade_contract.source_origins import SourceOrigins  # type: ignore[no-redef]
     from upgrade_contract.transaction import (  # type: ignore[no-redef]
         TransactionPrimitiveError,
         apply_create_only_plan,
@@ -354,6 +366,11 @@ def _render_setup_module_text(value: str, profile: str) -> str:
 
 
 def _stable_regular_bytes(path: Path, *, label: str) -> bytes:
+    windows = _windows_cli()
+    if windows is not None:
+        _observed, payload = windows.source_observation(path, capture_bytes=True)
+        assert payload is not None
+        return payload
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)
     try:
@@ -403,11 +420,11 @@ def _stable_regular_bytes(path: Path, *, label: str) -> bytes:
         os.close(descriptor)
 
 
-def _load_setup_catalog(project_path: Path) -> _SetupCatalogSnapshot:
+def _load_setup_catalog(project_path: Path, *, canonical: bool = False) -> _SetupCatalogSnapshot:
     """Load adopter-local setup catalog, falling back to the kit seed catalog."""
     project_catalog = project_path / "naos" / "setup_module_catalog.yaml"
     catalog_path = (
-        project_catalog if project_catalog.is_file() else SETUP_CATALOG_TEMPLATE
+        project_catalog if not canonical and project_catalog.is_file() else SETUP_CATALOG_TEMPLATE
     )
     source = "project" if catalog_path == project_catalog else "template"
     if not catalog_path.is_file():
@@ -469,6 +486,88 @@ def _setup_modules(project_path: Path) -> list[dict[str, Any]]:
     ]
 
 
+def _setup_effective_profile(project_path: Path, requested: str | None) -> str:
+    """Use native initialization lineage; add is not a profile transition."""
+    if _has_v3_control(project_path):
+        try:
+            from .upgrade_contract.v3_public_profile import _capture
+        except ImportError:
+            from upgrade_contract.v3_public_profile import _capture
+        previous = dict(_capture(project_path)[0].portable.inputs)
+    elif _windows_cli() is not None:
+        previous = _windows_cli().recorded_profile_inputs(project_path)
+    else:
+        scope = inspect_managed_content_scope(project_path)
+        if scope.status == "owner_enrollment_required":
+            previous = None
+        else:
+            inspection = inspect_managed_content_manifest(project_path)
+            if not inspection.apply_eligible or inspection.snapshot is None:
+                if scope.status == "valid" and inspection.refusal and "initialization profile lineage is missing" in inspection.refusal:
+                    # Existing standalone add compatibility: no init profile to
+                    # select. The managed request still validates its provenance
+                    # and permits only its existing create-only behavior.
+                    previous = None
+                else:
+                    raise ValueError(inspection.refusal or "Setup requires valid managed profile provenance.")
+            else:
+                previous = inspection.snapshot.get("previous_inputs")
+    recorded = previous.get("profile") if isinstance(previous, dict) else None
+    if previous is not None and (not isinstance(recorded, str) or recorded not in PROFILES):
+        raise ValueError("Recorded setup profile is missing or unsupported.")
+    if recorded is None:
+        policy_path = _guard_project_destination(
+            project_path, Path("naos/policy/default_policy.yaml"),
+            expected_leaf="file", reject_multiply_linked_file=True,
+        )
+        if policy_path.exists():
+            try:
+                policy = yaml.safe_load(_stable_regular_bytes(policy_path, label="project profile policy")) or {}
+            except yaml.YAMLError as exc:
+                raise ValueError(f"Project profile policy cannot be parsed: {exc}") from exc
+            if not isinstance(policy, dict):
+                raise ValueError("Project profile policy must be a YAML mapping.")
+            profiles = policy.get("profiles") if isinstance(policy, dict) else None
+            recorded = profiles.get("default") if isinstance(profiles, dict) else None
+            if not isinstance(recorded, str) or recorded not in PROFILES:
+                raise ValueError("Project policy has no supported default profile.")
+    if requested is not None and requested not in PROFILES:
+        raise ValueError(f"Unknown profile: {requested!r}")
+    if recorded is not None and requested is not None and recorded != requested:
+        raise ValueError(f"Setup profile {requested} does not match recorded project profile {recorded}; use an explicit profile transition.")
+    # Preserve the pre-initialization planning default only without a profile
+    # record. Malformed provenance never falls through to this default.
+    return recorded or requested or "lite"
+
+
+def _required_setup_modules(catalog, module, profile):
+    """Bind floors to kit IDs and protected activation assets, including aliases."""
+    selected_id = _normalize_setup_module_key(str(module.get("id") or ""))
+    def sources(item):
+        return {(_safe_relative_path(action.get("source"), field="source").as_posix().casefold(), action.get("copy_mode") == "tree")
+                for action in item.get("install_actions", []) if isinstance(action, dict)}
+    selected_sources = sources({**module, "install_actions": [action for action in module.get("install_actions", [])
+        if isinstance(action, dict) and _action_allowed_for_profile(action, profile)]})
+    def overlaps(protected):
+        return any(left == right or (left_tree and right.startswith(left + "/"))
+                   or (right_tree and left.startswith(right + "/"))
+                   for left, left_tree in selected_sources for right, right_tree in sources(protected))
+    return [item for item in catalog.get("modules", []) if (
+        _normalize_setup_module_key(str(item.get("id") or "")) == selected_id
+        or (isinstance(item.get("activation_gate"), dict) and overlaps(item))
+    )]
+
+
+def _setup_required_gate_failures(module, canonical_modules, project_path, profile):
+    failures = []
+    # Evaluate separately rather than merging: a local gate may add restrictions
+    # but cannot delete a required check, redirect its inputs, or lower a floor.
+    for candidate in [*canonical_modules, module]:
+        if candidate is not None:
+            failures.extend(_setup_activation_gate_failures(candidate, project_path, profile, force=False))
+    return list(dict.fromkeys(failures))
+
+
 def _resolve_setup_module(catalog: dict[str, Any], name: str) -> dict[str, Any] | None:
     normalized = _normalize_setup_module_key(name)
     for module in catalog.get("modules", []):
@@ -523,7 +622,7 @@ def _setup_source_authority_inventory(
             {
                 "action_index": action_index,
                 "action": action,
-                "source": source.relative_to(KIT_DIR).as_posix(),
+                "source": source.relative_to(KIT_DIR.resolve(strict=True)).as_posix(),
                 "destination": relative_destination.as_posix(),
                 "source_inventory": source_inventory,
             }
@@ -567,18 +666,55 @@ def _safe_relative_path(value: Any, *, field: str) -> Path:
     text = str(value or "").strip()
     if not text:
         raise ValueError(f"Install action is missing {field}.")
-    path = Path(text)
-    if path.is_absolute() or ".." in path.parts:
+    # Catalogue entries travel between hosts. Check both path grammars before
+    # touching the filesystem, including Windows rooted and drive-relative
+    # paths, which is_absolute() alone deliberately does not reject.
+    posix = PurePosixPath(text)
+    windows = PureWindowsPath(text)
+    if (posix.anchor or windows.anchor or ".." in posix.parts
+            or ".." in windows.parts or ":" in text or "\x00" in text):
         raise ValueError(f"Install action {field} must be a safe relative path: {text}")
-    return path
+    return Path(text)
 
 
 def _normalized_destination_component(value: str) -> str:
     return unicodedata.normalize("NFC", value).casefold()
 
 
+def _windows_cli():
+    try:
+        from . import naos_init as init_module
+    except ImportError:
+        import naos_init as init_module
+    return init_module._windows_cli()
+
+
+def _has_v3_control(project_root: Path) -> bool:
+    try:
+        from .upgrade_contract.v3_recovery import has_v3_control
+    except ImportError:
+        from upgrade_contract.v3_recovery import has_v3_control
+    return has_v3_control(project_root)
+
+
+def _require_legacy_add_target(project_root: Path) -> None:
+    """Keep unsupported v3 requests out of the legacy enrollment/writer path."""
+    try:
+        from .upgrade_contract.v3_recovery import has_v3_control
+    except ImportError:
+        from upgrade_contract.v3_recovery import has_v3_control
+    if has_v3_control(project_root):
+        raise ProvenanceError(
+            "Portable v3 add/setup requires a supported v3 request plan; "
+            "legacy add cannot mutate or re-enroll its control storage"
+        )
+
+
 def _canonical_project_root(project_path: Path) -> Path:
     """Resolve the operator-selected root before guarding descendants."""
+    windows = _windows_cli()
+    if windows is not None:
+        return windows.canonical_target(project_path, must_exist=True)
     canonical_root = project_path.resolve(strict=False)
     try:
         root_stat = canonical_root.lstat()
@@ -616,6 +752,10 @@ def _guard_project_destination(
         raise ValueError(f"Destination targets a reserved project path: {rel}")
 
     project_root = _canonical_project_root(project_path)
+    windows = _windows_cli()
+    if windows is not None:
+        windows.guard_destination(project_root, rel.as_posix(), kind=expected_leaf)
+        return project_root / rel
     destination = project_root / rel
 
     current = project_root
@@ -723,24 +863,37 @@ def _scripts_namespace_has_unmanaged_files(
     if scripts_root.is_symlink() or not scripts_root.is_dir():
         return True
     try:
-        scope = inspect_managed_content_scope(project_path)
-        if (
-            scope.status != "valid"
-            or not scope.project_id
-            or not scope.scope_integrity
-            or not scope.source_policy_sha256
-        ):
-            return True
-        runtime = _managed_runtime_arguments(project_path)
-        current = current_managed_content_paths(
-            project_path,
-            project_id=scope.project_id,
-            scope_integrity_sha3_512=scope.scope_integrity,
-            source_policy_sha256=scope.source_policy_sha256,
-            manifest_path=runtime["manifest_path"],
-            bases_root=runtime["bases_root"],
-            receipts_root=runtime["receipts_root"],
-        )
+        windows = _windows_cli()
+        if _has_v3_control(project_path):
+            try:
+                from .upgrade_contract.v3_public_profile import current_managed_paths
+            except ImportError:
+                from upgrade_contract.v3_public_profile import current_managed_paths
+            if windows is not None:
+                windows.guard_destination(project_path, 'scripts', kind='directory')
+            current = current_managed_paths(project_path)
+        elif windows is not None:
+            windows.guard_destination(project_path, 'scripts', kind='directory')
+            current = windows.current_paths(project_path)
+        else:
+            scope = inspect_managed_content_scope(project_path)
+            if (
+                scope.status != "valid"
+                or not scope.project_id
+                or not scope.scope_integrity
+                or not scope.source_policy_sha256
+            ):
+                return True
+            runtime = _managed_runtime_arguments(project_path)
+            current = current_managed_content_paths(
+                project_path,
+                project_id=scope.project_id,
+                scope_integrity_sha3_512=scope.scope_integrity,
+                source_policy_sha256=scope.source_policy_sha256,
+                manifest_path=runtime["manifest_path"],
+                bases_root=runtime["bases_root"],
+                receipts_root=runtime["receipts_root"],
+            )
         for path in scripts_root.rglob("*"):
             if path.is_symlink() or (
                 path.is_file()
@@ -814,7 +967,7 @@ def _load_agent_frontmatter_mapping(
     if len(parts) != 3:
         return None, text, f"{label} has no YAML frontmatter: {path}"
     try:
-        value = yaml.safe_load(parts[1]) or {}
+        value = load_agent_frontmatter(parts[1]) or {}
     except yaml.YAMLError as exc:
         return None, parts[2], f"{label} frontmatter cannot be read: {exc}"
     if not isinstance(value, dict):
@@ -1033,23 +1186,11 @@ def _setup_activation_gate_failures(
                 failures.append(child_error)
             else:
                 assert child is not None
-                child_tools = _as_string_list(child.get("tools"))
+                failures.extend(message for _rule, message in tool_scope_findings(child, "child"))
                 if child.get("name") != child_name:
                     failures.append(
                         f"configured debug child name must be {child_name}"
                     )
-                if expected_limits.get("child_write_allowed") is False and any(
-                    tool == "edit" or tool.startswith("edit/")
-                    for tool in child_tools
-                ):
-                    failures.append(
-                        "configured debug child exposes direct edit/create tools"
-                    )
-                if expected_limits.get("recursive_invocation_allowed") is False and {
-                    "agent",
-                    "agent/runSubagent",
-                }.intersection(child_tools):
-                    failures.append("configured debug child exposes an agent tool")
                 if child.get("disable-model-invocation") is not True:
                     failures.append(
                         "configured debug child must be unavailable for model invocation"
@@ -1113,17 +1254,10 @@ def _setup_activation_gate_failures(
                     failures.append(parent_error)
                 else:
                     assert parent is not None
-                    parent_tools = _as_string_list(parent.get("tools"))
+                    failures.extend("existing optional implementation parent: " + message for _rule, message in tool_scope_findings(parent, "parent"))
                     if parent.get("name") != parent_name:
                         failures.append(
                             f"existing optional implementation parent name must be {parent_name}"
-                        )
-                    if (
-                        "agent" not in parent_tools
-                        or "agent/runSubagent" in parent_tools
-                    ):
-                        failures.append(
-                            "existing optional implementation parent must expose only the current agent tool spelling"
                         )
                     if parent.get("agents") != [child_name]:
                         failures.append(
@@ -1142,6 +1276,21 @@ def _setup_activation_gate_failures(
                         failures.append(
                             "existing optional implementation parent instructions differ from the canonical bounded escalation protocol; reconcile the file manually against the reviewed canonical template before retrying (blanket --force restoration is unavailable)"
                         )
+
+    # This extra role check belongs to the governed-debug transition, not the
+    # generic setup activation mechanism used by future unrelated modules.
+    if capability_id == "CAP-GOVERNED-DEBUG-ESCALATION" and expected_transition == {
+        "from": "naos-implement-with-debug", "to": "naos-debug"
+    }:
+        default, _default_body, default_error = _load_agent_frontmatter_mapping(
+            project_path / ".github/agents/naos-implement.agent.md",
+            label="default implementation agent",
+        )
+        if default_error:
+            failures.append(default_error)
+        else:
+            assert default is not None
+            failures.extend(message for _rule, message in tool_scope_findings(default, "default"))
 
     approval = config.get("human_approval")
     if gate.get("require_human_approval") is True:
@@ -1172,6 +1321,9 @@ def _setup_activation_gate_failures(
 def _managed_source_contract(source: Path) -> tuple[dict[str, Any], dict[str, object]]:
     """Return one stable, supported source identity for request binding."""
 
+    windows = _windows_cli()
+    if windows is not None:
+        return windows.source_contract(source)
     identity, observed_metadata = regular_file_observation(source)
     metadata = source_metadata_contract(observed_metadata)
     require_supported_source_metadata(source, metadata)
@@ -1282,6 +1434,7 @@ def _build_managed_request_transition_plan(
 ) -> dict[str, Any]:
     """Classify one add/setup request against the complete managed manifest."""
 
+    _require_legacy_add_target(project_root)
     inspection = inspect_managed_content_manifest(project_root)
     if not inspection.apply_eligible or inspection.snapshot is None:
         raise ProvenanceError(
@@ -1346,6 +1499,7 @@ def _run_managed_create_only_request(
     dry_run: bool,
     plan_out: Path | None = None,
     preapply_revalidator: Callable[[], None] | None = None,
+    applicability=None,
 ) -> int:
     """Plan/apply one provenance-bound, all-or-nothing create-only request."""
 
@@ -1354,6 +1508,43 @@ def _run_managed_create_only_request(
         return 2
     try:
         project_root = _canonical_project_root(project_root)
+        if _has_v3_control(project_root):
+            try:
+                from .upgrade_contract import v3_public_request
+                from . import naos_upgrade as upgrade_module
+            except ImportError:
+                from upgrade_contract import v3_public_request
+                import naos_upgrade as upgrade_module
+            try:
+                if applicability is not None:
+                    applicability.select_route("portable_v3")
+                return v3_public_request.plan_command(
+                    project_root, operation=operation, request_inputs=request_inputs,
+                    sources=sources, plan_out=plan_out, cli=upgrade_module,
+                    add_module=sys.modules[__name__], preapply_revalidator=preapply_revalidator,
+                    **({"applicability": applicability} if applicability is not None else {}))
+            except (OSError, RuntimeError, ValueError) as exc:
+                raise ValueError('Portable v3 request review refused: ' + str(exc)) from exc
+        _require_legacy_add_target(project_root)
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"  [REFUSED] Managed-content request failed: {exc}", file=sys.stderr)
+        return 2
+    windows = _windows_cli()
+    if windows is not None:
+        try:
+            _validate_no_overlapping_destinations([relative for relative, _ in sources])
+            return windows.run_add_request(
+                project_root, sources, operation=operation,
+                request_inputs=request_inputs, dry_run=dry_run, plan_out=plan_out,
+                preapply_revalidator=preapply_revalidator,
+                **({"applicability": applicability} if applicability is not None else {}),
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            print(f"  [REFUSED] Windows managed-content request failed: {exc}", file=sys.stderr)
+            return 2
+    if applicability is not None:
+        applicability.select_route("posix_legacy")
+    try:
         inventory = _managed_request_inventory(sources)
         request_sha256 = canonical_sha256(
             {
@@ -1516,9 +1707,13 @@ def _run_managed_create_only_request(
             "this project cannot establish valid managed-content provenance"
         )
         print(f"  [PLAN-BLOCKED] {reason}")
+        if dry_run and applicability is not None:
+            applicability.record("blocked", "scope_blocked", request_sha256=request_sha256)
         return 0 if dry_run else 2
     if transition_blocker is not None:
         print(f"  [PLAN-BLOCKED] {transition_blocker}")
+        if dry_run and applicability is not None:
+            applicability.record("blocked", "profile_lineage_required", request_sha256=request_sha256)
         return 0 if dry_run else 2
     if collisions:
         assert transition_plan is not None
@@ -1529,6 +1724,8 @@ def _run_managed_create_only_request(
                 "be applied by `naos upgrade --apply-plan ... "
                 "--expect-plan-digest ...`."
             )
+            if dry_run and applicability is not None:
+                applicability.record("blocked", "external_plan_required", execution_route="external_reviewed_plan_apply", request_sha256=request_sha256, plan_status=transition_plan["status"], plan_sha256=transition_plan["plan_sha256"])
             return 0 if dry_run else 2
         if transition_plan["status"] != "ready":
             print(
@@ -1549,13 +1746,19 @@ def _run_managed_create_only_request(
         )
         return 0 if transition_plan["status"] == "ready" else 2
     if not pending:
+        if dry_run and applicability is not None:
+            applicability.record("noop", "provenance_current", request_sha256=request_sha256)
         print("  [ALREADY_APPLIED] Every requested path is provenance-current.")
         return 0
     assert create_only_plan is not None
     if create_only_plan.get("status") != "ready_create_only":
         print("  [PLAN-BLOCKED] The create-only plan is not ready.")
+        if dry_run and applicability is not None:
+            applicability.record("blocked", "create_plan_not_ready", request_sha256=request_sha256)
         return 0 if dry_run else 2
     if dry_run:
+        if applicability is not None:
+            applicability.record("ready", "create_only_ready", execution_route="create_only_add", direct_add_allowed=True, request_sha256=request_sha256, plan_status=create_only_plan["status"], plan_sha256=create_only_plan["plan_sha256"])
         if scope.status != "valid":
             print(
                 "  [DRY-RUN] Would establish plan-bound managed-content "
@@ -1672,6 +1875,10 @@ def _run_managed_create_only_request(
                 project_root,
                 authorization_digest=str(create_only_plan["plan_sha256"]),
                 source_policy_sha256=str(create_only_plan["source_policy_sha256"]),
+                creator_identity=(
+                    managed_content_creator_identity(KIT_DIR)
+                    if scope.status == "owner_enrollment_required" else None
+                ),
             )
             enrolled_pending, enrolled_satisfied, enrolled_collisions = (
                 _partition_managed_sources(
@@ -1738,9 +1945,15 @@ def _materialize_text_source(source: Path, destination: Path, content: str) -> P
 
     before_identity, before_metadata = _managed_source_contract(source)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
-    destination.write_text(content, encoding="utf-8")
-    shutil.copystat(source, destination)
+    if _windows_cli() is not None:
+        # This is an operation-owned external preview. Installed Windows
+        # security is declared by the runtime, never inferred from POSIX mode.
+        with destination.open('x', encoding='utf-8', newline='') as derived:
+            derived.write(content)
+    else:
+        shutil.copy2(source, destination)
+        destination.write_text(content, encoding="utf-8")
+        shutil.copystat(source, destination)
     after_identity, after_metadata = _managed_source_contract(source)
     if before_identity != after_identity or before_metadata != after_metadata:
         raise ValueError(f"Content source changed while materializing: {source}")
@@ -1796,6 +2009,7 @@ def _materialize_setup_request_sources(
     *,
     profile: str,
     materialized_root: Path,
+    source_origins: SourceOrigins | None = None,
 ) -> tuple[list[tuple[Path, Path]], list[dict[str, Any]]]:
     actions = [
         action
@@ -1848,6 +2062,8 @@ def _materialize_setup_request_sources(
                 expected_leaf="file",
                 reject_multiply_linked_file=True,
             )
+            if source_origins is not None:
+                source_origins.record(source, relative_destination.as_posix())
             patch = action.get("profile_patch")
             if isinstance(patch, dict) and patch.get("enabled"):
                 pattern = str(patch.get("pattern") or "")
@@ -1865,9 +2081,11 @@ def _materialize_setup_request_sources(
             sources.append((relative_destination, source))
         elif action_type == "copy_tree" and copy_mode == "tree":
             _validate_copy_tree_destination(relative_destination)
-            sources.extend(
-                _flatten_managed_tree_sources(source, relative_destination)
-            )
+            tree_sources = _flatten_managed_tree_sources(source, relative_destination)
+            if source_origins is not None:
+                for relative_leaf, source_leaf in tree_sources:
+                    source_origins.record(source_leaf, relative_leaf.as_posix())
+            sources.extend(tree_sources)
         else:
             raise ValueError(
                 f"Unsupported install action: {action_type}/{copy_mode}"
@@ -1875,13 +2093,140 @@ def _materialize_setup_request_sources(
     return sorted(sources, key=lambda item: item[0].as_posix()), selected_actions
 
 
+def _materialize_skill_host_request(
+    root: Path, source: Path, destination: Path, temporary: Path,
+    *, source_origins: SourceOrigins | None = None,
+) -> tuple[list[tuple[Path, Path]], dict[str, Any]]:
+    """Bind one skill and manual host routes; never edit existing project content."""
+    import importlib.util
+    sources = _flatten_managed_tree_sources(source, destination)
+    primary = next((p for rel, p in sources if rel == destination / "SKILL.md"), None)
+    if primary is None:
+        raise ValueError("Managed skill source has no SKILL.md")
+    if any(rel == destination / "agents/openai.yaml" for rel, _ in sources):
+        raise ValueError("Portable adapter Codex policy collides with skill support")
+    renderer_path = _kit_source_path({"source": "naos_init.py"})
+    renderer_identity = _managed_source_contract(renderer_path)
+    spec = importlib.util.spec_from_file_location("_naos_add_host_renderer", renderer_path)
+    if spec is None or spec.loader is None:
+        raise ValueError("Host route renderer is unavailable")
+    renderer = importlib.util.module_from_spec(spec)
+    renderer_bytes = _stable_regular_bytes(renderer_path, label="host route renderer")
+    if hashlib.sha256(renderer_bytes).hexdigest() != renderer_identity[0]["sha256"]:
+        raise ValueError("Host route renderer source differs from its pinned contract")
+    # Execute these source bytes, never a timestamp-selected cached code object.
+    exec(compile(renderer_bytes, str(renderer_path), "exec"), renderer.__dict__)
+    if _managed_source_contract(renderer_path) != renderer_identity:
+        raise ValueError("Host route renderer changed during loading")
+    profile = _setup_effective_profile(root, None)
+    original = _stable_regular_bytes(primary, label="skill source")
+    skill_names = {p.name for p in (TEMPLATES_DIR / "skills").iterdir() if p.is_dir()}
+    # Only paths actually referenced by this selected guidance are observed.
+    body = original.decode("utf-8")
+    body = re.sub(r"(?<![A-Za-z0-9_./-])templates/skills/([a-z0-9-]+)/SKILL\.md",
+                  r".github/skills/\1/SKILL.md", body)
+    candidates = set(re.findall(
+        r"scripts/[A-Za-z0-9_./-]+\.py|\.github/(?:skills/[a-z0-9-]+/SKILL\.md|agents/[a-z0-9-]+\.agent\.md|instructions/[a-z0-9-]+\.instructions\.md|prompts/[A-Za-z0-9_-]+(?:\.prompt)?\.md|autoresearch/[A-Za-z0-9_./-]+\.py)", body))
+    candidates.update(f".github/skills/{name}/SKILL.md" for name in skill_names if f"`{name}`" in body)
+    candidates.update(f".github/agents/{name}.agent.md" for name in re.findall(r"@naos-[a-z0-9-]+", body) for name in [name.lstrip("@")])
+    for name in re.findall(r"/(naos-[A-Za-z0-9_-]+)", body):
+        candidates.update((f".github/prompts/{name}.md", f".github/prompts/{name}.prompt.md"))
+    # Legacy guidance presence does not establish a separately installed adapter.
+    for reference in list(candidates):
+        if reference.startswith(".github/skills/") and reference.endswith("/SKILL.md"):
+            candidates.add(f".agents/skills/naos-portable-{Path(reference).parent.name}/SKILL.md")
+        elif reference.startswith(".github/prompts/"):
+            base = Path(reference).name.removesuffix(".prompt.md").removesuffix(".md").removeprefix("naos-")
+            base = re.sub(r"[^a-z0-9-]+", "-", base.lower()).strip("-")
+            candidates.add(f".agents/skills/naos-workflow-{base}/SKILL.md")
+    planned = {rel.as_posix() for rel, _ in sources}
+    planned.add(f".agents/skills/naos-portable-{destination.name}/SKILL.md")
+    inventory = set(planned)
+    observations = []
+    for name in sorted(candidates - planned):
+        relative = _safe_relative_path(name, field="host route reference")
+        path = _guard_project_destination(root, relative, expected_leaf="file", reject_multiply_linked_file=True)
+        if not path.exists():
+            observations.append({"path": name, "present": False})
+            continue
+        identity, metadata = _managed_source_contract(path)
+        observations.append({"path": name, "present": True, "identity": identity, "metadata": metadata})
+        inventory.add(name)
+    adapter_sources = {kind: _kit_source_path({"source": f"templates/host-adapters/{kind}.md"})
+                       for kind in ("portable-skill", "claude-command")}
+    adapter_bytes = {kind: _stable_regular_bytes(path, label="host adapter source") for kind, path in adapter_sources.items()}
+    policy = _kit_source_path({"source": "templates/host-adapters/openai.yaml"})
+    policy_bytes = _stable_regular_bytes(policy, label="host policy source")
+    adapter_name, outputs = renderer._render_selected_host_route(
+        (destination / "SKILL.md").as_posix(), original, adapter_bytes,
+        inventory=inventory, skill_names=skill_names, tier=profile,
+        portable_routes={path for path in inventory if path.startswith(".agents/skills/")},
+    )
+    portable = Path(".agents/skills") / adapter_name
+    # The original tree remains exact. Copy every safe support leaf to the route.
+    result = list(sources)
+    if source_origins is not None:
+        for relative, leaf in sources:
+            source_origins.record(leaf, relative.as_posix())
+    for relative, data in outputs.items():
+        kind = "portable-skill" if relative.endswith("/SKILL.md") else "claude-command"
+        template = adapter_sources[kind]
+        materialized = _materialize_text_source(template, temporary / relative, data.decode("utf-8"))
+        result.append((Path(relative), materialized))
+        if source_origins is not None:
+            for path, raw in [(template, adapter_bytes[kind]), (primary, original)]:
+                renderer.mode_row(source_origins.declaration, source=path.relative_to(KIT_DIR.resolve()).as_posix(),
+                                  source_bytes=raw, destination=relative, output_bytes=raw)
+            source_origins.record_recipe("host_adapter", relative, sorted([
+                ("kit/" + template.relative_to(KIT_DIR.resolve()).as_posix(), adapter_bytes[kind]),
+                ("kit/" + primary.resolve().relative_to(KIT_DIR.resolve()).as_posix(), original),
+                ("generated/selected_inventory.json", json.dumps(sorted(inventory), separators=(",", ":")).encode()),
+                ("generated/known_skill_names.json", json.dumps(sorted(skill_names), separators=(",", ":")).encode()),
+            ]), {"profile": profile, "name": adapter_name, "kind": kind})
+    result.append((portable / "agents/openai.yaml", policy))
+    if source_origins is not None:
+        source_origins.record(policy, (portable / "agents/openai.yaml").as_posix(), source_bytes=policy_bytes)
+    for relative, leaf in sources:
+        if relative == destination / "SKILL.md":
+            continue
+        target = portable / relative.relative_to(destination)
+        result.append((target, leaf))
+        if source_origins is not None:
+            source_origins.record(leaf, target.as_posix())
+    binding = {"schema": "naos.add.skill_host_routes.v1", "profile": profile,
+               "inventory": sorted(inventory), "observations": observations,
+               "skill_names": sorted(skill_names), "renderer": renderer_identity,
+               "add_implementation": _managed_source_contract(_kit_source_path({"source": "naos_add.py"})),
+               "templates": {kind: _managed_source_contract(path) for kind, path in adapter_sources.items()},
+               "policy": _managed_source_contract(policy)}
+    # JSON normal form makes persisted tuples and in-memory contracts identical.
+    binding = json.loads(json.dumps(binding))
+    return sorted(result, key=lambda item: item[0].as_posix()), binding
+
+
 @contextmanager
 def regenerate_managed_request(
     project_root: Path,
     plan: dict[str, Any],
+    *,
+    collect_source_modes: bool = False,
+    portable_request: bool = False,
 ) -> Iterator[dict[str, Any]]:
     """Regenerate fixed add/setup sources bound by a persisted plan."""
 
+    windows_binding = None
+    if not portable_request and _windows_cli() is not None:
+        checks = plan.get('checks')
+        if (not isinstance(checks, list) or len(checks) != 1
+                or not isinstance(checks[0], dict)
+                or checks[0].get('check_id') != 'managed_request_source_authority'):
+            raise ValueError('Windows add/setup plan lacks source-authority checks')
+        windows_binding = checks[0].get('operation_inputs')
+        request = plan.get('request')
+        if not isinstance(windows_binding, dict) or not isinstance(request, dict):
+            raise ValueError('Windows add/setup operation binding is invalid')
+        plan = {'operation': request.get('operation'), 'operation_inputs': windows_binding,
+                'selected_paths': windows_binding.get('selected_paths')}
     root = _canonical_project_root(project_root)
     operation = str(plan.get("operation") or "")
     operation_inputs = plan.get("operation_inputs")
@@ -1893,6 +2238,7 @@ def regenerate_managed_request(
     ):
         raise ValueError("Add/setup plan operation inputs are invalid.")
     request = dict(operation_inputs["request"])
+    source_origins = SourceOrigins.from_kit(KIT_DIR) if collect_source_modes else None
 
     with tempfile.TemporaryDirectory(
         prefix="naos-add-regenerate-",
@@ -1915,20 +2261,34 @@ def regenerate_managed_request(
             ):
                 raise ValueError("Add artifact operation binding is invalid.")
             if kind == "skill":
-                sources = _flatten_managed_tree_sources(
-                    source,
-                    relative_destination,
-                )
-                expected_request = {
-                    "kind": kind,
-                    "name": name,
-                    "template": source.relative_to(KIT_DIR).as_posix(),
-                }
+                route_request = request.get("host_routes")
+                if route_request is None:
+                    # Persisted legacy requests keep their exact tree-only scope.
+                    sources = _flatten_managed_tree_sources(source, relative_destination)
+                    if source_origins is not None:
+                        for relative_leaf, source_leaf in sources:
+                            source_origins.record(source_leaf, relative_leaf.as_posix())
+                    expected_request = {"kind": kind, "name": name,
+                                        "template": source.relative_to(KIT_DIR).as_posix()}
+                else:
+                    if not isinstance(route_request, dict) or route_request.get("schema") != "naos.add.skill_host_routes.v1":
+                        raise ValueError("Unsupported progressive skill host route request")
+                    sources, route_binding = _materialize_skill_host_request(
+                        root, source, relative_destination, materialized_root,
+                        source_origins=source_origins,
+                    )
+                    expected_request = {"kind": kind, "name": name,
+                                        "template": source.relative_to(KIT_DIR).as_posix(),
+                                        "host_routes": route_binding}
             else:
                 template_bytes = _stable_regular_bytes(
                     source,
                     label=f"{kind} template source",
                 )
+                if source_origins is not None:
+                    source_origins.record(
+                        source, relative_destination.as_posix(), source_bytes=template_bytes,
+                    )
                 template_identity, template_metadata = _managed_source_contract(source)
                 context = _load_naos_init_context(root)
                 context_sha256 = canonical_sha256(context)
@@ -1959,15 +2319,18 @@ def regenerate_managed_request(
                 raise ValueError("Setup-module plan profile is invalid.")
             if operation != f"naos-add-setup-module:{module_id}":
                 raise ValueError("Setup-module operation binding is invalid.")
+            _setup_effective_profile(root, profile)
             snapshot = _load_setup_catalog(root)
+            canonical_snapshot = _load_setup_catalog(root, canonical=True)
             module = _resolve_setup_module(snapshot.data, module_id)
             if module is None:
                 raise ValueError("Setup-module source is unavailable.")
-            activation_failures = _setup_activation_gate_failures(
+            canonical_modules = _required_setup_modules(canonical_snapshot.data, module, profile)
+            activation_failures = _setup_required_gate_failures(
                 module,
+                canonical_modules,
                 root,
                 profile,
-                force=False,
             )
             if activation_failures:
                 raise ValueError(
@@ -1978,6 +2341,7 @@ def regenerate_managed_request(
                 module,
                 profile=profile,
                 materialized_root=materialized_root,
+                source_origins=source_origins,
             )
             actions = [
                 action
@@ -1994,6 +2358,7 @@ def regenerate_managed_request(
                 "profile": profile,
                 "catalog_sha256": snapshot.sha256,
                 "catalog_schema_sha256": snapshot.schema_sha256,
+                "required_catalog_sha256": canonical_snapshot.sha256,
                 "catalog_version": snapshot.data.get("version"),
                 "catalog_source": snapshot.source,
                 "source_authority_sha256": canonical_sha256(authority),
@@ -2019,16 +2384,21 @@ def regenerate_managed_request(
             "selected_paths"
         ):
             raise ValueError("Add/setup selected path inventory changed after planning.")
-        yield {
-            "sources": sources,
-            "checks": [
+        checks = [
                 {
                     "check_id": "managed_request_source_authority",
                     "status": "passed",
                     "evidence_sha256": request_sha256,
                 }
-            ],
-        }
+            ]
+        if windows_binding is not None:
+            checks[0]['operation_inputs'] = windows_binding
+        result = {"sources": sources, "checks": checks}
+        if source_origins is not None:
+            result["source_mode_inventory"] = source_origins.inventory(
+                [(relative.as_posix(), source) for relative, source in sources]
+            )
+        yield result
 
 
 # ─── COMMANDS ─────────────────────────────────────────────────────────────────
@@ -2041,6 +2411,7 @@ def cmd_add(
     force: bool = False,
     dry_run: bool = False,
     plan_out: Path | None = None,
+    applicability=None,
 ) -> int:
     """
     Deploy a single template artifact into the project.
@@ -2071,31 +2442,21 @@ def cmd_add(
     try:
         project_path = _canonical_project_root(project_path)
         if kind == "skill":
-            sources = _flatten_managed_tree_sources(src, relative_dest)
-            source_inventory = _managed_request_inventory(sources)
-
-            def revalidate_skill_source() -> None:
-                current_sources = _flatten_managed_tree_sources(src, relative_dest)
-                if _managed_request_inventory(current_sources) != source_inventory:
-                    raise ValueError(
-                        "Managed skill source inventory changed before apply."
-                    )
-
-            return _run_managed_create_only_request(
-                project_path,
-                sources,
-                operation=(
-                    f"naos-add-artifact:{kind}:{relative_dest.as_posix()}"
-                ),
-                request_inputs={
-                    "kind": kind,
-                    "name": name,
-                    "template": src.relative_to(KIT_DIR).as_posix(),
-                },
-                dry_run=dry_run,
-                plan_out=plan_out,
-                preapply_revalidator=revalidate_skill_source,
-            )
+            with tempfile.TemporaryDirectory(prefix="naos-add-host-routes-", dir=_external_temp_root(project_path)) as temporary:
+                sources, binding = _materialize_skill_host_request(project_path, src, relative_dest, Path(temporary))
+                source_inventory = _managed_request_inventory(sources)
+                def revalidate_skill_source() -> None:
+                    with tempfile.TemporaryDirectory(prefix="naos-add-host-revalidate-", dir=_external_temp_root(project_path)) as fresh:
+                        current_sources, current_binding = _materialize_skill_host_request(project_path, src, relative_dest, Path(fresh))
+                        if current_binding != binding or _managed_request_inventory(current_sources) != source_inventory:
+                            raise ValueError("Managed skill host-route inputs changed before apply.")
+                return _run_managed_create_only_request(
+                    project_path, sources,
+                    operation=f"naos-add-artifact:{kind}:{relative_dest.as_posix()}",
+                    request_inputs={"kind": kind, "name": name, "template": src.relative_to(KIT_DIR).as_posix(), "host_routes": binding},
+                    dry_run=dry_run, plan_out=plan_out, preapply_revalidator=revalidate_skill_source,
+                    **({"applicability": applicability} if applicability is not None else {}),
+                )
 
         _guard_project_destination(
             project_path,
@@ -2157,6 +2518,7 @@ def cmd_add(
                 dry_run=dry_run,
                 plan_out=plan_out,
                 preapply_revalidator=revalidate_artifact_inputs,
+                **({"applicability": applicability} if applicability is not None else {}),
             )
     except CanonicalizationUnavailable as exc:
         print(
@@ -2169,7 +2531,7 @@ def cmd_add(
         return 1
     if result == 0 and kind == "agent" and not dry_run:
         print(
-            f"  [MANUAL_ACTION] Preserve .github/agents/AGENTS.md; add @{name} "
+            f"  [MANUAL_ACTION] Preserve root AGENTS.md; review .github/NAOS_AGENTS.md to add @{name} "
             "only through adopter review."
         )
     return result
@@ -2211,7 +2573,7 @@ def cmd_setup_module_list(project_path: Path) -> int:
 
 
 def cmd_setup_module_recommended(
-    project_path: Path, profile: str, dry_run: bool
+    project_path: Path, profile: str | None, dry_run: bool
 ) -> int:
     """Plan recommended modules without applying bulk writes."""
     if not dry_run:
@@ -2221,6 +2583,8 @@ def cmd_setup_module_recommended(
         )
         return 1
     try:
+        project_path = _canonical_project_root(project_path)
+        profile = _setup_effective_profile(project_path, profile)
         modules = _setup_modules(project_path)
     except (OSError, ValueError) as exc:
         print(f"  [ERROR] {exc}", file=sys.stderr)
@@ -2258,14 +2622,15 @@ def cmd_setup_module_recommended(
 def cmd_add_setup_module(
     name: str,
     project_path: Path,
-    profile: str,
+    profile: str | None = None,
     force: bool = False,
     dry_run: bool = False,
     confirm: bool = False,
     plan_out: Path | None = None,
+    applicability=None,
 ) -> int:
     """Apply explicit install_actions from the setup module catalog."""
-    if profile not in PROFILES:
+    if profile is not None and profile not in PROFILES:
         print(f"  [ERROR] Unknown profile: {profile!r}", file=sys.stderr)
         return 1
     if force:
@@ -2277,7 +2642,19 @@ def cmd_add_setup_module(
         return 2
     try:
         project_path = _canonical_project_root(project_path)
+        profile = _setup_effective_profile(project_path, profile)
+    except CanonicalizationUnavailable as exc:
+        print(
+            f"  [REFUSED] Exact canonicalization prerequisite unavailable: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+    except (OSError, ValueError) as exc:
+        print(f"  [REFUSED] {exc}", file=sys.stderr)
+        return 2
+    try:
         catalog_snapshot = _load_setup_catalog(project_path)
+        canonical_snapshot = _load_setup_catalog(project_path, canonical=True)
         catalog = catalog_snapshot.data
         catalog_path = catalog_snapshot.path
         catalog_source = catalog_snapshot.source
@@ -2296,9 +2673,14 @@ def cmd_add_setup_module(
 
     print(f"  [CATALOG] {catalog_path} ({catalog_source})")
     _print_setup_module_explanation(module, profile)
+    try:
+        canonical_modules = _required_setup_modules(canonical_snapshot.data, module, profile)
+    except ValueError as exc:
+        print(f"  [REFUSED] {exc}", file=sys.stderr)
+        return 2
 
     if (
-        bool(module.get("requires_confirmation"))
+        (bool(module.get("requires_confirmation")) or any(bool(item.get("requires_confirmation")) for item in canonical_modules))
         and not dry_run
         and plan_out is None
         and not confirm
@@ -2328,8 +2710,8 @@ def cmd_add_setup_module(
         return 2
 
     try:
-        activation_failures = _setup_activation_gate_failures(
-            module, project_path, profile, force=False
+        activation_failures = _setup_required_gate_failures(
+            module, canonical_modules, project_path, profile
         )
     except ValueError as exc:
         activation_failures = [str(exc)]
@@ -2377,6 +2759,10 @@ def cmd_add_setup_module(
             )
 
         def revalidate_setup_inputs() -> None:
+            _setup_effective_profile(project_path, profile)
+            refreshed_canonical = _load_setup_catalog(project_path, canonical=True)
+            if refreshed_canonical != canonical_snapshot:
+                raise ValueError("Required kit setup controls changed before apply.")
             refreshed = _load_setup_catalog(project_path)
             if (
                 refreshed.path != catalog_snapshot.path
@@ -2397,11 +2783,11 @@ def cmd_add_setup_module(
                 for action in refreshed_module.get("install_actions", [])
                 if isinstance(action, dict)
             ]
-            activation_changes = _setup_activation_gate_failures(
+            activation_changes = _setup_required_gate_failures(
                 refreshed_module,
+                canonical_modules,
                 project_path,
                 profile,
-                force=False,
             )
             if activation_changes:
                 raise ValueError(
@@ -2485,6 +2871,8 @@ def cmd_add_setup_module(
                 )
             if not sources:
                 print("  [NOTE] No actions apply to the selected profile.")
+                if applicability is not None:
+                    applicability.record("noop", "no_selected_actions")
                 result = 0
             else:
                 result = _run_managed_create_only_request(
@@ -2496,6 +2884,7 @@ def cmd_add_setup_module(
                         "profile": profile,
                         "catalog_sha256": catalog_sha256,
                         "catalog_schema_sha256": catalog_snapshot.schema_sha256,
+                        "required_catalog_sha256": canonical_snapshot.sha256,
                         "catalog_version": catalog.get("version"),
                         "catalog_source": catalog_source,
                         "source_authority_sha256": canonical_sha256(
@@ -2506,6 +2895,7 @@ def cmd_add_setup_module(
                     dry_run=dry_run,
                     plan_out=plan_out,
                     preapply_revalidator=revalidate_setup_inputs,
+                    **({"applicability": applicability} if applicability is not None else {}),
                 )
     except CanonicalizationUnavailable as exc:
         print(
@@ -2557,6 +2947,44 @@ def cmd_list(kind: str | None, project_path: Path) -> int:
 
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
+
+
+def _applicability_command(args, project_path):
+    """One opt-in stdout result; normal add and canonical plan wire stay unchanged."""
+    from contextlib import redirect_stdout
+    try:
+        from .upgrade_contract.add_applicability import BranchCollector
+    except ImportError:
+        from upgrade_contract.add_applicability import BranchCollector
+    collector = BranchCollector()
+    invalid = (not args.dry_run or args.list or args.recommended
+               or args.plan_out is not None or not args.kind or not args.name)
+    if invalid:
+        print("  [ERROR] --applicability-json requires --dry-run and one exact "
+              "artifact or setup module; not --list, --recommended or --plan-out.",
+              file=sys.stderr)
+        print(json.dumps(collector.result(2, reason_code="invalid_report_request"),
+                         sort_keys=True, separators=(",", ":")))
+        return 2
+    exit_code = None
+    try:
+        with redirect_stdout(sys.stderr):
+            if args.kind == SETUP_MODULE_KIND:
+                exit_code = cmd_add_setup_module(
+                    name=args.name, project_path=project_path, profile=args.profile,
+                    force=args.force, dry_run=args.dry_run, confirm=args.confirm,
+                    plan_out=args.plan_out, applicability=collector)
+            else:
+                exit_code = cmd_add(
+                    kind=args.kind, name=args.name, project_path=project_path,
+                    force=args.force, dry_run=args.dry_run, plan_out=args.plan_out,
+                    applicability=collector)
+        return exit_code
+    finally:
+        # Uncaught errors retain their original nonzero/traceback behavior.
+        # None is honest when no command return was observed; never infer ready.
+        print(json.dumps(collector.result(exit_code), sort_keys=True,
+                         separators=(",", ":")))
 
 
 def main() -> int:
@@ -2634,8 +3062,8 @@ def main() -> int:
     parser.add_argument(
         "--profile",
         choices=sorted(PROFILES),
-        default="lite",
-        help="NAOS profile for setup-module actions (default: lite)",
+        default=None,
+        help="Setup profile (default: recorded project profile; lite only before initialization). An explicit mismatch is refused.",
     )
     parser.add_argument(
         "--recommended",
@@ -2643,8 +3071,14 @@ def main() -> int:
         help="Plan recommended setup modules for a profile (dry-run only; apply selected modules one at a time)",
     )
 
+    parser.add_argument(
+        "--applicability-json", action="store_true",
+        help="With --dry-run, emit one applicability JSON result; diagnostics go to stderr. Never authorizes mutation.",
+    )
     args = parser.parse_args()
     project_path = args.project.resolve()
+    if args.applicability_json:
+        return _applicability_command(args, project_path)
 
     if args.plan_out is not None and (args.list or args.recommended):
         print(

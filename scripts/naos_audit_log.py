@@ -30,8 +30,22 @@ from naos_policy import (  # noqa: E402
     write_report,
 )
 
+from naos_secret_patterns import secret_content_reason, sanitize_report_value  # noqa: E402
+
 
 EVENT_SCHEMA = "naos.audit_log_event.v1"
+PUBLIC_EVENT_ID_SCHEME = "naos.audit_log_event.public_id.v1"
+PUBLIC_EVENT_ID_PATTERN = re.compile(r"audit-sha256-[0-9a-f]{64}")
+PUBLIC_EVENT_NONCE_PATTERN = re.compile(r"(?:0|[1-9][0-9]{0,38})")
+PUBLIC_EVENT_FIELDS = {
+    "schema", "event_id", "event_type", "generated_at", "session_id",
+    "operator_id", "operator_source", "generated_by", "profile", "project_root",
+    "naos_root", "source_report", "source_report_hash", "source_report_path",
+    "related_task_id", "related_capability_id", "related_gate_id", "related_artifacts",
+    "event_payload_summary", "event_payload_hash", "authority_layer",
+    "human_review_required", "limitations", "not_claimed", "residual_risks",
+    "event_id_scheme", "event_nonce",
+}
 SUMMARY_SCHEMA = "naos.audit_log_summary.v1"
 SAFE_FRAGMENT_RE = re.compile(r"[^A-Za-z0-9._:@+-]+")
 EVENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@+-]{7,160}$")
@@ -147,6 +161,21 @@ def safe_timestamp_fragment(value: str) -> str:
     return parsed.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
+def filename_fragment(value: Any, fallback: str = "unknown") -> str:
+    """Bounded portable leaf component; never rewrite a logical event identifier.
+
+    The digest covers the original value, including case and Unicode form, so
+    readable-prefix sanitization/truncation does not collapse those identities.
+    It is a naming discriminator, not an integrity or collision-freedom proof.
+    """
+    original = "" if value is None else str(value)
+    prefix = re.sub(r"[^A-Za-z0-9_-]+", "_", original)[:8].strip("_-")
+    if not prefix:
+        prefix = re.sub(r"[^A-Za-z0-9_-]+", "_", fallback)[:8].strip("_-") or "unknown"
+    digest = hashlib.sha256(original.encode("utf-8", errors="surrogatepass")).hexdigest()[:24]
+    return f"{prefix}-{digest}"
+
+
 def audit_log_root_path(root: Path, naos_root: str, policy: dict[str, Any]) -> Path:
     configured = str(policy.get("paths", {}).get("audit_log_root") or "audit_log")
     return root / naos_root / configured
@@ -173,6 +202,90 @@ def hash_json(data: Any) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _public_event_body(event: Any, *, allow_unknown: bool = False) -> dict[str, Any] | None:
+    """Check the finite public ID contract, without files, clocks or randomness."""
+    if type(event) is not dict or set(event) != PUBLIC_EVENT_FIELDS:
+        return None
+    nullable = {"session_id", "operator_id", "source_report", "source_report_hash",
+                "source_report_path", "related_task_id", "related_capability_id", "related_gate_id"}
+    objects = {"generated_by", "event_payload_summary"}
+    arrays = {"related_artifacts", "limitations", "not_claimed", "residual_risks"}
+    strings = PUBLIC_EVENT_FIELDS - nullable - objects - arrays - {"human_review_required"}
+    if (any(type(event[key]) not in {str, type(None)} for key in nullable)
+            or any(type(event[key]) is not dict for key in objects)
+            or any(type(event[key]) is not list or any(type(value) is not str for value in event[key])
+                   for key in arrays)
+            or any(type(event[key]) is not str for key in strings)
+            or event["schema"] != EVENT_SCHEMA
+            or event["event_id_scheme"] != PUBLIC_EVENT_ID_SCHEME
+            or event["profile"] not in {"quickstart", "lite", "standard", "assured"}
+            or event["event_type"] not in ALLOWED_EVENT_TYPES
+            or (event["event_type"] == "unknown" and not allow_unknown)
+            or event["authority_layer"] != "historical_record_non_authoritative"
+            or event["human_review_required"] is not True
+            or not PUBLIC_EVENT_ID_PATTERN.fullmatch(event["event_id"])
+            or not PUBLIC_EVENT_NONCE_PATTERN.fullmatch(event["event_nonce"])
+            or int(event["event_nonce"]) >= 2 ** 128):
+        return None
+    # Reject non-JSON Python objects and invalid nested keys rather than invoking
+    # hash_json's compatibility default=str conversion on untrusted input.
+    pending = [(event, 0)]
+    inspected = 0
+    while pending:
+        value, depth = pending.pop()
+        inspected += 1
+        if depth > 64 or inspected > 50000:
+            return None
+        if type(value) is dict:
+            if any(type(key) is not str for key in value):
+                return None
+            if inspected + len(pending) + len(value) > 50000:
+                return None
+            pending.extend((item, depth + 1) for item in value.values())
+        elif type(value) is list:
+            if inspected + len(pending) + len(value) > 50000:
+                return None
+            pending.extend((item, depth + 1) for item in value)
+        elif type(value) not in {str, int, float, bool, type(None)}:
+            return None
+    try:
+        json.dumps(event, allow_nan=False)
+        if event["event_payload_hash"] != hash_json(event["event_payload_summary"]):
+            return None
+        # Hash exactly the sanitized stored body; no caller-selected exclusions.
+        return {key: value for key, value in event.items() if key != "event_id"}
+    except (TypeError, ValueError, UnicodeError, RecursionError):
+        return None
+
+
+def _assign_public_audit_event_id(event: dict[str, Any]) -> None:
+    body = {key: value for key, value in event.items() if key != "event_id"}
+    event["event_id"] = "audit-sha256-" + hash_json({"domain": PUBLIC_EVENT_ID_SCHEME, "event": body})
+
+
+def _verified_public_audit_event_id(event: Any, *, allow_unknown: bool = False) -> str | None:
+    body = _public_event_body(event, allow_unknown=allow_unknown)
+    if body is None:
+        return None
+    try:
+        expected = "audit-sha256-" + hash_json({"domain": PUBLIC_EVENT_ID_SCHEME, "event": body})
+    except (TypeError, ValueError, UnicodeError, RecursionError):
+        return None
+    return expected if event["event_id"] == expected else None
+
+
+def recompute_public_audit_event_id(event: Any) -> str | None:
+    """Return a matching independently recomputed ID for supported new events.
+
+    This pure check identifies a full domain-separated body digest, not a
+    credential, authenticated producer, truthful event or tamper-proof record.
+    Legacy IDs, unknown event types, extra fields, malformed bodies, invalid
+    nonce/payload hashes and nonmatching IDs have no public-ID recognition.
+    Other event fields still require their ordinary credential/hygiene checks.
+    """
+    return _verified_public_audit_event_id(event)
+
+
 def safe_digest(path: Path | None) -> str | None:
     if path is None or not path.exists() or not path.is_file():
         return None
@@ -185,7 +298,8 @@ def safe_digest(path: Path | None) -> str | None:
 
 def contains_forbidden_payload(data: Any) -> list[str]:
     text = json.dumps(data, sort_keys=True, default=str)
-    matches = []
+    reason = secret_content_reason(text)
+    matches = [reason] if reason else []
     for pattern in SECRET_PATTERNS:
         if pattern.search(text):
             matches.append(pattern.pattern)
@@ -241,14 +355,14 @@ def summarize_source_report(report: dict[str, Any] | None, source_report_path: P
         }
     forbidden = contains_forbidden_payload(payload)
     if forbidden:
-        return {
+        return sanitize_report_value({
             "redacted": True,
             "redaction_reason": "forbidden_payload_indicator",
             "forbidden_payload_indicators": forbidden,
             "source_report_path": str(source_report_path) if source_report_path else None,
             "schema": data.get("schema"),
             "status": data.get("status"),
-        }
+        })
     return payload
 
 
@@ -259,13 +373,38 @@ def event_date_dir(generated_at: str) -> str:
     return parsed.astimezone(UTC).strftime("%Y-%m-%d")
 
 
-def event_file_path(audit_root: Path, event: dict[str, Any]) -> Path:
-    date_dir = audit_root / event_date_dir(str(event.get("generated_at") or ""))
-    timestamp = safe_timestamp_fragment(str(event.get("generated_at") or ""))
-    session = safe_fragment(event.get("session_id"), "no-session", 48)
-    event_type = safe_fragment(event.get("event_type"), "unknown", 48)
-    event_id = safe_fragment(event.get("event_id"), uuid.uuid4().hex, 80)
+def legacy_event_file_path(audit_root: Path, event: dict[str, Any]) -> Path:
+    generated_at = str(event.get("generated_at") or "")
+    date_dir = audit_root / event_date_dir(generated_at)
+    timestamp = (safe_timestamp_fragment(generated_at) if parse_timestamp(generated_at) is not None
+                 else filename_fragment(generated_at, "timestamp"))
+    session = filename_fragment(event.get("session_id"), "no-session")
+    event_type = filename_fragment(event.get("event_type"))
+    event_id = filename_fragment(event.get("event_id"), "event")
     return date_dir / f"{timestamp}-{session}-{event_type}-{event_id}.jsonl"
+
+
+def event_file_path(audit_root: Path, event: dict[str, Any]) -> Path:
+    """Compact storage name; logical event identity and event bytes are unchanged.
+
+    Encode all four original naming inputs together, without truthiness coercion,
+    truncation, case folding or Unicode normalization. JSON preserves scalar
+    types and escapes lone surrogates before UTF-8 hashing. The full SHA256 is a
+    storage discriminator, not an authentication or collision-freedom claim.
+    """
+    values = [event.get(key) for key in ("generated_at", "session_id", "event_type", "event_id")]
+    encoded = json.dumps(values, ensure_ascii=True, separators=(",", ":"), allow_nan=False).encode("ascii")
+    digest = hashlib.sha256(encoded).hexdigest()
+    return audit_root / event_date_dir(str(event.get("generated_at") or "")) / f"audit-{digest}.jsonl"
+
+
+def event_file_paths(audit_root: Path, event: dict[str, Any]) -> tuple[Path, Path]:
+    """Exact current and prior storage operands; never discover arbitrary names.
+
+    Writers use only event_file_path. Readers retain the previous deterministic
+    name without moving old files or accepting an unknown leaf with valid JSON.
+    """
+    return event_file_path(audit_root, event), legacy_event_file_path(audit_root, event)
 
 
 def validate_audit_event(event: dict[str, Any]) -> list[dict[str, Any]]:
@@ -306,6 +445,9 @@ def validate_audit_event(event: dict[str, Any]) -> list[dict[str, Any]]:
         findings.append({"id": "audit_log_event.invalid_event_type", "severity": "blocking", "status": "invalid_events"})
     if not EVENT_ID_PATTERN.fullmatch(str(event.get("event_id") or "")):
         findings.append({"id": "audit_log_event.invalid_event_id", "severity": "blocking", "status": "invalid_events"})
+    if "event_id_scheme" in event or "event_nonce" in event:
+        if _verified_public_audit_event_id(event, allow_unknown=True) is None:
+            findings.append({"id": "audit_log_event.invalid_public_event_id", "severity": "blocking", "status": "invalid_events"})
     forbidden = contains_forbidden_payload(event.get("event_payload_summary") or {})
     if forbidden:
         findings.append(
@@ -350,9 +492,12 @@ def build_audit_event(
     if summary.get("redacted"):
         residual_risks.append("secret_like_payload_indicator_redacted")
     source_report_hash = safe_digest(source_report_path) if source_report_path else None
-    return {
+    event = sanitize_report_value({
         "schema": EVENT_SCHEMA,
-        "event_id": f"audit-{safe_timestamp_fragment(generated_at)}-{uuid.uuid4().hex[:12]}",
+        "event_id_scheme": PUBLIC_EVENT_ID_SCHEME,
+        # Public occurrence discriminator; the existing UUID4 label is stored
+        # as canonical decimal text so JSON clients need no 128-bit number type.
+        "event_nonce": str(uuid.uuid4().int),
         "event_type": event_type,
         "generated_at": generated_at,
         "session_id": str(session_id) if session_id else None,
@@ -376,7 +521,10 @@ def build_audit_event(
         "limitations": LIMITATIONS,
         "not_claimed": NOT_CLAIMED,
         "residual_risks": residual_risks,
-    }
+    })
+    event["event_payload_hash"] = hash_json(event["event_payload_summary"])
+    _assign_public_audit_event_id(event)
+    return event
 
 
 def write_audit_event(
@@ -444,8 +592,8 @@ def write_audit_event(
     path = event_file_path(audit_root, event)
     path.parent.mkdir(parents=True, exist_ok=True)
     while path.exists():
-        event["event_id"] = f"audit-{safe_timestamp_fragment(event['generated_at'])}-{uuid.uuid4().hex[:12]}"
-        event["event_payload_hash"] = hash_json(event["event_payload_summary"])
+        event["event_nonce"] = str(uuid.uuid4().int)
+        _assign_public_audit_event_id(event)
         path = event_file_path(audit_root, event)
     temp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
@@ -560,6 +708,11 @@ def build_summary_report(
                 "status": "advisory",
                 "message": "Some audit events do not have session_id metadata.",
                 "event_ids": missing_session[:25],
+                "evidence_classification": "confirmed",
+                "classification_scope": "observed_audit_event_session_field_absence",
+                "reasoning_summary": "Loaded JSON mapping events with the listed identifiers lacked session_id at summary time; event validity is assessed separately and this does not establish audit completeness or session attribution.",
+                "source_path": str(Path(__file__).resolve()),
+                "human_review_required": True,
             }
         )
     if missing_operator:
@@ -580,7 +733,7 @@ def build_summary_report(
         status = "advisory"
     else:
         status = "ready"
-    return {
+    return sanitize_report_value({
         "schema": SUMMARY_SCHEMA,
         "generated_at": generated_at,
         "profile": profile,
@@ -620,7 +773,7 @@ def build_summary_report(
             "missing_session_id_events": len(missing_session),
             "missing_operator_id_events": len(missing_operator),
         },
-    }
+    })
 
 
 def build_parser() -> argparse.ArgumentParser:

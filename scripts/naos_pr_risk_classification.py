@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -87,6 +88,18 @@ DEFAULT_RULES = {
     "trusted_authors": [],
     "protected_path_patterns": [
         ".github/**",
+        ".githooks/**",
+        ".claude/hooks/**",
+        ".claude/settings.json",
+        ".codex/config.toml",
+        ".vscode/mcp.json",
+        ".cursor/mcp.json",
+        ".mcp.json",
+        ".ai/mcp.json",
+        "mcp.json",
+        ".agents/mcp_config.json",
+        ".kilo/kilo.jsonc",
+        "opencode.json",
         "policies/**",
         "schemas/**",
         "capabilities/**",
@@ -94,6 +107,7 @@ DEFAULT_RULES = {
         "scripts/validators/**",
         "naos/**",
     ],
+    "test_contract_path_patterns": ["tests/**", "test/**", "**/tests/**", "**/test/**", "test_*.py", "**/test_*.py", "*_test.py", "**/*_test.py"],
     "workflow_path_patterns": [".github/workflows/**", "templates/workflows/**"],
     "dependency_path_patterns": [
         "pyproject.toml",
@@ -110,6 +124,9 @@ DEFAULT_RULES = {
     "ai_surface_path_patterns": [
         "CLAUDE.md",
         "AGENTS.md",
+        "**/AGENTS.md",
+        "GEMINI.md",
+        "**/GEMINI.md",
         ".github/copilot-instructions.md",
         ".github/agents/**",
         ".github/prompts/**",
@@ -156,18 +173,60 @@ def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _run_readonly_git_diff(root: Path, args: list[str], **options: Any) -> subprocess.CompletedProcess:
+    """Let Git filter stat-only differences using a disposable index copy."""
+    located = subprocess.run(
+        ["git", "--no-optional-locks", "rev-parse", "--git-path", "index"],
+        cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    if located.returncode != 0:
+        raise RuntimeError("Cannot locate Git index: " + located.stderr.decode("utf-8", errors="replace").strip())
+    name = os.fsdecode(located.stdout).removesuffix("\n")
+    if os.name == "nt":
+        name = name.removesuffix("\r")
+    if not name or "\x00" in name:
+        raise RuntimeError("Git returned an invalid index path")
+    index = Path(name)
+    if not index.is_absolute():
+        index = root / index
+    try:
+        temp_root = Path(tempfile.gettempdir()).resolve()
+        if temp_root.is_relative_to(root.resolve()) or temp_root.is_relative_to(index.parent.resolve()):
+            raise RuntimeError("Read-only Git diff requires temporary storage outside the project and index directory")
+        scratch = tempfile.TemporaryDirectory(prefix="naos-git-diff-", dir=temp_root)
+    except OSError as exc:
+        raise RuntimeError(f"Cannot prepare private Git index: {exc}") from exc
+    with scratch as temporary:
+        private_index = Path(temporary) / "index"
+        try:
+            raw = index.read_bytes()
+        except FileNotFoundError:
+            pass  # Preserve an actually absent index as absent, not an empty file.
+        else:
+            with private_index.open("xb") as stream:
+                stream.write(raw)
+        environment = os.environ.copy()
+        environment["GIT_INDEX_FILE"] = str(private_index)
+        # Keep Git's content filter; any refresh writes only the disposable
+        # index. Disable new split-index publication in repository metadata.
+        return subprocess.run(
+            ["git", "--no-optional-locks", "-c", "core.splitIndex=false", *args],
+            cwd=root, env=environment, **options,
+        )
+
+
 def run_git(root: Path, args: list[str]) -> tuple[int, str, str]:
     try:
-        result = subprocess.run(
-            ["git", *args],
-            cwd=root,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
+        options = dict(text=True, encoding="utf-8", errors="surrogateescape",
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        if args and args[0] == "diff":
+            result = _run_readonly_git_diff(root, args, **options)
+        else:
+            result = subprocess.run(["git", "--no-optional-locks", *args], cwd=root, **options)
     except FileNotFoundError:
         return 127, "", "git not found"
+    except (OSError, RuntimeError) as exc:
+        return 1, "", f"Read-only Git observation unavailable: {exc}"
     return result.returncode, result.stdout, result.stderr
 
 
@@ -243,9 +302,9 @@ def validate_diff_ref(value: str | None, *, label: str) -> str | None:
     if not ref:
         return None
     if ref.startswith("-") or any(ch.isspace() or ord(ch) < 32 for ch in ref):
-        raise ValueError(f"{label} is not a safe git ref: {value!r}")
+        raise ValueError(f"{label} is not a safe git ref")
     if ".." in ref or ref.endswith(".") or "@{" in ref or "\\" in ref:
-        raise ValueError(f"{label} is not a safe git ref: {value!r}")
+        raise ValueError(f"{label} is not a safe git ref")
     return ref
 
 
@@ -256,47 +315,112 @@ def infer_diff_args(base_ref: str | None, head_ref: str | None) -> tuple[list[st
         return [f"{base_ref}...{head_ref}"], "explicit_base_head"
     if base_ref:
         return [f"{base_ref}...HEAD"], "explicit_base_to_head"
+    if head_ref:
+        raise ValueError("head_ref requires base_ref for a PR comparison")
     return ["HEAD"], "working_tree_vs_head"
 
 
-def parse_porcelain_path(raw: str) -> str:
-    path = raw.strip()
-    if " -> " in path:
-        path = path.split(" -> ", 1)[1].strip()
-    if len(path) >= 2 and path[0] == path[-1] == '"':
-        path = path[1:-1]
-    return path
+def resolve_diff_comparison(root: Path, base_ref: str | None, head_ref: str | None) -> dict[str, Any]:
+    """Freeze each requested comparison endpoint to a commit before diff reads."""
+    try:
+        _, source = infer_diff_args(base_ref, head_ref)
+        base = validate_diff_ref(base_ref, label="base_ref")
+        head = validate_diff_ref(head_ref, label="head_ref")
+    except ValueError as exc:
+        return {"diff_source": "invalid_comparison", "diff_args": [], "git_status": "unavailable", "error": str(exc)}
+    refs = [("base_ref", base), ("head_ref", head or "HEAD")] if base else [("head_ref", "HEAD")]
+    resolved: dict[str, str] = {}
+    for label, ref in refs:
+        code, out, err = run_git(root, ["rev-parse", "--verify", f"{ref}^{{commit}}"])
+        commit = out.strip()
+        if code != 0 or not re.fullmatch(r"[0-9a-fA-F]{40,64}", commit):
+            return {
+                "diff_source": source,
+                "diff_args": [],
+                "git_status": "unavailable",
+                "git_exit_code": code,
+                "error": f"{label} does not resolve to a commit: {sanitized_git_error(err, root)}",
+            }
+        resolved[label] = commit
+    diff_args = (
+        [f"{resolved['base_ref']}...{resolved['head_ref']}"]
+        if base else [resolved["head_ref"]]
+    )
+    return {"diff_source": source, "diff_args": diff_args, "git_status": "available", "resolved_commits": resolved}
 
 
-def untracked_files(root: Path) -> list[dict[str, str]]:
-    code, out, _ = run_git(root, ["status", "--porcelain=v1", "--untracked-files=all"])
+def untracked_files(root: Path, metadata: dict[str, Any] | None = None) -> list[dict[str, str]]:
+    code, out, err = run_git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])
     if code != 0:
+        if metadata is not None:
+            metadata.update({
+                "untracked_git_status": "unavailable",
+                "untracked_git_exit_code": code,
+                "untracked_error": sanitized_git_error(err, root),
+            })
         return []
+    if metadata is not None:
+        metadata["untracked_git_status"] = "available"
     files: list[dict[str, str]] = []
-    for line in out.splitlines():
-        if not line.startswith("?? "):
+    for record in out.split("\0"):
+        if not record.startswith("?? "):
             continue
-        path = parse_porcelain_path(line[3:])
+        path = record[3:]
         if path:
             files.append({"status": "??", "path": path})
     return files
 
 
-def changed_files(root: Path, base_ref: str | None, head_ref: str | None) -> tuple[list[dict[str, str]], dict[str, Any]]:
-    diff_args, source = infer_diff_args(base_ref, head_ref)
-    code, out, err = run_git(root, ["diff", "--name-status", *diff_args])
-    metadata = {"diff_source": source, "diff_args": diff_args, "git_status": "available" if code == 0 else "unavailable"}
-    if code != 0:
-        metadata["error"] = err.strip() or "git diff failed"
-        return [], metadata
+def sanitized_git_error(error: str, root: Path) -> str:
+    """Keep useful Git context without exposing local roots or control characters."""
+    message = error.strip().replace(str(root), "<project>").replace(str(Path.home()), "<home>")
+    message = re.sub(r"(?i)(://[^\s/:@]+:)[^\s@]+@", r"\1<redacted>@", message)
+    return "".join(ch if ch.isprintable() or ch == "\n" else "?" for ch in message)[:500] or "git command failed"
+
+
+def parse_name_status_z(output: str) -> list[dict[str, str]]:
+    if not output:
+        return []
+    if not output.endswith("\0"):
+        raise ValueError("git name-status output was not NUL terminated")
+    fields = output[:-1].split("\0")
     files: list[dict[str, str]] = []
-    for line in out.splitlines():
-        parts = line.split("\t")
-        if len(parts) >= 2:
-            files.append({"status": parts[0], "path": parts[-1]})
+    index = 0
+    while index < len(fields):
+        status = fields[index]
+        index += 1
+        if not re.fullmatch(r"[A-Z?][0-9]*", status):
+            raise ValueError("git name-status output had an invalid status")
+        path_count = 2 if status.startswith(("R", "C")) else 1
+        if index + path_count > len(fields):
+            raise ValueError("git name-status output was truncated")
+        for path in fields[index : index + path_count]:
+            if not path:
+                raise ValueError("git name-status output had an empty path")
+            files.append({"status": status, "path": path})
+        index += path_count
+    return files
+
+
+def changed_files(
+    root: Path, base_ref: str | None, head_ref: str | None, comparison: dict[str, Any] | None = None
+) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    metadata = dict(comparison if comparison is not None else resolve_diff_comparison(root, base_ref, head_ref))
+    if metadata["git_status"] != "available":
+        return [], metadata
+    diff_args, source = metadata["diff_args"], metadata["diff_source"]
+    code, out, err = run_git(root, ["diff", "--name-status", "-z", "--no-ext-diff", *diff_args])
+    if code != 0:
+        metadata.update({"git_status": "unavailable", "git_exit_code": code, "error": sanitized_git_error(err, root)})
+        return [], metadata
+    try:
+        files = parse_name_status_z(out)
+    except ValueError as exc:
+        metadata.update({"git_status": "unavailable", "error": str(exc)})
+        return [], metadata
     if source == "working_tree_vs_head":
         existing = {item["path"] for item in files}
-        untracked = [item for item in untracked_files(root) if item["path"] not in existing]
+        untracked = [item for item in untracked_files(root, metadata) if item["path"] not in existing]
         if untracked:
             files.extend(untracked)
             metadata["untracked_files_included"] = len(untracked)
@@ -310,7 +434,7 @@ def untracked_added_lines(root: Path, limit: int, already_scanned: int) -> tuple
     if remaining == 0:
         metadata["truncated"] = True
         return lines, metadata
-    for item in untracked_files(root):
+    for item in untracked_files(root, metadata):
         if remaining <= 0:
             metadata["truncated"] = True
             break
@@ -337,12 +461,16 @@ def untracked_added_lines(root: Path, limit: int, already_scanned: int) -> tuple
     return lines, metadata
 
 
-def added_diff_lines(root: Path, base_ref: str | None, head_ref: str | None, limit: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    diff_args, source = infer_diff_args(base_ref, head_ref)
+def added_diff_lines(
+    root: Path, base_ref: str | None, head_ref: str | None, limit: int, comparison: dict[str, Any] | None = None
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    metadata = dict(comparison if comparison is not None else resolve_diff_comparison(root, base_ref, head_ref))
+    if metadata["git_status"] != "available":
+        return [], metadata
+    diff_args, source = metadata["diff_args"], metadata["diff_source"]
     code, out, err = run_git(root, ["diff", "--unified=0", "--no-ext-diff", *diff_args])
-    metadata = {"diff_source": source, "diff_args": diff_args, "git_status": "available" if code == 0 else "unavailable"}
     if code != 0:
-        metadata["error"] = err.strip() or "git diff failed"
+        metadata.update({"git_status": "unavailable", "git_exit_code": code, "error": sanitized_git_error(err, root)})
         return [], metadata
     results: list[dict[str, Any]] = []
     current_path: str | None = None
@@ -355,6 +483,11 @@ def added_diff_lines(root: Path, base_ref: str | None, head_ref: str | None, lim
         if line.startswith("+++ b/"):
             current_path = line[6:]
             current_line = 0
+            continue
+        if line.startswith("+++ "):
+            current_path = None
+            if line != "+++ /dev/null":
+                metadata["unparsed_added_file_headers"] = metadata.get("unparsed_added_file_headers", 0) + 1
             continue
         if line.startswith("@@"):
             match = re.search(r"\+(\d+)", line)
@@ -442,6 +575,7 @@ def classify_file(path: str, rules: dict[str, Any], severity: str) -> tuple[list
     findings: list[dict[str, Any]] = []
     checks = [
         ("protected_path", "protected_path_patterns", "pr_risk.protected_path", "Changed file touches a protected governance or CI path."),
+        ("test_contract", "test_contract_path_patterns", "pr_risk.test_contract_change", "Changed test file requires comparison with the retained baseline, specification and human approval before assertion weakening, skip/xfail, retry or timeout changes; this signal does not prove tampering."),
         ("workflow", "workflow_path_patterns", "pr_risk.workflow_change", "Changed file touches workflow configuration."),
         ("dependency", "dependency_path_patterns", "pr_risk.dependency_change", "Changed file touches dependency manifests or lockfiles."),
         ("ai_surface", "ai_surface_path_patterns", "pr_risk.ai_surface_change", "Changed file touches AI instruction, prompt, agent, skill, or rule surfaces."),
@@ -505,6 +639,20 @@ def classify_diff_lines(lines: list[dict[str, Any]], rules: dict[str, Any], seve
     return findings
 
 
+def diff_evidence_complete(metadata: dict[str, Any]) -> bool:
+    untracked = metadata.get("untracked") or {}
+    return (
+        metadata["git_status"] == "available"
+        and metadata.get("untracked_git_status") != "unavailable"
+        and not metadata.get("truncated")
+        and not metadata.get("unparsed_added_file_headers")
+        and untracked.get("untracked_git_status") != "unavailable"
+        and not untracked.get("truncated")
+        and not untracked.get("unreadable_skipped")
+        and not untracked.get("binary_or_non_utf8_skipped")
+    )
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.project_path or ".").resolve()
     policy = load_policy(args.policy, args.naos_root, root)
@@ -513,15 +661,32 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     rules_path = default_rules_path(root, naos_root, args.rules, policy)
     rules = merge_rules(DEFAULT_RULES, load_yaml(rules_path))
     severity = severity_for_profile(profile, policy)
-    files, diff_metadata = changed_files(root, args.base_ref, args.head_ref)
+    comparison = resolve_diff_comparison(root, args.base_ref, args.head_ref)
+    files, diff_metadata = changed_files(root, args.base_ref, args.head_ref, comparison)
     diff_lines, diff_line_metadata = added_diff_lines(
         root,
         args.base_ref,
         args.head_ref,
         int(rules.get("max_diff_lines_scanned") or DEFAULT_RULES["max_diff_lines_scanned"]),
+        comparison,
     )
 
     findings: list[dict[str, Any]] = []
+    diff_available = diff_evidence_complete(diff_metadata) and diff_evidence_complete(diff_line_metadata)
+    if not diff_available:
+        findings.append(
+            finding(
+                finding_id="pr_risk.diff_unavailable",
+                severity=severity,
+                status="unavailable",
+                message="PR risk classification is inconclusive because required Git diff evidence is unavailable or incomplete.",
+                category="diff_unavailable",
+                details={
+                    "name_status_available": diff_evidence_complete(diff_metadata),
+                    "added_lines_available": diff_evidence_complete(diff_line_metadata),
+                },
+            )
+        )
     changed: list[dict[str, Any]] = []
     for item in files:
         path = item["path"]
@@ -548,7 +713,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     for item in findings:
         category = str(item.get("category") or "unknown")
         category_counts[category] = category_counts.get(category, 0) + 1
-    risk_tier, risk_implied_profile = derive_risk_tier(category_counts, rules)
+    risk_tier, risk_implied_profile = derive_risk_tier(category_counts, rules) if diff_available else ("unknown", None)
     summary.update(
         {
             "changed_files": len(changed),
@@ -566,6 +731,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "generated_at": utc_now(),
         "profile": profile,
         "status": status_from_counts(summary),
+        "classification_status": "complete" if diff_available else "inconclusive",
         "project_root": str(root),
         "naos_root": naos_root,
         "rules_path": str(rules_path) if rules_path else None,

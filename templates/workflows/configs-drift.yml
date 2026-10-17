@@ -5,34 +5,81 @@ on:
     - cron: '0 2 * * *'  # nightly at 02:00 UTC
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
   configs-drift:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'
 
-      - name: Install minimal deps
+      # Optional adopter interface, not a NAOS-supplied script or implementation.
+      # Before enabling, provide scripts/configs_snapshot.py and requirements.txt,
+      # and separately supply an existing prior JSON snapshot at the path below
+      # (for example, a reviewed committed baseline; adapt retrieval if needed).
+      # Review the script against this exact CLI contract before setting the variable:
+      # --prev reads and preserves prior bytes; --latest writes current JSON;
+      # --out-dir writes archive JSON files; --diff-md writes the prior/current diff.
+      # Outputs must be fresh and describe the same current capture. This guard checks declared
+      # prerequisites; it does not verify capture correctness or implement diffing.
+      - name: Require adopter snapshot implementation
+        env:
+          NAOS_CONFIGS_SNAPSHOT_REVIEWED: ${{ vars.NAOS_CONFIGS_SNAPSHOT_REVIEWED }}
+        shell: python
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt || true
+          import os
+          from pathlib import Path
+          import sys
+
+          if os.environ.get("NAOS_CONFIGS_SNAPSHOT_REVIEWED") != "true":
+              sys.exit("ADAPT required: review the adopter snapshot CLI and baseline contract before enabling this optional sample.")
+          for required in ("scripts/configs_snapshot.py", "requirements.txt", "data/configs_snapshot_previous.json"):
+              if not Path(required).is_file():
+                  sys.exit(f"ADAPT required: provide {required} before enabling this optional sample.")
+
+      - name: Install minimal deps
+        run: python -m pip install -r requirements.txt
 
       - name: Generate configs snapshot + diff
+        shell: python
         run: |
-          # [ADAPT: replace with your configs snapshot script path and output directories]
-          python scripts/configs_snapshot.py \
-            --out-dir data/configs_snapshots \
-            --latest data/configs_snapshot_latest.json \
-            --prev data/configs_snapshot_latest.json \
-            --diff-md naos/CONFIGS_DIFF.md
+          import json
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          previous = Path("data/configs_snapshot_previous.json")
+          current = Path("data/configs_snapshot_latest.json")
+          diff = Path("naos/CONFIGS_DIFF.md")
+          archive = Path("data/configs_snapshots")
+          if previous.resolve() == current.resolve():
+              sys.exit("Prior input and current output must be distinct paths.")
+          if current.exists() or diff.exists() or any(archive.glob("*.json")):
+              sys.exit("Prepare fresh current, archive and diff output paths before running this sample.")
+          prior_bytes = previous.read_bytes()
+          json.loads(prior_bytes)
+          result = subprocess.run([
+              sys.executable, "scripts/configs_snapshot.py",
+              "--out-dir", str(archive), "--latest", str(current),
+              "--prev", str(previous), "--diff-md", str(diff),
+          ], check=False)
+          if result.returncode:
+              sys.exit(result.returncode)
+          if previous.read_bytes() != prior_bytes:
+              sys.exit("Adopter snapshot command changed the prior input.")
+          if not current.is_file() or not diff.is_file() or not any(archive.glob("*.json")):
+              sys.exit("Adopter snapshot command did not produce the declared outputs.")
+          json.loads(current.read_bytes())
 
       - name: Upload snapshot artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: configs-snapshots
           # [ADAPT: update paths to match your snapshot output directories]
@@ -41,7 +88,7 @@ jobs:
             data/configs_snapshot_latest.json
 
       - name: Upload diff markdown
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: configs-diff-md
           # [ADAPT: update to match your diff output path]

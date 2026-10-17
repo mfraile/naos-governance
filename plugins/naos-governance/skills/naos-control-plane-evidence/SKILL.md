@@ -1,7 +1,8 @@
 ---
-name: "naos-control-plane-evidence"
-description: "Use NAOS control-plane, evidence, gate, dashboard, and review-routing commands from Codex without overclaiming approval or compliance."
-parameters: []
+name: naos-control-plane-evidence
+description: Use NAOS control-plane, evidence, gate, dashboard, and review-routing commands from Codex without overclaiming approval or compliance.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # NAOS Control-Plane Evidence
@@ -151,3 +152,24 @@ turn traceability gaps into canonical lifecycle failures.
 Repository-intelligence status and validation are source-binding and generated-
 state checks only. FTS and graph results are retrieval candidates, not semantic
 truth, requirements approval, complete coverage, or evidence of absence.
+
+## Current-source review
+
+Systemic family templates start unresolved. Closed review binds the selected
+rules, policy, durable sources and supporting evidence; exact declared derived
+outputs remain live missing/stale/adverse observations. Unknown/custom files
+remain witnessed. Follow `docs/CONTROL_PLANE.md` under Systemic Impact Review.
+Configuration-only context review uses the gate's emitted subject and an actual
+reviewed snapshot under `docs/CONFIGURATION_POSTURE_REVIEW.md`. Neither record
+authenticates a reviewer, approves runtime evidence or waives unrelated failures.
+
+For complete local readiness, supply actual task/query/indexed-path context to
+`naos ci-readiness`. Opt-in `--finalize-dependencies` supports Lite, Standard and
+Assured with current L0–L2 and targets through L3; current L3 and L4/L5 fail
+closed. Lite's enabled L0 behavioral capability permits inert inspection only;
+its missing-conformance warning and `not_ready` remain visible, without baseline
+readiness, maturity promotion or human approval. Complete Assured
+workflow and installed-artifact/native qualification remain pending. It
+verifies a new full self-check before final gates and creates no missing
+evidence or approvals; exit success does not establish semantic gate readiness.
+Follow `INSTALLATION_MANUAL.md` and the project's `NAOS_QUICK_REFERENCE.md`.

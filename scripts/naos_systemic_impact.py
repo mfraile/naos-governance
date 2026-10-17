@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from naos_self_check_inspection import logical_path
+
 import argparse
 import hashlib
 import json
@@ -38,8 +40,10 @@ from naos_policy import (  # noqa: E402
     write_report,
 )
 
+from naos_systemic_applicability import load_rule_document, role_family, validate_adopter_routing  # noqa: E402
 
-REVIEW_STATUSES = {"ready", "review_required", "blocked", "advisory", "not_configured", "disabled", "unknown"}
+
+REVIEW_STATUSES = {"not_applicable", "ready", "review_required", "blocked", "advisory", "not_configured", "disabled", "unknown"}
 SEVERITY_TO_STATUS = {
     "none": "ready",
     "advisory": "advisory",
@@ -126,6 +130,9 @@ def finding_occurrence(
         "id": finding.get("id"),
         "family_id": finding.get("family_id"),
         "family_status": family_status,
+        "target_family_id": finding.get("target_family_id"),
+        "source_family_ids": finding.get("source_family_ids") or [],
+        "source_severities": finding.get("source_severities") or {},
         "severity": str(finding.get("severity") or "unknown"),
         "status": str(finding.get("status") or "unknown"),
         "message": str(finding.get("message") or "No finding message was provided."),
@@ -207,6 +214,14 @@ def finding_presentation_bucket(occurrence: dict[str, Any]) -> str:
     family_status = occurrence.get("family_status")
     if status in DISABLED_WAIVED_STATUSES:
         return "disabled_waived"
+    if occurrence.get("source_family_ids") and occurrence.get("target_family_id"):
+        # A shared target is not owned by the representative source family.
+        # Its strongest contributing severity controls presentation as well.
+        if severity in ACTIONABLE_SEVERITIES:
+            return "actionable"
+        if severity in {"none", "advisory"}:
+            return "advisory_not_configured"
+        return "unknown_other"
     if family_status is not None:
         if family_status in ACTIONABLE_FAMILY_STATUSES:
             return "actionable"
@@ -263,6 +278,9 @@ def format_finding_occurrence(
         f"{_compact_text(message)}"
     )
     detail_groups = (
+        ("source families", occurrence.get("source_family_ids") or []),
+        ("source severities", [occurrence["source_severities"]]
+         if occurrence.get("source_severities") else []),
         ("next", occurrence.get("required_next_actions") or []),
         ("evidence", occurrence.get("evidence") or []),
         ("waiver", occurrence.get("waivers") or []),
@@ -516,6 +534,7 @@ def classify_changed_path(
         if isinstance(rules.get("changed_path_routing"), dict)
         else {}
     )
+    validate_adopter_routing(routing)
     exclusions = [
         item for item in routing.get("exclusions") or [] if isinstance(item, dict)
     ]
@@ -536,6 +555,8 @@ def classify_changed_path(
             "matched_generated_routing_families": [],
             "matched_kit_source_routing_families": [],
             "matched_adopter_generated_routing_families": [],
+            "matched_adopter_declared_routing_families": [],
+            "artifact_applicability_errors": [],
             "matched_exclusions": matched_exclusions,
             "review_triggers": [],
         }
@@ -543,12 +564,28 @@ def classify_changed_path(
     artifact_families = [
         item for item in rules.get("artifact_families") or [] if isinstance(item, dict)
     ]
-    matched_artifact_families = sorted(
-        str(item.get("family_id"))
-        for item in artifact_families
-        if item.get("family_id")
-        and _matching_patterns(normalized, as_list(item.get("file_patterns")))
-    )
+    matched_artifact_families = []
+    applicability_errors = []
+    for family in artifact_families:
+        if not family.get("family_id"):
+            continue
+        projected = family
+        if repository_role is not None:
+            try:
+                projected = role_family(family, repository_role)
+            except ValueError as exc:
+                # Invalid declarations cannot silently remove a source family.
+                # Preserve the error in changed-path integrity as well as the
+                # aggregate family evaluator's original missing/unknown state.
+                applicability_errors.append({
+                    "family_id": str(family["family_id"]), "message": str(exc)
+                })
+            else:
+                if projected["_role_applicability"]["applicable"] is False:
+                    continue
+        if _matching_patterns(normalized, as_list(projected.get("file_patterns"))):
+            matched_artifact_families.append(str(family["family_id"]))
+    matched_artifact_families.sort()
     routing_families = [
         item for item in routing.get("routing_families") or [] if isinstance(item, dict)
     ]
@@ -564,17 +601,25 @@ def classify_changed_path(
         if item.get("route_id")
         and _matching_patterns(normalized, as_list(item.get("generated_patterns")))
     )
+    matched_adopter_declared_routing_families = []
+    for route in routing_families:
+        if "adopter_patterns" not in route:
+            continue
+        if _matching_patterns(normalized, route["adopter_patterns"]):
+            matched_adopter_declared_routing_families.append(str(route["route_id"]))
+    matched_adopter_declared_routing_families.sort()
     governed_patterns = as_list(routing.get("governed_patterns"))
     governed = bool(_matching_patterns(normalized, governed_patterns))
     if repository_role == "kit_source":
         matched = bool(matched_routing_families)
     elif repository_role == "adopter_project":
-        matched = bool(matched_generated_routing_families)
+        matched = bool(matched_generated_routing_families or matched_adopter_declared_routing_families)
     else:
         matched = bool(
             matched_artifact_families
             or matched_routing_families
             or matched_generated_routing_families
+            or matched_adopter_declared_routing_families
         )
     return {
         "path": normalized,
@@ -587,6 +632,8 @@ def classify_changed_path(
         "matched_adopter_generated_routing_families": (
             matched_generated_routing_families
         ),
+        "matched_adopter_declared_routing_families": matched_adopter_declared_routing_families,
+        "artifact_applicability_errors": applicability_errors,
         "matched_exclusions": [],
         "review_triggers": [],
     }
@@ -1048,12 +1095,19 @@ def build_changed_path_review(
                 "matched_adopter_generated_routing_families"
             ]
         else:
-            classification["active_repository_routing_families"] = classification[
-                "matched_adopter_generated_routing_families"
-            ]
+            classification["active_repository_routing_families"] = dedupe(
+                classification["matched_adopter_generated_routing_families"]
+                + classification["matched_adopter_declared_routing_families"]
+            )
             classification["cross_role_propagation_candidates"] = classification[
                 "matched_kit_source_routing_families"
             ]
+        for error in classification["artifact_applicability_errors"]:
+            integrity_findings.append({
+                "type": "invalid_artifact_applicability",
+                "message": error["message"],
+                "family_id": error["family_id"], "value": path,
+            })
         if classification["classification"] == "unclassified":
             integrity_findings.append(
                 {
@@ -1081,7 +1135,7 @@ def build_changed_path_review(
         matched_routes = (
             classification["matched_routing_families"]
             if repository_role == "kit_source"
-            else classification["matched_generated_routing_families"]
+            else classification["active_repository_routing_families"]
         )
         for route_id in matched_routes:
             route = route_by_id[route_id]
@@ -1358,9 +1412,9 @@ def build_changed_path_review(
 
 def relative_text(root: Path, path: Path) -> str:
     try:
-        return str(path.relative_to(root))
+        return path.relative_to(root).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix()
 
 
 def should_ignore(path: Path, ignored: set[str]) -> bool:
@@ -1527,11 +1581,20 @@ def evaluate_families(
         for item in rules.get("review_surfaces") or []
         if isinstance(item, dict) and item.get("surface_id")
     }
-    prelim = {
-        str(item.get("family_id")): preliminary_family(root=root, ignored=ignored, family=item, defaults=defaults)
-        for item in raw_families
-        if item.get("family_id")
-    }
+    repository_role = "kit_source" if is_kit_repository(root, naos_root) else "adopter_project"
+    prelim = {}
+    for raw_family in raw_families:
+        if not raw_family.get("family_id"):
+            continue
+        try:
+            projected = role_family(raw_family, repository_role)
+            applicability = projected.pop("_role_applicability")
+        except ValueError as exc:
+            projected = dict(raw_family)
+            applicability = {"repository_role": repository_role, "applicable": None, "reason": str(exc)}
+        item = preliminary_family(root=root, ignored=ignored, family=projected, defaults=defaults)
+        item["applicability"] = applicability
+        prelim[str(raw_family["family_id"])] = item
 
     results: list[dict[str, Any]] = []
     all_findings: list[dict[str, Any]] = []
@@ -1541,6 +1604,26 @@ def evaluate_families(
         related = dedupe(as_list(raw.get("related_families")) + as_list(raw.get("impact_targets")))
         review_obligations: list[dict[str, Any]] = []
         family_findings: list[dict[str, Any]] = []
+        applicability = item["applicability"]
+        if applicability["applicable"] is False:
+            results.append({
+                "family_id": family_id, "name": item.get("name"),
+                "enabled": item["enabled"], "configured": False,
+                "files_found": item["files_found"], "missing_expected": [], "stale_files": [],
+                "related_families": related, "review_obligations": [],
+                "severity": severity, "evaluated_status": "not_applicable",
+                "human_review_required": False, "waivers": [],
+                "limitations": as_list(raw.get("limitations")),
+                "applicability": applicability,
+                "effective_definition": raw,
+            })
+            continue
+        if applicability["applicable"] is None:
+            family_findings.append(finding(
+                family_id=family_id, severity=severity, status="applicability_invalid",
+                message=applicability["reason"],
+                required_next_actions=["Repair the explicit repository-role declaration; no exemption was applied."],
+            ))
 
         if not item["enabled"]:
             family_findings.append(
@@ -1607,7 +1690,11 @@ def evaluate_families(
                 target_kind = "artifact_family"
                 target_enabled = bool(target["enabled"])
                 target_configured = bool(target["configured"])
-                if not target_enabled:
+                if target["applicability"]["applicable"] is False:
+                    target_status = "not_applicable"
+                elif target["applicability"]["applicable"] is None:
+                    target_status = "unknown"
+                elif not target_enabled:
                     target_status = "disabled"
                 elif not target_configured:
                     target_status = "not_configured"
@@ -1629,6 +1716,8 @@ def evaluate_families(
             }
             if target_kind == "review_surface":
                 obligation["target_kind"] = target_kind
+            if target is not None:
+                obligation["applicability"] = target["applicability"]
             review_obligations.append(obligation)
             if target_status in {"not_configured", "disabled", "unknown", "review_required"}:
                 if target_kind == "review_surface":
@@ -1645,16 +1734,18 @@ def evaluate_families(
                         f"Artifact family '{family_id}' requires review of "
                         f"'{target_id}', currently {target_status}."
                     )
-                family_findings.append(
-                    finding(
-                        family_id=family_id,
-                        severity=severity if target_status != "disabled" else "advisory",
-                        status=finding_status,
-                        message=finding_message,
-                        related_families=[target_id],
-                        required_next_actions=obligation["required_next_actions"],
-                    )
+                target_finding = finding(
+                    family_id=family_id,
+                    severity=severity if target_status != "disabled" else "advisory",
+                    status=finding_status,
+                    message=finding_message,
+                    related_families=[target_id],
+                    required_next_actions=obligation["required_next_actions"],
                 )
+                if target_kind != "review_surface":
+                    target_finding.update(target_family_id=target_id,
+                                          target_status=target_status)
+                family_findings.append(target_finding)
 
         waivers = [entry for entry in raw.get("waivers") or [] if isinstance(entry, dict)]
         if waivers:
@@ -1680,6 +1771,8 @@ def evaluate_families(
         result = {
             "family_id": family_id,
             "name": item.get("name"),
+            "applicability": applicability,
+            "effective_definition": raw,
             "enabled": item["enabled"],
             "configured": item["configured"],
             "files_found": item["files_found"],
@@ -1700,6 +1793,49 @@ def evaluate_families(
     return results, all_findings
 
 
+def collapse_target_links(findings: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Count an unmet target once, retaining every source's review obligation.
+
+    Call only after source-specific family reviews: those decisions must see
+    the original edges. Review surfaces and independent family facts never
+    participate in this consolidation.
+    """
+    severity_order = {"none": -1, "advisory": 0, "warning": 1, "required": 2, "blocking": 3}
+    groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    retained = []
+    for item in findings:
+        target = item.get("target_family_id")
+        state = item.get("target_status")
+        if (item.get("status") not in {"missing_link", "disabled"}
+                or not isinstance(target, str) or not target
+                or state not in {"not_configured", "disabled", "unknown", "review_required"}
+                or item.get("severity") not in severity_order):
+            retained.append(item)
+            continue
+        groups.setdefault((item["status"], target, state), []).append(item)
+    occurrences = sum(len(items) for items in groups.values())
+    for (status, target, state), items in sorted(groups.items()):
+        representative = min(items, key=lambda item: (
+            -severity_order[item["severity"]], item["family_id"]))
+        sources = sorted({item["family_id"] for item in items})
+        combined = dict(representative)
+        combined.update(
+            id=f"target:{target}:{state}",
+            message=f"Target '{target}', currently {state}, requires review from {len(sources)} source families.",
+            source_family_ids=sources,
+            source_severities={item["family_id"]: item["severity"]
+                               for item in sorted(items, key=lambda item: item["family_id"])},
+            required_next_actions=sorted({action for item in items
+                                          for action in item["required_next_actions"]}),
+        )
+        retained.append(combined)
+    return retained, {
+        "target_link_findings": len(groups),
+        "target_link_occurrences": occurrences,
+        "target_link_duplicates_collapsed": occurrences - len(groups),
+    }
+
+
 def build_report(
     *,
     root: Path,
@@ -1710,8 +1846,16 @@ def build_report(
     rules_source: str,
     changed_paths: list[str] | None = None,
     review_record_path: Path | None = None,
+    family_review_record_path: Path | None = None,
+    family_review_template_path: Path | None = None,
+    family_review_report_path: Path | None = None,
 ) -> dict[str, Any]:
-    rules = load_yaml(rules_path)
+    rules_error = None
+    try:
+        rules = load_rule_document(rules_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError) as exc:
+        rules = {}
+        rules_error = type(exc).__name__
     artifact_families, findings = evaluate_families(
         root=root,
         naos_root=naos_root,
@@ -1719,6 +1863,12 @@ def build_report(
         policy=policy,
         rules=rules,
     )
+    if rules_error is not None:
+        findings.append(finding(
+            family_id="systemic_rules", severity="blocking" if profile == "assured" else "required",
+            status="invalid_rules", message="Systemic rules could not be unambiguously evaluated.",
+            required_next_actions=["Repair the selected rules declaration: " + rules_error],
+        ))
     summary = finding_counts(findings)
     summary.update(
         {
@@ -1726,6 +1876,7 @@ def build_report(
             "configured": sum(1 for item in artifact_families if item.get("configured")),
             "not_configured": sum(1 for item in artifact_families if item.get("evaluated_status") == "not_configured"),
             "disabled": sum(1 for item in artifact_families if item.get("evaluated_status") == "disabled"),
+            "not_applicable": sum(1 for item in artifact_families if item.get("evaluated_status") == "not_applicable"),
             "ready": sum(1 for item in artifact_families if item.get("evaluated_status") == "ready"),
             "review_required": sum(1 for item in artifact_families if item.get("evaluated_status") == "review_required"),
             "blocked": sum(1 for item in artifact_families if item.get("evaluated_status") == "blocked"),
@@ -1760,6 +1911,7 @@ def build_report(
             "rules": "Project-configured artifact-family relationships; not proof by themselves.",
             "report": "NAOS evaluates current configured state and review obligations.",
             "governance_decision": "Human/project governance decides remediation, waiver, and next action.",
+            "finding_counts": "Unmet target links count once per target/state at the strongest source severity; source-family obligations and review surfaces remain independent.",
             "flow": "configure -> evaluate -> report -> review -> update -> re-evaluate",
         },
         "summary": summary,
@@ -1786,6 +1938,51 @@ def build_report(
             ),
             review_record_path=review_record_path,
         )
+    selected_family_record = family_review_record_path
+    if selected_family_record is None:
+        configured_record = policy.get("paths", {}).get("systemic_impact_family_review_record")
+        if configured_record:
+            selected_family_record = root / naos_root / str(configured_record)
+    if selected_family_record is not None or family_review_template_path is not None:
+        from naos_systemic_family_review import apply_family_review
+
+        if family_review_report_path is None:
+            family_review_report_path = logical_path(root, report_output_path(root, naos_root, policy, "systemic_impact_report"))
+        report = apply_family_review(
+            report, root=root, naos_root=naos_root, profile=profile,
+            rules=rules, rules_path=rules_path, rules_source=rules_source, policy=policy,
+            record_path=selected_family_record, template_path=family_review_template_path,
+            report_path=family_review_report_path,
+            validate_entries=lambda entries: _review_record_schema_findings({
+                "schema": CHANGED_PATH_REVIEW_SCHEMA, "changed_paths": ["aggregate-record"], "reviews": entries,
+            }),
+            closed_dispositions=CLOSED_CHANGED_PATH_DISPOSITIONS,
+        )
+    report["findings"], target_counts = collapse_target_links(report["findings"])
+    report["summary"].update(finding_counts(report["findings"]))
+    report["summary"].update(target_counts)
+    report["status"] = status_from_counts(report["summary"])
+    # These rows are evaluator observations, not adopted project claims. Declare
+    # their origin without asserting the truth or resolution of the reviewed
+    # subject. Keep severity, status and all review obligations unchanged.
+    for item in report["findings"]:
+        item.update(
+            evidence_classification="confirmed",
+            classification_scope="systemic_evaluator_observation_only",
+            classification_reason=(
+                "The deterministic evaluator emitted this rule-state diagnostic "
+                "or review obligation; underlying artifact correctness and human "
+                "review decisions are not established by this classification."
+            ),
+            source_path=str(Path(__file__).resolve()),
+            evidence_refs=[
+                {"type": "local_file", "ref": str(Path(__file__).resolve())},
+                {"type": "local_file", "ref": str(rules_path)},
+            ],
+            human_review_required=True,
+            not_claimed=["source finding truth", "issue resolution", "approval",
+                         "complete coherence", "human review replacement"],
+        )
     return report
 
 
@@ -1796,6 +1993,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--policy")
     parser.add_argument("--rules", help="Path to systemic_impact_rules.yaml.")
     parser.add_argument("--output")
+    parser.add_argument("--family-review-record", help="Explicit exact-current aggregate review declaration; factual defects remain unresolved.")
+    parser.add_argument("--family-review-template", help="Write an unresolved JSON aggregate review template; never creates a closed review.")
     parser.add_argument(
         "--changed-path",
         action="append",
@@ -1841,6 +2040,7 @@ def main(argv: list[str] | None = None) -> int:
     naos_root = args.naos_root or default_naos_root(policy)
     profile = normalize_profile(args.profile, policy)
     rules_path, rules_source = resolve_rules_path(root, naos_root, policy, args.rules)
+    output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "systemic_impact_report")
     report = build_report(
         root=root,
         profile=profile,
@@ -1850,8 +2050,41 @@ def main(argv: list[str] | None = None) -> int:
         rules_source=rules_source,
         changed_paths=changed_paths,
         review_record_path=Path(args.review_record) if args.review_record else None,
+        family_review_record_path=Path(args.family_review_record) if args.family_review_record else None,
+        family_review_template_path=Path(args.family_review_template) if args.family_review_template else None,
+        family_review_report_path=output,
     )
-    output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "systemic_impact_report")
+    if "aggregate_review" in report:
+        selected_policy_path = policy.get("_meta", {}).get("path")
+        selected_record = report["aggregate_review"].get("record_path")
+        hard_inputs = [rules_path, Path(selected_policy_path) if selected_policy_path else None,
+                       Path(selected_record) if selected_record else None]
+        if output is not None and any(path is not None and output.resolve() == path.resolve() for path in hard_inputs):
+            parser.error("systemic output must not replace rules, policy or selected review record")
+        policy_sink = report_output_path(root, naos_root, policy, "systemic_impact_report")
+        for family in report["artifact_families"]:
+            for reference in family.get("files_found", []):
+                source = root / reference
+                if output is not None and (output.resolve() == source.resolve() or source.is_dir() and output.resolve().is_relative_to(source.resolve())):
+                    if policy_sink is None or output.resolve() != policy_sink.resolve() or output.suffix != ".json":
+                        parser.error("alternative systemic output must not replace a current source witness")
+                    report_directory = root / naos_root / str(policy.get("paths", {}).get("reports_dir") or "reports")
+                    if not output.resolve().is_relative_to(report_directory.resolve()):
+                        parser.error("own systemic output exclusion requires the selected report directory")
+    if args.family_review_template:
+        template_path = Path(args.family_review_template)
+        selected_policy_path = policy.get("_meta", {}).get("path")
+        protected = [rules_path, output, Path(args.family_review_record) if args.family_review_record else None,
+                     Path(selected_policy_path) if selected_policy_path else None]
+        protected.extend(root / item["path"] for obligation in report["aggregate_review"]["obligations"]
+                         for item in obligation["source_files"] if not item["path"].endswith("/"))
+        if any(path is not None and template_path.resolve() == path.resolve() for path in protected):
+            parser.error("family review template must not replace a selected record, source, policy or report")
+        from naos_systemic_family_review import create_unresolved_template
+        try:
+            create_unresolved_template(root, template_path, report["aggregate_review"])
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
     write_report(output, report)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

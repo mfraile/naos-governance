@@ -38,6 +38,7 @@
     "summary"
   ],
   "properties": {
+    "collection_coverage": {"type": "object", "required": ["schema", "status", "max_artifacts", "indexed_artifacts", "capacity_deferred_paths", "other_exclusion_records", "scope", "limitations"], "properties": {"schema": {"const": "naos.local_context_collection_coverage.v1"}, "status": {"enum": ["complete_within_configured_bounds", "incomplete_capacity"]}, "max_artifacts": {"type": "integer", "minimum": 1}, "indexed_artifacts": {"type": "integer", "minimum": 0}, "capacity_deferred_paths": {"type": "integer", "minimum": 0}, "other_exclusion_records": {"type": "integer", "minimum": 0}, "scope": {"const": "configured artifact collection; capacity accounting only"}, "limitations": {"const": ["Capacity-deferred paths were not read or checked for secret-like content.", "Other exclusion records include policy, size, privacy and unsafe-topology exclusions; they are not all intentional omissions.", "Counts do not measure all discovered, eligible or content-read files, complete repository coverage, or retrieval relevance."]}}, "additionalProperties": false},
     "schema": { "const": "naos.local_context_index.v1" },
     "generated_at": { "type": "string" },
     "profile": { "type": "string" },

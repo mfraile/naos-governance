@@ -6,33 +6,42 @@ on:
   pull_request:
     branches: [main]
 
+# Optional adopter sample. Before enabling, supply approved requirements.txt and
+# requirements-dev.txt (ruff, mypy, pytest, pytest-cov), src/, tests/unit/ and
+# tests/acceptance/; adapt services and credentials to the project. Verify the
+# selected profile supplies every validator/Make target used below (the complete
+# generic validator chain is not supplied by every profile).
+# Direct scanner pins reduce drift; transitive/project dependencies and runner
+# images still require adopter compatibility validation in this shared environment.
 env:
   PYTHON_VERSION: '3.11'
   # [ADAPT: set your Node.js version if you have a frontend]
   # NODE_VERSION: '18'
+
+permissions:
+  contents: read
 
 jobs:
   lint:
     name: Linting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Cache Python dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install -r requirements-dev.txt
 
       - name: Run Ruff Lint
         # [ADAPT: adjust source directories if your project uses a different layout]
@@ -86,7 +95,7 @@ jobs:
           - 6379:6379
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set CI database URL
         run: |
@@ -94,15 +103,14 @@ jobs:
           echo "DATABASE_URL=postgresql://ci_runner:${{ github.run_id }}_${{ github.run_attempt }}@localhost:5432/app_test" >> "$GITHUB_ENV"
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
 
       - name: Run unit tests
         run: pytest tests/unit/ -v --cov=src --cov-report=xml
@@ -110,33 +118,59 @@ jobs:
       - name: Run acceptance tests
         run: pytest tests/acceptance/ -v
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
+      - name: Upload coverage (explicit opt-in)
+        if: ${{ vars.NAOS_ENABLE_CODECOV == 'true' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
   security:
     name: Security Scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
-          pip install bandit safety pip-audit pip-licenses
-          pip install -r requirements.txt
+          # Primary-source reviewed direct versions; no installed compatibility claim.
+          python -m pip install bandit==1.9.4 safety==3.8.1 pip-audit==2.10.1 pip-licenses==5.5.5
+          python -m pip install -r requirements.txt
 
       - name: Run Bandit
         run: bandit -r src/ -f json -o bandit-report.json
 
-      - name: Run Safety
-        run: safety check --json
+      # Effective Platform project policy can override local policy. Before
+      # declaring this reviewed, verify reporting, intended manifest coverage,
+      # all severities including unknown, and any suppressing ignores. This
+      # declaration is an activation prerequisite, not remote-policy validation;
+      # scan cannot promise failure on every finding under arbitrary policies.
+      - name: Run Safety (adopter-approved provider and policy)
+        env:
+          SAFETY_API_KEY: ${{ secrets.SAFETY_API_KEY }}
+          NAOS_SAFETY_POLICY_REVIEWED: ${{ vars.NAOS_SAFETY_POLICY_REVIEWED }}
+        shell: python
+        run: |
+          import os
+          import subprocess
+          import sys
+
+          if not os.environ.get("SAFETY_API_KEY", "").strip():
+              sys.exit("Configure the adopter Safety API key before enabling this sample.")
+          if os.environ.get("NAOS_SAFETY_POLICY_REVIEWED") != "true":
+              sys.exit("Review the effective Safety project policy and scan scope before enabling this sample.")
+          # The pinned CLI consumes SAFETY_API_KEY directly from the environment.
+          # Never print it, pass it in arguments, or enable debug credential output.
+          sys.exit(subprocess.run(
+              ["safety", "--stage", "cicd", "scan", "--target", ".", "--output", "json"],
+              check=False,
+          ).returncode)
 
       - name: Run pip-audit
         run: pip-audit --requirement requirements.txt --strict --desc
@@ -150,7 +184,7 @@ jobs:
             || echo "::warning::Unknown licenses detected — review license-report.json"
 
       - name: Upload security reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: security-reports
@@ -162,15 +196,14 @@ jobs:
     name: Config Schema Validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install deps
         run: |
-          pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install -r requirements-dev.txt
       - name: Validate configs via JSON Schemas
         run: |
           # [ADAPT: set --configs-dir, --schema-dir, and --required-config as needed]
@@ -181,18 +214,17 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, test]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          python -m pip install -r requirements.txt
+          if [ -f requirements-dev.txt ]; then python -m pip install -r requirements-dev.txt; fi
 
       - name: Run governance validation
         run: |

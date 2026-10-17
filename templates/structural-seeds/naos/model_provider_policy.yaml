@@ -138,7 +138,7 @@ roles:
       - secrets
       - credentials
       - private memory payloads
-    notes: "Optional role for implementation agents. Keep host-tool model strings in agent frontmatter."
+    notes: "Optional role for implementation agents. Agent model is omitted for host selection by default; an explicit host selector and actual session choice still require project review. This policy does not mutate or enforce the host selection."
   review:
     enabled: false
     provider_kind: declarative_only

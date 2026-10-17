@@ -24,37 +24,152 @@
     "summary"
   ],
   "properties": {
-    "schema": {"type": "string"},
-    "generated_at": {"type": "string"},
-    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"type": "string"},
-    "output_path": {"type": ["string", "null"]},
-    "sarif_version": {"type": "string", "const": "2.1.0"},
+    "schema": {
+      "type": "string",
+      "const": "naos.sarif_export.v1"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "quickstart",
+        "lite",
+        "standard",
+        "assured"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready"
+      ]
+    },
+    "output_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sarif_version": {
+      "type": "string",
+      "const": "2.1.0"
+    },
     "input_reports": {
       "type": "array",
-      "items": {"type": "object"}
+      "items": {
+        "type": "object"
+      }
     },
-    "deterministic_findings_count": {"type": "integer", "minimum": 0},
-    "advisory_findings_count": {"type": "integer", "minimum": 0},
+    "deterministic_findings_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "advisory_findings_count": {
+      "type": "integer",
+      "minimum": 0
+    },
     "skipped_sources": {
       "type": "array",
-      "items": {"type": "object"}
+      "items": {
+        "type": "object"
+      }
     },
     "unsupported_sources": {
       "type": "array",
-      "items": {"type": "object"}
+      "items": {
+        "type": "object"
+      }
     },
-    "rules_count": {"type": "integer", "minimum": 0},
-    "results_count": {"type": "integer", "minimum": 0},
+    "rules_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "results_count": {
+      "type": "integer",
+      "minimum": 0
+    },
     "limitations": {
       "type": "array",
-      "items": {"type": "string"}
+      "items": {
+        "type": "string"
+      }
     },
     "not_claimed": {
       "type": "array",
-      "items": {"type": "string"}
+      "items": {
+        "type": "string"
+      }
     },
-    "human_review_required": {"type": "boolean"},
-    "summary": {"type": "object"}
+    "human_review_required": {
+      "type": "boolean"
+    },
+    "summary": {
+      "type": "object"
+    },
+    "export_accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collected_findings",
+        "aggregate_duplicates",
+        "excluded_advisory_findings",
+        "duplicate_findings",
+        "exported_findings"
+      ],
+      "properties": {
+        "collected_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "aggregate_duplicates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_advisory_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exported_findings": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "output_delivery": {
+      "const": "stdout"
+    },
+    "sarif": {
+      "type": "object",
+      "required": [
+        "version",
+        "runs"
+      ],
+      "properties": {
+        "version": {
+          "const": "2.1.0"
+        },
+        "runs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "dependentRequired": {
+    "sarif": [
+      "output_delivery"
+    ],
+    "output_delivery": [
+      "sarif"
+    ]
   }
 }

@@ -406,6 +406,13 @@ def build_report(
                         "task_id": task_id,
                         "status": "gap",
                         "message": f"Explicit composed traceability link is missing: {link_name}.",
+                        "evidence_classification": "confirmed",
+                        "classification_scope": "generated_structural_link_check_failure_only",
+                        "classification_reason": (
+                            "The producer computed this link check as false from its loaded mapping inputs; "
+                            "it does not establish whether a planned task should be implemented or approve a link."
+                        ),
+                        "observed_relationship_state": relationship_states[link_name],
                     }
                 )
 

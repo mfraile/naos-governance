@@ -25,7 +25,7 @@
     "schema": {"const": "naos.secure_coding_reporting.v1"},
     "generated_at": {"type": "string", "format": "date-time"},
     "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"type": "string"},
+    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
     "project_root": {"type": "string"},
     "naos_root": {"type": "string"},
     "deterministic": {"const": true},

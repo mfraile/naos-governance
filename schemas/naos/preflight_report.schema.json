@@ -4,24 +4,211 @@
   "title": "NAOS Preflight Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schema", "generated_at", "profile", "status", "command", "mode", "naos_root", "project_root", "human_review_required", "not_claimed", "limitations", "findings", "summary"],
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "command",
+    "mode",
+    "naos_root",
+    "project_root",
+    "human_review_required",
+    "not_claimed",
+    "limitations",
+    "findings",
+    "summary"
+  ],
   "properties": {
-    "schema": {"const": "naos.preflight_report.v1"},
-    "generated_at": {"type": "string"},
-    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
-    "command": {"const": "preflight"},
-    "mode": {"type": "string"},
-    "naos_root": {"type": "string"},
-    "project_root": {"type": "string"},
-    "session_id": {"type": ["string", "null"]},
-    "generated_by": {"type": "object"},
-    "human_review_required": {"type": "boolean"},
-    "not_claimed": {"type": "array", "items": {"type": "string"}},
-    "limitations": {"type": "array", "items": {"type": "string"}},
-    "findings": {"type": "array", "items": {"type": "object"}},
-    "known_gaps": {"type": "array"},
-    "residual_risks": {"type": "array"},
-    "summary": {"type": "object"}
+    "schema": {
+      "const": "naos.preflight_report.v1"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "profile": {
+      "enum": [
+        "quickstart",
+        "lite",
+        "standard",
+        "assured"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "advisory",
+        "review_required",
+        "warning",
+        "invalid_config",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "command": {
+      "const": "preflight"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "naos_root": {
+      "type": "string"
+    },
+    "project_root": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "generated_by": {
+      "type": "object"
+    },
+    "human_review_required": {
+      "type": "boolean"
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "known_gaps": {
+      "type": "array"
+    },
+    "residual_risks": {
+      "type": "array"
+    },
+    "summary": {
+      "type": "object"
+    },
+    "git_observations": {
+      "type": "object",
+      "required": [
+        "repository",
+        "working_tree"
+      ],
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/git_observation"
+        },
+        "working_tree": {
+          "$ref": "#/$defs/git_observation"
+        }
+      }
+    },
+    "project_signals": {
+      "type": "object",
+      "properties": {
+        "has_git": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "git_repository_state": {
+          "enum": [
+            "present",
+            "not_work_tree",
+            "unknown"
+          ]
+        },
+        "git_repository_observation": {
+          "$ref": "#/$defs/git_observation"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "git_observation": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "command",
+        "outcome",
+        "returncode",
+        "timeout_seconds",
+        "execution_complete",
+        "output_complete",
+        "stdout",
+        "stderr",
+        "diagnostic",
+        "stdout_truncated",
+        "stderr_truncated"
+      ],
+      "properties": {
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outcome": {
+          "enum": [
+            "unknown",
+            "success",
+            "nonzero_exit",
+            "timeout",
+            "unavailable",
+            "execution_error",
+            "invalid_config"
+          ]
+        },
+        "returncode": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "timeout_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 300
+        },
+        "execution_complete": {
+          "type": "boolean"
+        },
+        "output_complete": {
+          "type": "boolean"
+        },
+        "stdout": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "stderr": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "diagnostic": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "stdout_truncated": {
+          "type": "boolean"
+        },
+        "stderr_truncated": {
+          "type": "boolean"
+        }
+      }
+    }
   }
 }

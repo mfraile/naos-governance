@@ -32,20 +32,26 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
-import yaml
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from architecture_boundaries import (  # noqa: E402
+    BoundaryPolicyError,
+    find_boundary_violations,
+    load_boundary_policy,
+)
 from source_roots import existing_source_roots  # noqa: E402
+from naos_console import configure_console_output  # noqa: E402
 
 try:
     from validator_context import is_kit_repository, print_kit_skip
 except ModuleNotFoundError:
+
     def is_kit_repository() -> bool:
         return False
 
     def print_kit_skip(validator_name: str, reason: str) -> None:
         print(f"{validator_name}: SKIP")
         print(f"  - kit repo context: {reason}")
+
 
 # ── Path configuration ────────────────────────────────────────────────────────
 NAOS_ROOT = Path(os.getenv("NAOS_ROOT", "naos"))
@@ -86,14 +92,9 @@ class Colors:
     END = "\033[0m"
 
 
-def load_boundary_rules() -> dict:
-    if not BOUNDARY_CONFIG.exists():
-        return {}
-    try:
-        with open(BOUNDARY_CONFIG, encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
-    except Exception:
-        return {}
+def load_boundary_rules():
+    """Load the shared policy, preserving malformed configuration as a finding."""
+    return load_boundary_policy(BOUNDARY_CONFIG)
 
 
 # ── Checks ────────────────────────────────────────────────────────────────────
@@ -101,37 +102,28 @@ def load_boundary_rules() -> dict:
 
 def check_module_boundaries() -> Tuple[bool, List[str]]:
     """Check for imports that violate boundary rules in naos_architecture_boundaries.yaml."""
-    rules = load_boundary_rules()
-    if not rules:
-        return True, []  # No boundary file → skip (advisory)
+    try:
+        policy = load_boundary_rules()
+    except BoundaryPolicyError as exc:
+        return False, [f"Malformed boundary policy: {exc}"]
+    if policy.status == "unconfigured":
+        return True, [
+            f"Boundary policy unconfigured ({policy.placeholders} placeholder rules)"
+        ]
 
-    boundaries = rules.get("boundaries", [])
-    if not boundaries:
-        return True, []
-
-    issues: List[str] = []
-
-    for py_file in _iter_source_files():
-        text = py_file.read_text(encoding="utf-8", errors="ignore")
-        imports = re.findall(r"^(?:from|import)\s+([\w.]+)", text, re.MULTILINE)
-
-        for boundary in boundaries:
-            module = boundary.get("module", "")
-            forbidden = boundary.get("forbidden_imports", [])
-            if not module or not forbidden:
-                continue
-            if not _file_belongs_to_module(py_file, module):
-                continue
-            for imp in imports:
-                for forbidden_prefix in forbidden:
-                    if imp.startswith(forbidden_prefix):
-                        rel = _relative_to_source_root(py_file)
-                        issues.append(
-                            f"{rel}: module '{module}' imports from forbidden '{imp}'"
-                        )
-                        break
-
-    return len(issues) == 0, issues
+    root = Path.cwd()
+    roots = tuple(existing_source_roots(root))
+    findings = [
+        finding
+        for py_file in _iter_source_files()
+        for finding in find_boundary_violations(py_file.resolve(), root, roots, policy)
+    ]
+    issues = [
+        f"{finding.source}:{finding.line}: {finding.severity} forbidden import '{finding.target}'"
+        + (f" ({finding.reason})" if finding.reason else "")
+        for finding in findings
+    ]
+    return not any(finding.severity == "ERROR" for finding in findings), issues
 
 
 def check_hardcoded_values() -> Tuple[bool, List[str]]:
@@ -202,22 +194,11 @@ def _relative_to_source_root(py_file: Path) -> Path:
     return py_file
 
 
-def _file_belongs_to_module(py_file: Path, module: str) -> bool:
-    """Return True if py_file is under the given module directory."""
-    for src_root in existing_source_roots(Path.cwd()):
-        module_path = src_root / module.replace(".", "/")
-        try:
-            py_file.relative_to(module_path)
-            return True
-        except ValueError:
-            continue
-    return False
-
-
 # ── main ──────────────────────────────────────────────────────────────────────
 
 
 def main() -> int:
+    configure_console_output()
     if is_kit_repository():
         print_kit_skip(
             "Architecture Coherence",
@@ -244,6 +225,8 @@ def main() -> int:
         total += 1
         if passed:
             print(f"{Colors.GREEN}✓ PASS{Colors.END} — {name}")
+            for issue in issues[:5]:
+                print(f"  {Colors.YELLOW}→ {issue}{Colors.END}")
         else:
             failed.append(name)
             print(f"{Colors.RED}✗ FAIL{Colors.END} — {name}")

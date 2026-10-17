@@ -23,8 +23,6 @@ from naos_agent_trace_validate import (  # noqa: E402
     ACTION_TYPES,
     AUTHORITY_LAYERS,
     LIFECYCLE_PHASES,
-    REVIEW_STATUS_VALUES,
-    TRACE_ORIGINS,
     TRACE_STATUS_VALUES,
     trace_default_path,
     validate_event,
@@ -230,14 +228,14 @@ def normalize_record(record: dict[str, Any], *, line_number: int, source_rel: st
         "source_hashes": {source_rel: f"sha256:{source_hash}"},
         "profile": record.get("profile") if record.get("profile") in {"quickstart", "lite", "standard", "assured"} else None,
         "authority_layer": normalize_enum(first_string(record, "authority_layer"), AUTHORITY_LAYERS, "record_only"),
-        "trace_origin": normalize_enum(first_string(record, "trace_origin"), TRACE_ORIGINS, "tool_declared"),
+        "trace_origin": "tool_declared",
         "trace_status": normalize_enum(first_string(record, "trace_status"), TRACE_STATUS_VALUES, "declared"),
         "confidence": record.get("confidence") if isinstance(record.get("confidence"), (int, float)) else None,
         "residual_risks": as_string_list(record.get("residual_risks")),
         "forbidden_payload_check": {"performed": False, "status": "not_performed_by_importer", "notes": ["Run naos agent-traces after import for payload review."]},
-        "review_status": normalize_enum(first_string(record, "review_status"), REVIEW_STATUS_VALUES, "review_pending"),
-        "reviewer": first_string(record, "reviewer"),
-        "reviewed_at": first_string(record, "reviewed_at"),
+        "review_status": "review_pending",
+        "reviewer": None,
+        "reviewed_at": None,
         "human_review_required": True,
         "limitations": sorted(dict.fromkeys(limitations)),
         "not_claimed": sorted(dict.fromkeys(not_claimed)),
@@ -253,21 +251,91 @@ def load_existing_trace_file(path: Path) -> tuple[dict[str, Any], list[dict[str,
     except Exception as exc:
         return {"version": 1, "events": []}, [], str(exc)
     if isinstance(data, list):
-        events = [item for item in data if isinstance(item, dict)]
-        return {"version": 1, "events": events}, events, None
-    if isinstance(data, dict):
-        raw_events = data.get("events") or []
-        events = [item for item in raw_events if isinstance(item, dict)]
-        data["events"] = events
-        return data, events, None
-    return {"version": 1, "events": []}, [], "trace file must be a mapping with events or a list of events"
+        raw_events = data
+        data = {"version": 1, "events": raw_events}
+    elif isinstance(data, dict):
+        raw_events = data.get("events", [])
+    else:
+        return {}, [], "trace file must be a mapping with events or a list of events"
+    if not isinstance(raw_events, list) or any(not isinstance(item, dict) for item in raw_events):
+        return data, [], "existing events must be a list containing only mappings; refusing data loss"
+    return data, raw_events, None
+
+
+def trace_append_text(original: str, events: list[dict[str, Any]]) -> str:
+    """Insert only new block-sequence entries; preserve all original text.
+
+    Unsupported YAML layouts fail closed instead of being serialized wholesale.
+    """
+    if not events:
+        return original
+    node = yaml.compose(original)
+    if isinstance(node, yaml.SequenceNode):
+        sequence = node
+    elif isinstance(node, yaml.MappingNode):
+        matches = [value for key, value in node.value if key.value == "events"]
+        if len(matches) != 1:
+            raise ValueError("Trace append requires exactly one explicit events sequence")
+        sequence = matches[0]
+    else:
+        raise ValueError("Trace append requires an explicit events sequence")
+    if not isinstance(sequence, yaml.SequenceNode) or (sequence.flow_style and sequence.value):
+        raise ValueError("Trace append requires a block or empty events sequence; nonempty flow layouts need explicit conversion")
+    # Aliases can point at sequences elsewhere: never append at that foreign node.
+    if isinstance(node, yaml.MappingNode):
+        key = next(key for key, value in node.value if key.value == "events")
+        if sequence.start_mark.index < key.end_mark.index:
+            raise ValueError("Refusing to append through an events alias")
+    if sequence.flow_style:
+        indent = key.start_mark.column if isinstance(node, yaml.MappingNode) else 0
+    else:
+        # Sequence node marks can start at an anchor; actual dash tokens bind indentation.
+        entries = [token for token in yaml.scan(original)
+                   if isinstance(token, yaml.tokens.BlockEntryToken)
+                   and sequence.start_mark.index <= token.start_mark.index <= sequence.value[0].start_mark.index]
+        if not entries:
+            raise ValueError("Trace append cannot determine the existing block entry indentation")
+        indent = entries[0].start_mark.column
+    addition = yaml.safe_dump(events, sort_keys=False, allow_unicode=True)
+    addition = "".join(" " * indent + line if line.strip() else line for line in addition.splitlines(keepends=True))
+    position = sequence.end_mark.index
+    prefix = original[:position]
+    if sequence.flow_style:
+        # Expanding an empty [] changes only its syntax; retain surrounding comments.
+        line_end = original.find("\n", position)
+        position = len(original) if line_end < 0 else line_end + 1
+        prefix = original[:sequence.start_mark.index] + original[sequence.end_mark.index:position]
+    if prefix and not prefix.endswith("\n"):
+        addition = "\n" + addition
+    candidate = prefix + addition + original[position:]
+    # Structural equality verifies insertion did not alter existing semantic data.
+    expected = yaml.safe_load(original)
+    if isinstance(expected, list):
+        expected = expected + events
+    else:
+        expected["events"] = expected["events"] + events
+    if yaml.safe_load(candidate) != expected:
+        raise ValueError("Trace append could not preserve existing YAML structure")
+    return candidate
 
 
 def write_trace_file(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists() and path.is_symlink():
+    if path.is_symlink():
         raise ValueError(f"Refusing to write trace events through symlink: {path}")
-    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    original_bytes = path.read_bytes() if path.exists() else None
+    if original_bytes is None:
+        content = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+    else:
+        original = original_bytes.decode("utf-8")
+        existing, old_events, error = load_existing_trace_file(path)
+        if error:
+            raise ValueError(error)
+        if data.get("events", [])[:len(old_events)] != old_events:
+            raise ValueError("Trace write is append-only")
+        content = trace_append_text(original, data["events"][len(old_events):])
+    from naos_trace_atomic_write import publish_trace
+    publish_trace(path, content, original_bytes)
 
 
 def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -400,8 +468,15 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
         if not any(item.get("status") in {"invalid_target_trace_file", "duplicate_event_ids"} for item in findings):
             trace_data.setdefault("version", 1)
             trace_data["events"] = existing_events + normalized_events
-            write_trace_file(target_trace_file, trace_data)
-            written = True
+            try:
+                write_trace_file(target_trace_file, trace_data)
+                written = True
+            except (OSError, ValueError, yaml.YAMLError) as exc:
+                findings.append(finding(
+                    "harness_trace_import.target_write", severity, "target_write_failed",
+                    f"Trace append was not completed: {exc}",
+                    target_trace_file=repo_relative(root, target_trace_file),
+                ))
 
     summary = finding_counts(findings)
     summary.update(

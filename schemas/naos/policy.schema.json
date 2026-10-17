@@ -8,6 +8,21 @@
   "properties": {
     "version": {"type": "string"},
     "description": {"type": "string"},
+    "dashboard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicability", "selected_workflows"],
+      "properties": {
+        "applicability": {"enum": ["selected_workflows", "selected_obligations"]},
+        "selected_workflows": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["professional_adoption", "brownfield_adoption", "ai_code_provenance", "regulated_context"]
+          }
+        }
+      }
+    },
     "task_claim_default_ttl_hours": {"type": "integer", "minimum": 1},
     "profiles": {
       "type": "object",

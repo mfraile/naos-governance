@@ -1,7 +1,8 @@
 ---
-name: "naos-adoption-readiness"
-description: "Guide Codex through NAOS greenfield and brownfield adoption readiness flows over an installed project-local kit."
-parameters: []
+name: naos-adoption-readiness
+description: Guide Codex through NAOS greenfield and brownfield adoption readiness flows over an installed project-local kit.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # NAOS Adoption Readiness
@@ -14,14 +15,19 @@ testing, onboarding, or adoption evidence generation.
 ## Greenfield
 
 Use `--no-write-preview` when the user wants evaluation without report writes.
-Use adoption `--dry-run` for the report-writing preview, then review the
+Use adoption `--dry-run` for a preview that may write reports when prerequisites
+permit persistence. A blocked prerequisite can prevent reports; read its finding
+IDs and next action before continuing. Then review the
 generated install set before explicit `init --activate`. Profile selection is
 purpose-based, not compulsory progression.
 
-Portable preview generation is exercised on Linux with Python 3.11. Managed
-`init --activate` mutation is currently supported only on Darwin ARM64 with
-CPython 3.11–3.13; unsupported tuples refuse before target mutation. Use an
-absent external `--preview-dir` for review when the active host is unsupported.
+Managed activation targets native macOS, Ubuntu and Windows 11 with CPython
+3.11–3.13. Implementation and qualification are separate. Use the exact
+operation/candidate evidence in the platform manual; no blanket qualification
+of subsequent source changes follows. Preview generation and package
+installation do not qualify filesystem recovery. Use an absent external
+`--preview-dir` for review. Consult `INSTALLATION_MANUAL.md` and
+`docs/PLATFORM_ADAPTERS.md` for current platform limits.
 
 ```bash
 PROFILE=standard
@@ -139,3 +145,23 @@ Memory setup and reports are declaration/review surfaces only: they do not
 install Engram, configure clients, synchronize memory, call MCP, or prove live
 provider, project-identity, or tool access. A policy-valid use-grade item remains
 access-unverified until the separate active-client verification boundary is met.
+
+## Current evidence preconditions
+
+Diagnostic repository-intelligence plans retain findings but cannot authorize
+enrollment/apply; their bundle and generation fields are null. Keep an
+actionable plan's external `bundle.path` in a private evidence directory through
+operation/recovery, and use an absent explicit output path. Older diagnostic
+bundles do not authorize mutation. Follow `docs/ADOPTION_GUIDE.md` for details.
+
+Complete readiness needs actual task/query/indexed-path inputs. Its opt-in
+`--finalize-dependencies` mode supports Lite, Standard and Assured with current
+L0–L2 and targets through L3. Lite's enabled L0 behavioral capability permits
+inert inspection only; its missing-conformance warning and `not_ready` remain
+visible. Integrated/native and installed-artifact qualification remain pending,
+and finalization creates no evidence or review approvals;
+default behaviour is unchanged. Follow `INSTALLATION_MANUAL.md` and the project's
+`NAOS_QUICK_REFERENCE.md`. Supported configuration review uses the gate's emitted
+subject and actual reviewed snapshot/evidence under
+`docs/CONFIGURATION_POSTURE_REVIEW.md`; it does not waive stale sources,
+unrelated findings or runtime enablement.

@@ -12,7 +12,7 @@
 #   make -f Makefile.naos gov-full          - gov-refresh + truth validation
 #   make -f Makefile.naos gov-status        - print counts from PROJECT_STATUS.md
 #   make -f Makefile.naos drift-check       - check for signs of governance drift
-#   make -f Makefile.naos semantic-audit    - optional project-configured AI code quality review
+#   make -f Makefile.naos semantic-audit    - deprecated unavailable LLM quality-audit command
 #   make -f Makefile.naos validate-all      - run all non-AI validators
 #   make -f Makefile.naos naos-readiness    - check lifecycle gates before task/baseline/drift work
 #   make -f Makefile.naos function-index    - regenerate FUNCTION_INDEX.yaml
@@ -124,6 +124,7 @@ HARNESS_TRACE_SOURCE ?=
 HARNESS_TRACE_IMPORT_ARGS ?=
 RESEARCH_RECORD ?=
 REPOSITORY_INTELLIGENCE_ARGS ?=
+SELF_CHECK_ARGS ?=
 
 NAOS_POLICY_ARG := $(if $(NAOS_POLICY),--policy $(NAOS_POLICY),)
 NAOS_STRICT_ARG := $(if $(NAOS_STRICT),--strict,)
@@ -198,8 +199,8 @@ gov-refresh: ## Sync TASK_REGISTRY → all derived PM files (run after any task 
 	"$(PYTHON)" scripts/workflows/generate_naos_dashboard.py $(NAOS_COMMON_ARGS)
 	@echo "✅ gov-refresh complete"
 
-gov-full: gov-refresh ## gov-refresh + truth validation
-	@echo "🔍 [gov-full] Running truth validation..."
+gov-full: gov-refresh ## gov-refresh + truth-table task-metric consistency
+	@echo "🔍 [gov-full] Checking truth-table task metrics..."
 	"$(PYTHON)" scripts/naos_validate_truth.py
 	@echo "✅ gov-full complete"
 
@@ -216,7 +217,7 @@ validate-all: ## Run all non-AI validators (task registry, task coherence, metri
 	else \
 		echo "    skip (truth validator not installed for this tier)"; \
 	fi
-	@echo "  — task registry semantics"
+	@echo "  — task registry schema and semantics"
 	@if [ -f scripts/naos_validate_task_registry.py ]; then \
 		"$(PYTHON)" scripts/naos_validate_task_registry.py; \
 	else \
@@ -236,7 +237,7 @@ validate-all: ## Run all non-AI validators (task registry, task coherence, metri
 	fi
 	@echo "  — spec files"
 	@if [ -f scripts/validators/validate_specs.py ]; then \
-		"$(PYTHON)" scripts/validators/validate_specs.py; \
+		"$(PYTHON)" scripts/validators/validate_specs.py --profile "$(NAOS_PROFILE)"; \
 	else \
 		echo "    skip (validator not installed for this tier)"; \
 	fi
@@ -359,14 +360,12 @@ function-index: ## Regenerate FUNCTION_INDEX.yaml from src/
 	"$(PYTHON)" scripts/naos_code_quality_audit.py --generate-index
 	@echo "✅ Function index regenerated: naos/inventory/FUNCTION_INDEX.yaml"
 
-semantic-audit: ## Optional project-configured AI code quality review (uses LLM when enabled)
-	@echo "🔍 Running semantic audit..."
+semantic-audit: ## Deprecated: LLM quality audit is unavailable (exit 2)
 	"$(PYTHON)" scripts/naos_code_quality_audit.py --semantic-audit
-	@echo "✅ Semantic audit complete"
 
 # ─── Governance Audit ──────────────────────────────────────────────────────────
 
-naos-audit: ## Governance completeness audit — 7 categories, 0-10 scoring (inspired by ECC harness-audit)
+naos-audit: ## Governance completeness audit — 5 categories, 0-10 scoring (inspired by ECC harness-audit)
 	@echo "🔍 Running governance completeness audit..."
 	"$(PYTHON)" scripts/naos_governance_audit.py
 	@echo "✅ Audit complete"
@@ -393,10 +392,10 @@ naos-claims: ## Validate public/project claims against local evidence
 		echo "    skip (claims validator not installed for this tier)"; \
 	fi
 
-naos-self-check: ## Run control-plane self-conformance summary
+naos-self-check: ## Inspect self-conformance; SELF_CHECK_ARGS=--refresh publishes reports
 	@echo "🔎 [naos-self-check] Running self-conformance for profile $(NAOS_PROFILE)..."
 	@if [ -f scripts/naos_self_check.py ]; then \
-		"$(PYTHON)" scripts/naos_self_check.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+		"$(PYTHON)" scripts/naos_self_check.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG) $(SELF_CHECK_ARGS); \
 	else \
 		echo "    skip (self-check validator not installed for this tier)"; \
 	fi
@@ -556,7 +555,7 @@ naos-learning-loop-review: ## Review governed learning lifecycle records
 naos-adapter-coherence: ## Review Codex/Claude/plugin/adapter coherence
 	@echo "🔎 [naos-adapter-coherence] Reviewing adapter coherence for profile $(NAOS_PROFILE)..."
 	@if [ -f scripts/naos_adapter_coherence.py ]; then \
-		"$(PYTHON)" scripts/naos_adapter_coherence.py $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
+		"$(PYTHON)" scripts/naos_adapter_coherence.py $(NAOS_COMMON_ARGS) --scope project $(NAOS_STRICT_ARG); \
 	else \
 		echo "    skip (adapter-coherence reviewer not installed for this tier)"; \
 	fi
@@ -1183,7 +1182,7 @@ naos-gate-evaluate: ## Evaluate G0-G8 gates using the file-first manifest
 	@if [ -f scripts/naos_gate_evaluate.py ]; then \
 		OUT=""; \
 		if [ -d "$(NAOS_ROOT)" ]; then OUT="--output $(NAOS_ROOT)/reports/gate_evaluation.json"; fi; \
-		"$(PYTHON)" scripts/naos_gate_evaluate.py --profile $(NAOS_PROFILE) --naos-root $(NAOS_ROOT) $$OUT $(if $(TEAM_ID),--team-id $(TEAM_ID),); \
+		"$(PYTHON)" scripts/naos_gate_evaluate.py --profile $(NAOS_PROFILE) --naos-root $(NAOS_ROOT) $$OUT $(NAOS_STRICT_ARG) $(if $(TEAM_ID),--team-id $(TEAM_ID),); \
 	else \
 		echo "    skip (gate evaluate script not installed for this tier)"; \
 	fi
@@ -1289,7 +1288,7 @@ naos-help: ## Show all NAOS governance targets
 	@echo "  make -f Makefile.naos naos-readiness  — Check lifecycle readiness gates"
 	@echo "  make -f Makefile.naos function-index  — Regenerate function index"
 	@echo "  make -f Makefile.naos naos-claims     — Validate project-local claims"
-	@echo "  make -f Makefile.naos naos-self-check — Run control-plane self-conformance"
+	@echo "  make -f Makefile.naos naos-self-check — Inspect conformance; add SELF_CHECK_ARGS=--refresh to publish"
 	@echo "  make -f Makefile.naos naos-capability-maturity — Evaluate maturity readiness"
 	@echo "  make -f Makefile.naos naos-systemic-impact — Evaluate systemic impact review obligations"
 	@echo "  make -f Makefile.naos naos-module-headers — Evaluate canonical module-header traceability"
@@ -1382,8 +1381,8 @@ naos-help: ## Show all NAOS governance targets
 	@echo "  make -f Makefile.naos naos-calibration-shadow — Check deterministic report metadata drift"
 	@echo "  make -f Makefile.naos naos-evidence-classification — Classify finding provenance for review"
 	@echo "  make -f Makefile.naos naos-cross-harness-review-readiness — Report future cross-harness/DSSE readiness"
-	@echo "  make -f Makefile.naos semantic-audit  — Optional project-configured AI code quality review"
-	@echo "  make -f Makefile.naos naos-audit      — Governance completeness audit (7 categories, 0-10)"
+	@echo "  make -f Makefile.naos semantic-audit  — Deprecated unavailable LLM quality-audit command"
+	@echo "  make -f Makefile.naos naos-audit      — Governance completeness audit (5 categories, 0-10)"
 	@echo "  make -f Makefile.naos naos-conformance — Static conformance check → naos/reports/conformance_latest.json"
 	@echo "  make -f Makefile.naos admissibility-pack — Bundle reviewer/vendor-cascade evidence zip"
 	@echo ""

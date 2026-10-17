@@ -188,6 +188,11 @@ human_review_requirements:
 known_gaps: []
 residual_risks:
   - id: SESSION-LIFECYCLE-RISK-001
+    evidence_classification: hypothesized
+    classification_scope: possible_lifecycle_compliance_risk
+    human_review_required: true
+    hypothesis_reason: "Report presence does not prove a person or agent followed the checklist; no particular session violation is asserted."
+    next_review_step: "Review session actions and source evidence before relying on lifecycle completion."
     description: "Lifecycle reports summarize file/report posture but do not guarantee a human or agent followed the checklist."
     owner: project_team
     status: accepted_default

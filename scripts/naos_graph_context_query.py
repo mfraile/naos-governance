@@ -20,6 +20,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from naos_self_check_inspection import inspection_input_path, logicalize_payload  # noqa: E402
+
+from naos_local_context_query import resolve_indexed_path  # noqa: E402
+
 from naos_policy import (  # noqa: E402
     default_naos_root,
     exit_code_for_summary,
@@ -130,6 +134,7 @@ def local_context_index_paths(
     sqlite_arg: str | None,
 ) -> tuple[Path, Path | None]:
     index_report = Path(index_report_arg) if index_report_arg else report_default_path(root, naos_root, policy, "local_context_index_report")
+    index_report = inspection_input_path(root, naos_root, index_report)
     sqlite_path = Path(sqlite_arg) if sqlite_arg else None
     if sqlite_path is None and index_report.exists():
         try:
@@ -141,6 +146,10 @@ def local_context_index_paths(
     if sqlite_path is None:
         configured = str(policy.get("paths", {}).get("local_context_index_sqlite") or "context_index/local_context_index.sqlite")
         sqlite_path = root / naos_root / configured
+    # Resolve after all ordinary path selection. A pending/failed selected DB
+    # remains unavailable; it must never fall back to yesterday's canonical DB.
+    if sqlite_path is not None:
+        sqlite_path = inspection_input_path(root, naos_root, sqlite_path)
     return index_report, sqlite_path
 
 
@@ -324,15 +333,16 @@ def seed_nodes_from_args(args: argparse.Namespace, artifacts_by_id: dict[str, di
         seeds.append({"node_id": f"artifact:{args.artifact_id}", "seed_type": "artifact_id", "seed_value": args.artifact_id})
     if args.path:
         modes.append("path_seed")
-        normalized = args.path.strip().lstrip("./")
+        normalized = resolve_indexed_path(args.path, set(artifacts_by_path))
         artifact = artifacts_by_path.get(normalized)
-        seeds.append(
-            {
-                "node_id": f"artifact:{artifact.get('artifact_id')}" if artifact else f"path:{normalized}",
-                "seed_type": "path",
-                "seed_value": normalized,
-            }
-        )
+        if artifact:
+            seeds.append(
+                {
+                    "node_id": f"artifact:{artifact.get('artifact_id')}",
+                    "seed_type": "path",
+                    "seed_value": normalized,
+                }
+            )
     if args.task:
         modes.append("task_seed")
         seeds.append({"node_id": f"task:{args.task.upper()}", "seed_type": "task", "seed_value": args.task.upper()})
@@ -651,13 +661,15 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
         seeds = seeds[:max_seed_nodes]
     if requested_depth > depth:
         findings.append(finding("graph_context_query.depth_clamped", "advisory", "advisory", f"Requested depth {requested_depth} was clamped to {depth}."))
-    for seed in seeds:
-        if seed["node_id"].startswith("path:"):
-            findings.append(finding("graph_context_query.seed_path_missing", "advisory", "missing", f"Seed path was not found in the generated local context index: {seed['seed_value']}"))
+    if args.path and not any(seed["seed_type"] == "path" for seed in seeds):
+        findings.append(finding("graph_context_query.seed_path_missing", "advisory", "missing", f"Seed path did not resolve uniquely in the generated local context index: {args.path}"))
 
     has_query = bool(modes_requested)
     if not has_query:
-        findings.append(finding("graph_context_query.no_seed", "advisory", "not_configured", "Supply --artifact-id, --path, --task, --spec, --capability, --context-query-result, or --task-context-pack."))
+        no_seed = finding("graph_context_query.no_seed", "advisory", "not_configured", "Supply --artifact-id, --path, --task, --spec, --capability, --context-query-result, or --task-context-pack.")
+        no_seed.update(evidence_classification="confirmed", classification_scope="invocation_input_absence",
+                       source_path=str(Path(__file__).resolve()), human_review_required=True)
+        findings.append(no_seed)
 
     results = traverse(seeds, filtered_edges, artifacts_by_id, depth=depth, limit=limit) if has_query and index_available else []
     if has_query and index_available and not results:
@@ -808,12 +820,20 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
         },
         "findings": findings,
         "known_gaps": [
-            {"id": "GCQ-KG-001", "summary": "Graph query uses explicit indexed/report links only; richer module/test/finding links depend on upstream deterministic reports."},
-            {"id": "GCQ-KG-002", "summary": "No graph runtime, graph algorithm, graph database, semantic ranking, MCP, Engram, or memory-payload traversal is implemented."},
+            {"id": "GCQ-KG-001", "summary": "Graph query uses explicit indexed/report links only; richer module/test/finding links depend on upstream deterministic reports.",
+             "evidence_classification": "confirmed", "classification_scope": "shipped_graph_query_limit", "source_path": str(Path(__file__).resolve()), "human_review_required": True},
+            {"id": "GCQ-KG-002", "summary": "This bounded explicit-link query does not use an optional graph database or general-purpose graph runtime, semantic ranking, MCP, Engram, or memory-payload traversal.",
+             "evidence_classification": "confirmed", "classification_scope": "shipped_graph_query_limit", "source_path": str(Path(__file__).resolve()), "human_review_required": True},
         ],
         "residual_risks": [
-            {"id": "GCQ-RR-001", "summary": "Explicit links can be stale, incomplete, or weak; source artifacts must be checked directly."},
-            {"id": "GCQ-RR-002", "summary": "Two-hop traversal can surface context candidates that are related but not relevant to the active task."},
+            {"id": "GCQ-RR-001", "summary": "Explicit links can be stale, incomplete, or weak; source artifacts must be checked directly.",
+             "evidence_classification": "hypothesized", "classification_scope": "possible_graph_query_risk", "source_path": str(Path(__file__).resolve()),
+             "hypothesis_reason": "A stored explicit link may outlive or misrepresent its source; this run does not assert one is stale.",
+             "next_review_step": "Inspect returned links against their source artifacts and current hashes.", "human_review_required": True},
+            {"id": "GCQ-RR-002", "summary": "Two-hop traversal can surface context candidates that are related but not relevant to the active task.",
+             "evidence_classification": "hypothesized", "classification_scope": "possible_graph_query_risk", "source_path": str(Path(__file__).resolve()),
+             "hypothesis_reason": "Graph proximity does not establish task relevance; no specific result is judged irrelevant here.",
+             "next_review_step": "Review each candidate against the task and its original artifact.", "human_review_required": True},
         ],
         "waivers": [],
         "limitations": [
@@ -850,7 +870,7 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
         "human_review_required": human_review_required,
         "summary": summary,
     }
-    return report
+    return logicalize_payload(report)
 
 
 def build_parser() -> argparse.ArgumentParser:

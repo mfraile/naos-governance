@@ -8,16 +8,24 @@ applyTo: "**"
 > Applies globally to all coding sessions.
 > Project-level AI-surface budget is checked separately with `naos ai-surface-budget`; this file governs live session behavior, not static baseline approval.
 
+The generated Standard/Assured Bash pre-commit hook accepts caller-supplied
+`NAOS_CONTEXT_REMAINING_PCT`: unset does nothing, an integer below 35 warns,
+and below 25 rejects the commit. This signal does not measure context
+automatically or verify a checkpoint or compact handoff.
+
 ## Context Brackets
 
-As the context window fills, escalating constraints apply:
+Use the normative PAUL bracket table in
+`.github/skills/cognitive-checkpoint/SKILL.md` for the selected profile.
+That table uses headroom remaining; for the same supplied estimate,
+`used = 100 - remaining`. Thus 60% used / 40% remaining is MODERATE;
+70% used / 30% remaining is DEEP. Do not maintain a separate used-percent table.
 
-| Bracket | Threshold | Behavior |
-|---------|:---------:|---------|
-| `FRESH` | < 25% used | Normal operation — full analysis, deep research, complete documentation |
-| `MODERATE` | 25–50% used | Prefer concise outputs; avoid redundant tool calls; batch reads |
-| `DEEP` | 50–75% used | Prioritize essential context only; use configured/authorized/verified memory tools or compact fallback; emit session checkpoints |
-| `CRITICAL` | > 75% used | Save session state to authorized memory or compact fallback immediately; complete current atomic unit; hand off cleanly |
+Treat an absent, invalid or unavailable percentage as `UNKNOWN`, not FRESH.
+Record whether an estimate came from the caller or an identified host display;
+do not infer a measured percentage from a static AI-surface budget or task type.
+Without a usable signal, continue the profile's phase, discovery, compaction and
+handoff checkpoint guidance. These instructions do not measure model context.
 
 ## Rules Per Bracket
 

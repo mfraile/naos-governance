@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,35 +29,70 @@ def _load_config(path: Path) -> dict:
         return {"ai_review": {"enabled": False, "mode": "disabled"}}
     if yaml is None:
         raise RuntimeError("PyYAML is required to read naos_ai_precommit.yaml")
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError("AI configuration must be valid YAML") from exc
+    if not isinstance(data, dict):
+        raise ValueError("AI configuration root must be a mapping")
+    return data
+
+
+def _section(data: dict, key: str, label: str | None = None) -> dict:
+    value = data.get(key, {})
+    if not isinstance(value, dict):
+        raise ValueError(f"{label or key} must be a mapping when present")
+    return value
+
+
+def _optional_text(section: dict, key: str, label: str) -> str | None:
+    value = section.get(key)
+    if value is not None and not isinstance(value, str):
+        raise ValueError(f"{label} must be a string or null")
+    return value
 
 
 def _policy(data: dict) -> tuple[bool, str, str | None]:
-    section = data.get("ai_review", {}) if isinstance(data, dict) else {}
-    enabled = bool(section.get("enabled", data.get("enabled", True)))
-    mode = str(section.get("mode", data.get("stage2_fallback", {}).get("preferred_backend", "static_only")))
-    provider = section.get("provider")
+    if not isinstance(data, dict):
+        raise ValueError("AI configuration root must be a mapping")
+    section = _section(data, "ai_review")
+    fallback = _section(data, "stage2_fallback")
+    grader = _section(_section(data, "grading"), "llm_grader", "grading.llm_grader")
+    for mapping, label in ((data, "enabled"), (section, "ai_review.enabled")):
+        if "enabled" in mapping and type(mapping["enabled"]) is not bool:
+            raise ValueError(f"{label} must be a YAML Boolean")
+    for mapping, key, label in ((section, "mode", "ai_review.mode"),
+                                (fallback, "preferred_backend", "stage2_fallback.preferred_backend")):
+        if key in mapping and not isinstance(mapping[key], str):
+            raise ValueError(f"{label} must be a string")
+    provider = _optional_text(section, "provider", "ai_review.provider")
+    _optional_text(section, "api_key_env", "ai_review.api_key_env")
+    _optional_text(grader, "api_key_env", "grading.llm_grader.api_key_env")
+    enabled = section.get("enabled", data.get("enabled", True))
+    mode = section.get("mode", fallback.get("preferred_backend", "static_only"))
     legacy = {"auto": "ide_agent", "ollama": "local_ollama", "agent": "ide_agent"}
     mode = legacy.get(mode, mode)
     if not enabled:
         mode = "disabled"
-    return enabled, mode, str(provider) if provider else None
+    return enabled, mode, provider or None
 
 
 def check_config(config_path: Path) -> int:
     try:
         data = _load_config(config_path)
+        enabled, mode, provider = _policy(data)
+        section = _section(data, "ai_review")
+        grader = _section(_section(data, "grading"), "llm_grader", "grading.llm_grader")
+        env_var = section.get("api_key_env") or grader.get("api_key_env")
     except Exception as exc:
-        print(f"[FAIL] Cannot load AI config: {exc}")
+        print(f"[FAIL] Invalid AI configuration: {exc}")
         return 1
-    enabled, mode, provider = _policy(data)
     if mode not in VALID_MODES:
         print(f"[FAIL] Invalid ai_review.mode: {mode}")
         return 1
     print(f"[OK] AI review policy: enabled={enabled} mode={mode} provider={provider or 'n/a'}")
     if mode == "api_provider":
-        env_var = data.get("ai_review", {}).get("api_key_env") or data.get("grading", {}).get("llm_grader", {}).get("api_key_env")
-        if env_var and not str(env_var).startswith("[ADAPT"):
+        if env_var and not env_var.startswith("[ADAPT"):
             print(f"[INFO] API provider expects environment variable: {env_var}")
         print("[INFO] Provider execution is not performed by v0.9.2 safe mode.")
     elif mode == "local_ollama":

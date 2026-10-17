@@ -8,8 +8,9 @@ import fnmatch
 import hashlib
 import json
 import os
+import stat
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,10 @@ import yaml
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+
+from naos_self_check_inspection import (  # noqa: E402
+    inspection_read_path, inspection_validation_root,
+)
 
 from naos_policy import (  # noqa: E402
     controlled_now_utc,
@@ -34,6 +39,12 @@ from naos_policy import (  # noqa: E402
     status_from_counts,
     write_report,
 )
+from naos_evidence_contracts import classify_control_plane_report, local_evidence_subject  # noqa: E402
+
+try:  # Reuse the shipped local subset validator only for opted-in consumption.
+    from naos_schema_validation import validate_json_schema_file as validate_external_review_schema  # noqa: E402
+except ImportError:
+    validate_external_review_schema = None
 
 try:  # Installed Standard/Assured adopters receive both scripts together.
     from naos_ai_component_inventory import (  # noqa: E402
@@ -198,6 +209,8 @@ EXTERNAL_SARIF_GATES = {
 }
 EXTERNAL_SARIF_NOT_CLAIMED = [
     "finding verification",
+    "reviewer authentication",
+    "implementation approval",
     "risk or severity mapping",
     "control satisfaction",
     "assessed-scope completeness",
@@ -213,10 +226,10 @@ EXTERNAL_SARIF_NOT_CLAIMED = [
     "publication authority",
 ]
 EXTERNAL_SARIF_LIMITATIONS = [
-    "External-SARIF reconciliation reads the local ingest report only and emits advisory human-review prompts.",
+    "External-SARIF reconciliation reads local ingest evidence and optional exact-current supported routing reviews; generated prompts are advisory.",
     "Imported message text and raw SARIF payloads are not retained in result records.",
     "Native levels and source-declared taxonomy references remain unverified and are not mapped to NAOS risk, severity, controls, or requirements authority.",
-    "A repeated prompt is not a durable human disposition, waiver, task link, remediation state, or closed-loop lifecycle.",
+    "A repeated prompt alone is not a durable disposition; a supported exact-current authored review can clear routing review only, without authenticating a reviewer, verifying a finding, accepting risk, or approving work.",
     "Zero reported results and source execution status do not establish scanner correctness, assessed-scope completeness, or vulnerability absence.",
 ]
 EXTERNAL_SARIF_RESULT_REQUIRED_FIELDS = {
@@ -1058,7 +1071,13 @@ def parse_date(value: Any) -> date | None:
 
 
 def source_is_ignored(source_ref: str, rules: dict[str, Any]) -> bool:
-    normalized = source_ref.strip().lstrip("./")
+    normalized = source_ref.strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    # Malformed/traversing references must remain visible, not become ignored
+    # by a wildcard after normalization.
+    if normalized.startswith("/") or ":" in normalized or ".." in normalized.split("/"):
+        return False
     for pattern in as_list(rules.get("ignored_source_patterns")):
         if fnmatch.fnmatch(normalized, pattern) or fnmatch.fnmatch(f"{normalized}/", pattern):
             return True
@@ -1083,6 +1102,9 @@ def finding(
     source_ref: str | None = None,
     target_surfaces: list[str] | None = None,
     required_next_actions: list[str] | None = None,
+    evidence_classification: str | None = None,
+    classification_scope: str | None = None,
+    classification_reason: str | None = None,
 ) -> dict[str, Any]:
     result = {
         "id": item_id,
@@ -1097,6 +1119,12 @@ def finding(
         result["source_ref"] = source_ref
     if target_surfaces is not None:
         result["target_surfaces"] = target_surfaces
+    if evidence_classification is not None:
+        result["evidence_classification"] = evidence_classification
+    if classification_scope is not None:
+        result["classification_scope"] = classification_scope
+    if classification_reason is not None:
+        result["classification_reason"] = classification_reason
     return result
 
 
@@ -1125,6 +1153,8 @@ def relative_ref(root: Path, path: Path) -> str:
 def optional_artifact_state(path: Path, root: Path) -> str:
     """Classify an optional artifact without following symlink components."""
 
+    path = inspection_read_path(path)
+    root = inspection_validation_root(root, path)
     if ".." in path.parts:
         return "unsafe"
     lexical_root = root.absolute()
@@ -1162,29 +1192,77 @@ def report_path(root: Path, naos_root: str, policy: dict[str, Any], key: str) ->
     return root / naos_root / reports_dir / filename
 
 
+def _report_exists(path: Path) -> bool:
+    """Probe the selected current operand while keeping callers' logical refs."""
+    return inspection_read_path(path).exists()
+
+
 def load_json_report(path: Path) -> tuple[dict[str, Any] | None, str | None]:
-    if not path.exists():
-        return None, None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        physical = inspection_read_path(path)
+        if not physical.exists():
+            return None, None
+        data = json.loads(physical.read_text(encoding="utf-8"))
     except Exception as exc:
         return None, str(exc)
     return data if isinstance(data, dict) else {}, None
 
 
-def load_alignment_frontmatter(root: Path, naos_root: str, policy: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+def classified_optional_source(
+    root: Path, naos_root: str, profile: str, policy: dict[str, Any], output_key: str,
+) -> tuple[Path, str, dict[str, Any] | None, dict[str, Any], dict[str, Any]]:
+    """Use the same validated report bytes for observation and route data."""
+    report = report_path(root, naos_root, policy, output_key)
+    try:
+        # Keep lexical path components: resolving a report symlink here would
+        # conceal it from the evidence classifier's lstat checks.
+        source_ref = report.relative_to(root).as_posix()
+    except ValueError:
+        source_ref = "unsafe_external_path"
+    evidence, data = classify_control_plane_report(
+        root, source_ref, profile=profile, naos_root=naos_root, policy=policy,
+    )
+    source_report = {
+        "path": source_ref,
+        "present": _report_exists(report) or inspection_read_path(report).is_symlink(),
+        "status": data.get("status") if data is not None else None,
+        "schema": data.get("schema") if data is not None else evidence.get("producer_schema"),
+        "error": ", ".join(evidence["reason_codes"]) if evidence["requirement_outcome"] == "unresolved" else None,
+        "evidence_classification": evidence,
+    }
+    return report, source_ref, data, evidence, source_report
+
+
+def load_alignment_frontmatter(
+    root: Path, naos_root: str, policy: dict[str, Any],
+) -> tuple[dict[str, Any], str | None, str | None]:
     filename = str(policy.get("paths", {}).get("pre_implementation_alignment") or "PRE_IMPLEMENTATION_ALIGNMENT.md")
     path = root / naos_root / filename
-    if not path.exists():
-        return {}, None
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---"):
-        return {}, relative_ref(root, path)
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return {}, relative_ref(root, path)
-    data = yaml.safe_load(parts[1]) or {}
-    return (data if isinstance(data, dict) else {}), relative_ref(root, path)
+    source_ref = relative_ref(root, path)
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except FileNotFoundError:
+        return {}, None, None
+    except (OSError, UnicodeError):
+        return {}, source_ref, "alignment file cannot be read as UTF-8"
+    lines = text.split("\n")
+    if lines[0] != "---":
+        return {}, source_ref, "alignment file is missing YAML frontmatter"
+    end = next((index for index, line in enumerate(lines[1:], 1)
+                if line.rstrip(" \t") == "---"), None)
+    if end is None:
+        return {}, source_ref, "alignment file has unterminated YAML frontmatter"
+    raw = "\n".join(lines[1:end])
+    try:
+        data = yaml.safe_load(raw)
+    except yaml.YAMLError:
+        return {}, source_ref, "alignment frontmatter contains invalid YAML"
+    # Preserve genuinely empty metadata, but reject explicit YAML null scalars.
+    if data is None and all(not line.strip() or line.lstrip().startswith("#") for line in lines[1:end]):
+        data = {}
+    if not isinstance(data, dict):
+        return {}, source_ref, "alignment frontmatter must parse to a mapping"
+    return data, source_ref, None
 
 
 def risk_tier(value: Any) -> str | None:
@@ -1680,6 +1758,12 @@ def evaluate_item(
                 status="review_required",
                 message="Item is routed, but configured human-review evidence remains expected.",
                 source_type=source_type,
+                evidence_classification="confirmed",
+                classification_scope="generated_routed_item_missing_review_date_only",
+                classification_reason=(
+                    "The loaded routed item requires human review and has no review_date; "
+                    "this does not decide or replace the pending human review."
+                ),
                 source_ref=source_ref,
                 target_surfaces=target_surfaces,
                 required_next_actions=["Record review date or reviewer decision when project governance completes disposition."],
@@ -1691,7 +1775,6 @@ def evaluate_item(
         "source_type": source_type,
         "source_ref": source_ref,
         "summary": str(item.get("summary") or ""),
-        "source_artifact_family": item.get("source_artifact_family"),
         "target_surfaces": target_surfaces,
         "expected_target_surfaces": expected_targets,
         "missing_expected_targets": missing_expected_targets,
@@ -1712,12 +1795,18 @@ def evaluate_item(
         "rationale": item.get("rationale"),
         "required_next_actions": required_actions_for(item, status, missing_expected_targets),
     }
+    if item.get("source_artifact_family") is not None:
+        decision["source_artifact_family"] = item["source_artifact_family"]
     for passthrough_key in (
         "hitl_required",
         "hitl_reason_codes",
         "aivss_reason_codes",
         "external_sarif_reason_codes",
         "external_result_id",
+        "external_review_consumption",
+        "external_imported_human_review_required",
+        "external_result_classification",
+        "external_result_verification_status",
         "external_source_execution_status",
         "external_result_posture",
         "external_coverage_status",
@@ -1828,7 +1917,7 @@ def build_parallel_lane_reconciliation(
     _, alignment_review_error = load_json_report(
         report_path(root, naos_root, policy, "pre_implementation_alignment_review_report")
     )
-    alignment_data, alignment_ref = load_alignment_frontmatter(root, naos_root, policy)
+    alignment_data, alignment_ref, alignment_error = load_alignment_frontmatter(root, naos_root, policy)
 
     optional_report_refs: list[str] = []
     load_errors = {
@@ -1836,6 +1925,7 @@ def build_parallel_lane_reconciliation(
         "plan_coherence": plan_error,
         "task_claim_report": task_claims_error,
         "pre_implementation_alignment_review": alignment_review_error,
+        "pre_implementation_alignment": alignment_error,
     }
     for key in (
         "pr_risk_classification_report",
@@ -1844,7 +1934,7 @@ def build_parallel_lane_reconciliation(
         "pre_implementation_alignment_review_report",
     ):
         path = report_path(root, naos_root, policy, key)
-        if path.exists():
+        if _report_exists(path):
             optional_report_refs.append(relative_ref(root, path))
     if alignment_ref:
         optional_report_refs.append(alignment_ref)
@@ -1855,23 +1945,21 @@ def build_parallel_lane_reconciliation(
     reason_code_counts = {code: 0 for code in PARALLEL_LANE_REASON_ORDER}
     routes: list[dict[str, Any]] = []
 
-    if not handoff_dir.is_dir():
-        return [], [], {
-            "status": "not_applicable",
-            "summary": {
-                "handoff_reports_found": 0,
-                "declared_lane_reports": 0,
-                "routes_generated": 0,
-                "hitl_required": 0,
-                "reason_code_counts": reason_code_counts,
-            },
-            "source_reports": [],
-            "optional_report_refs": optional_report_refs,
-            "optional_report_load_errors": {key: value for key, value in load_errors.items() if value},
-            "routes": [],
-            "limitations": PARALLEL_LANE_LIMITATIONS,
-            "not_claimed": PARALLEL_LANE_NOT_CLAIMED,
-        }
+    if alignment_error:
+        alignment_finding = finding(
+            item_id="control_plane_review.invalid_alignment_frontmatter",
+            severity=route_severity_for_parallel_lane(root, naos_root, profile),
+            status="review_required",
+            message=alignment_error,
+            source_ref=alignment_ref,
+            required_next_actions=["Repair alignment frontmatter and rerun alignment and control-plane review."],
+        )
+        alignment_finding.update({
+            "requirement_outcome": "unresolved",
+            "human_review_required": True,
+            "related_gates": ["G2", "G6"],
+        })
+        generated_findings.append(alignment_finding)
 
     for path in sorted(handoff_dir.glob("*.json")):
         source_ref = relative_ref(root, path)
@@ -2005,20 +2093,20 @@ def build_ai_component_inventory_reconciliation(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     report = report_path(root, naos_root, policy, "ai_component_inventory_report")
     source_ref = relative_ref(root, report)
-    if report.exists() and bounded_ai_component_inventory_path is not None:
+    if _report_exists(report) and bounded_ai_component_inventory_path is not None:
         try:
-            bounded_ai_component_inventory_path(report, root)
+            bounded_ai_component_inventory_path(inspection_read_path(report), inspection_validation_root(root, inspection_read_path(report)))
             data, error = load_json_report(report)
         except Exception as exc:
             data, error = None, f"unsafe inventory report path: {exc}"
-    elif report.exists():
+    elif _report_exists(report):
         data, error = None, "AI component inventory path validator is unavailable"
     else:
         data, error = load_json_report(report)
     reason_code_counts = {code: 0 for code in AI_COMPONENT_INVENTORY_REASON_ORDER}
     source_report = {
         "path": source_ref,
-        "present": report.exists(),
+        "present": _report_exists(report),
         "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else None),
         "schema": data.get("schema") if isinstance(data, dict) else None,
         "error": error,
@@ -2048,7 +2136,7 @@ def build_ai_component_inventory_reconciliation(
     if consumer_error:
         source_report["consumer_error"] = consumer_error
 
-    if not report.exists() and (source_kit_missing_not_applicable or not required_for_profile):
+    if not _report_exists(report) and (source_kit_missing_not_applicable or not required_for_profile):
         return [], [], {
             "status": "not_applicable",
             "summary": {
@@ -2067,7 +2155,7 @@ def build_ai_component_inventory_reconciliation(
         }
 
     reasons: set[str] = set()
-    if not report.exists():
+    if not _report_exists(report):
         reasons.add("inventory_report_missing")
     elif error:
         reasons.add("inventory_report_parse_error")
@@ -2171,7 +2259,7 @@ def build_ai_component_inventory_reconciliation(
     return [decision], findings, {
         "status": status_from_counts(finding_counts(findings)) if findings else "review_required",
         "summary": {
-            "report_present": report.exists(),
+            "report_present": _report_exists(report),
             "findings_seen": len(report_findings),
             "routes_generated": 1,
             "human_review_required": 1,
@@ -2271,7 +2359,7 @@ def build_agent_sponsor_registry_reconciliation(
         data, error = None, "unsafe sponsor-registry report path"
     elif report_present and bounded_agent_sponsor_registry_path is not None:
         try:
-            bounded_agent_sponsor_registry_path(report, root)
+            bounded_agent_sponsor_registry_path(inspection_read_path(report), inspection_validation_root(root, inspection_read_path(report)))
             data, error = load_json_report(report)
         except Exception:
             data, error = None, "unsafe sponsor-registry report path"
@@ -2531,7 +2619,7 @@ def build_aivss_reconciliation(
         data, error = None, "unsafe AIVSS verification report path"
     elif report_present and bounded_aivss_path is not None:
         try:
-            bounded_aivss_path(report, root)
+            bounded_aivss_path(inspection_read_path(report), inspection_validation_root(root, inspection_read_path(report)))
             data, error = load_json_report(report)
         except Exception:
             data, error = None, "unsafe AIVSS verification report path"
@@ -2701,17 +2789,8 @@ def is_sha256_hex(value: Any) -> bool:
 
 
 def external_result_id_for(source_sha256: str, run_index: int, result_index: int) -> str:
-    payload = json.dumps(
-        {
-            "source_sha256": source_sha256,
-            "run_index": run_index,
-            "result_index": result_index,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
-    return "sarif-" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    from naos_secret_public_literals import external_result_id_for as derive
+    return derive(source_sha256, run_index, result_index)
 
 
 def validate_external_sarif_report(data: dict[str, Any]) -> tuple[list[str], list[str]]:
@@ -2896,6 +2975,147 @@ def external_assessment_reason_codes(assessment: dict[str, Any]) -> set[str]:
     return reasons
 
 
+def external_routing_review_content_sha256(data: dict[str, Any]) -> str:
+    """Bind every imported report field except top-level generation timestamp churn."""
+    content = {key: value for key, value in data.items() if key != "generated_at"}
+    return hashlib.sha256(json.dumps(content, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=False, allow_nan=False).encode("utf-8")).hexdigest()
+
+
+def external_review_local_bytes(root: Path, reference: Any) -> bytes | None:
+    """Read bounded project-local regular evidence without following links."""
+    if not isinstance(reference, str):
+        return None
+    path = local_evidence_subject(root, reference)
+    if path is None:
+        return None
+    try:
+        logical = path
+        path = inspection_read_path(logical)
+        validation_root = inspection_validation_root(root, path)
+        # Ordinary authored references keep their original lexical component
+        # walk (local_evidence_subject may have resolved an internal symlink).
+        # Only an exact selected custody mapping changes the walked operand.
+        parts = Path(reference).parts if path == logical else path.relative_to(validation_root).parts
+        current = validation_root
+        for part in parts:
+            current = current / part
+            info = current.lstat()
+            if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+                return None
+        if not path.is_file() or path.stat().st_size > 4 * 1024 * 1024:
+            return None
+        return path.read_bytes()
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
+def external_routing_review_errors(
+    *, root: Path, item: dict[str, Any], record: dict[str, Any],
+    source_ref: str, data: dict[str, Any], rules: dict[str, Any], review_items_ref: str | None,
+    profile: str, naos_root: str,
+) -> list[str]:
+    schema_path = kit_root() / "schemas" / "naos" / "external_evidence_ingest.schema.json"
+    if validate_external_review_schema is None or validate_external_review_schema(data, schema_path):
+        return ["review_report_schema_invalid_or_unavailable"]
+    try:
+        declared_root = Path(data["project_root"])
+        if (data.get("profile") != profile or data.get("naos_root") != naos_root
+                or not declared_root.is_absolute() or declared_root.resolve() != root.resolve()):
+            return ["review_report_scope_mismatch"]
+    except (TypeError, ValueError, OSError, RuntimeError):
+        return ["review_report_scope_mismatch"]
+    # Re-read only the bounded consumption operands. Duplicate mapping keys
+    # cannot silently select one of two authored declarations or report values.
+    def unique_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate mapping key")
+            result[key] = value
+        return result
+
+    class UniqueReviewLoader(yaml.SafeLoader):
+        pass
+
+    def unique_yaml_mapping(loader, node):
+        loader.flatten_mapping(node)
+        return unique_pairs([(loader.construct_object(key), loader.construct_object(value))
+                             for key, value in node.value])
+
+    UniqueReviewLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, unique_yaml_mapping)
+    try:
+        report_bytes = external_review_local_bytes(root, source_ref)
+        def reject_constant(value):
+            raise ValueError(f"non-finite JSON constant: {value}")
+
+        current_report = json.loads(report_bytes, object_pairs_hook=unique_pairs, parse_constant=reject_constant)
+        if current_report != data:
+            return ["review_report_input_changed"]
+        declaration_bytes = external_review_local_bytes(root, review_items_ref)
+        declaration = yaml.load(declaration_bytes, Loader=UniqueReviewLoader)
+        if (not isinstance(declaration, dict) or not isinstance(declaration.get("items"), list)
+                or declaration["items"].count(item) != 1):
+            return ["review_declaration_input_invalid"]
+    except (TypeError, ValueError, UnicodeError, yaml.YAMLError):
+        return ["review_consumption_input_invalid"]
+    review = item.get("external_result_review")
+    fields = {"external_result_id", "source_sha256", "report_content_sha256",
+              "reviewed_at", "supporting_ref", "supporting_sha256"}
+    if (not isinstance(review, dict) or set(review) != fields
+            or any(not isinstance(review.get(field), str) or not review[field].strip() for field in fields)):
+        return ["review_contract_invalid"]
+    errors = []
+    if (item.get("id") != "CPR-EXTERNAL-SARIF-" + record["external_result_id"].removeprefix("sarif-").upper()
+            or item.get("source_type") != EXTERNAL_SARIF_SOURCE_TYPE
+            or item.get("source_ref") != source_ref
+            or review.get("external_result_id") != record["external_result_id"]
+            or review.get("source_sha256") != record["source_sha256"]
+            or review.get("report_content_sha256") != external_routing_review_content_sha256(data)):
+        errors.append("review_identity_or_content_mismatch")
+    if (not isinstance(item.get("owner"), str) or not item["owner"].strip()
+            or not isinstance(item.get("rationale"), str) or not item["rationale"].strip()
+            or not isinstance(item.get("disposition"), str)
+            or item.get("disposition") not in ROUTED_DISPOSITIONS or item.get("waiver_ref")):
+        errors.append("review_routing_declaration_invalid")
+    try:
+        reviewed = datetime.fromisoformat(review["reviewed_at"].replace("Z", "+00:00"))
+        now = controlled_now_utc()
+        window = int(rules.get("freshness_window_days", 90))
+        if (reviewed.tzinfo is None or reviewed > now
+                or reviewed < now - timedelta(days=window)
+                or parse_date(item.get("review_date")) != reviewed.date()):
+            errors.append("review_timestamp_invalid_or_stale")
+    except (TypeError, ValueError, KeyError, AttributeError, OverflowError):
+        errors.append("review_timestamp_invalid_or_stale")
+    supporting = external_review_local_bytes(root, review.get("supporting_ref"))
+    if (not supporting or not is_sha256_hex(review.get("supporting_sha256"))
+            or hashlib.sha256(supporting).hexdigest() != review.get("supporting_sha256")
+            or review.get("supporting_ref") == source_ref
+            or review.get("supporting_ref") not in as_list(item.get("related_evidence"))):
+        errors.append("review_support_missing_or_mismatched")
+    # The report describes an imported snapshot. Check its declared local source
+    # before consuming a review, so an old report cannot hide changed source bytes.
+    scans = data.get("scans")
+    raw_source = scans.get("resolved_source") if isinstance(scans, dict) else None
+    try:
+        source = Path(raw_source)
+        source_relative = (next((source.relative_to(parent).as_posix() for parent in source.parents
+                                 if parent.resolve() == root.resolve()), None)
+                           if source.is_absolute() else source.as_posix())
+    except (TypeError, ValueError):
+        source_relative = None
+    if (review.get("supporting_ref") in {source_relative, review_items_ref}
+            or review.get("supporting_sha256") in {record["source_sha256"],
+                                                   hashlib.sha256(report_bytes).hexdigest(),
+                                                   hashlib.sha256(declaration_bytes).hexdigest()}):
+        errors.append("review_support_self_reference")
+    source_bytes = external_review_local_bytes(root, source_relative)
+    if source_bytes is None or hashlib.sha256(source_bytes).hexdigest() != record["source_sha256"]:
+        errors.append("review_source_missing_or_stale")
+    return errors
+
+
 def build_external_sarif_reconciliation(
     *,
     root: Path,
@@ -2907,6 +3127,8 @@ def build_external_sarif_reconciliation(
     allowed_target_surfaces: set[str],
     allowed_dispositions: set[str],
     required_fields: list[str],
+    authored_items: list[dict[str, Any]] | None = None,
+    review_items_ref: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     report = report_path(root, naos_root, policy, "external_evidence_ingest_report")
     source_ref = relative_ref(root, report)
@@ -2914,20 +3136,28 @@ def build_external_sarif_reconciliation(
     reason_code_counts = {code: 0 for code in EXTERNAL_SARIF_REASON_ORDER}
     source_report = {
         "path": source_ref,
-        "present": report.exists(),
+        "present": _report_exists(report),
         "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else None),
         "schema": data.get("schema") if isinstance(data, dict) else None,
         "error": error,
     }
+    authored_items = authored_items or []
+    report_fingerprint_error = None
+    if isinstance(data, dict):
+        try:
+            source_report["routing_review_content_sha256"] = external_routing_review_content_sha256(data)
+        except (TypeError, ValueError):
+            report_fingerprint_error = "report content is not finite canonical JSON"
+            source_report["routing_review_content_error"] = report_fingerprint_error
     empty_summary = {
-        "report_present": report.exists(),
+        "report_present": _report_exists(report),
         "findings_seen": 0,
         "results_seen": 0,
         "routes_generated": 0,
         "human_review_required": 0,
         "reason_code_counts": reason_code_counts,
     }
-    if not report.exists():
+    if not _report_exists(report):
         return [], [], {
             "status": "not_applicable",
             "summary": empty_summary,
@@ -2948,6 +3178,8 @@ def build_external_sarif_reconciliation(
         schema_errors.append(error or "report root must be an object")
     else:
         schema_errors, content_errors = validate_external_sarif_report(data)
+    if report_fingerprint_error:
+        schema_errors.append(report_fingerprint_error)
     source_report.update(
         {
             "source_configured": summary.get("source_configured"),
@@ -2974,7 +3206,8 @@ def build_external_sarif_reconciliation(
     findings: list[dict[str, Any]] = []
     routes: list[dict[str, Any]] = []
 
-    def add_route(route_id: str, reason_codes: list[str], external_result_id: str | None = None) -> None:
+    def add_route(route_id: str, reason_codes: list[str], external_result_id: str | None = None,
+                  record: dict[str, Any] | None = None) -> None:
         related_gates = dedupe(
             [gate for code in reason_codes for gate in EXTERNAL_SARIF_GATES.get(code, [])]
         )
@@ -2994,6 +3227,8 @@ def build_external_sarif_reconciliation(
             "human_review_required": True,
             "external_sarif_reason_codes": reason_codes,
             "external_result_id": external_result_id,
+            "external_result_classification": record.get("classification") if record else None,
+            "external_result_verification_status": record.get("verification_status") if record else None,
             "external_source_execution_status": assessment.get("source_execution_status"),
             "external_result_posture": assessment.get("result_posture"),
             "external_coverage_status": assessment.get("coverage_status"),
@@ -3004,6 +3239,38 @@ def build_external_sarif_reconciliation(
             "not_claimed": EXTERNAL_SARIF_NOT_CLAIMED,
             "notes": "Generated from the local external-evidence ingest report; not written to control_plane_review_items.yaml and not a durable disposition.",
         }
+        candidates = [item for item in authored_items if item.get("id") == route_id
+                      or (isinstance(item.get("external_result_review"), dict)
+                          and item["external_result_review"].get("external_result_id") == external_result_id)]
+        consumption = {"status": "not_declared", "claim_scope": "routing_review_only", "routing_review_consumed": False, "reason_codes": []}
+        if record is not None and candidates:
+            errors = ["review_duplicate"] if len(candidates) != 1 else external_routing_review_errors(
+                root=root, item=candidates[0], record=record, source_ref=source_ref,
+                data=data, rules=rules, review_items_ref=review_items_ref, profile=profile, naos_root=naos_root,
+            )
+            if not errors:
+                authored_decision, _ = evaluate_item(
+                    item=candidates[0], rules=rules, severity="advisory",
+                    required_fields=required_fields, allowed_source_types=allowed_source_types,
+                    allowed_target_surfaces=allowed_target_surfaces, allowed_dispositions=allowed_dispositions,
+                )
+                if authored_decision["status"] != "routed":
+                    errors.append("review_routing_incomplete")
+            if not errors:
+                for key in ("disposition", "owner", "review_date", "target_surfaces",
+                            "related_evidence", "known_gap_ref", "residual_risk_ref", "rationale"):
+                    if key in candidates[0]:
+                        route_item[key] = candidates[0][key]
+                route_item["related_evidence"] = dedupe([source_ref, *as_list(candidates[0].get("related_evidence"))])
+                route_item["summary"] = f"{scope} routing review consumed; imported finding remains unknown/unverified."
+                route_item["human_review_required"] = False
+                route_item["notes"] = "Supported authored routing review consumed; imported finding remains unknown/unverified."
+                consumption = {"status": "consumed", "claim_scope": "routing_review_only", "routing_review_consumed": True, "reason_codes": [],
+                               "review": candidates[0]["external_result_review"], "item_id": candidates[0]["id"]}
+            else:
+                consumption = {"status": "rejected", "claim_scope": "routing_review_only", "routing_review_consumed": False, "reason_codes": errors}
+        route_item["external_review_consumption"] = consumption
+        route_item["external_imported_human_review_required"] = True
         decision, route_findings = evaluate_item(
             item=route_item,
             rules=rules,
@@ -3032,7 +3299,9 @@ def build_external_sarif_reconciliation(
                 "id": decision["id"],
                 "status": decision["status"],
                 "severity": "advisory",
-                "human_review_required": True,
+                "human_review_required": decision["human_review_required"],
+                "external_review_consumption": consumption,
+                "external_imported_human_review_required": True,
                 "external_sarif_reason_codes": reason_codes,
                 "external_result_id": external_result_id,
                 "related_gates": related_gates,
@@ -3062,10 +3331,15 @@ def build_external_sarif_reconciliation(
                 reasons.add("external_result_control_link_unverified")
             ordered_reasons = [code for code in EXTERNAL_SARIF_REASON_ORDER if code in reasons]
             external_result_id = str(record["external_result_id"])
+            from naos_secret_public_literals import recompute_public_external_route_id
+            route_id = recompute_public_external_route_id(record)
+            if route_id is None:
+                raise ValueError("Validated external result identity cannot be rederived")
             add_route(
-                "CPR-EXTERNAL-SARIF-" + external_result_id.removeprefix("sarif-").upper(),
+                route_id,
                 ordered_reasons,
                 external_result_id,
+                record,
             )
     else:
         reasons = external_assessment_reason_codes(assessment)
@@ -3074,13 +3348,13 @@ def build_external_sarif_reconciliation(
             add_route("CPR-EXTERNAL-SARIF-ASSESSMENT", ordered_reasons)
 
     return decisions, findings, {
-        "status": "review_required" if decisions else "pass",
+        "status": "review_required" if any(item["status"] != "routed" for item in decisions) else ("routed" if decisions else "pass"),
         "summary": {
             "report_present": True,
             "findings_seen": len(report_findings),
             "results_seen": len(records),
             "routes_generated": len(decisions),
-            "human_review_required": len(decisions),
+            "human_review_required": sum(item["human_review_required"] for item in decisions),
             "reason_code_counts": reason_code_counts,
         },
         "source_report": source_report,
@@ -3109,7 +3383,7 @@ def build_model_provider_reconciliation(
     reason_code_counts = {code: 0 for code in MODEL_PROVIDER_REASON_ORDER}
     source_report = {
         "path": source_ref,
-        "present": report.exists(),
+        "present": _report_exists(report),
         "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else None),
         "schema": data.get("schema") if isinstance(data, dict) else None,
         "error": error,
@@ -3126,7 +3400,7 @@ def build_model_provider_reconciliation(
         except (OSError, yaml.YAMLError) as exc:
             declaration_error = str(exc)
     report_expected = declaration_path.is_file() and (declaration_error is not None or bool(declaration.get("enabled", True)))
-    if not report.exists() and not report_expected:
+    if not _report_exists(report) and not report_expected:
         return [], [], {
             "status": "not_applicable",
             "summary": {
@@ -3149,7 +3423,7 @@ def build_model_provider_reconciliation(
     reasons: set[str] = set()
     validation_reasons: list[str] = []
     validation_errors: list[str] = []
-    if not report.exists():
+    if not _report_exists(report):
         validation_reasons = ["report_missing"]
         validation_errors = ["Declared model evidence has no report; run the model producer"]
     elif validate_model_provider_report is None:
@@ -3172,7 +3446,7 @@ def build_model_provider_reconciliation(
         return [], [], {
             "status": "pass",
             "summary": {
-                "report_present": report.exists(),
+                "report_present": _report_exists(report),
                 "findings_seen": len(report_findings),
                 "routes_generated": 0,
                 "human_review_required": 0,
@@ -3246,7 +3520,7 @@ def build_model_provider_reconciliation(
     return [decision], findings, {
         "status": status_from_counts(finding_counts(findings)) if findings else "review_required",
         "summary": {
-            "report_present": report.exists(),
+            "report_present": _report_exists(report),
             "findings_seen": len(report_findings),
             "routes_generated": 1,
             "human_review_required": 1,
@@ -3278,7 +3552,7 @@ def build_model_telemetry_reconciliation(
     reason_code_counts = {code: 0 for code in MODEL_TELEMETRY_REASON_ORDER}
     source_report = {
         "path": source_ref,
-        "present": report.exists(),
+        "present": _report_exists(report),
         "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else None),
         "schema": data.get("schema") if isinstance(data, dict) else None,
         "error": error,
@@ -3296,7 +3570,7 @@ def build_model_telemetry_reconciliation(
             declaration_error = str(exc)
     report_expected = declaration_path.is_file() and (declaration_error is not None or bool(declaration.get("enabled", False)))
     report_expected = report_expected and (declaration_error is not None or bool(declaration.get("telemetry_declared")))
-    if not report.exists() and not report_expected:
+    if not _report_exists(report) and not report_expected:
         return [], [], {
             "status": "not_applicable",
             "summary": {
@@ -3319,7 +3593,7 @@ def build_model_telemetry_reconciliation(
     reasons: set[str] = set()
     validation_reasons: list[str] = []
     validation_errors: list[str] = []
-    if not report.exists():
+    if not _report_exists(report):
         validation_reasons = ["report_missing"]
         validation_errors = ["Declared model evidence has no report; run the model producer"]
     elif validate_model_telemetry_report is None:
@@ -3344,7 +3618,7 @@ def build_model_telemetry_reconciliation(
         return [], [], {
             "status": "pass",
             "summary": {
-                "report_present": report.exists(),
+                "report_present": _report_exists(report),
                 "findings_seen": len(report_findings),
                 "routes_generated": 0,
                 "human_review_required": 0,
@@ -3412,7 +3686,7 @@ def build_model_telemetry_reconciliation(
     return [decision], findings, {
         "status": status_from_counts(finding_counts(findings)) if findings else "review_required",
         "summary": {
-            "report_present": report.exists(),
+            "report_present": _report_exists(report),
             "findings_seen": len(report_findings),
             "routes_generated": 1,
             "human_review_required": 1,
@@ -3438,22 +3712,15 @@ def build_failure_mode_posture_reconciliation(
     allowed_dispositions: set[str],
     required_fields: list[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    report = report_path(root, naos_root, policy, "failure_mode_posture_report")
-    source_ref = relative_ref(root, report)
-    data, error = load_json_report(report)
+    report, source_ref, data, evidence, source_report = classified_optional_source(
+        root, naos_root, profile, policy, "failure_mode_posture_report",
+    )
     reason_code_counts = {code: 0 for code in FAILURE_MODE_POSTURE_REASON_ORDER}
-    source_report = {
-        "path": source_ref,
-        "present": report.exists(),
-        "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else None),
-        "schema": data.get("schema") if isinstance(data, dict) else None,
-        "error": error,
-    }
-    if not report.exists():
+    if evidence["applicability"] == "not_applicable":
         return [], [], {
             "status": "not_applicable",
             "summary": {
-                "report_present": False,
+                "report_present": source_report["present"],
                 "findings_seen": 0,
                 "routes_generated": 0,
                 "human_review_required": 0,
@@ -3475,7 +3742,7 @@ def build_failure_mode_posture_reconciliation(
     reasons: set[str] = set()
     for report_finding in report_findings:
         append_failure_mode_posture_reason(reasons, failure_mode_posture_reason_code(report_finding))
-    if error:
+    if evidence["requirement_outcome"] == "unresolved" or evidence["human_review_required"]:
         append_failure_mode_posture_reason(reasons, "failure_mode_posture_review_required")
     elif report_findings and report_status in {"advisory", "warning", "required_missing", "blocked", "unknown"}:
         append_failure_mode_posture_reason(reasons, "failure_mode_posture_review_required")
@@ -3585,19 +3852,12 @@ def build_failure_mode_observations_reconciliation(
     allowed_dispositions: set[str],
     required_fields: list[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    report = report_path(root, naos_root, policy, "failure_mode_observations_report")
-    source_ref = relative_ref(root, report)
-    data, error = load_json_report(report)
+    report, source_ref, data, evidence, source_report = classified_optional_source(
+        root, naos_root, profile, policy, "failure_mode_observations_report",
+    )
     reason_code_counts = {code: 0 for code in FAILURE_MODE_OBSERVATIONS_REASON_ORDER}
-    source_report = {
-        "path": source_ref,
-        "present": report.exists(),
-        "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else None),
-        "schema": data.get("schema") if isinstance(data, dict) else None,
-        "error": error,
-    }
     empty_summary = {
-        "report_present": report.exists(),
+        "report_present": _report_exists(report),
         "findings_seen": 0,
         "observations_seen": 0,
         "routes_generated": 0,
@@ -3610,10 +3870,10 @@ def build_failure_mode_observations_reconciliation(
         "mapping_basis_counts": {},
         "unmapped_observations": 0,
     }
-    if not report.exists():
+    if evidence["applicability"] == "not_applicable":
         return [], [], {
             "status": "not_applicable",
-            "summary": empty_summary | {"report_present": False},
+            "summary": empty_summary,
             "source_report": source_report,
             "source_report_refs": [],
             "routes": [],
@@ -3629,8 +3889,10 @@ def build_failure_mode_observations_reconciliation(
     reasons: set[str] = set()
     for report_finding in report_findings:
         append_failure_mode_observations_reason(reasons, failure_mode_observations_reason_code(report_finding))
-    if error:
+    if evidence["validation"] != "valid" or evidence["scope"] != "matched":
         append_failure_mode_observations_reason(reasons, "source_report_malformed")
+    if evidence["requirement_outcome"] == "unresolved" or evidence["human_review_required"]:
+        append_failure_mode_observations_reason(reasons, "failure_mode_observations_review_required")
     elif report_findings and report_status in {"advisory", "warning", "required_missing", "blocked", "unknown"}:
         append_failure_mode_observations_reason(reasons, "failure_mode_observations_review_required")
     reason_codes = [code for code in FAILURE_MODE_OBSERVATIONS_REASON_ORDER if code in reasons]
@@ -3752,22 +4014,15 @@ def build_opencode_config_hygiene_reconciliation(
     allowed_dispositions: set[str],
     required_fields: list[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    report = report_path(root, naos_root, policy, "opencode_config_hygiene_report")
-    source_ref = relative_ref(root, report)
-    data, error = load_json_report(report)
+    report, source_ref, data, evidence, source_report = classified_optional_source(
+        root, naos_root, profile, policy, "opencode_config_hygiene_report",
+    )
     reason_code_counts = {code: 0 for code in OPENCODE_CONFIG_HYGIENE_REASON_ORDER}
-    source_report = {
-        "path": source_ref,
-        "present": report.exists(),
-        "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else None),
-        "schema": data.get("schema") if isinstance(data, dict) else None,
-        "error": error,
-    }
-    if not report.exists():
+    if evidence["applicability"] == "not_applicable":
         return [], [], {
             "status": "not_applicable",
             "summary": {
-                "report_present": False,
+                "report_present": source_report["present"],
                 "findings_seen": 0,
                 "routes_generated": 0,
                 "human_review_required": 0,
@@ -3785,8 +4040,10 @@ def build_opencode_config_hygiene_reconciliation(
     reasons: set[str] = set()
     for report_finding in report_findings:
         append_opencode_config_hygiene_reason(reasons, opencode_config_hygiene_reason_code(report_finding))
-    if error:
+    if evidence["validation"] != "valid" or evidence["scope"] != "matched":
         append_opencode_config_hygiene_reason(reasons, "opencode_project_config_malformed")
+    if evidence["requirement_outcome"] == "unresolved" or evidence["human_review_required"]:
+        append_opencode_config_hygiene_reason(reasons, "opencode_config_review_required")
     elif report_findings and report_status in {"advisory", "warning", "required_missing", "blocked", "unknown"}:
         append_opencode_config_hygiene_reason(reasons, "opencode_config_review_required")
     reason_codes = [code for code in OPENCODE_CONFIG_HYGIENE_REASON_ORDER if code in reasons]
@@ -3895,22 +4152,15 @@ def build_design_traceability_reconciliation(
     allowed_dispositions: set[str],
     required_fields: list[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    report = report_path(root, naos_root, policy, "design_traceability_report")
-    source_ref = relative_ref(root, report)
-    data, error = load_json_report(report)
+    report, source_ref, data, evidence, source_report = classified_optional_source(
+        root, naos_root, profile, policy, "design_traceability_report",
+    )
     reason_code_counts = {code: 0 for code in DESIGN_TRACEABILITY_REASON_ORDER}
-    source_report = {
-        "path": source_ref,
-        "present": report.exists(),
-        "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else None),
-        "schema": data.get("schema") if isinstance(data, dict) else None,
-        "error": error,
-    }
-    if not report.exists():
+    if evidence["applicability"] == "not_applicable":
         return [], [], {
             "status": "not_applicable",
             "summary": {
-                "report_present": False,
+                "report_present": source_report["present"],
                 "findings_seen": 0,
                 "routes_generated": 0,
                 "human_review_required": 0,
@@ -3928,8 +4178,10 @@ def build_design_traceability_reconciliation(
     reasons: set[str] = set()
     for report_finding in report_findings:
         append_design_traceability_reason(reasons, design_traceability_reason_code(report_finding))
-    if error:
+    if evidence["validation"] != "valid" or evidence["scope"] != "matched":
         append_design_traceability_reason(reasons, "stale_or_conflicting_evidence")
+    if evidence["requirement_outcome"] == "unresolved" or evidence["human_review_required"]:
+        append_design_traceability_reason(reasons, "design_traceability_review_required")
     elif report_findings and report_status in {"advisory", "warning", "required_missing", "blocked", "unknown"}:
         append_design_traceability_reason(reasons, "design_traceability_review_required")
     reason_codes = [code for code in DESIGN_TRACEABILITY_REASON_ORDER if code in reasons]
@@ -4032,29 +4284,23 @@ def build_ui_experience_quality_reconciliation(
     allowed_dispositions: set[str],
     required_fields: list[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    report = report_path(root, naos_root, policy, "ui_experience_quality_report")
-    source_ref = relative_ref(root, report)
-    data, error = load_json_report(report)
+    report, source_ref, data, evidence, source_report = classified_optional_source(
+        root, naos_root, profile, policy, "ui_experience_quality_report",
+    )
+    error = source_report["error"]
     reason_code_counts = {code: 0 for code in UI_EXPERIENCE_QUALITY_REASON_ORDER}
-    source_report = {
-        "path": source_ref,
-        "present": report.exists(),
-        "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else None),
-        "schema": data.get("schema") if isinstance(data, dict) else None,
-        "error": error,
-    }
-    if not report.exists():
+    if evidence["applicability"] == "not_applicable":
         return [], [], {
             "status": "not_applicable",
             "summary": {
-                "report_present": False,
+                "report_present": source_report["present"],
                 "findings_seen": 0,
                 "routes_generated": 0,
                 "human_review_required": 0,
                 "reason_code_counts": reason_code_counts,
             },
             "source_report": source_report,
-            "source_report_refs": [],
+            "source_report_refs": [source_ref] if source_report["present"] else [],
             "routes": [],
             "limitations": UI_EXPERIENCE_QUALITY_LIMITATIONS,
             "not_claimed": UI_EXPERIENCE_QUALITY_NOT_CLAIMED,
@@ -4065,7 +4311,7 @@ def build_ui_experience_quality_reconciliation(
     reasons: set[str] = set()
     for report_finding in report_findings:
         append_ui_experience_quality_reason(reasons, ui_experience_quality_reason_code(report_finding))
-    if error:
+    if evidence["requirement_outcome"] == "unresolved" or evidence["human_review_required"]:
         append_ui_experience_quality_reason(reasons, "ui_experience_quality_review_required")
     elif report_findings and report_status in {"advisory", "warning", "required_missing", "blocked", "unknown"}:
         append_ui_experience_quality_reason(reasons, "ui_experience_quality_review_required")
@@ -4193,7 +4439,10 @@ def build_report(
 
     routing_decisions: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
+    external_review_items = [item for item in raw_items if "external_result_review" in item]
     for item in raw_items:
+        if "external_result_review" in item:
+            continue
         decision, item_findings = evaluate_item(
             item=item,
             rules=rules,
@@ -4231,8 +4480,28 @@ def build_report(
             allowed_target_surfaces=allowed_target_surfaces,
             allowed_dispositions=allowed_dispositions,
             required_fields=required_fields,
+            authored_items=raw_items,
+            review_items_ref=relative_ref(root, items_path),
         )
     )
+    current_external_ids = {item["id"] for item in external_sarif_decisions}
+    current_external_results = {item.get("external_result_id") for item in external_sarif_decisions
+                                if item.get("external_result_id")}
+    for item in external_review_items:
+        review = item.get("external_result_review")
+        if (any(item.get("id") == current_id for current_id in current_external_ids)
+                or (isinstance(review, dict)
+                    and any(review.get("external_result_id") == result_id for result_id in current_external_results))):
+            continue
+        invalid_item = dict(item, disposition="needs_review", human_review_required=True)
+        decision, item_findings = evaluate_item(
+            item=invalid_item, rules=rules, severity=severity, required_fields=required_fields,
+            allowed_source_types=allowed_source_types, allowed_target_surfaces=allowed_target_surfaces,
+            allowed_dispositions=allowed_dispositions,
+        )
+        decision["external_review_consumption"] = {"status": "rejected", "claim_scope": "routing_review_only", "routing_review_consumed": False, "reason_codes": ["review_current_result_missing"]}
+        routing_decisions.append(decision)
+        findings.extend(item_findings)
     routing_decisions.extend(external_sarif_decisions)
     findings.extend(external_sarif_findings)
 
@@ -4519,7 +4788,7 @@ def build_report(
         "schema": "naos.control_plane_review.v1",
         "generated_at": utc_now_text(),
         "profile": profile,
-        "status": status_from_counts(summary) if routing_decisions else "not_configured",
+        "status": status_from_counts(summary) if routing_decisions or parallel_findings else "not_configured",
         "naos_root": naos_root,
         "project_root": str(root),
         "rules": {
@@ -4574,6 +4843,7 @@ def build_report(
         "waivers": waivers,
         "human_review_required": bool(
             summary["human_review_required"]
+            or any(item.get("human_review_required") for item in parallel_findings)
             or summary["review_required"]
             or summary["missing_routing"]
             or summary["parallel_lane_handoff_hitl_required"]

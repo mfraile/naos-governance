@@ -1,7 +1,9 @@
 # naos_memory.yaml — NAOS memory onboarding state
 #
 # Engram runtime data lives under data_dir; the database is derived as
-# <data_dir>/engram.db. ENGRAM_DATA_DIR overrides the declared path at runtime.
+# <data_dir>/engram.db. For direct Engram use, ENGRAM_DATA_DIR may select the
+# observed runtime path. The optional managed toolkit fixes user-home/.engram and
+# accepts ENGRAM_DATA_DIR only when it names that same store.
 # The maintained replication profile is local. NAOS does not configure Git sync.
 # Never store credentials, API keys, tokens, connection strings, PII, customer data,
 # or regulated data in memory configuration or memory checkpoints.

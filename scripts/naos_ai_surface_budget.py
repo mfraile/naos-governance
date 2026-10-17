@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import importlib.util
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -38,7 +40,11 @@ from naos_policy import (  # noqa: E402
 
 
 REPORT_SCHEMA = "naos.ai_surface_context_budget.v1"
-PROFILE_BASELINE_SCHEMA = "naos.ai_surface_profile_footprint_baseline.v1"
+PROFILE_BASELINE_SCHEMA = "naos.ai_surface_profile_footprint_baseline.v1"  # Historical artifact contract.
+PROFILE_REPORT_SCHEMA = "naos.ai_surface_profile_footprint_baseline.v2"
+PROFILE_PROJECTION_VERSION = "classifier_scan_hash_links.v1"
+PROFILE_DETERMINISM_SCOPE = "complete_measurement_projection"
+PROFILE_RAW_HASH_AUTHORITY = "classifier_emitted_historical_scan_time_hash_declaration"
 RULES_SCHEMA = "naos.ai_surface_context_budget_rules.v1"
 DEFAULT_RULES_PATH = ROOT_DIR / "templates" / "structural-seeds" / "naos" / "ai_surface_context_budget_rules.yaml"
 DEFAULT_BASELINE_REL = "baselines/ai_surface_health_baseline.json"
@@ -73,12 +79,14 @@ FRESH_UUID_RE = re.compile(
     r"\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b",
     re.IGNORECASE,
 )
+FRESH_AUDIT_REFERENCE_MAX_FILES = 1000
+FRESH_AUDIT_REFERENCE_MAX_ENTRIES = 50000
 FRESH_DYNAMIC_NORMALIZATIONS = [
     "temporary roots",
     "Python executable",
     "user-home paths",
     "generated session UUIDs",
-    "generated audit event IDs",
+    "generated audit event IDs (new IDs only in exact verified audit-finding reference slots)",
     "generated input mtimes to the fixed replay instant",
 ]
 FRESH_GENERATED_INPUT_PHASE = "post-isolation-overlay_pre-self-check"
@@ -206,6 +214,20 @@ DEFAULT_RULES: dict[str, Any] = {
             "block_tokens": 18000,
         },
         {
+            "id": "claude_code_plugin_base",
+            "label": "Claude Code plugin governance loadout",
+            "profiles": ["lite", "standard", "assured"],
+            "files": [
+                {"path": "plugins/naos-governance-claude-code/README.md", "optional": True},
+                {"path": "plugins/naos-governance-claude-code/skills/naos-adoption-readiness/SKILL.md", "optional": True},
+                {"path": "plugins/naos-governance-claude-code/skills/naos-forensic-review/SKILL.md", "optional": True},
+                {"path": "plugins/naos-governance-claude-code/skills/naos-governed-learning/SKILL.md", "optional": True},
+                {"path": "plugins/naos-governance-claude-code/skills/naos-adapter-coexistence/SKILL.md", "optional": True},
+            ],
+            "warn_tokens": 8000,
+            "block_tokens": 12000,
+        },
+        {
             "id": "copilot_base",
             "label": "Copilot base governance loadout",
             "profiles": ["lite", "standard", "assured"],
@@ -228,7 +250,7 @@ DEFAULT_RULES: dict[str, Any] = {
             "profiles": ["standard", "assured"],
             "files": [
                 {"path": "templates/agents/AGENTS.md", "optional": True},
-                {"path": ".github/agents/AGENTS.md", "optional": True},
+                {"path": ".github/NAOS_AGENTS.md", "optional": True},
                 {"path": "templates/agents/naos-implement.agent.md", "optional": True},
                 {"path": ".github/agents/naos-implement.agent.md", "optional": True},
                 {"path": "templates/prompts/naos-task-start.prompt.md", "optional": True},
@@ -244,7 +266,7 @@ DEFAULT_RULES: dict[str, Any] = {
             "profiles": ["standard", "assured"],
             "files": [
                 {"path": "templates/agents/AGENTS.md", "optional": True},
-                {"path": ".github/agents/AGENTS.md", "optional": True},
+                {"path": ".github/NAOS_AGENTS.md", "optional": True},
                 {"path": "templates/agents/naos-review.agent.md", "optional": True},
                 {"path": ".github/agents/naos-review.agent.md", "optional": True},
                 {"path": "templates/prompts/naos-task-complete.prompt.md", "optional": True},
@@ -294,7 +316,13 @@ DEFAULT_RULES: dict[str, Any] = {
         {
             "id": "context_pressure",
             "label": "Context pressure",
-            "phrases": ["context pressure", "NAOS_CONTEXT_REMAINING_PCT", "checkpoint", "compact"],
+            "phrases": ["context pressure", "checkpoint", "compact"],
+        },
+        {
+            "id": "caller_context_signal",
+            "label": "Caller-supplied hook context signal",
+            "profiles": ["standard", "assured"],
+            "phrases": ["NAOS_CONTEXT_REMAINING_PCT"],
         },
         {
             "id": "profile_gate_boundary",
@@ -442,27 +470,35 @@ def threshold_findings(
     policy: dict[str, Any],
     scope: str,
 ) -> list[dict[str, Any]]:
+    provenance = {
+        "evidence_classification": "confirmed",
+        "classification_scope": "configured_character_estimate_threshold",
+        "classification_reason": (
+            "Compares a deterministic character-based token estimate with the selected "
+            "configured threshold; does not measure provider tokenization or model behavior."
+        ),
+        "source_path": str(Path(__file__).resolve()),
+    }
     if block_tokens and tokens > block_tokens:
-        return [
-            finding(
-                finding_id=f"AI_SURFACE_{scope.upper()}_BUDGET_EXCEEDED",
-                severity=condition_severity(profile, policy, "blocking"),
-                status=f"{scope}_budget_exceeded",
-                message=f"{item_label} is estimated at {tokens} tokens, above the configured block threshold {block_tokens}.",
-                source=source,
-            )
-        ]
-    if warn_tokens and tokens > warn_tokens:
-        return [
-            finding(
-                finding_id=f"AI_SURFACE_{scope.upper()}_BUDGET_WARNING",
-                severity=condition_severity(profile, policy, "warning"),
-                status=f"{scope}_budget_warning",
-                message=f"{item_label} is estimated at {tokens} tokens, above the configured warning threshold {warn_tokens}.",
-                source=source,
-            )
-        ]
-    return []
+        item = finding(
+            finding_id=f"AI_SURFACE_{scope.upper()}_BUDGET_EXCEEDED",
+            severity=condition_severity(profile, policy, "blocking"),
+            status=f"{scope}_budget_exceeded",
+            message=f"{item_label} is estimated at {tokens} tokens, above the configured block threshold {block_tokens}.",
+            source=source,
+        )
+    elif warn_tokens and tokens > warn_tokens:
+        item = finding(
+            finding_id=f"AI_SURFACE_{scope.upper()}_BUDGET_WARNING",
+            severity=condition_severity(profile, policy, "warning"),
+            status=f"{scope}_budget_warning",
+            message=f"{item_label} is estimated at {tokens} tokens, above the configured warning threshold {warn_tokens}.",
+            source=source,
+        )
+    else:
+        return []
+    item.update(provenance)
+    return [item]
 
 
 def build_family_reports(
@@ -556,6 +592,9 @@ def build_scenarios(
             "label": scenario.get("label") or scenario_id,
             "profiles": profiles,
             "applicable_to_profile": applicable,
+            "measurement_basis": "configured_synthetic_bundle",
+            "observed_host_loading": False,
+            "artifact_presence": "present" if files else "empty",
             "file_count": len(files),
             "files": [item["path"] for item in files],
             "missing_required_files": missing_required,
@@ -616,6 +655,14 @@ def build_anchors(
         if not isinstance(anchor, dict):
             continue
         anchor_id = str(anchor.get("id") or "unknown")
+        profiles = anchor.get("profiles", [])
+        if "profiles" in anchor and (
+            not isinstance(profiles, list) or not profiles
+            or any(not isinstance(item, str) or item not in PROFILE_ORDER for item in profiles)
+            or len(set(profiles)) != len(profiles)
+        ):
+            raise ValueError(f"Anchor {anchor_id} profiles must be unique supported profile names.")
+        applicable = not profiles or profile in profiles
         phrases = [str(item) for item in anchor.get("phrases") or []]
         matched = [phrase for phrase in phrases if phrase.lower() in text]
         missing = [phrase for phrase in phrases if phrase.lower() not in text]
@@ -624,13 +671,15 @@ def build_anchors(
             {
                 "id": anchor_id,
                 "label": anchor.get("label") or anchor_id,
+                "profiles": profiles,
+                "applicable_to_profile": applicable,
                 "present": present,
                 "matched_phrases": matched,
                 "missing_phrases": missing,
                 "required_phrases": phrases,
             }
         )
-        if not present:
+        if applicable and not present:
             missing_text = ", ".join(missing) if missing else "no configured phrases"
             findings.append(
                 finding(
@@ -674,7 +723,7 @@ def build_snapshot(
         "total_files": sum(int(item["file_count"]) for item in family_reports),
         "families": {item["id"]: {"file_count": item["file_count"], "estimated_tokens": item["estimated_tokens"]} for item in family_reports},
         "combined_scenarios": {item["id"]: {"estimated_tokens": item["estimated_tokens"], "file_count": item["file_count"]} for item in scenarios},
-        "anchors": {item["id"]: bool(item["present"]) for item in anchors},
+        "anchors": {item["id"]: bool(item["present"]) for item in anchors if item.get("applicable_to_profile", True)},
     }
 
 
@@ -690,7 +739,7 @@ def baseline_snapshot(data: dict[str, Any] | None) -> dict[str, Any]:
         "total_files": summary.get("total_files"),
         "families": {item.get("id"): {"file_count": item.get("file_count"), "estimated_tokens": item.get("estimated_tokens")} for item in data.get("families") or [] if isinstance(item, dict)},
         "combined_scenarios": {item.get("id"): {"estimated_tokens": item.get("estimated_tokens"), "file_count": item.get("file_count")} for item in data.get("combined_scenarios") or [] if isinstance(item, dict)},
-        "anchors": {item.get("id"): bool(item.get("present")) for item in data.get("anchors") or [] if isinstance(item, dict)},
+        "anchors": {item.get("id"): bool(item.get("present")) for item in data.get("anchors") or [] if isinstance(item, dict) and item.get("applicable_to_profile", True)},
     }
 
 
@@ -715,15 +764,23 @@ def compare_baseline(
     }
     if not baseline_meta.get("present"):
         if baseline_meta.get("status") == "missing_baseline":
-            findings.append(
-                finding(
-                    finding_id="AI_SURFACE_BASELINE_MISSING",
-                    severity=str((rules.get("baseline") or {}).get("baseline_missing_severity") or "advisory"),
-                    status="missing_baseline",
-                    message="No approved AI-surface health baseline is present; posture is still measured from current source artifacts.",
-                    source=str(baseline_meta.get("path")),
-                )
+            item = finding(
+                finding_id="AI_SURFACE_BASELINE_MISSING",
+                severity=str((rules.get("baseline") or {}).get("baseline_missing_severity") or "advisory"),
+                status="missing_baseline",
+                message="No AI-surface health baseline is present at the selected path; posture is still measured from current source artifacts.",
+                source=str(baseline_meta.get("path")),
             )
+            item.update(
+                evidence_classification="confirmed",
+                classification_scope="selected_baseline_path_absence",
+                classification_reason=(
+                    "The selected baseline path was absent at execution time; this does not "
+                    "verify approval or establish absence of a baseline elsewhere."
+                ),
+                source_path=str(Path(__file__).resolve()),
+            )
+            findings.append(item)
         return result, findings
     if baseline_meta.get("status") == "invalid_baseline" or baseline_data is None:
         findings.append(
@@ -793,6 +850,482 @@ def health_posture(findings: list[dict[str, Any]]) -> str:
     return "healthy"
 
 
+def _build_guarded_project_context(
+    root: Path, rules: dict[str, Any], *, candidate_host: str | None = None,
+) -> dict[str, Any]:
+    """Estimate a bounded project-local subset in a stable tree, not host loading."""
+    root = root.resolve()
+    limits = {"max_files": 64, "max_import_depth": 5, "max_file_bytes": 1048576,
+              "max_discovery_entries": 256, "max_directory_depth": 8}
+    unresolved: list[dict[str, str]] = []
+    startup: dict[str, dict[str, Any]] = {}
+    imports: list[dict[str, str]] = []
+    conditional: list[dict[str, Any]] = []
+    on_demand: list[dict[str, Any]] = []
+    active: set[str] = set()
+    cache: dict[str, tuple[str, dict[str, Any]] | None] = {}
+    discovery_count = 0
+
+    def lexical_identifier(path: Path) -> str:
+        relative = path.relative_to(root)
+        if ".." in relative.parts:
+            raise ValueError("outside_project")
+        return relative.as_posix()
+
+    def reject(path: Path, reason: str) -> None:
+        try:
+            relative = lexical_identifier(path)
+        except ValueError:
+            relative = str(path)
+        unresolved.append({"path": relative, "reason": reason})
+
+    def guarded_stat(path: Path) -> os.stat_result:
+        relative = Path(lexical_identifier(path))
+        current = root
+        observed = root.lstat()
+        for part in relative.parts:
+            current /= part
+            observed = current.lstat()
+            if stat.S_ISLNK(observed.st_mode):
+                raise ValueError("symlink_path")
+        if not path.resolve().is_relative_to(root):
+            raise ValueError("outside_project")
+        return observed
+
+    def identity(observed: os.stat_result) -> tuple[int, ...]:
+        return (observed.st_dev, observed.st_ino, observed.st_mode, observed.st_size,
+                observed.st_mtime_ns, observed.st_ctime_ns)
+
+    def same_read_identity(left: os.stat_result, right: os.stat_result) -> bool:
+        # Windows can expose different ctime meanings through lstat and fstat.
+        fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns")
+        if any(getattr(left, field) != getattr(right, field) for field in fields):
+            return False
+        left_birth = getattr(left, "st_birthtime_ns", None)
+        right_birth = getattr(right, "st_birthtime_ns", None)
+        return left_birth is None or right_birth is None or left_birth == right_birth
+
+    def read(path: Path, relationship: str) -> tuple[str, dict[str, Any]] | None:
+        try:
+            relative = lexical_identifier(path)
+            before = guarded_stat(path)
+            if relative in cache:
+                loaded = cache[relative]
+                return (loaded[0], {**loaded[1], "relationship": relationship}) if loaded else None
+            if len(cache) >= limits["max_files"]:
+                reject(path, "file_limit")
+                return None
+            cache[relative] = None
+            if not stat.S_ISREG(before.st_mode):
+                raise ValueError("not_regular_file")
+            with path.open("rb") as stream:
+                opened = os.fstat(stream.fileno())
+                data = stream.read(limits["max_file_bytes"] + 1)
+                consumed = os.fstat(stream.fileno())
+            after = guarded_stat(path)
+            if len(data) > limits["max_file_bytes"]:
+                raise ValueError("byte_limit")
+            if (identity(before) != identity(after)
+                    or identity(opened) != identity(consumed)
+                    or not same_read_identity(before, opened)
+                    or not same_read_identity(after, consumed)):
+                raise ValueError("changed_during_read")
+            if len(data) != before.st_size:
+                raise ValueError("size_mismatch")
+            # Match legacy universal-newline character estimation using the same bytes.
+            text = data.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+            metrics = {"path": relative, "lines": len(text.splitlines()), "chars": len(text),
+                       "estimated_tokens": estimate_tokens(len(text), rules),
+                       "sha256": hashlib.sha256(data).hexdigest(), "relationship": relationship}
+            cache[relative] = (text, metrics)
+            return text, metrics
+        except FileNotFoundError:
+            reject(path, "missing_file")
+        except (OSError, UnicodeError, ValueError, RuntimeError) as exc:
+            reject(path, str(exc))
+        return None
+
+    def visit(path: Path, relationship: str, depth: int) -> None:
+        try:
+            relative = lexical_identifier(path)
+            guarded_stat(path)
+        except FileNotFoundError:
+            reject(path, "missing_file")
+            return
+        except (OSError, ValueError, RuntimeError) as exc:
+            reject(path, str(exc))
+            return
+        if relative in active:
+            reject(path, "import_cycle")
+            return
+        if relative in startup:
+            return
+        if depth > limits["max_import_depth"]:
+            reject(path, "depth_limit")
+            return
+        loaded = read(path, relationship)
+        if loaded is None:
+            return
+        text, metrics = loaded
+        startup[relative] = metrics
+        active.add(relative)
+        fenced = False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith(("```", "~~~")):
+                fenced = not fenced
+                continue
+            if fenced:
+                continue
+            if stripped.startswith("@"):
+                target = stripped[1:]
+                if target.startswith("/") or not re.fullmatch(r"[A-Za-z0-9_.\-/]+", target) or Path(target).is_absolute() or ".." in Path(target).parts:
+                    reject(path, "unsupported_or_external_import:" + target)
+                    continue
+                child = path.parent / target
+                imports.append({"from": relative, "to": lexical_identifier(child),
+                                "syntax": "standalone_relative_import"})
+                visit(child, "explicit_import", depth + 1)
+            elif re.search(r"(?<!\w)@[A-Za-z0-9_./~-]+", stripped):
+                reject(path, "unsupported_inline_import_or_mention")
+        active.remove(relative)
+
+    def discover(base: Path, relationship: str, depth: int = 0) -> list[Path]:
+        nonlocal discovery_count
+        try:
+            before = guarded_stat(base)
+            if not stat.S_ISDIR(before.st_mode):
+                raise ValueError("not_directory")
+            if depth > limits["max_directory_depth"]:
+                raise ValueError("directory_depth_limit")
+            children: list[Path] = []
+            with os.scandir(base) as entries:
+                for entry in entries:
+                    if discovery_count >= limits["max_discovery_entries"]:
+                        # Do not publish an order-dependent subset of a truncated directory.
+                        raise ValueError("discovery_entry_limit")
+                    discovery_count += 1
+                    children.append(base / entry.name)
+            if identity(guarded_stat(base)) != identity(before):
+                raise ValueError("directory_changed_during_discovery")
+            found: list[Path] = []
+            for child in sorted(children):
+                try:
+                    observed = guarded_stat(child)
+                    if stat.S_ISDIR(observed.st_mode):
+                        found.extend(discover(child, relationship, depth + 1))
+                    elif stat.S_ISREG(observed.st_mode) and child.suffix == (
+                            ".mdc" if relationship == "cursor_rule_candidate" else ".md"):
+                        if relationship != "skill_body_on_demand" or child.name == "SKILL.md":
+                            found.append(child)
+                except (OSError, ValueError, RuntimeError) as exc:
+                    reject(child, str(exc))
+            return found
+        except FileNotFoundError:
+            return []
+        except (OSError, ValueError, RuntimeError) as exc:
+            reject(base, str(exc))
+            return []
+
+    if candidate_host is not None:
+        if candidate_host not in {"cursor", "copilot_harness", "vscode_local"}:
+            raise ValueError("Unsupported project candidate host")
+        base_inputs: dict[str, dict[str, Any]] = {}
+        conditional_inputs: dict[str, dict[str, Any]] = {}
+
+        def candidate(path: Path, condition: str | None = None) -> None:
+            # Optional absence differs from an unsafe path/read. Keep the same
+            # guarded stat/read/discovery and fixed bounds as the Claude model.
+            try:
+                guarded_stat(path)
+            except FileNotFoundError:
+                return
+            except (OSError, ValueError, RuntimeError) as exc:
+                reject(path, str(exc))
+                return
+            relationship = "conditional_instruction_candidate" if condition else "project_instruction_candidate"
+            loaded = read(path, relationship)
+            if loaded is not None:
+                row = loaded[1]
+                if condition:
+                    row["condition"] = condition
+                    conditional_inputs[row["path"]] = row
+                else:
+                    base_inputs[row["path"]] = row
+
+        def metadata(path: Path, text: str) -> dict[str, Any] | None:
+            lines = text.splitlines()
+            if not lines or lines[0] != "---":
+                return {}
+            try:
+                closing = next((index for index in range(1, len(lines)) if lines[index] == "---"), None)
+                if closing is None:
+                    raise ValueError("unterminated_frontmatter")
+                value = yaml.safe_load("\n".join(lines[1:closing]))
+                if not isinstance(value, dict):
+                    raise ValueError("invalid_frontmatter_mapping")
+                return value
+            except RecursionError:
+                reject(path, "unsupported_deep_frontmatter")
+            except (ValueError, yaml.YAMLError) as exc:
+                reject(path, str(exc))
+            return None
+
+        if candidate_host == "cursor":
+            candidate(root / "AGENTS.md")
+            for path in discover(root / ".cursor" / "rules", "cursor_rule_candidate"):
+                loaded = read(path, "conditional_instruction_candidate")
+                if loaded is None:
+                    continue
+                meta = metadata(path, loaded[0])
+                if meta is None:
+                    continue
+                flag = meta.get("alwaysApply")
+                if "alwaysApply" in meta and type(flag) is not bool:
+                    reject(path, "unsupported_alwaysApply_metadata")
+                    continue
+                if flag is True:
+                    candidate(path)
+                else:
+                    candidate(path, "glob/relevance/manual rule applicability not evaluated")
+        else:
+            candidate(root / ".github" / "copilot-instructions.md")
+            candidate(root / "AGENTS.md", "Local chat.useAgentsMdFile setting unverified"
+                      if candidate_host == "vscode_local" else None)
+            for path in discover(root / ".github" / "instructions", "instruction_candidate"):
+                if not path.name.endswith(".instructions.md"):
+                    continue
+                loaded = read(path, "conditional_instruction_candidate")
+                if loaded is None:
+                    continue
+                meta = metadata(path, loaded[0])
+                if meta is None:
+                    continue
+                if "applyTo" in meta and not isinstance(meta["applyTo"], str):
+                    reject(path, "unsupported_applyTo_metadata")
+                    continue
+                # Even universal globs remain candidates until the actual host,
+                # settings and request applicability are established.
+                candidate(path, "applyTo=" + str(meta.get("applyTo", "manual/description selection"))
+                          + "; task paths and host/settings applicability unverified")
+            if candidate_host == "vscode_local":
+                for name in ("CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"):
+                    candidate(root / name, "Local chat.useClaudeMdFile compatibility setting unverified; no import expansion assumed")
+                for path in discover(root / ".claude" / "rules", "rule_candidate"):
+                    loaded = read(path, "conditional_instruction_candidate")
+                    if loaded is None:
+                        continue
+                    meta = metadata(path, loaded[0])
+                    if meta is None:
+                        continue
+                    paths = meta.get("paths")
+                    if "paths" in meta and not (isinstance(paths, str) or isinstance(paths, list)
+                            and all(isinstance(item, str) for item in paths)):
+                        reject(path, "unsupported_paths_metadata")
+                        continue
+                    candidate(path, "Local Claude-rule compatibility setting and paths applicability unverified")
+        union = {**base_inputs, **conditional_inputs}
+        rows = [union[key] for key in sorted(union)]
+        result = {
+            "host": candidate_host,
+            "basis": "project_local_conservative_candidate_union",
+            "observed_loading": False, "settings_verified": False,
+            "status": "partial" if unresolved else "project_local_subset" if rows else "not_present",
+            "scope": "Repository-root project candidates only; format alternatives and conditional envelopes are not an assembled request.",
+            "limits": limits,
+            "base_candidates": [base_inputs[key] for key in sorted(base_inputs)],
+            "conditional_candidates": [conditional_inputs[key] for key in sorted(conditional_inputs)],
+            "all_candidates": rows,
+            "base_candidate_estimated_tokens": sum(row["estimated_tokens"] for row in base_inputs.values()),
+            "all_candidate_estimated_tokens": sum(row["estimated_tokens"] for row in rows),
+            "input_files": [{key: loaded[1][key] for key in ("path", "lines", "chars", "estimated_tokens", "sha256")}
+                            | {"relationship": "source_input"}
+                            for _, loaded in sorted(cache.items()) if loaded is not None],
+            "unresolved": unresolved,
+            "deduplication": "exact contained project path only; distinct files with equal text are counted separately",
+            "token_basis": "configured_character_estimate_not_provider_tokenizer",
+            "threshold_basis": "metadata_only_no_new_or_retuned_host_thresholds; configured combined_scenarios remain synthetic",
+            "excluded": ["Ancestor/nested scope outside this repository-root model", "User/global instructions and custom instruction directories",
+                         "Skill/prompt/command/reference bodies loaded on demand", "Runtime tool reads, file mentions and instruction-link expansion",
+                         "Actual trust/settings/harness selection and task-specific glob matching", "Semantic deduplication and actual request assembly"],
+            "source_refs": (["https://cursor.com/docs/rules"] if candidate_host == "cursor" else
+                            ["https://code.visualstudio.com/docs/agent-customization/custom-instructions"]),
+            "known_limitations": ["Base candidates include documented format alternatives, not a guarantee all are enabled together.",
+                                  "Conditional candidates contribute only to the conservative all-candidate envelope, never a startup total.",
+                                  "Local Claude compatibility is not a universal Copilot CLI/cloud loading claim.",
+                                  "Stable-tree read checks do not establish a race-proof filesystem sandbox."],
+        }
+        validate_host_candidate_union(result)
+        return result
+
+    for entry_name in ("CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"):
+        entry = root / entry_name
+        try:
+            guarded_stat(entry)
+        except FileNotFoundError:
+            continue
+        except (OSError, ValueError, RuntimeError) as exc:
+            reject(entry, str(exc))
+            continue
+        visit(entry, "project_entry", 0)
+    for path in discover(root / ".claude" / "rules", "rule"):
+        loaded = read(path, "rule")
+        if loaded is None:
+            continue
+        text, metrics = loaded
+        metadata: dict[str, Any] = {}
+        lines = text.splitlines()
+        if lines and lines[0] == "---":
+            try:
+                closing = next((index for index in range(1, len(lines)) if lines[index] == "---"), None)
+                if closing is None:
+                    raise ValueError("unterminated_frontmatter")
+                value = yaml.safe_load("\n".join(lines[1:closing]))
+                if not isinstance(value, dict):
+                    raise ValueError("invalid_frontmatter_mapping")
+                metadata = value
+                paths = metadata.get("paths")
+                if "paths" in metadata and not (isinstance(paths, str) or isinstance(paths, list) and all(isinstance(item, str) for item in paths)):
+                    raise ValueError("unsupported_paths_metadata")
+            except RecursionError:
+                reject(path, "unsupported_deep_frontmatter")
+                continue
+            except (ValueError, yaml.YAMLError) as exc:
+                reject(path, str(exc))
+                continue
+        if "paths" in metadata:
+            metrics["relationship"] = "paths_conditioned_rule"
+            metrics["paths"] = metadata["paths"]
+            conditional.append(metrics)
+        else:
+            visit(path, "unconditional_project_rule", 0)
+    for directory, relationship in (("skills", "skill_body_on_demand"), ("commands", "command_body_on_demand")):
+        for path in discover(root / ".claude" / directory, relationship):
+            loaded = read(path, relationship)
+            if loaded is not None:
+                on_demand.append(loaded[1])
+    # Reviewed task-time references are input evidence, never inferred startup
+    # imports. Reuse bounded custody/read/discovery checks and keep their metric
+    # rows separate from the files actually selected by the startup grammar.
+    for path in discover(root / ".github" / "naos-guidance", "guidance_reference_on_demand"):
+        loaded = read(path, "guidance_reference_on_demand")
+        if loaded is not None:
+            on_demand.append(loaded[1])
+    files = [startup[key] for key in sorted(startup)]
+    present = bool(files or conditional or on_demand)
+    return {
+        "host": "claude_code", "basis": "project_local_static_loading_estimate",
+        "observed_loading": False,
+        "status": "partial" if unresolved else "project_local_subset" if present else "not_present",
+        "scope": "Project CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md, supported contained imports and unconditional project rules; excludes ancestors, user settings, runtime reads and activation.",
+        "supported_import_grammar": "standalone @relative/path outside fenced code; no absolute, parent traversal or symlink paths",
+        "limits": limits,
+        "input_files": [{key: loaded[1][key] for key in ("path", "lines", "chars", "estimated_tokens", "sha256")} | {"relationship": "source_input"}
+                        for _, loaded in sorted(cache.items()) if loaded is not None],
+        "startup_files": files,
+        "startup_estimated_tokens": sum(int(item["estimated_tokens"]) for item in files),
+        "conditional_rules": conditional, "on_demand_bodies": on_demand,
+        "import_edges": imports, "unresolved": unresolved,
+        "github_instructions_basis": "manual_or_prose_requested_reads_unless_explicitly_imported",
+        "token_basis": "configured_character_estimate_not_provider_tokenizer",
+        "known_limitations": ["Stable project tree assumption: post-read identity checks do not establish a race-proof filesystem sandbox.",
+                              "Conditional and on-demand presence can have zero startup estimate; activation and actual reads remain unobserved.",
+                              "Skill metadata, prose-requested reads, ancestors, settings and unsupported import syntax are not complete startup accounting.",
+                              "Absence covers only modeled project candidates; installed host version and settings are not inspected."],
+        "vendor_guidance": {"kind": "advisory", "claude_file_target_lines": 200, "hard_token_limit": None,
+            "source_refs": ["https://code.claude.com/docs/en/memory", "https://code.claude.com/docs/en/skills"],
+            "verified_on": "2026-10-13", "authority": "root_primary_document_review"},
+        "local_thresholds_are_vendor_limits": False,
+    }
+
+
+def build_claude_host_context(root: Path, rules: dict[str, Any]) -> dict[str, Any]:
+    """Backward-compatible Claude-only static subset and its original fields."""
+    return _build_guarded_project_context(root, rules)
+
+
+def validate_host_candidate_union(view: dict[str, Any]) -> None:
+    """Verify reported exact-path partition/accounting; no host execution claim."""
+    if view.get("observed_loading") is not False or view.get("settings_verified") is not False:
+        raise ValueError("Candidate union cannot assert observed loading/settings")
+    bases = view["base_candidates"]
+    conditional = view["conditional_candidates"]
+    union = view["all_candidates"]
+    if (any(row.get("relationship") != "project_instruction_candidate" or "condition" in row for row in bases)
+            or any(row.get("relationship") != "conditional_instruction_candidate" or not row.get("condition") for row in conditional)):
+        raise ValueError("Host conditional/base classification mismatch")
+    names = [row["path"] for row in bases + conditional]
+    if len(names) != len(set(names)) or [row["path"] for row in union] != sorted(names):
+        raise ValueError("Host candidate partition or exact-path union mismatch")
+    inputs = {row["path"]: row for row in view["input_files"]}
+    for row in union:
+        if any(inputs.get(row["path"], {}).get(key) != row[key]
+               for key in ("path", "lines", "chars", "estimated_tokens", "sha256")):
+            raise ValueError("Host union candidate is not bound to its source input")
+    by_path = {row["path"]: row for row in union}
+    for row in bases + conditional:
+        if any(by_path[row["path"]][key] != row[key]
+               for key in ("path", "lines", "chars", "estimated_tokens", "sha256")):
+            raise ValueError("Host partition candidate is not bound to its union/source input")
+    if (view["base_candidate_estimated_tokens"] != sum(row["estimated_tokens"] for row in bases)
+            or view["all_candidate_estimated_tokens"] != sum(row["estimated_tokens"] for row in union)):
+        raise ValueError("Host union token accounting mismatch")
+
+
+def build_host_contexts(
+    root: Path, rules: dict[str, Any], *, claude_context: dict[str, Any] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Project bounded host-specific static candidates, not provider requests."""
+    return {"claude_code": claude_context if claude_context is not None else build_claude_host_context(root, rules),
+            **{host: _build_guarded_project_context(root, rules, candidate_host=host)
+               for host in ("cursor", "copilot_harness", "vscode_local")}}
+
+
+
+def host_input_manifest(views: dict[str, dict[str, Any]]) -> list[dict[str, str]]:
+    """Bind all actually read host inputs, including refused-metadata sources."""
+    inputs: dict[str, str] = {}
+    for view in views.values():
+        for row in view["input_files"]:
+            relative, digest = row["path"], row["sha256"]
+            if relative in inputs and inputs[relative] != digest:
+                raise ValueError("Host input changed between independently guarded views: " + relative)
+            inputs[relative] = digest
+    return [{"path": relative, "sha256": inputs[relative]} for relative in sorted(inputs)]
+
+
+def validate_host_input_bindings(
+    views: dict[str, dict[str, Any]], manifest: list[dict[str, str]], *,
+    generated_manifest: list[dict[str, str]] | None = None,
+) -> None:
+    if set(views) != {"claude_code", "cursor", "copilot_harness", "vscode_local"}:
+        raise ValueError("Host view coverage mismatch")
+    for host, view in views.items():
+        if host != "claude_code":
+            validate_host_candidate_union(view)
+    if manifest != host_input_manifest(views):
+        raise ValueError("Host input manifest coverage/hash mismatch")
+    if generated_manifest is not None:
+        generated = {row["path"]: row["sha256"] for row in generated_manifest}
+        if any(generated.get(row["path"]) != row["sha256"] for row in manifest):
+            raise ValueError("Host input not bound to generated content manifest")
+
+
+
+def validate_report_host_contexts(report: dict[str, Any]) -> None:
+    """Validate additive host/input bindings without reading historical paths."""
+    if "host_contexts" not in report:
+        return
+    views, inputs = report["host_contexts"], report["input_sources"]
+    if views["claude_code"] != report["host_context"]:
+        raise ValueError("Legacy Claude host context differs from additive view")
+    if inputs["host_union_files"] != {host: view["input_files"] for host, view in views.items()}:
+        raise ValueError("Report host input-source coverage/hash mismatch")
+    if inputs["host_context_files"] != views["claude_code"]["input_files"]:
+        raise ValueError("Legacy Claude input sources differ from additive view")
+    validate_host_input_bindings(views, inputs["host_union_content_manifest"])
+
+
 def build_report(
     *,
     root: Path,
@@ -803,6 +1336,10 @@ def build_report(
     baseline_path: Path | None,
 ) -> dict[str, Any]:
     rules, rules_meta = load_rules(rules_path)
+    host_context = build_claude_host_context(root, rules)
+    host_contexts = build_host_contexts(root, rules, claude_context=host_context)
+    host_manifest = host_input_manifest(host_contexts)
+    validate_host_input_bindings(host_contexts, host_manifest)
     families, findings, file_index = build_family_reports(root, rules, profile, policy)
     scenarios, scenario_findings = build_scenarios(root, rules, profile, policy, file_index)
     findings.extend(scenario_findings)
@@ -812,6 +1349,14 @@ def build_report(
     baseline_data, baseline_meta = load_baseline(baseline_path)
     baseline, baseline_findings = compare_baseline(snapshot, baseline_data, baseline_meta, rules, profile, policy)
     findings.extend(baseline_findings)
+    # Only explicitly declared observations receive context for the actual rules
+    # used. Scenario IDs and absent baseline paths remain subjects, not files
+    # asserted to exist. A failed/missing rules load uses module defaults.
+    for item in findings:
+        if item.get("evidence_classification") == "confirmed":
+            item["evidence_refs"] = [{"type": "local_file", "ref": str(Path(__file__).resolve())}]
+            if rules_meta.get("present") and rules_meta.get("source") == "rules_file":
+                item["evidence_refs"].append({"type": "local_file", "ref": str(rules_path.resolve())})
     summary = finding_counts(findings)
     posture = health_posture(findings)
     summary.update(
@@ -825,7 +1370,7 @@ def build_report(
             "ai_surface_health_posture": posture,
         }
     )
-    return {
+    report = {
         "schema": REPORT_SCHEMA,
         "generated_at": utc_now_text(),
         "profile": profile,
@@ -842,12 +1387,17 @@ def build_report(
         "input_sources": {
             "rules": rules_meta,
             "source_files": sorted(file_index),
+            "host_context_files": host_context["input_files"],
+            "host_union_files": {host: view["input_files"] for host, view in host_contexts.items()},
+            "host_union_content_manifest": host_manifest,
             "optional_baseline": baseline_meta,
         },
         "non_inputs": DOWNSTREAM_NON_INPUTS,
         "downstream_consumers": DOWNSTREAM_CONSUMERS,
         "families": families,
         "combined_scenarios": scenarios,
+        "host_context": host_context,
+        "host_contexts": host_contexts,
         "anchors": anchors,
         "snapshot": snapshot,
         "findings": findings,
@@ -880,6 +1430,8 @@ def build_report(
         "human_review_required": bool(findings),
         "summary": summary,
     }
+    validate_report_host_contexts(report)
+    return report
 
 
 def canonical_sha256(value: Any) -> str:
@@ -921,6 +1473,113 @@ def normalize_dynamic_values(value: Any, replacements: list[tuple[str, str]]) ->
         normalized = FRESH_UUID_RE.sub("<dynamic-session-id>", normalized)
         return normalized
     return value
+
+
+def fresh_public_audit_event_references(
+    preview_root: Path, *, profile: str,
+) -> dict[str, dict[str, Any]]:
+    """Bound fresh default audit operands; uncertain events remain measured."""
+    if profile not in PROFILE_ORDER:
+        return {}
+    try:
+        from naos_secret_public_literals import collect_public_audit_event_references
+        from naos_systemic_family_review import AUDIT_PRODUCER_EVENT_TYPES, _audit_output_shape
+        from naos_policy import report_default_path
+        from naos_ai_surfaces import checked_path
+    except ImportError:
+        return {}
+    audit_root = preview_root / "naos" / "audit_log"
+    files: list[Path] = []
+    entries = 0
+    try:
+        audit_root = checked_path(preview_root, "naos/audit_log")
+        for ancestor in (preview_root, preview_root / "naos", audit_root):
+            metadata = ancestor.lstat()
+            if (not stat.S_ISDIR(metadata.st_mode)
+                    or getattr(metadata, "st_file_attributes", 0) & 0x400):
+                return {}
+        with os.scandir(audit_root) as dates:
+            for date in dates:
+                entries += 1
+                if entries > FRESH_AUDIT_REFERENCE_MAX_ENTRIES:
+                    return {}
+                if not date.is_dir(follow_symlinks=False):
+                    continue
+                date_path = checked_path(preview_root, Path(date.path).relative_to(preview_root).as_posix())
+                with os.scandir(date_path) as candidates:
+                    for candidate in candidates:
+                        entries += 1
+                        if entries > FRESH_AUDIT_REFERENCE_MAX_ENTRIES:
+                            return {}
+                        if (candidate.name.endswith(".jsonl")
+                                and candidate.is_file(follow_symlinks=False)):
+                            files.append(checked_path(preview_root,
+                                Path(candidate.path).relative_to(preview_root).as_posix()))
+                            if len(files) > FRESH_AUDIT_REFERENCE_MAX_FILES:
+                                return {}
+        references = collect_public_audit_event_references(
+            sorted(files), root=preview_root, naos_root="naos")
+        policy = load_policy(root=preview_root, naos_root="naos")
+        sources = {str(report_default_path(preview_root, "naos", policy, key)): key
+                   for key in AUDIT_PRODUCER_EVENT_TYPES}
+        selected_operands = {str(path) for path in files}
+        verified = {}
+        for event_id, reference in references.items():
+            event = reference["event"]
+            source_key = sources.get(event.get("source_report_path"))
+            # Reuse the existing finite producer shapes: authored nested data
+            # cannot disappear behind a normalized occurrence reference.
+            if (reference["event_file"] in selected_operands
+                    and event.get("profile") == profile
+                    and event.get("generated_at") == FRESH_PROFILE_FIXED_TIME
+                    and event.get("event_type") in AUDIT_PRODUCER_EVENT_TYPES.get(source_key, set())
+                    and _audit_output_shape(event, source_key)):
+                verified[event_id] = reference
+        return verified
+    except (OSError, ValueError, TypeError, KeyError):
+        return {}
+
+
+def normalize_fresh_audit_finding(
+    finding: dict[str, Any], *, check_id: str,
+    references: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Normalize only verified occurrence references in exact producer slots."""
+    if check_id != "naos_audit_log":
+        return finding
+    finding_id = finding.get("id")
+    if finding_id == "audit_log.missing_operator_id_events":
+        field = "operator_id"
+        expected = {"id", "severity", "status", "message", "event_ids"}
+        message = "Some audit events do not have resolved operator_id metadata."
+    elif finding_id == "audit_log.missing_session_id_events":
+        field = "session_id"
+        expected = {"id", "severity", "status", "message", "event_ids",
+                    "evidence_classification", "classification_scope", "reasoning_summary",
+                    "source_path", "human_review_required"}
+        message = "Some audit events do not have session_id metadata."
+        if (finding.get("evidence_classification") != "confirmed"
+                or finding.get("classification_scope") != "observed_audit_event_session_field_absence"
+                or finding.get("reasoning_summary") != "Loaded JSON mapping events with the listed identifiers lacked session_id at summary time; event validity is assessed separately and this does not establish audit completeness or session attribution."
+                or type(finding.get("source_path")) is not str
+                or finding.get("human_review_required") is not True):
+            return finding
+    else:
+        return finding
+    event_ids = finding.get("event_ids")
+    if (set(finding) != expected or finding.get("severity") != "advisory"
+            or finding.get("status") != "advisory" or finding.get("message") != message
+            or type(event_ids) is not list or len(event_ids) > 25
+            or any(type(event_id) is not str for event_id in event_ids)):
+        return finding
+    normalized = dict(finding)
+    normalized["event_ids"] = [
+        "audit-<fixed-time>-<dynamic-id>"
+        if event_id in references and not references[event_id]["event"].get(field)
+        else event_id
+        for event_id in event_ids
+    ]
+    return normalized
 
 
 def profile_state_class(status: Any, severity: Any = None) -> str:
@@ -984,7 +1643,9 @@ def flatten_self_check(
     replacements: list[tuple[str, str]],
     returncode: int,
     command: list[str],
+    public_audit_references: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    public_audit_references = public_audit_references or {}
     occurrences: list[dict[str, Any]] = []
     check_states: list[dict[str, Any]] = []
     finding_state_counts = empty_profile_state_counts()
@@ -1018,7 +1679,9 @@ def flatten_self_check(
                 raise RuntimeError(
                     f"Fresh {profile} self-check check {check_id!r} emitted a non-object finding at index {finding_index}."
                 )
-            normalized_finding = normalize_dynamic_values(raw_finding, replacements)
+            normalized_finding = normalize_dynamic_values(
+                normalize_fresh_audit_finding(raw_finding, check_id=check_id,
+                                             references=public_audit_references), replacements)
             state_class = profile_state_class(
                 normalized_finding.get("status"),
                 normalized_finding.get("severity"),
@@ -1077,6 +1740,9 @@ def run_fresh_self_check(preview_root: Path, profile: str) -> tuple[dict[str, An
     ]
     temporary_environment_root = preview_root.parent / "isolated-environment"
     temporary_environment_root.mkdir(parents=True, exist_ok=True)
+    isolated_home = (temporary_environment_root / "home").resolve()
+    isolated_home.mkdir(parents=True, exist_ok=True)
+    home_drive, home_path = os.path.splitdrive(str(isolated_home))
     environment = {
         key: os.environ[key]
         for key in ("PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT")
@@ -1084,6 +1750,10 @@ def run_fresh_self_check(preview_root: Path, profile: str) -> tuple[dict[str, An
     }
     environment.update(
         {
+            "HOME": str(isolated_home),
+            "USERPROFILE": str(isolated_home),
+            "HOMEDRIVE": home_drive,
+            "HOMEPATH": home_path,
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONHASHSEED": "0",
             "NAOS_FIXED_TIME": FRESH_PROFILE_FIXED_TIME,
@@ -1143,6 +1813,7 @@ def apply_fresh_self_check_isolation(preview_root: Path) -> dict[str, Any]:
             "naos_fixed_time": FRESH_PROFILE_FIXED_TIME,
             "python_hash_seed": "0",
             "temporary_provider_and_git_metadata_roots": True,
+            "temporary_home_and_user_profile": True,
         },
         "normalizations": list(FRESH_DYNAMIC_NORMALIZATIONS),
         "not_claimed": [
@@ -1207,12 +1878,38 @@ def normalize_generated_input_mtimes(
         raise RuntimeError("Fresh-profile fixed time must include a timezone.")
     fixed_ns = int(fixed.timestamp()) * 1_000_000_000
     for relative in files:
-        path = preview_root / relative
-        if not path.is_file() or path.is_symlink():
+        parts = relative.split("/")
+        if (not relative or "\\" in relative or ":" in relative
+                or any(part in {"", ".", ".."} for part in parts)):
             raise RuntimeError(
                 f"Fresh-profile generated input cannot be normalized: {relative}"
             )
-        os.utime(path, ns=(fixed_ns, fixed_ns), follow_symlinks=False)
+        path = preview_root
+        for index, part in enumerate([None, *parts]):
+            if part is not None:
+                path = path / part
+            metadata = path.lstat()
+            leaf = index == len(parts)
+            if (stat.S_ISLNK(metadata.st_mode)
+                    or getattr(metadata, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                    or not (stat.S_ISREG(metadata.st_mode) if leaf else stat.S_ISDIR(metadata.st_mode))
+                    or (leaf and metadata.st_nlink != 1)):
+                raise RuntimeError(f"Fresh-profile generated input cannot be normalized: {relative}")
+        if not path.resolve().is_relative_to(preview_root.resolve()):
+            raise RuntimeError(f"Fresh-profile generated input escapes fixture: {relative}")
+        identity = (metadata.st_dev, metadata.st_ino)
+        # Windows lacks no-follow utime on supported Python versions. This is
+        # a private disposable scaffold, not a concurrent-mutation sandbox.
+        if os.utime in os.supports_follow_symlinks:
+            os.utime(path, ns=(fixed_ns, fixed_ns), follow_symlinks=False)
+        else:
+            os.utime(path, ns=(fixed_ns, fixed_ns))
+        after = path.lstat()
+        if ((after.st_dev, after.st_ino) != identity
+                or not stat.S_ISREG(after.st_mode)
+                or getattr(after, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                or after.st_nlink != 1 or after.st_mtime_ns != fixed_ns):
+            raise RuntimeError(f"Fresh-profile generated input changed during normalization: {relative}")
     return {
         "scope": "every scaffold-declared regular file",
         "fixed_time": FRESH_PROFILE_FIXED_TIME,
@@ -1308,6 +2005,9 @@ def fresh_profile_measurement(
         if rules_meta.get("source") != "rules_file":
             raise RuntimeError(f"Fresh {profile} scaffold did not load its generated rules seed.")
         resident = resident_context_metrics(preview_root, rules)
+        host_contexts = build_host_contexts(preview_root, rules)
+        host_manifest = host_input_manifest(host_contexts)
+        validate_host_input_bindings(host_contexts, host_manifest, generated_manifest=content_manifest)
         reachable_commands = [
             {"command": command, "script": script}
             for command, script in sorted(script_commands.items())
@@ -1329,6 +2029,7 @@ def fresh_profile_measurement(
             replacements=replacements,
             returncode=returncode,
             command=command,
+            public_audit_references=fresh_public_audit_event_references(preview_root, profile=profile),
         )
         self_check["isolation"] = isolation
         metrics = {
@@ -1362,6 +2063,8 @@ def fresh_profile_measurement(
                 "mtime_normalization": mtime_normalization,
             },
             "resident_context": resident,
+            "host_contexts": host_contexts,
+            "host_union_content_manifest": host_manifest,
             "cli_commands": {
                 "basis": "cli.SCRIPT_COMMANDS entries whose mapped script exists in the generated profile",
                 "count": len(reachable_commands),
@@ -1513,6 +2216,114 @@ def profile_source_inputs(rules_path: Path) -> list[dict[str, str]]:
     return inputs
 
 
+def profile_raw_hash_declarations(report: dict[str, Any]) -> list[dict[str, Any]]:
+    """Describe only known classifier diagnostics, without reading historical paths.
+
+    These are retained producer declarations, not reconstructed source reports or
+    verification of original bytes, current path contents, or authenticity.
+    """
+    declarations: list[dict[str, Any]] = []
+    for profile_index, profile in enumerate(report.get("profiles") or []):
+        self_check = profile["self_check"]
+        checks = self_check["check_states"]
+        for occurrence_index, occurrence in enumerate(self_check["finding_occurrences"]):
+            item = occurrence["finding"]
+            if occurrence["check_id"] != "naos_evidence_classification":
+                continue
+            identifier = item.get("id")
+            legacy_id = (type(identifier) is str
+                         and identifier.startswith("evidence_classification.missing."))
+            ordinal_id = (type(identifier) is str
+                          and identifier.startswith("EC-")
+                          and item.get("id_scheme") == "report_ordinal_v1")
+            if not (legacy_id or ordinal_id):
+                continue
+            check_index = occurrence["check_index"]
+            finding_index = occurrence["finding_index"]
+            expected_identity = (
+                f"fresh-profile/{profile['profile']}/check[{check_index}]=naos_evidence_classification"
+                f"/finding[{finding_index}]"
+            )
+            if (type(check_index) is not int or not 0 <= check_index < len(checks)
+                    or checks[check_index]["id"] != occurrence["check_id"]
+                    or checks[check_index]["check_index"] != check_index
+                    or type(finding_index) is not int or finding_index < 0
+                    or finding_index >= checks[check_index]["finding_count"]
+                    or occurrence["identity"] != expected_identity):
+                raise RuntimeError("Classifier raw-hash occurrence ownership is invalid.")
+            source_index = item.get("source_index")
+            if (not isinstance(item.get("finding_id"), str) or not item["finding_id"]
+                    or not ((legacy_id and identifier == "evidence_classification.missing." + item["finding_id"])
+                            or (ordinal_id and identifier == f"EC-{finding_index + 1}"))
+                    or item.get("status") != "missing_classification"
+                    or not isinstance(item.get("source_report"), str) or not item["source_report"]
+                    or item.get("source_bucket") not in {"findings", "known_gaps", "residual_risks"}
+                    or "source_index" not in item
+                    or (source_index is not None and (type(source_index) is not int or source_index < 0))
+                    or not isinstance(item.get("scan_generated_at"), str)
+                    or not isinstance(item.get("source_observed_at"), str)
+                    or not isinstance(item.get("source_report_sha256"), str)
+                    or re.fullmatch(r"[0-9a-f]{64}", item["source_report_sha256"]) is None
+                    or not isinstance(item.get("source_item_sha256"), str)
+                    or re.fullmatch(r"[0-9a-f]{64}", item["source_item_sha256"]) is None):
+                raise RuntimeError("Classifier raw-hash diagnostic shape is invalid.")
+            pointer = (
+                f"/profiles/{profile_index}/self_check/finding_occurrences/{occurrence_index}"
+                "/finding/source_report_sha256"
+            )
+            declarations.append({
+                "link_id": pointer,
+                "occurrence_identity": occurrence["identity"],
+                "source_report": item["source_report"],
+                "source_bucket": item["source_bucket"],
+                "source_index": source_index,
+                "source_item_sha256": item["source_item_sha256"],
+                "source_report_sha256": item["source_report_sha256"],
+            })
+    return declarations
+
+
+def fresh_profile_measurement_projection(report: dict[str, Any]) -> dict[str, Any]:
+    """Complete v2 measurement; only exact owned raw report hashes become links."""
+    if (report.get("schema") != PROFILE_REPORT_SCHEMA
+            or report.get("measurement_projection_version") != PROFILE_PROJECTION_VERSION
+            or report.get("determinism_scope") != PROFILE_DETERMINISM_SCOPE
+            or report.get("deterministic") is not True
+            or "stable_payload_sha256" in report):
+        raise RuntimeError("Fresh-profile v2 measurement scope is invalid.")
+    declarations = profile_raw_hash_declarations(report)
+    expected_envelope = {
+        "authority": PROFILE_RAW_HASH_AUTHORITY,
+        "original_report_bytes_archived": False,
+        "original_report_bytes_verified": False,
+        "current_source_state_verified": False,
+        "authenticity_verified": False,
+        "declarations": declarations,
+    }
+    if canonical_sha256(report.get("raw_hash_provenance")) != canonical_sha256(expected_envelope):
+        raise RuntimeError("Fresh-profile raw-hash declaration links are inconsistent.")
+    projection = copy.deepcopy({
+        key: value for key, value in report.items()
+        if key not in {"generated_at", "raw_hash_provenance", "measurement_payload_sha256", "report_integrity_sha256"}
+    })
+    for declaration in declarations:
+        parts = declaration["link_id"].split("/")
+        item = projection["profiles"][int(parts[2])]["self_check"]["finding_occurrences"][int(parts[5])]["finding"]
+        item["source_report_sha256"] = {
+            "type": "historical_scan_time_raw_report_hash_link",
+            "link_id": declaration["link_id"],
+        }
+    return projection
+
+
+def bind_fresh_profile_v2_digests(report: dict[str, Any]) -> None:
+    """Builder operation; validators independently recompute without rebinding."""
+    report["measurement_payload_sha256"] = canonical_sha256(fresh_profile_measurement_projection(report))
+    report["report_integrity_sha256"] = canonical_sha256({
+        key: value for key, value in report.items() if key != "report_integrity_sha256"
+    })
+
+
 def build_fresh_profiles_report(
     *,
     rules_path: Path,
@@ -1556,7 +2367,7 @@ def build_fresh_profiles_report(
         status = "pass"
     inputs = profile_source_inputs(rules_path)
     report: dict[str, Any] = {
-        "schema": PROFILE_BASELINE_SCHEMA,
+        "schema": PROFILE_REPORT_SCHEMA,
         "generated_at": FRESH_PROFILE_FIXED_TIME,
         "status": status,
         "deterministic": True,
@@ -1617,6 +2428,9 @@ def build_fresh_profiles_report(
             "Resident context uses the configured deterministic chars-per-token estimate over unique matching generated files.",
             "Profile CLI command count covers generated-script-reachable SCRIPT_COMMANDS entries; the installed global envelope is separate.",
             "Threshold changes require reviewed source updates; this command never auto-tunes or auto-approves them.",
+            "Determinism applies to the complete measurement projection, not equality of full per-run reports.",
+            "Raw report hashes are retained classifier-emitted historical scan-time declarations; original report bytes are not archived or verified here.",
+            "Whole-report integrity does not verify current source state or authenticity.",
         ],
         "not_claimed": [
             "candidate approval",
@@ -1626,21 +2440,33 @@ def build_fresh_profiles_report(
             "automatic threshold tuning",
             "automatic baseline approval",
         ],
-        "stable_payload_sha256": "",
+        "determinism_scope": PROFILE_DETERMINISM_SCOPE,
+        "measurement_projection_version": PROFILE_PROJECTION_VERSION,
+        "raw_hash_provenance": {},
     }
-    stable_payload = {
-        key: value
-        for key, value in report.items()
-        if key not in {"generated_at", "stable_payload_sha256"}
+    report["raw_hash_provenance"] = {
+        "authority": PROFILE_RAW_HASH_AUTHORITY,
+        "original_report_bytes_archived": False,
+        "original_report_bytes_verified": False,
+        "current_source_state_verified": False,
+        "authenticity_verified": False,
+        "declarations": profile_raw_hash_declarations(report),
     }
-    report["stable_payload_sha256"] = canonical_sha256(stable_payload)
+    bind_fresh_profile_v2_digests(report)
     validate_fresh_profiles_report(report)
     return report
 
 
 def validate_fresh_profiles_report(report: dict[str, Any]) -> None:
-    if report.get("schema") != PROFILE_BASELINE_SCHEMA:
+    if report.get("schema") not in {PROFILE_BASELINE_SCHEMA, PROFILE_REPORT_SCHEMA}:
         raise RuntimeError("Fresh-profile report schema is invalid.")
+    if report["schema"] == PROFILE_BASELINE_SCHEMA and any(
+        key in report for key in {
+            "determinism_scope", "measurement_projection_version", "raw_hash_provenance",
+            "measurement_payload_sha256", "report_integrity_sha256",
+        }
+    ):
+        raise RuntimeError("Historical v1 reports cannot contain v2 contract fields.")
     profiles = report.get("profiles") or []
     if [profile.get("profile") for profile in profiles] != list(PROFILE_ORDER):
         raise RuntimeError("Fresh-profile report order is not the controlled four-profile order.")
@@ -1699,6 +2525,14 @@ def validate_fresh_profiles_report(report: dict[str, Any]) -> None:
             raise RuntimeError(
                 f"Fresh {profile_name} generated-input mtime normalization is inconsistent."
             )
+        # Additive host projections bind to the pre-measurement generated
+        # manifest. Historical reports without either additive field remain valid.
+        if "host_contexts" in profile or "host_union_content_manifest" in profile:
+            try:
+                validate_host_input_bindings(profile["host_contexts"], profile["host_union_content_manifest"],
+                                             generated_manifest=manifest)
+            except (ValueError, KeyError, TypeError) as exc:
+                raise RuntimeError(f"Fresh {profile_name} host input provenance is inconsistent: {exc}") from exc
         resident = profile["resident_context"]
         resident_files = resident["files"]
         if resident["file_count"] != len(resident_files):
@@ -1766,8 +2600,18 @@ def validate_fresh_profiles_report(report: dict[str, Any]) -> None:
     source = report["source"]
     if source["input_set_sha256"] != canonical_sha256(source["inputs"]):
         raise RuntimeError("Fresh-profile source input-set digest is inconsistent.")
-    if report.get("stable_payload_sha256") != stable_payload_sha256:
-        raise RuntimeError("Fresh-profile stable payload digest is inconsistent.")
+    if report["schema"] == PROFILE_BASELINE_SCHEMA:
+        if report.get("stable_payload_sha256") != stable_payload_sha256:
+            raise RuntimeError("Fresh-profile stable payload digest is inconsistent.")
+    else:
+        projection = fresh_profile_measurement_projection(report)
+        if report.get("measurement_payload_sha256") != canonical_sha256(projection):
+            raise RuntimeError("Fresh-profile measurement payload digest is inconsistent.")
+        integrity = canonical_sha256({
+            key: value for key, value in report.items() if key != "report_integrity_sha256"
+        })
+        if report.get("report_integrity_sha256") != integrity:
+            raise RuntimeError("Fresh-profile whole-report integrity digest is inconsistent.")
 
 
 def profile_occurrence_sort_key(occurrence: dict[str, Any]) -> tuple[int, str]:
@@ -1888,6 +2732,9 @@ def profile_footprint_lines(report: dict[str, Any], *, show_all: bool) -> list[s
         f"NAOS fresh-profile footprint: {report['status']} "
         f"({report['summary']['finding_occurrences']} complete finding occurrences)"
     ]
+    if report.get("schema") == PROFILE_REPORT_SCHEMA:
+        lines.append("Determinism scope: complete measurement projection; raw hashes are retained historical declarations.")
+        lines.append("Whole-report integrity does not verify original report bytes, current source state, or authenticity.")
     for profile in report.get("profiles") or []:
         metrics = profile["metrics"]
         state_counts = profile["self_check"]["finding_state_counts"]
@@ -1904,6 +2751,22 @@ def profile_footprint_lines(report: dict[str, Any], *, show_all: bool) -> list[s
     )
     lines.extend(f"- {row['text']}" for row in presentation["rows"])
     return lines
+
+
+def host_context_lines(report: dict[str, Any]) -> list[str]:
+    """Keep human output as explicit as JSON about candidates versus startup."""
+    views = report.get("host_contexts") or {}
+    result: list[str] = []
+    if "claude_code" in views:
+        result.append("  Claude project startup subset: " + str(views["claude_code"]["startup_estimated_tokens"])
+                      + " estimated tokens; actual loading unobserved")
+    for host in ("cursor", "copilot_harness", "vscode_local"):
+        if host in views:
+            view = views[host]
+            result.append(f"  {host}: {view['base_candidate_estimated_tokens']} base candidate tokens; "
+                          f"{view['all_candidate_estimated_tokens']} including conditional envelope "
+                          f"({view['status']}; settings/loading unverified)")
+    return result
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2004,6 +2867,8 @@ def main(argv: list[str] | None = None) -> int:
             f"({report['summary']['total_estimated_tokens']} estimated tokens, "
             f"{report['summary']['total_findings']} findings) -> {destination}"
         )
+        for line in host_context_lines(report):
+            print(line)
     return exit_code_for_summary(profile, report["summary"], policy, args.strict)
 
 

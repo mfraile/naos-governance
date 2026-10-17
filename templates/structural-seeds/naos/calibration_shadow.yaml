@@ -65,12 +65,9 @@ comparison_rules:
   compare_finding_ids: true
   compare_source_categories: true
   compare_summary_counts: true
-  ignore_fields:
-    - generated_at
-    - session_id
-    - operator_id
-    - run_id
-    - absolute_paths
+# Execution metadata is outside these fixed structural comparisons. The
+# legacy ignore_fields declaration is accepted only for migration; it does not
+# suppress schema, status, finding, source, or summary drift.
 not_claimed:
   - model behavior calibration
   - behavioral correctness proof

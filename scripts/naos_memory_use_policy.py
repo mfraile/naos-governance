@@ -13,7 +13,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
 from jsonschema import Draft202012Validator
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -21,6 +20,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    normalize_boolean_settings,
     controlled_now_utc,
     controlled_utc_now_text,
     default_naos_root,
@@ -29,16 +29,21 @@ from naos_policy import (  # noqa: E402
     is_kit_repository,
     kit_root,
     load_policy,
+    load_yaml_temporal_text,
     normalize_profile,
     report_output_path,
-    severity_for_profile,
+    resolve_report_rule_severity,
     write_report,
 )
 
 try:
-    from naos_mcp_config_registry import config_descriptors  # noqa: E402
+    from naos_mcp_config_registry import (  # noqa: E402
+        config_descriptors, expected_mcp_config_source_identity, managed_config_path_refusal,
+    )
 except ImportError:  # pragma: no cover - compatibility for older generated adopters
     config_descriptors = None  # type: ignore[assignment]
+    expected_mcp_config_source_identity = None  # type: ignore[assignment]
+    managed_config_path_refusal = None  # type: ignore[assignment]
 
 
 REPORT_SCHEMA = "naos.memory_use_policy.v1"
@@ -145,10 +150,20 @@ def as_mapping(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+# Consumed input toggles only; derived report booleans are not configuration.
+BOOLEAN_SETTING_PATHS = (
+    "enabled",
+    "profile_posture.*.human_review_required_if_review_items_exist",
+    "recall_trace_readiness_policy.readiness_only",
+    "audit_event_readiness_policy.readiness_only",
+    "confidence_policy.unknown_confidence_allows_instruction",
+)
+
+
 def bool_value(value: Any, default: bool = False) -> bool:
     if value is None:
         return default
-    return value if isinstance(value, bool) else default
+    return value if isinstance(value, bool) else False
 
 
 def dedupe_strings(values: list[Any]) -> list[str]:
@@ -156,7 +171,7 @@ def dedupe_strings(values: list[Any]) -> list[str]:
 
 
 def load_yaml_mapping(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = load_yaml_temporal_text(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"Expected YAML mapping: {path}")
     return data
@@ -209,16 +224,31 @@ def _candidate_input_path(root: Path, value: Any) -> Path | None:
     return path if path.is_absolute() else root / path
 
 
-def _registered_config_paths(root: Path) -> list[Path]:
+def _registered_config_paths(root: Path, report: dict[str, Any] | None = None) -> list[Path]:
     if config_descriptors is None:
         relative_paths = [".vscode/mcp.json", ".cursor/mcp.json", ".mcp.json", ".ai/mcp.json", "mcp.json"]
         return [root / relative for relative in relative_paths]
+    scan_scope = report.get("mcp_scan_scope") if isinstance(report, dict) else None
+    scope_declared = isinstance(scan_scope, dict)
+    scan_scope = scan_scope if scope_declared else {}
+    # Existing legacy reports have no scope projection. Current scoped access
+    # reports bind freshness to the same explicit user/managed selections.
+    include_user = scan_scope.get("user_registry_metadata") is True if scope_declared else True
+    include_managed = scan_scope.get("managed_registry_metadata") is True
+    include_client_policy = scan_scope.get("client_policy_metadata") is True
     paths: list[Path] = []
-    for descriptor in config_descriptors(include_user=True, include_client_policy=False):
+    for descriptor in config_descriptors(
+        include_user=include_user, include_client_policy=include_client_policy,
+        include_managed=include_managed,
+    ):
         if descriptor.scope == "workspace":
             paths.append(root / descriptor.path)
+        elif descriptor.id == "codex_user_mcp" and os.environ.get("CODEX_HOME"):
+            paths.append(Path(os.environ["CODEX_HOME"]).expanduser() / "config.toml")
         elif descriptor.path.startswith("~/"):
             paths.append(Path.home() / descriptor.path[2:])
+        elif descriptor.scope == "managed":
+            paths.append(Path(descriptor.path))
     return paths
 
 
@@ -226,7 +256,7 @@ def _declared_upstream_inputs(root: Path, report: dict[str, Any]) -> list[Path]:
     candidates: list[Path] = [
         root / "configs" / "naos_memory.yaml",
         root / "naos" / "configs" / "naos_memory.yaml",
-        *_registered_config_paths(root),
+        *_registered_config_paths(root, report),
     ]
     for key in ("rules_path", "memory_rules_path", "authorization_matrix_path", "memory_config_path"):
         if path := _candidate_input_path(root, report.get(key)):
@@ -286,12 +316,47 @@ def inspect_upstream_report(
     if report and not profile_match:
         validation_reasons.append("profile_mismatch")
 
+    source_identity_status = "not_applicable"
+    if present and report and report_key == "memory_provider_access":
+        source_identity_status = "unverifiable"
+        scan_scope = report.get("mcp_scan_scope")
+        observed_identity = scan_scope.get("source_identity") if isinstance(scan_scope, dict) else None
+        expected_identity = None
+        if isinstance(scan_scope, dict) and expected_mcp_config_source_identity is not None:
+            try:
+                expected_identity = expected_mcp_config_source_identity(
+                    root, config_ids=scan_scope.get("descriptor_ids"),
+                    include_user=scan_scope.get("user_registry_metadata") is True,
+                    include_managed=scan_scope.get("managed_registry_metadata") is True,
+                    include_client_policy=scan_scope.get("client_policy_metadata") is True,
+                )
+            except (OSError, RuntimeError, TypeError, ValueError):
+                expected_identity = None
+        if expected_identity is None or not isinstance(observed_identity, dict):
+            validation_reasons.append("source_identity_unverifiable")
+        elif observed_identity != expected_identity:
+            source_identity_status = "mismatch"
+            validation_reasons.append("source_identity_mismatch")
+        else:
+            source_identity_status = "matched"
+
     freshness_status = "not_evaluated"
     newer_inputs: list[str] = []
     if present and report and not validation_reasons:
         try:
             report_mtime = path.stat().st_mtime_ns
+            scope = report.get("mcp_scan_scope")
+            managed_paths = set()
+            if isinstance(scope, dict) and scope.get("managed_registry_metadata") is True:
+                if config_descriptors is None or managed_config_path_refusal is None:
+                    raise OSError("Managed config selection unavailable")
+                managed_paths = {Path(item.path) for item in config_descriptors(include_managed=True)
+                                 if item.scope == "managed"}
             for candidate in _declared_upstream_inputs(root, report):
+                if candidate in managed_paths and (
+                    managed_config_path_refusal is None or managed_config_path_refusal(candidate)
+                ):
+                    raise OSError("Managed config ancestry refused")
                 if candidate.is_file() and candidate.stat().st_mtime_ns > report_mtime:
                     try:
                         newer_inputs.append(str(candidate.resolve().relative_to(root.resolve())))
@@ -315,6 +380,7 @@ def inspect_upstream_report(
         "schema_error_count": schema_errors,
         "project_root_match": project_match,
         "profile_match": profile_match,
+        "source_identity_status": source_identity_status,
         "freshness_status": freshness_status,
         "newer_declared_inputs": sorted(newer_inputs),
         "accepted_for_join": accepted,
@@ -363,15 +429,16 @@ def profile_posture(rules: dict[str, Any], profile: str) -> dict[str, Any]:
     return defaults.get(profile, defaults["quickstart"])
 
 
+def severity_for_rules_resolution(root: Path, naos_root: str, profile: str, policy: dict[str, Any], posture: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+    return resolve_report_rule_severity(
+        profile, policy, posture.get("severity"),
+        advisory=is_kit_repository(root, naos_root),
+        review_required=True,
+    )
+
+
 def severity_for_rules(root: Path, naos_root: str, profile: str, policy: dict[str, Any], posture: dict[str, Any]) -> str:
-    if is_kit_repository(root, naos_root):
-        return "advisory"
-    configured = str(posture.get("severity") or "").strip()
-    if configured == "review_required":
-        return "required" if profile == "standard" else "blocking" if profile == "assured" else "warning"
-    if configured in {"advisory", "warning", "required", "blocking"}:
-        return configured
-    return severity_for_profile(profile, policy)
+    return severity_for_rules_resolution(root, naos_root, profile, policy, posture)[0]
 
 
 def finding(identifier: str, severity: str, status: str, message: str, actions: list[str] | None = None, **extra: Any) -> dict[str, Any]:
@@ -503,8 +570,17 @@ def safe_item_summary(
 
 
 def approved_statuses(rules: dict[str, Any]) -> set[str]:
-    values = set(string_list(rules.get("approved_review_statuses")))
-    return values or APPROVED_STATUSES
+    """Allow adopter restrictions, never new meanings of approval.
+
+    Missing and empty-list declarations retain the historical canonical default.
+    Malformed declarations fail closed; unknown strings cannot add approval.
+    """
+    if "approved_review_statuses" not in rules or rules["approved_review_statuses"] == []:
+        return set(APPROVED_STATUSES)
+    values = rules["approved_review_statuses"]
+    if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+        return set()
+    return set(values) & APPROVED_STATUSES
 
 
 def has_source_refs(item: dict[str, Any], rules: dict[str, Any] | None = None) -> bool:
@@ -609,7 +685,7 @@ def item_claims_memory_truth(item: dict[str, Any]) -> bool:
         "memory is source of truth",
         "memory is the source of truth",
     ]
-    return any(phrase in encoded for phrase in phrases) or bool(item.get("memory_is_source_of_truth"))
+    return any(phrase in encoded for phrase in phrases) or bool_value(item.get("memory_is_source_of_truth"))
 
 
 def evaluate_items(
@@ -955,6 +1031,21 @@ def evaluate_items(
 
 def evaluate_rules(rules: dict[str, Any], severity: str) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
+    configured_statuses = rules.get("approved_review_statuses", [])
+    invalid_statuses = not isinstance(configured_statuses, list) or any(
+        not isinstance(value, str) or value not in APPROVED_STATUSES
+        for value in configured_statuses
+    )
+    if bool_value(rules.get("enabled"), True) and invalid_statuses:
+        findings.append(
+            finding(
+                "memory_policy_approved_review_statuses_invalid",
+                severity,
+                "review_required",
+                "Approved review statuses may only restrict the canonical approval vocabulary.",
+                ["Use a list containing only approved and/or approved_with_limits; no new approval aliases."],
+            )
+        )
     private_policy = as_mapping(rules.get("private_payload_policy"))
     write_policy = as_mapping(rules.get("memory_write_back_policy"))
     cloud_policy = as_mapping(rules.get("cloud_memory_policy"))
@@ -1199,6 +1290,8 @@ def evaluate_audit_events(events: list[dict[str, Any]], rules: dict[str, Any], s
 def status_from_findings(rules: dict[str, Any], posture: dict[str, Any], item_count: int, findings: list[dict[str, Any]]) -> str:
     if any(item.get("severity") == "blocking" or item.get("status") == "blocked" for item in findings):
         return "blocked"
+    if any(item.get("id") == "boolean_setting_invalid" for item in findings):
+        return "review_required"
     if not bool_value(rules.get("enabled"), True) or (posture.get("state") == "disabled" and item_count == 0):
         return "disabled"
     if any(
@@ -1208,7 +1301,7 @@ def status_from_findings(rules: dict[str, Any], posture: dict[str, Any], item_co
         for item in findings
     ):
         return "review_required"
-    if item_count and posture.get("human_review_required_if_review_items_exist"):
+    if item_count and bool_value(posture.get("human_review_required_if_review_items_exist")):
         return "review_required"
     if item_count:
         return "advisory"
@@ -1229,8 +1322,18 @@ def build_report(
     memory_readiness_report_path: Path,
     memory_provider_access_report_path: Path,
 ) -> dict[str, Any]:
+    rules, invalid_booleans = normalize_boolean_settings(rules, BOOLEAN_SETTING_PATHS)
+    # Validate item leaves without rewriting raw values used by existing safety checks.
+    _, item_invalid = normalize_boolean_settings(review_items, (
+        "memory_review_items.*.memory_is_source_of_truth",
+        "memory_review_items.*.requires_user_confirmation",
+        "memory_review_items.*.can_use_as_context",
+        "memory_review_items.*.can_use_as_supporting_evidence",
+        "memory_review_items.*.can_use_as_instruction",
+    ), prefix="review_items")
+    invalid_booleans.extend(item_invalid)
     posture = profile_posture(rules, profile)
-    severity = severity_for_rules(root, naos_root, profile, policy, posture)
+    severity, severity_downgrade = severity_for_rules_resolution(root, naos_root, profile, policy, posture)
     items = [item for item in as_list(review_items.get("memory_review_items")) if isinstance(item, dict)]
     traces = [item for item in as_list(review_items.get("recall_traces")) if isinstance(item, dict)]
     events = [item for item in as_list(review_items.get("audit_events")) if isinstance(item, dict)]
@@ -1255,12 +1358,16 @@ def build_report(
     recall_readiness, recall_findings = evaluate_recall_traces(traces, rules, severity)
     audit_readiness, audit_findings = evaluate_audit_events(events, rules, severity)
     findings = [
+        *([severity_downgrade] if severity_downgrade and bool_value(rules.get("enabled"), True) else []),
         *rule_findings,
         *malformed_findings,
         *item_findings,
         *recall_findings,
         *audit_findings,
     ]
+
+    if invalid_booleans:
+        findings.append(finding("boolean_setting_invalid", severity, "review_required", "Expected YAML booleans; invalid values do not grant authority: " + ", ".join(invalid_booleans)))
 
     readiness_report, readiness_join = inspect_upstream_report(
         root=root,
@@ -1361,7 +1468,7 @@ def build_report(
             ),
             "malformed_input_entries": sum(len(as_list(entries)) for entries in malformed_entries.values()),
             "human_review_required": bool(findings)
-            or bool(items and posture.get("human_review_required_if_review_items_exist")),
+            or bool(items) and bool_value(posture.get("human_review_required_if_review_items_exist")),
         }
     )
 

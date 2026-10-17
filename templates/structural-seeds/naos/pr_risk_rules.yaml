@@ -3,12 +3,34 @@ mode: deterministic_metadata_only
 trusted_authors: []
 protected_path_patterns:
   - .github/**
+  - .githooks/**
+  - .claude/hooks/**
+  - .claude/settings.json
+  - .codex/config.toml
+  - .vscode/mcp.json
+  - .cursor/mcp.json
+  - .mcp.json
+  - .ai/mcp.json
+  - mcp.json
+  - .agents/mcp_config.json
+  - .kilo/kilo.jsonc
+  - opencode.json
   - policies/**
   - schemas/**
   - capabilities/**
   - templates/**
   - scripts/validators/**
   - naos/**
+# Detective review of changed test contracts, including assertion removals.
+test_contract_path_patterns:
+  - tests/**
+  - test/**
+  - "**/tests/**"
+  - "**/test/**"
+  - test_*.py
+  - "**/test_*.py"
+  - "*_test.py"
+  - "**/*_test.py"
 workflow_path_patterns:
   - .github/workflows/**
   - templates/workflows/**
@@ -26,6 +48,9 @@ dependency_path_patterns:
 ai_surface_path_patterns:
   - CLAUDE.md
   - AGENTS.md
+  - "**/AGENTS.md"
+  - GEMINI.md
+  - "**/GEMINI.md"
   - .github/copilot-instructions.md
   - .github/agents/**
   - .github/prompts/**

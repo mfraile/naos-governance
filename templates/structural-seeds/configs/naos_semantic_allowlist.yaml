@@ -1,43 +1,21 @@
-# naos_semantic_allowlist.yaml — NAOS Semantic Audit Allowlist
-# Functions and code patterns explicitly permitted to skip semantic quality review.
-# Exemptions here prevent false-positive warnings from:
-#   scripts/naos_semantic_baseline_audit.py
-#
-# Entry format:
-#   id: unique exemption ID (SEM-NNN)
-#   pattern: file glob or function name
-#   reason: why semantic review is not needed
-#   category: test | generated | external | trivial
-#   approved_by: who approved the exemption
-#   date: YYYY-MM-DD
-
+# Exact symbol-pair exceptions for naos_code_quality_audit.py --check-duplicates.
+# Keys are taken verbatim from FUNCTION_SIMILARITY_INDEX.json entries.
+# A listed pair downgrades a high-confidence cosine ERROR to WARNING; the
+# finding and warning log remain visible. It does not suppress exact duplicates,
+# grant approval, authorize a provider, or exempt files/categories from review.
+# Missing file means no exceptions. A present malformed or legacy pattern file
+# produces SEMANTIC_ALLOWLIST_INVALID (exit 2); migrate deliberately to pairs.
 version: 1.0
+semantic_allowlist: []
 
-# Categories of automatic exemptions (no need to list individually)
-auto_exempt_categories:
-  - test files: "tests/**/*.py"
-  - generated code: "**/*.pb.py"
-  - generated code: "**/*_pb2.py"
-  - migrations: "[ADAPT: alembic/versions/**]"
-  - vendored: "vendor/**"
-  - scripts: "scripts/naos_*.py"  # governance scripts — already reviewed
-
-# Manual exemptions (add as needed)
-allowlist: []
-
-# ─── Usage Guide ─────────────────────────────────────────────────────────────
-#
-# When to add a manual exemption:
-#   - Trivial utility functions (no business logic, semantically obvious)
-#   - External API client wrappers (logic defined by API spec)
-#   - Auto-generated or vendored code that can't be modified
-#
-# To add an exemption:
-#
-# allowlist:
-#   - id: SEM-001
-#     pattern: "src/utils/time.py::format_timestamp"
-#     reason: "Trivial time formatting — no business logic"
-#     category: trivial
-#     approved_by: "[your name]"
+# Example (replace the empty list above; do not duplicate the YAML key):
+# semantic_allowlist:
+#   - pair: [services.orders.build_order, services.orders.copy_order]
+#     reason: "Separately reviewed implementations with intentional similarity"
+#     approved_by: "[reviewer]"
 #     date: "YYYY-MM-DD"
+# Pair order is irrelevant. Exactly two distinct, nonempty symbol keys are
+# required. Review metadata is descriptive; NAOS does not authenticate it.
+# Older semantic_allowlist/pair files remain supported. The previous seed's
+# allowlist/pattern and auto_exempt_categories formats were never implemented;
+# they are rejected rather than reinterpreted as approved exceptions.

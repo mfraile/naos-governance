@@ -40,7 +40,7 @@ def spec_summary(path: Path, root: Path) -> dict[str, object]:
     text = path.read_text(encoding="utf-8", errors="replace")
     title = next((line.lstrip("# ").strip() for line in text.splitlines() if line.strip().startswith("#")), path.stem)
     return {
-        "path": str(path.relative_to(root)),
+        "path": path.relative_to(root).as_posix(),
         "title": title,
         "sha256": digest(path),
         "line_count": len(text.splitlines()),
@@ -55,23 +55,48 @@ def spec_summary(path: Path, root: Path) -> dict[str, object]:
     }
 
 
-def build_report(root: Path) -> dict[str, object]:
-    specs_root = root / ".specify" / "specs"
-    specs = sorted(specs_root.glob("*.md")) if specs_root.is_dir() else []
+def build_report(root: Path, specs_root: str | None = None) -> dict[str, object]:
+    root = root.resolve()
+    if specs_root is None:
+        current = root / "specs"
+        legacy = root / ".specify/specs"
+        specs_root = (
+            "specs" if current.exists() or current.is_symlink()
+            else ".specify/specs" if legacy.exists() or legacy.is_symlink()
+            else "specs"
+        )
+    selected_root = (root / specs_root).resolve()
+    try:
+        spec_root_text = selected_root.relative_to(root).as_posix()
+    except ValueError:
+        raise ValueError("--specs-root must remain within --project-root") from None
+    specs = []
     findings = []
+    candidates = sorted(selected_root.rglob("*.md"), key=lambda path: path.relative_to(root).as_posix()) if selected_root.is_dir() else []
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            path.resolve().relative_to(root)
+        except ValueError:
+            findings.append({"id": "spec_kit.external_spec_skipped", "severity": "advisory",
+                             "path": path.relative_to(root).as_posix(),
+                             "message": "Markdown reference outside the project was not read."})
+            continue
+        specs.append(path)
     if not specs:
         findings.append(
             {
                 "id": "spec_kit.no_specs_found",
                 "severity": "advisory",
-                "message": "No .specify/specs/*.md files were found.",
+                "message": f"No markdown files were found under {spec_root_text}.",
             }
         )
     return {
         "schema": SCHEMA,
         "generated_at": utc_now(),
-        "project_root": str(root),
-        "spec_root": str(specs_root),
+        "project_root": ".",
+        "spec_root": spec_root_text,
         "spec_count": len(specs),
         "specs": [spec_summary(path, root) for path in specs],
         "default_write_behavior": "dry_run_no_writes",
@@ -92,7 +117,7 @@ def build_report(root: Path) -> dict[str, object]:
         "human_review_required": True,
         "summary": {
             "spec_count": len(specs),
-            "status": "ready" if specs else "advisory",
+            "status": "advisory" if findings else "ready",
             "human_review_required": True,
         },
     }
@@ -101,6 +126,7 @@ def build_report(root: Path) -> dict[str, object]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Optional dry-run Spec-Kit to NAOS mapper.")
     parser.add_argument("--project-root", default=".", help="Project root to inspect.")
+    parser.add_argument("--specs-root", default=None, help="Project-contained markdown root to scan recursively. Default: specs when present; historical .specify/specs only when specs is absent. Explicit selection overrides discovery.")
     parser.add_argument("--output", help="Optional JSON report path. Omit for no file writes.")
     parser.add_argument("--json", action="store_true", help="Print JSON to stdout.")
     parser.add_argument("--dry-run", action="store_true", help="Accepted for clarity; no writes occur unless --output is set.")
@@ -108,9 +134,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     root = Path(args.project_root).resolve()
-    report = build_report(root)
+    try:
+        report = build_report(root, args.specs_root)
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.output:
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)

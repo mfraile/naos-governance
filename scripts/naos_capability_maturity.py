@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,9 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
-    controlled_now_utc,
+    _operand_yaml_loader_signature,
+    _operand_yaml_parse,
+    _OPERAND_YAML_C_LOADER,
     controlled_utc_now_text,
     default_naos_root,
     effective_enforcement,
@@ -35,7 +38,11 @@ from naos_policy import (  # noqa: E402
     status_from_counts,
     write_report,
 )
+from naos_evidence_contracts import classify_evidence, _json_value, _inspection_safe_file  # noqa: E402
+from naos_self_check_inspection import inspection_read_path, logical_path  # noqa: E402
 
+
+from naos_report_composition import WITNESS_SCHEMA
 
 MATURITY_LEVELS = ["L0", "L1", "L2", "L3", "L4", "L5"]
 MATURITY_INDEX = {level: index for index, level in enumerate(MATURITY_LEVELS)}
@@ -46,11 +53,103 @@ def utc_now_text() -> str:
     return controlled_utc_now_text()
 
 
+class _MaturityMappingChecks:
+    """Reject explicit duplicate keys, including keys inside merge sources."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._checked_mappings = set()
+
+    def flatten_mapping(self, node):
+        if id(node) not in self._checked_mappings:
+            seen = set()
+            merge_seen = False
+            for key_node, _ in node.value:
+                if key_node.tag == "tag:yaml.org,2002:merge":
+                    if merge_seen:
+                        raise yaml.constructor.ConstructorError(None, None, "duplicate merge key", key_node.start_mark)
+                    merge_seen = True
+                    continue
+                key = self.construct_object(key_node)
+                try:
+                    duplicate = key in seen
+                    seen.add(key)
+                except TypeError as exc:
+                    raise yaml.constructor.ConstructorError(None, None, "invalid mapping key", key_node.start_mark) from exc
+                if duplicate:
+                    raise yaml.constructor.ConstructorError(None, None, "duplicate mapping key", key_node.start_mark)
+            self._checked_mappings.add(id(node))
+        return super().flatten_mapping(node)
+
+
+class _MaturityLoader(_MaturityMappingChecks, yaml.SafeLoader):
+    pass
+
+
+_MATURITY_BASELINE = _operand_yaml_loader_signature(_MaturityLoader)
+if _OPERAND_YAML_C_LOADER is not None:
+    class _CMaturityLoader(_MaturityMappingChecks, _OPERAND_YAML_C_LOADER):
+        pass
+else:
+    _CMaturityLoader = None
+_MATURITY_C_BASELINE = (_operand_yaml_loader_signature(_CMaturityLoader)
+                        if _CMaturityLoader is not None else None)
+
+
+def input_error(path: Path, reason: str) -> ValueError:
+    return ValueError(f"Invalid capability maturity input {path}: {reason}")
+
+
+def input_present(path: Path) -> bool:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise input_error(path, "cannot inspect input") from exc
+    return True
+
+
 def load_yaml(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if not isinstance(data, dict):
-        raise ValueError(f"Expected YAML mapping: {path}")
+    try:
+        content = path.read_text(encoding="utf-8")
+        accelerated = (_CMaturityLoader if _operand_yaml_loader_signature(
+            _MaturityLoader) == _MATURITY_BASELINE else None)
+        data = _operand_yaml_parse(content, _MaturityLoader, accelerated, _MATURITY_C_BASELINE)
+    except (OSError, yaml.YAMLError, ValueError, TypeError, AttributeError, KeyError, OverflowError, RecursionError) as exc:
+        raise input_error(path, "cannot read unambiguous YAML mapping") from exc
+    if not isinstance(data, dict) or not data:
+        raise input_error(path, "expected nonempty mapping")
     return data
+
+
+def check_level(value: Any, path: Path, field: str) -> None:
+    if not isinstance(value, str) or value not in MATURITY_INDEX:
+        raise input_error(path, f"{field} must be L0 through L5 when present")
+
+
+def check_id(value: Any, path: Path) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"CAP-[A-Z0-9-]+", value):
+        raise input_error(path, "capability identifier must be a CAP identifier")
+
+
+def check_contract(data: dict[str, Any], path: Path, profile: str) -> None:
+    if "id" in data:
+        check_id(data["id"], path)
+    if "default_maturity" in data:
+        check_level(data["default_maturity"], path, "default_maturity")
+    profiles = data.get("profiles", {})
+    if not isinstance(profiles, dict):
+        raise input_error(path, "profiles must be a mapping")
+    selected = profiles.get(profile, {})
+    if not isinstance(selected, dict):
+        raise input_error(path, "selected profile must be a mapping")
+    if "target_maturity" in selected:
+        check_level(selected["target_maturity"], path, "selected target_maturity")
+    if "enforcement" in selected and selected["enforcement"] not in ("none", "advisory", "warning", "required", "blocking", "not_applicable"):
+        raise input_error(path, "selected profile has invalid enforcement")
+    if "known_limitations" in data and (not isinstance(data["known_limitations"], list) or any(not isinstance(x, str) for x in data["known_limitations"])):
+        raise input_error(path, "known_limitations must be a list of strings")
 
 
 def find_capabilities_dir(root: Path, naos_root: str, explicit: str | None = None) -> Path:
@@ -65,22 +164,30 @@ def find_capabilities_dir(root: Path, naos_root: str, explicit: str | None = Non
         ]
     )
     for candidate in candidates:
-        if candidate.is_dir():
+        if input_present(candidate):
+            if not candidate.is_dir():
+                raise input_error(candidate, "expected capability directory")
             return candidate
     return candidates[-1]
 
 
-def load_capability_contracts(root: Path, naos_root: str, explicit: str | None = None) -> dict[str, dict[str, Any]]:
+def load_capability_contracts(root: Path, naos_root: str, profile: str, explicit: str | None = None) -> dict[str, dict[str, Any]]:
     capabilities_dir = find_capabilities_dir(root, naos_root, explicit)
     contracts: dict[str, dict[str, Any]] = {}
-    for path in sorted(capabilities_dir.glob("*.yaml")):
+    try:
+        paths = sorted(capabilities_dir.iterdir())
+    except OSError as exc:
+        raise input_error(capabilities_dir, "cannot enumerate capability directory") from exc
+    for path in paths:
+        if not path.match("*.yaml"):
+            continue
         if path.name.startswith("_"):
             continue
-        try:
-            data = load_yaml(path)
-        except Exception:
-            continue
-        cap_id = str(data.get("id") or path.stem)
+        data = load_yaml(path)
+        check_contract(data, path, profile)
+        cap_id = data.get("id", path.stem)
+        if cap_id in contracts:
+            raise input_error(path, "duplicate capability contract identifier")
         data["_path"] = str(path)
         contracts[cap_id] = data
     return contracts
@@ -93,17 +200,42 @@ def resolve_state_path(root: Path, naos_root: str, policy: dict[str, Any], expli
     return root / naos_root / filename
 
 
-def normalize_state_entries(state: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    entries = state.get("capabilities") or []
+def normalize_state_entries(state: dict[str, Any], path: Path) -> dict[str, dict[str, Any]]:
+    entries = state.get("capabilities")
     if not isinstance(entries, list):
-        return {}
+        raise input_error(path, "capabilities must be a list")
     normalized: dict[str, dict[str, Any]] = {}
     for entry in entries:
         if not isinstance(entry, dict):
-            continue
+            raise input_error(path, "capability state entries must be mappings")
         cap_id = entry.get("capability_id")
-        if cap_id:
-            normalized[str(cap_id)] = entry
+        check_id(cap_id, path)
+        if cap_id in normalized:
+            raise input_error(path, "duplicate capability state identifier")
+        if "enabled" in entry and not isinstance(entry["enabled"], bool):
+            raise input_error(path, "enabled must be a boolean when present")
+        for field in ("current_maturity", "target_maturity"):
+            if field in entry:
+                check_level(entry[field], path, field)
+        for field in ("owner_1lod", "owner_2lod", "accountable_reviewer"):
+            if field in entry and not isinstance(entry[field], str):
+                raise input_error(path, f"{field} must be a string when present")
+        if "evidence_refs" in entry and (not isinstance(entry["evidence_refs"], list) or any(not isinstance(x, str) for x in entry["evidence_refs"])):
+            raise input_error(path, "evidence_refs must be a list of strings")
+        requirements = entry.get("evidence_requirements", {})
+        if not isinstance(requirements, dict) or any(
+            not isinstance(ref, str) or ref not in entry.get("evidence_refs", [])
+            or not isinstance(value, dict) or set(value) - {"type", "optional", "require_current_source"}
+            or ("type" in value and value["type"] not in {"report", "manual"})
+            or any(type(value[key]) is not bool for key in ("optional", "require_current_source") if key in value)
+            for ref, value in requirements.items()
+        ):
+            raise input_error(path, "evidence_requirements must map declared references to typed requirement fields")
+        if "freshness_window_days" in entry and (isinstance(entry["freshness_window_days"], bool) or not isinstance(entry["freshness_window_days"], int) or entry["freshness_window_days"] < 0):
+            raise input_error(path, "freshness_window_days must be a nonnegative integer")
+        if "waivers" in entry and (not isinstance(entry["waivers"], list) or any(not isinstance(x, dict) for x in entry["waivers"])):
+            raise input_error(path, "waivers must be a list of mappings")
+        normalized[cap_id] = entry
     return normalized
 
 
@@ -125,51 +257,151 @@ def configured_owners(entry: dict[str, Any]) -> list[str]:
     return missing
 
 
-def path_matches(root: Path, pattern: str) -> list[Path]:
-    if not pattern or "<" in pattern or ">" in pattern:
-        return []
-    candidate = Path(pattern)
-    if not candidate.is_absolute():
-        candidate = root / candidate
-    if any(ch in str(candidate) for ch in "*?["):
-        return [path for path in root.glob(str(candidate.relative_to(root))) if path.exists()]
-    return [candidate] if candidate.exists() else []
+def typed_evidence_status(root: Path, entry: dict[str, Any], policy: dict[str, Any],
+                          profile: str, naos_root: str) -> list[dict[str, Any]]:
+    results = []
+    for ref in entry.get("evidence_refs") or []:
+        requirement = dict((entry.get("evidence_requirements") or {}).get(ref) or {})
+        if "type" not in requirement and not ref.lower().endswith(".json"):
+            requirement["type"] = "manual"
+        requirement["freshness_window_days"] = entry.get("freshness_window_days", evidence_staleness_days(policy))
+        result = classify_evidence(root, ref, profile=profile, naos_root=naos_root, policy=policy,
+                                   requirement=requirement, consumer="maturity_support")
+        result["stage"] = "L2"
+        result["requirement_contract"] = {
+            "type": requirement.get("type", "report"),
+            "optional": requirement.get("optional", False),
+            "require_current_source": requirement.get("require_current_source", False),
+            "freshness_window_days": requirement["freshness_window_days"],
+        }
+        results.append(result)
+    return results
 
 
-def evidence_status(root: Path, entry: dict[str, Any], policy: dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
-    refs = [str(item) for item in entry.get("evidence_refs") or []]
-    missing: list[str] = []
-    stale: list[str] = []
-    present: list[str] = []
-    window = entry.get("freshness_window_days")
+def _selected_json(root: Path, reference: str, *, expected_sha256: str | None = None) -> dict[str, Any] | None:
+    path = inspection_read_path(root / reference)
+    if _inspection_safe_file(root, path) != "available":
+        return None
     try:
-        freshness_days = int(window)
-    except Exception:
-        freshness_days = evidence_staleness_days(policy)
-    generated_at = controlled_now_utc()
-    for ref in refs:
-        matches = path_matches(root, ref)
-        if not matches:
-            missing.append(ref)
-            continue
-        for path in matches:
-            present.append(str(path.relative_to(root)) if path.is_relative_to(root) else str(path))
-            if freshness_days > 0:
-                mtime = datetime.fromtimestamp(path.stat().st_mtime, UTC)
-                if (generated_at - mtime).days > freshness_days:
-                    stale.append(str(path.relative_to(root)) if path.is_relative_to(root) else str(path))
-    return missing, stale, present
+        content = path.read_bytes()
+        if expected_sha256 is not None and hashlib.sha256(content).hexdigest() != expected_sha256:
+            return None
+        value = _json_value(path, data=content)
+    except (OSError, UnicodeError, ValueError, TypeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _current_signal_projection(root: Path, naos_root: str, policy: dict[str, Any], profile: str,
+                               cap_id: str, entry: dict[str, Any], dashboard_ref: str,
+                               current_l2: list[dict[str, Any]], state_path: Path | None,
+                               dashboard_sha256: str) -> tuple[bool, str]:
+    dashboard = _selected_json(root, dashboard_ref, expected_sha256=dashboard_sha256)
+    if dashboard is None:
+        return False, "dashboard_changed_or_unreadable"
+    if dashboard.get("schema") not in ("naos.dashboard_summary.v1", "naos.dashboard_summary.v2"):
+        return False, "dashboard_schema_mismatch"
+    readiness = dashboard.get("capability_maturity_readiness")
+    source = (dashboard.get("inputs") or {}).get("capability_maturity")
+    embedded = source.get("data") if isinstance(source, dict) else None
+    if dashboard.get("schema") == "naos.dashboard_summary.v2":
+        witness = source.get("collection_witness") if isinstance(source, dict) else None
+        try:
+            from jsonschema import Draft202012Validator
+            schema = json.loads((kit_root() / "schemas/naos/capability_maturity_collection_witness.schema.json").read_text())
+            Draft202012Validator(schema).validate(witness)
+            if (source.get("schema") != "naos.report_source_reference.v1"
+                    or source.get("composition_kind") != "source_reference"
+                    or witness.get("source_sha256") != source.get("source_sha256")
+                    or witness.get("source_size_bytes") != source.get("source_size_bytes")
+                    or witness.get("source_schema") != source.get("source_schema")
+                    or witness.get("source_generated_at") != source.get("source_generated_at")):
+                return False, "maturity_witness_identity_mismatch"
+        except Exception:
+            return False, "maturity_witness_invalid"
+        embedded = dict(witness)
+        embedded["schema"] = embedded.pop("source_schema")
+    elif isinstance(embedded, dict):
+        # Legacy data is the complete source report, never a witness wearing
+        # the source discriminator. Version2 uses its separate typed witness.
+        try:
+            from jsonschema import Draft202012Validator
+            source_schema = json.loads((kit_root() / "schemas/naos/capability_maturity_report.schema.json").read_text())
+            Draft202012Validator(source_schema).validate(embedded)
+        except Exception:
+            return False, "legacy_maturity_source_invalid"
+    current_ref = logical_path(root, report_default_path(root, naos_root, policy, "capability_maturity_report")).relative_to(root).as_posix()
+    current = _selected_json(root, current_ref)
+    if not isinstance(readiness, dict) or not isinstance(embedded, dict) or not isinstance(current, dict):
+        return False, "maturity_source_missing"
+    expected_identity = {"schema": "naos.capability_maturity.v1", "profile": profile,
+                         "naos_root": naos_root, "project_root": str(root.resolve())}
+    if any(embedded.get(key) != value or current.get(key) != value for key, value in expected_identity.items()):
+        return False, "maturity_source_scope_mismatch"
+    if state_path and (embedded.get("state") or {}).get("path") != str(state_path):
+        return False, "maturity_state_path_mismatch"
+    if embedded.get("state") != current.get("state"):
+        return False, "maturity_state_mismatch"
+    rows = readiness.get("capabilities")
+    source_rows = embedded.get("capabilities")
+    current_rows = current.get("capabilities")
+    if not all(isinstance(rows, list) for rows in (rows, source_rows, current_rows)):
+        return False, "capability_signal_missing"
+    selected = [[row for row in collection if isinstance(row, dict) and row.get("capability_id") == cap_id]
+                for collection in (rows, source_rows, current_rows)]
+    if any(len(collection) != 1 for collection in selected):
+        return False, "capability_signal_missing_or_duplicate"
+    projected, source_row, current_row = (collection[0] for collection in selected)
+    fields = ("capability_id", "enabled", "current_maturity", "target_maturity", "evaluated_status",
+              "ready_for_promotion", "human_approval_required", "promotion_recorded", "missing_evidence",
+              "stale_evidence", "waivers", "required_next_actions")
+    if any(key not in projected or key not in source_row or projected[key] != source_row[key] for key in fields):
+        return False, "capability_signal_projection_mismatch"
+    if type(projected.get("enabled")) is not bool or any(not isinstance(projected.get(key), str) for key in ("current_maturity", "target_maturity")):
+        return False, "capability_signal_invalid"
+    if any(not isinstance(projected.get(key), list) for key in ("missing_evidence", "stale_evidence", "waivers", "required_next_actions")):
+        return False, "capability_signal_invalid"
+    if any(any(not isinstance(value, str) for value in projected[key])
+           for key in ("missing_evidence", "stale_evidence", "required_next_actions")):
+        return False, "capability_signal_invalid"
+    if any(not isinstance(value, dict) for value in projected["waivers"]):
+        return False, "capability_signal_invalid"
+    if any(type(projected.get(key)) is not bool for key in ("ready_for_promotion", "human_approval_required", "promotion_recorded")):
+        return False, "capability_signal_invalid"
+    stable = ("enabled", "current_maturity", "target_maturity", "waivers")
+    if any(source_row.get(key) != current_row.get(key) or source_row.get(key) != entry.get(key, [] if key == "waivers" else None) for key in stable):
+        return False, "capability_state_projection_mismatch"
+    old_l2 = [item for item in source_row.get("evidence_results", []) if isinstance(item, dict) and item.get("stage") == "L2"]
+    stored_l2 = [item for item in current_row.get("evidence_results", []) if isinstance(item, dict) and item.get("stage") == "L2"]
+    def facts(items: list[dict[str, Any]]) -> list[str]:
+        def selected(item: dict[str, Any]) -> dict[str, Any]:
+            return {
+                key: item.get(key) for key in (
+                    "reference", "availability", "applicability", "applicability_reason",
+                    "applicability_source", "validation", "scope", "producer_outcome",
+                    "requirement_outcome", "content_sha256", "generation_age", "requirement_contract",
+                )
+            } | {"candidates": sorted(
+                json.dumps({key: candidate.get(key) for key in (
+                    "reference", "content_sha256", "availability", "requirement_outcome",
+                )}, sort_keys=True)
+                for candidate in item.get("candidates", []) if isinstance(candidate, dict)
+            )}
+        return sorted(json.dumps(selected(item), sort_keys=True) for item in items)
+    if facts(old_l2) != facts(stored_l2) or facts(old_l2) != facts(current_l2):
+        return False, "capability_evidence_projection_mismatch"
+    return True, "current_selected_projection"
 
 
 def default_gate_reports(root: Path, naos_root: str, policy: dict[str, Any]) -> list[str]:
     return [
-        str(report_default_path(root, naos_root, policy, "gate_status_report").relative_to(root)),
-        str(report_default_path(root, naos_root, policy, "gate_evaluation_report").relative_to(root)),
+        logical_path(root, report_default_path(root, naos_root, policy, "gate_status_report")).relative_to(root).as_posix(),
+        logical_path(root, report_default_path(root, naos_root, policy, "gate_evaluation_report")).relative_to(root).as_posix(),
     ]
 
 
 def default_dashboard_report(root: Path, naos_root: str, policy: dict[str, Any]) -> str:
-    return str(report_default_path(root, naos_root, policy, "dashboard_summary_report").relative_to(root))
+    return logical_path(root, report_default_path(root, naos_root, policy, "dashboard_summary_report")).relative_to(root).as_posix()
 
 
 def related_systemic_impact_evidence(root: Path, naos_root: str, policy: dict[str, Any]) -> dict[str, Any]:
@@ -1044,6 +1276,13 @@ def related_evidence_classification_evidence(root: Path, naos_root: str, policy:
         "summary": data.get("summary") or {},
         "policy_valid": bool(data.get("policy_valid")),
         "classification_counts": data.get("classification_counts") or {},
+        **{key: data[key] for key in ("declared_classification_counts", "inferred_classification_counts")
+           if key in data},
+        "classification_count_semantics": data.get("classification_count_semantics")
+        or "legacy_unspecified_labels_not_verified_evidence",
+        **({"unclassified_context": data["unclassified_context"],
+            "unclassified_context_counts": data.get("unclassified_context_counts") or {}}
+           if "unclassified_context" in data else {}),
         "missing_classification": len(data.get("missing_classification") or []),
         "human_review_required": bool(data.get("human_review_required")),
         "rule": "Evidence classification is related evidence only; it does not promote maturity, prove truth, resolve issues, approve work, or prove compliance.",
@@ -1097,6 +1336,43 @@ def blocking_status_for_profile(profile: str) -> str:
     return "blocked" if profile in {"standard", "assured"} else "advisory"
 
 
+def observed_evidence_finding(
+    cap_id: str, severity: str, status: str, message: str, *,
+    root: Path, state_path: Path | None, results: list[dict[str, Any]],
+    selected_references: list[str], gate_linkage: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Describe this producer's executed typed evaluation, never source truth."""
+    item = finding(cap_id, severity, status, message)
+    observations = [{key: result.get(key) for key in (
+        "reference", "availability", "applicability", "validation", "scope",
+        "generation_age", "producer_outcome", "requirement_outcome", "reason_codes",
+        "content_sha256", "stage", "requirement_contract",
+    )} for result in results]
+    refs = [{"type": "local_file", "ref": str(Path(__file__).resolve())}]
+    # These references identify actually evaluated local bytes when the typed
+    # reader supplied a digest. Missing/unsafe references are observations only.
+    for result in results:
+        if result.get("availability") == "available" and isinstance(result.get("content_sha256"), str):
+            refs.append({"type": "generated_report" if result["reference"].lower().endswith(".json") else "local_file",
+                         "ref": str(root / result["reference"]), "sha256": result["content_sha256"]})
+    item.update(
+        evidence_classification="confirmed",
+        classification_scope="generated_typed_evidence_requirement_observation_only",
+        reasoning_summary="The selected maturity evaluator executed these local typed evidence checks and observed an unmet requirement. The classification confirms only this evaluation result, not source truth, evidence adequacy, promotion, approval, remediation, or completed human review.",
+        source_path=str(Path(__file__).resolve()),
+        selected_state_path=str(state_path) if state_path else None,
+        selected_evidence_references=list(selected_references),
+        observed_evidence_results=observations,
+        observed_evaluation_sha256=hashlib.sha256(json.dumps(
+            observations, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
+        evidence_refs=refs,
+        human_review_required=True,
+    )
+    if gate_linkage is not None:
+        item["observed_gate_linkage"] = gate_linkage
+    return item
+
+
 def evaluate_capability(
     *,
     root: Path,
@@ -1106,6 +1382,7 @@ def evaluate_capability(
     cap_id: str,
     contract: dict[str, Any],
     entry: dict[str, Any] | None,
+    state_path: Path | None = None,
 ) -> dict[str, Any]:
     severity = "advisory" if is_kit_repository(root, naos_root) else severity_for_profile(profile, policy)
     contract_profile = contract.get("profiles", {}).get(profile, {}) if isinstance(contract.get("profiles"), dict) else {}
@@ -1119,9 +1396,16 @@ def evaluate_capability(
 
     if entry is None:
         required_next_actions.append("Declare adopter-local state for this capability in naos/capability_state.yaml.")
-        advisory_findings.append(
-            finding(cap_id, severity, "not_configured", "Capability is present in the kit but has no adopter-local state declaration.")
+        missing_entry = finding(cap_id, severity, "not_configured", "Capability is present in the kit but has no adopter-local state declaration.")
+        missing_entry.update(
+            evidence_classification="confirmed",
+            classification_scope="selected_state_entry_absent_at_evaluation",
+            reasoning_summary="The selected capability contract is loaded, but the selected state mapping has no entry for this capability; this does not decide applicability or maturity.",
+            source_path=str(contract.get("_path") or Path(__file__).resolve()),
+            selected_state_path=str(state_path) if state_path else None,
+            human_review_required=True,
         )
+        advisory_findings.append(missing_entry)
         return {
             "capability_id": cap_id,
             "enabled": None,
@@ -1173,50 +1457,125 @@ def evaluate_capability(
 
     missing_owners = configured_owners(entry)
     if target_idx is not None and target_idx >= MATURITY_INDEX["L1"] and missing_owners:
-        blocking_findings.append(
-            finding(
-                cap_id,
-                severity,
-                "missing_owner",
-                f"Capability target maturity requires configured owners: {', '.join(missing_owners)}.",
-                "owners",
-            )
+        owner_finding = finding(
+            cap_id,
+            severity,
+            "missing_owner",
+            f"Capability target maturity requires configured owners: {', '.join(missing_owners)}.",
+            "owners",
         )
+        owner_finding.update(
+            evidence_classification="confirmed",
+            classification_scope="selected_state_owner_fields_unassigned_at_evaluation",
+            reasoning_summary="The selected state entry has unassigned owner fields required by its declared target level; this does not assign an owner, prove accountability, or approve promotion.",
+            source_path=str(state_path) if state_path and state_path.is_file() else str(Path(__file__).resolve()),
+            missing_owner_fields=missing_owners,
+            human_review_required=True,
+        )
+        blocking_findings.append(owner_finding)
         required_next_actions.append("Assign 1LoD owner, 2LoD owner, and accountable reviewer.")
 
-    missing_refs, stale_refs, present_refs = evidence_status(root, entry, policy)
+    evidence_results = typed_evidence_status(root, entry, policy, profile, naos_root)
+    missing_refs = [item["reference"] for item in evidence_results
+                    if item["applicability"] == "applicable" and item["availability"] == "missing"]
+    stale_refs = [item["reference"] for item in evidence_results
+                  if item["applicability"] == "applicable" and item["generation_age"]["status"] == "stale"]
+    unresolved_refs = [item["reference"] for item in evidence_results
+                       if item["applicability"] == "applicable" and item["requirement_outcome"] != "satisfied"
+                       and item["reference"] not in missing_refs + stale_refs]
+    positive_evidence = any(item["applicability"] == "applicable" and item["requirement_outcome"] == "satisfied"
+                            for item in evidence_results)
+    present_refs = [item["reference"] for item in evidence_results if item["availability"] == "available"]
+    bases = {"manual" if item["claim_ceiling"] == "manual_reference_availability" else "automatic"
+             for item in evidence_results if item["requirement_outcome"] == "satisfied"}
+    evidence_basis = "mixed" if len(bases) > 1 else next(iter(bases), "none")
+    l2_unresolved = bool(missing_refs or stale_refs or unresolved_refs or not positive_evidence)
+    gate_supported = False
+    projection_ok = False
+    highest_relevant_idx = max(current_idx if current_idx is not None else -1,
+                               target_idx if target_idx is not None else -1)
     if target_idx is not None and target_idx >= MATURITY_INDEX["L2"]:
         if not entry.get("evidence_refs"):
             missing_evidence.append("evidence_refs")
         missing_evidence.extend(missing_refs)
         stale_evidence.extend(stale_refs)
-        if missing_refs or not entry.get("evidence_refs"):
+        if missing_refs or not positive_evidence:
             blocking_findings.append(
-                finding(cap_id, severity, "missing_evidence", "Operational maturity requires fresh evidence references.")
+                observed_evidence_finding(cap_id, severity, "missing_evidence", "Operational maturity requires applicable satisfied evidence references.",
+                    root=root, state_path=state_path, results=evidence_results, selected_references=entry.get("evidence_refs") or [])
             )
             required_next_actions.append("Run the relevant validator and add its report path to evidence_refs.")
         if stale_refs:
             blocking_findings.append(
-                finding(cap_id, severity, "stale_evidence", "One or more evidence references are older than the configured freshness window.")
+                observed_evidence_finding(cap_id, severity, "stale_evidence", "One or more evidence references are older than the configured freshness window.",
+                    root=root, state_path=state_path, results=[item for item in evidence_results if item["reference"] in stale_refs], selected_references=stale_refs)
             )
             required_next_actions.append("Regenerate stale evidence before reviewing maturity readiness.")
+        if unresolved_refs:
+            blocking_findings.append(observed_evidence_finding(cap_id, severity, "unresolved_evidence", "One or more required evidence references are unresolved.",
+                root=root, state_path=state_path, results=[item for item in evidence_results if item["reference"] in unresolved_refs], selected_references=unresolved_refs))
+            required_next_actions.append("Resolve typed evidence findings before reviewing maturity readiness.")
 
-    if target_idx is not None and target_idx >= MATURITY_INDEX["L3"]:
+    if highest_relevant_idx >= MATURITY_INDEX["L3"]:
         gate_reports = default_gate_reports(root, naos_root, policy)
-        gate_missing = [ref for ref in gate_reports if not path_matches(root, ref)]
-        if gate_missing:
-            missing_evidence.extend(gate_missing)
-            blocking_findings.append(
-                finding(cap_id, severity, "missing_gate_evidence", "Enforced maturity requires gate status/evaluation evidence.")
-            )
-            required_next_actions.append("Run gate status/evaluation before reviewing L3 readiness.")
+        gate_results = [classify_evidence(root, ref, profile=profile, naos_root=naos_root, policy=policy,
+                                          requirement={"freshness_window_days": entry.get("freshness_window_days", evidence_staleness_days(policy))},
+                                          consumer="maturity") for ref in gate_reports]
+        for result in gate_results:
+            result["stage"] = "L3"
+        evidence_results.extend(gate_results)
+        gate_missing = [item["reference"] for item in gate_results if item["availability"] == "missing"]
+        missing_evidence.extend(gate_missing)
+        gate_ids = contract.get("gatekeepers") or []
+        def linked_report(result: dict[str, Any]) -> bool:
+            digest = result.get("content_sha256")
+            if not isinstance(digest, str):
+                return False
+            rows = (_selected_json(root, result["reference"], expected_sha256=digest) or {}).get("gates", [])
+            if not isinstance(rows, list):
+                return False
+            linked_rows = [row for row in rows if isinstance(row, dict) and row.get("id") in gate_ids]
+            return all(any(row.get("id") == gate_id for row in linked_rows) for gate_id in gate_ids) and any(
+                row.get("status") == "ready" and row.get("readiness") == "ready" for row in linked_rows)
+        linked = bool(gate_ids) and all(linked_report(result) for result in gate_results)
+        gate_supported = all(item["requirement_outcome"] == "satisfied" for item in gate_results) and linked
+        if not gate_supported:
+            unresolved_refs.extend(item["reference"] for item in gate_results if item["requirement_outcome"] != "satisfied")
+            if not linked:
+                unresolved_refs.append("missing_gate_linkage" if not gate_ids else "unresolved_linked_gate")
+            if target_idx is not None and target_idx >= MATURITY_INDEX["L3"]:
+                blocking_findings.append(
+                    observed_evidence_finding(cap_id, severity, "missing_gate_evidence", "Enforced maturity requires resolved selected gates linked to this capability.",
+                        root=root, state_path=state_path, results=gate_results, selected_references=gate_reports,
+                        gate_linkage={"selected_gate_ids": gate_ids, "linked": linked})
+                )
+                required_next_actions.append("Run gate status/evaluation before reviewing L3 readiness.")
 
-    if target_idx is not None and target_idx >= MATURITY_INDEX["L4"]:
+    if highest_relevant_idx >= MATURITY_INDEX["L4"]:
         dashboard_report = default_dashboard_report(root, naos_root, policy)
-        if not path_matches(root, dashboard_report):
+        dashboard_result = classify_evidence(root, dashboard_report, profile=profile, naos_root=naos_root,
+                                              policy=policy,
+                                              requirement={"freshness_window_days": entry.get("freshness_window_days", evidence_staleness_days(policy))},
+                                              consumer="maturity")
+        dashboard_result["stage"] = "L4"
+        evidence_results.append(dashboard_result)
+        projection_reason = "dashboard_unresolved"
+        if dashboard_result["requirement_outcome"] == "satisfied":
+            projection_ok, projection_reason = _current_signal_projection(
+                root, naos_root, policy, profile, cap_id, entry, dashboard_report,
+                [item for item in evidence_results if item["stage"] == "L2"], state_path,
+                dashboard_result["content_sha256"])
+        dashboard_result["signal_tracking"] = "current_selected_projection" if projection_ok else "unresolved"
+        dashboard_result["measurement_assurance"] = "not_established"
+        if not projection_ok:
+            dashboard_result["requirement_outcome"] = "unresolved"
+            dashboard_result["reason_codes"].append(projection_reason)
+            unresolved_refs.append(dashboard_report)
+        if dashboard_result["availability"] == "missing":
             missing_evidence.append(dashboard_report)
+        if not projection_ok and target_idx is not None and target_idx >= MATURITY_INDEX["L4"]:
             blocking_findings.append(
-                finding(cap_id, severity, "missing_dashboard_evidence", "Measured maturity requires dashboard summary evidence.")
+                finding(cap_id, severity, "missing_dashboard_evidence", "Measured maturity requires a current selected capability signal projection.")
             )
             required_next_actions.append("Refresh the NAOS dashboard before reviewing L4 readiness.")
 
@@ -1240,21 +1599,29 @@ def evaluate_capability(
     # (assured), staying advisory at lower profiles. It does not auto-promote or adjudicate.
     default_idx = maturity_index(contract.get("default_maturity")) or 0
     if current_idx is not None and current_idx >= MATURITY_INDEX["L2"] and current_idx > default_idx:
-        if not entry.get("evidence_refs") or missing_refs or stale_refs:
+        current_unsupported = (l2_unresolved
+                               or (current_idx >= MATURITY_INDEX["L3"] and not gate_supported)
+                               or (current_idx >= MATURITY_INDEX["L4"] and not projection_ok))
+        if current_unsupported:
             cg1 = finding(
                 cap_id,
                 severity,
                 "unsupported_current_maturity",
-                f"Declared current_maturity {current} is not backed by present, fresh evidence; current_maturity is an adopter declaration, not proof.",
+                f"Declared current_maturity {current} lacks required evidence or prerequisites; current_maturity is an adopter declaration, not proof.",
                 "current_maturity",
             )
             if severity == "blocking":
                 blocking_findings.append(cg1)
             else:
                 advisory_findings.append(cg1)
-            required_next_actions.append(
-                "Add fresh evidence_refs supporting the declared current_maturity, or lower current_maturity to the supported level."
-            )
+            if l2_unresolved:
+                required_next_actions.append(
+                    "Add resolved evidence_refs supporting the declared current_maturity, or lower current_maturity to the supported level."
+                )
+            elif current_idx >= MATURITY_INDEX["L3"] and not gate_supported:
+                required_next_actions.append("Resolve linked gate evidence supporting declared current_maturity.")
+            elif current_idx >= MATURITY_INDEX["L4"] and not projection_ok:
+                required_next_actions.append("Refresh the selected dashboard projection supporting declared current_maturity.")
 
     if waivers:
         advisory_findings.append(
@@ -1293,6 +1660,9 @@ def evaluate_capability(
         "missing_evidence": list(dict.fromkeys(missing_evidence)),
         "stale_evidence": list(dict.fromkeys(stale_evidence)),
         "present_evidence": sorted(set(present_refs)),
+        "unresolved_evidence": sorted(set(unresolved_refs)),
+        "evidence_results": evidence_results,
+        "evidence_basis": evidence_basis,
         "blocking_findings": blocking_findings,
         "advisory_findings": advisory_findings,
         "waivers": waivers,
@@ -1310,10 +1680,10 @@ def build_report(
     state_path: Path,
     capabilities_dir: str | None = None,
 ) -> dict[str, Any]:
-    contracts = load_capability_contracts(root, naos_root, capabilities_dir)
-    state_exists = state_path.exists()
+    contracts = load_capability_contracts(root, naos_root, profile, capabilities_dir)
+    state_exists = input_present(state_path)
     state_data = load_yaml(state_path) if state_exists else {}
-    state_entries = normalize_state_entries(state_data)
+    state_entries = normalize_state_entries(state_data, state_path) if state_exists else {}
 
     capabilities = [
         evaluate_capability(
@@ -1324,6 +1694,7 @@ def build_report(
             cap_id=cap_id,
             contract=contract,
             entry=state_entries.get(cap_id),
+            state_path=state_path,
         )
         for cap_id, contract in sorted(contracts.items())
     ]
@@ -1454,15 +1825,33 @@ def main(argv: list[str] | None = None) -> int:
     naos_root = args.naos_root or default_naos_root(policy)
     profile = normalize_profile(args.profile, policy)
     state_path = resolve_state_path(root, naos_root, policy, args.state)
-    report = build_report(
-        root=root,
-        profile=profile,
-        naos_root=naos_root,
-        policy=policy,
-        state_path=state_path,
-        capabilities_dir=args.capabilities_dir,
-    )
     output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "capability_maturity_report")
+    try:
+        report = build_report(
+            root=root,
+            profile=profile,
+            naos_root=naos_root,
+            policy=policy,
+            state_path=state_path,
+            capabilities_dir=args.capabilities_dir,
+        )
+    except ValueError as exc:
+        error = {
+            "schema": "naos.capability_maturity_input_error.v1",
+            "status": "invalid_input",
+            "errors": [str(exc)],
+            "human_review_required": True,
+            "findings": [{
+                "id": "capability_maturity_input_invalid",
+                "status": "invalid_input",
+                "severity": "blocking",
+                "message": str(exc),
+                "human_review_required": True,
+            }],
+        }
+        write_report(output, error)
+        print(json.dumps(error, indent=2, sort_keys=True) if args.json else f"ERROR: {exc}")
+        return 2
     write_report(output, report)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

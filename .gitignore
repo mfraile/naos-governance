@@ -21,6 +21,9 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
+# Local test command output
+/child-evidence/
+/cli-evidence/
 
 # Editors
 .vscode/
@@ -37,6 +40,7 @@ Thumbs.db
 
 # Claude Code local state (worktrees are ephemeral tool output, not repo content)
 .claude/worktrees/
+.claude/settings.local.json
 
 # VS Code workspace file (local convenience, no repo value)
 *.code-workspace

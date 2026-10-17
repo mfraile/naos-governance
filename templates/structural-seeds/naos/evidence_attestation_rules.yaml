@@ -2,6 +2,7 @@ version: "1.0"
 semantics:
   state: "Rules declare which local evidence artifacts NAOS should hash and review."
   report: "NAOS reports local SHA-256 digests and reviewer metadata for human review."
+  creator_attribution: "Per-artifact generated_by.operator_id is a content-bound producer declaration when present; the collector is not the artifact creator and identity is not authenticated."
   governance_boundary: "Local digest plus reviewer metadata is bounded evidence, not approval."
   not_claimed:
     - "cryptographic signing"

@@ -2,7 +2,7 @@
 
 **Version**: 1.1.0
 **Status**: Draft
-**Applicable To**: All NAOS profiles (lite / standard / assured)
+**Applicable To**: Lite, Standard and Assured; conformance-runner examples require Standard/Assured
 
 ---
 
@@ -45,7 +45,7 @@ These files support review and audit/admissibility discussions. They do not prov
 
 | Cadence | Trigger | Dimensions | Cost posture | Enabled by default |
 |---------|---------|-----------|---------|-------------------|
-| On-demand deterministic conformance | Manual | 1–3 | no model/API cost; local labor/tooling varies | ✅ Yes (always available) |
+| On-demand deterministic conformance | Manual | 1–3 | no model/API cost; local labor/tooling varies | Standard/Assured runner; verify installed files |
 | Behavioral readiness cadence | Cron (1st Monday) | 1, 2, 3 | project-configured | ❌ Future/project-configured |
 | Quarterly review readiness | Cron (1st Monday of quarter) | 1–8 | project-configured | ❌ Future/project-configured |
 | Dependency audit | After pip/npm major upgrade | 1, 3 | project-measured | ❌ Enable after v1.0 |
@@ -66,6 +66,13 @@ These files support review and audit/admissibility discussions. They do not prov
 - Before a significant governance change (new rule, updated instruction file)
 - After a major AI toolchain upgrade
 - When team members report frequent governance reminder messages
+
+**Profile boundary**: The `.github/autoresearch/runner.py` examples in this
+playbook apply to generated Standard/Assured projects. Lite installs the
+static grader subset, not that runner or its scenario battery. In Lite, use
+installed profile-aware commands such as `naos self-check --profile lite`
+and the project's own tests; do not report an absent runner as conformance
+evidence. Confirm command availability before adopting the CI examples.
 
 **Command**:
 ```bash
@@ -88,8 +95,8 @@ NAOS Conformance Check
 ```
 
 Frontmatter failures name the file and missing field. Common fixes are adding
-`model` or `tools` to `.agent.md`, adding `parameters: []` and a `## When to Use`
-section to `SKILL.md`, or adding `applyTo` to `*.instructions.md`.
+`model` or `tools` to `.agent.md`, migrating skill inputs to JSON text in
+`metadata.naos-parameters` and adding a `## When to Use` section to `SKILL.md`, or adding `applyTo` to `*.instructions.md`.
 
 **Thresholds**:
 | Score | Status | Action |
@@ -106,20 +113,24 @@ section to `SKILL.md`, or adding `applyTo` to `*.instructions.md`.
 
 **When**: 1st Monday of each month (or when a governance file changes).
 
-**Spacing policy**: Never runs twice within 14 days unless `--force-drift` is passed.
+**Proposed spacing policy**: A separately implemented evaluator should enforce a
+14-day cooldown with an explicitly approved override. The shipped runner has no
+`--force-drift` option or behavioral cadence enforcement.
 
-**Trigger logic**:
+**Proposed evaluator trigger logic (not implemented by the kit)**:
 1. Check time since last run (must be ≥14 days)
 2. Check if any governance file changed since last run
 3. If either condition is met → run; else → skip with cost notice
 
-**Command**:
+**Available readiness command** (select your project profile):
 ```bash
-# Planned behavioral runtime example; not available in v1.0.x
-# python .github/autoresearch/runner.py --drift --runs 5
+naos behavioral-readiness --profile standard
 ```
 
-**Interpreting results**:
+This command reports deterministic prerequisites and impacters. It does not run
+behavioral trials or measure drift; evaluator command syntax remains undefined.
+
+**Illustrative future evaluator results (not readiness output)**:
 ```
 Drift check: N=5 runs
 Mean: [project-configured score] (baseline: [approved baseline])
@@ -146,11 +157,13 @@ Per-scenario grand means:
 
 **When**: 1st Monday of each quarter (or after a major governance overhaul).
 
-**Command**:
+**Available readiness command** (select your project profile):
 ```bash
-# Planned behavioral runtime example; not available in v1.0.x
-# python .github/autoresearch/runner.py --assess --dimensions 1,2,3,4,5,6,7,8 --runs 3
+naos behavioral-readiness --profile standard
 ```
+
+A full behavioral battery requires a separate evaluator. The kit does not
+provide an `--assess` command or behavioral dimension grading.
 
 **Reading the 8 dimensions**:
 
@@ -386,6 +399,11 @@ created: 2026-03-22
 
 ## CI Automation Examples
 
+These examples require separate approval before installation or activation.
+Schedules remain opt-in; no behavioral evaluator is enabled by these examples.
+A first-Monday cadence uses a Monday schedule plus an explicit day-of-month
+filter, because restricting both cron day fields does not encode their intersection.
+
 ### GitHub Actions
 
 ```yaml
@@ -393,35 +411,42 @@ created: 2026-03-22
 name: NAOS Governance (Static Conformance)
 
 on:
-  schedule:
-    - cron: '0 9 1-7 * 1'  # 1st Monday of each month at 09:00 UTC
-  workflow_dispatch:        # Allow manual triggering
-    inputs:
-      force:
-        description: 'Force project-configured behavioral evaluator cadence (bypass cooldown)'
-        type: boolean
-        default: false
+  workflow_dispatch:        # Manual static conformance only
+  # Uncomment only after schedule approval:
+  # schedule:
+  #   - cron: '0 9 * * 1'    # Mondays at 09:00 UTC; filtered below
 
 jobs:
   drift-check:
     runs-on: ubuntu-latest
     steps:
+      - name: Select first Monday or event run
+        id: cadence
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "$(date -u +%d)" -le 7 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.cadence.outputs.run == 'true'
 
       - name: Set up Python
+        if: steps.cadence.outputs.run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install dependencies
+        if: steps.cadence.outputs.run == 'true'
         run: pip install -r requirements-dev.txt
 
       - name: Run static conformance
+        if: steps.cadence.outputs.run == 'true'
         run: |
           make -f Makefile.naos naos-readiness
           make -f Makefile.naos naos-conformance
 
       - name: Upload drift report
+        if: steps.cadence.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: conformance-report-${{ github.run_number }}
@@ -509,8 +534,9 @@ exit $EXIT_CODE
 **Scheduling the shell script** (any CI system):
 
 ```bash
-# crontab entry (runs at 09:00 on the 1st Monday of each month)
-0 9 1-7 * 1 /path/to/project/.naos/ci/static_conformance.sh >> /var/log/naos-conformance.log 2>&1
+# Optional crontab entry after approval (first Monday, scheduler local time).
+# Cron requires the percent sign to be escaped.
+0 9 * * 1 test "$(date +\%d)" -le 7 && /path/to/project/.naos/ci/static_conformance.sh >> /var/log/naos-conformance.log 2>&1
 ```
 
 ### Jenkins Pipeline
@@ -519,12 +545,21 @@ exit $EXIT_CODE
 // Jenkinsfile (governance stage)
 pipeline {
   agent any
-  triggers {
-    // 1st Monday of each month at 09:00
-    cron('H 9 1-7 * 1')
-  }
+  // Opt-in after approval: Mondays during 09:00; stage filters first Monday.
+  // Use the same timezone for the Jenkins scheduler and agent.
+  // triggers {
+  //   cron('H 9 * * 1')
+  // }
   stages {
     stage('Governance Conformance Check') {
+      when {
+        anyOf {
+          not { triggeredBy 'TimerTrigger' }
+          expression {
+            return sh(script: 'test "$(date +%d)" -le 7', returnStatus: true) == 0
+          }
+        }
+      }
       steps {
         sh 'pip install -r requirements-dev.txt'
         sh 'make -f Makefile.naos naos-readiness'

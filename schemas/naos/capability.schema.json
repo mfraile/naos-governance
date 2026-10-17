@@ -163,12 +163,16 @@
       }
     },
     "tool_ref": {
+      "allOf": [{
+        "if": {"required": ["script"], "properties": {"script": {"pattern": "^kit://"}}},
+        "then": {"properties": {"status": {"enum": ["external", "planned", "manual"]}}}
+      }],
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "status"],
       "properties": {
         "id": {"type": "string"},
-        "script": {"type": "string"},
+        "script": {"type": "string", "description": "Local script or explicit kit:// dependency; a kit dependency cannot be locally available."},
         "status": {
           "type": "string",
           "enum": ["available", "planned", "external", "manual"]

@@ -1,0 +1,2 @@
+# Public source text stays byte-stable in Windows autocrlf checkouts.
+* text=auto eol=lf

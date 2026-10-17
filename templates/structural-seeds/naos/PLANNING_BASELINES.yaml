@@ -2,6 +2,9 @@ schema: naos.planning_baselines.v1
 current_baseline_id: PB-001
 
 # The task registry may be drafted and revised before this baseline is ready.
+# Text digests require valid UTF-8 and normalize only CRLF to LF.
+# Existing file_sha256 approvals retain exact-byte meaning. Changing a digest
+# contract requires a new baseline version and attributable decision.
 # Move a baseline to implementation_ready only after the applicable source
 # bindings, deterministic evidence, and attributable human decision exist.
 baselines:
@@ -15,12 +18,12 @@ baselines:
     source_bindings:
       requirements:
         path: specs/03-requirements.md
-        digest_kind: file_sha256
+        digest_kind: text_lf_sha256_v1
         sha256: null
       architecture:
         path: specs/04-architecture.md
         applicability: required_by_profile
-        digest_kind: file_sha256
+        digest_kind: text_lf_sha256_v1
         sha256: null
       task_registry:
         path: naos/TASK_REGISTRY.yaml
@@ -30,18 +33,21 @@ baselines:
         sha256: null
       alignment:
         path: naos/PRE_IMPLEMENTATION_ALIGNMENT.md
-        digest_kind: file_sha256
+        digest_kind: text_lf_sha256_v1
         sha256: null
     evidence_refs:
+      # Preserve actual filled/pass and alignment/ready producer bytes here
+      # before computing digests and seeking the planning decision. Reports in
+      # naos/reports are mutable working outputs, not approved snapshots.
       spec_pack_contract:
-        path: naos/reports/spec_pack_contract.json
+        path: naos/planning-evidence/PB-001/spec_pack_contract.json
         required_by_profile: true
-        digest_kind: file_sha256
+        digest_kind: text_lf_sha256_v1
         sha256: null
       pre_implementation_alignment_review:
-        path: naos/reports/pre_implementation_alignment_review.json
+        path: naos/planning-evidence/PB-001/pre_implementation_alignment_review.json
         required_by_profile: true
-        digest_kind: file_sha256
+        digest_kind: text_lf_sha256_v1
         sha256: null
     decision_ref: null
     # Every non-terminal task must appear exactly once when implementation_ready.

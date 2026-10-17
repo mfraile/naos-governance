@@ -19,12 +19,14 @@ Environment variables:
 import argparse
 import os
 import re
+import sys
 from pathlib import Path
 
 import yaml
+import spec_header
 
-# Regex for FR/NFR heading detection
-_REQ_HEADER_RE = re.compile(r"^## ((?:FR|NFR)-[A-Z0-9]+(?:-ENHANCED)?):", re.MULTILINE)
+# Shared H2/H3 requirement-header contract.
+_REQ_HEADER_RE = spec_header.REQ_HEADER_RE
 
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -44,43 +46,49 @@ def _truncate(
     encoded = text.encode("utf-8")
     if len(encoded) <= max_bytes:
         return text
-    truncated = encoded[:max_bytes].decode("utf-8", errors="ignore")
+    suffix = f"\n\n[... truncated — see {source_ref} for full content]" if source_ref else "\n[... truncated]"
+    suffix_bytes = suffix.encode("utf-8")[:max_bytes]
+    truncated = encoded[:max(0, max_bytes - len(suffix_bytes))].decode("utf-8", errors="ignore")
     last_newline = truncated.rfind("\n")
     if last_newline > 0:
         truncated = truncated[:last_newline]
-    if source_ref:
-        truncated += f"\n\n[... truncated — see {source_ref} for full content]"
+    truncated += suffix_bytes.decode("utf-8", errors="ignore")
     return truncated
 
 
 def extract_fr(fr_id: str) -> str:
     """Extract a requirement section from specs/03-requirements.md.
 
-    Finds the ## FR-XXX: heading and extracts everything until the next ## heading.
+    Finds an H2/H3 FR/NFR heading and extracts its bounded section.
     """
     if not REQUIREMENTS_SPEC.exists():
         return f"ERROR: {REQUIREMENTS_SPEC} not found"
 
     text = REQUIREMENTS_SPEC.read_text(encoding="utf-8")
-    lines = text.split("\n")
+    lines = text.splitlines()
 
-    pattern = re.compile(rf"^## {re.escape(fr_id)}:", re.IGNORECASE)
     start_line = None
     for i, line in enumerate(lines):
-        if pattern.match(line):
+        match = _REQ_HEADER_RE.match(line)
+        if match and match.group(1).upper() == fr_id.upper():
             start_line = i
             break
 
     if start_line is None:
-        available = _REQ_HEADER_RE.findall(text)
+        available = sorted(spec_header.canonical_frs(text))
         return (
             f"ERROR: {fr_id} not found in {REQUIREMENTS_SPEC}\n"
             f"Available: {', '.join(available[:20])}"
         )
 
     end_line = len(lines)
+    heading_level = len(lines[start_line]) - len(lines[start_line].lstrip("#"))
     for i in range(start_line + 1, len(lines)):
-        if lines[i].startswith("## "):
+        if _REQ_HEADER_RE.match(lines[i]):
+            end_line = i
+            break
+        heading = re.match(r"^(#{1,6})\s+", lines[i])
+        if heading and len(heading.group(1)) <= heading_level:
             end_line = i
             break
 
@@ -94,6 +102,7 @@ def extract_arch(arch_id: str) -> str:
 
     Falls back to searching specs/04-architecture.md if not in YAML.
     """
+    arch_id = arch_id.upper()
     if not arch_id.startswith("ARCH-"):
         arch_id = f"ARCH-{arch_id}"
 
@@ -126,32 +135,11 @@ def extract_arch(arch_id: str) -> str:
     # 2. Also extract from specs/04-architecture.md
     if ARCHITECTURE_SPEC.exists():
         text = ARCHITECTURE_SPEC.read_text(encoding="utf-8")
-        lines = text.split("\n")
-
-        pattern = re.compile(rf"^##+ .*{re.escape(arch_id)}", re.IGNORECASE)
-        start_line = None
-        for i, line in enumerate(lines):
-            if pattern.match(line):
-                start_line = i
-                break
-
-        if start_line is not None:
-            heading_level = len(lines[start_line]) - len(lines[start_line].lstrip("#"))
-            end_line = min(start_line + 80, len(lines))
-            for i in range(start_line + 1, min(start_line + 200, len(lines))):
-                if lines[i].startswith("#"):
-                    current_level = len(lines[i]) - len(lines[i].lstrip("#"))
-                    if current_level <= heading_level:
-                        end_line = i
-                        break
-
-            spec_section = "\n".join(lines[start_line:end_line]).strip()
-            result_parts.append("## Spec Excerpt")
-            result_parts.append(
-                f"_From specs/04-architecture.md lines {start_line + 1}-{end_line}_"
-            )
-            result_parts.append("")
-            result_parts.append(spec_section)
+        sections = spec_header.architecture_component_sections(text).get(arch_id, [])
+        if len(sections) > 1:
+            return f"ERROR: {arch_id} has ambiguous component definitions"
+        if sections:
+            result_parts.extend(["## Spec Excerpt", "_From specs/04-architecture.md_", "", sections[0]])
 
     if not result_parts:
         return f"ERROR: {arch_id} not found in boundaries config or architecture spec"
@@ -209,7 +197,7 @@ def list_requirements() -> str:
         return f"ERROR: {REQUIREMENTS_SPEC} not found"
 
     text = REQUIREMENTS_SPEC.read_text(encoding="utf-8")
-    ids = _REQ_HEADER_RE.findall(text)
+    ids = sorted(spec_header.canonical_frs(text))
     frs = sorted(
         [r for r in ids if r.startswith("FR-")],
         key=lambda x: (0, int(x[3:])) if x[3:].isdigit() else (1, x),
@@ -221,7 +209,10 @@ def list_requirements() -> str:
     return f"FRs ({len(frs)}): {', '.join(frs)}\nNFRs ({len(nfrs)}): {', '.join(nfrs)}"
 
 
-def main() -> None:
+def main() -> int:
+    # Captured Windows pipes must preserve the same Unicode spec text as POSIX.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", newline="\n")
     parser = argparse.ArgumentParser(
         description="Extract spec sections for agent context",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -246,14 +237,16 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.fr:
-        print(extract_fr(args.fr))
+        result = extract_fr(args.fr)
     elif args.arch:
-        print(extract_arch(args.arch))
+        result = extract_arch(args.arch)
     elif args.api:
-        print(extract_api(args.api))
-    elif args.list_requirements:
-        print(list_requirements())
+        result = extract_api(args.api)
+    else:
+        result = list_requirements()
+    print(_truncate(result, MAX_OUTPUT_BYTES - 1))
+    return 1 if result.startswith("ERROR:") else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

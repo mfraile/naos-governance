@@ -12,8 +12,9 @@ import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from typing import Any, Iterable
+from urllib.parse import quote, unquote
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -47,6 +48,7 @@ LIMITATIONS = [
     "Generated runtime reports are optional adopter artifacts and are not required in the kit repository.",
     "SARIF consumers may display severity differently from NAOS profile severity.",
     "Human review remains required for durable decisions, approvals, waivers, and maturity changes.",
+    "Artifact locations are relative to %srcroot%; consumers must bind that base to the reviewed project root. Unmapped foreign paths and non-path references have no physical location.",
 ]
 
 UNSUPPORTED_STRUCTURED_SOURCES = [
@@ -187,22 +189,48 @@ def as_list(value: Any) -> list[Any]:
     return [value]
 
 
-def relative_uri(path_value: Any, root: Path) -> str | None:
-    if not path_value:
+def relative_uri(path_value: Any, root: PurePath) -> str | None:
+    """Serialize a project path without changing its native filename semantics.
+
+    Pure Windows roots support deterministic path-contract tests on other hosts;
+    actual CLI roots are native Paths and also receive a containment check.
+    A trailing :line[:column] is legacy location notation unless it identifies
+    an existing literal filename. It is not a URI scheme or a drive separator.
+    """
+    if not isinstance(path_value, (str, PurePath)):
         return None
-    value = str(path_value).strip()
-    if not value or value.startswith(("http://", "https://")):
+    value = str(path_value)
+    if not value.strip() or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", value):
         return None
-    if any(char in value for char in "<>{}*"):
+    if any(ord(char) < 32 or ord(char) == 127 or char in "<>{}*" for char in value):
         return None
-    value = value.split(":", 1)[0] if re.search(r":\d+$", value) else value
-    path = Path(value)
-    if path.is_absolute():
-        try:
-            value = path.resolve().relative_to(root.resolve()).as_posix()
-        except ValueError:
+
+    windows = isinstance(root, PureWindowsPath)
+    path_type = PureWindowsPath if windows else PurePosixPath
+    try:
+        bound_root = root.resolve() if isinstance(root, Path) else root
+        literal_exists = isinstance(root, Path) and (root / value).exists()
+        if not literal_exists:
+            value = re.sub(r":[1-9][0-9]*(?::[1-9][0-9]*)?$", "", value)
+        if not windows and PureWindowsPath(value).drive and not literal_exists:
             return None
-    return value.replace("\\", "/").lstrip("./")
+        path = path_type(value)
+        if ".." in path.parts:
+            return None
+        if windows and (path.drive or path.root) and not path.is_absolute():
+            return None
+        if path.is_absolute():
+            candidate = Path(value).resolve() if isinstance(root, Path) else path
+            relative = candidate.relative_to(bound_root)
+        else:
+            relative = path
+            if isinstance(root, Path):
+                (bound_root / value).resolve().relative_to(bound_root)
+        if not relative.parts or relative.as_posix() == ".":
+            return None
+        return quote(relative.as_posix(), safe="/")
+    except (OSError, RuntimeError, ValueError, UnicodeError):
+        return None
 
 
 def finding_location(finding: dict[str, Any], root: Path) -> list[dict[str, Any]]:
@@ -212,29 +240,79 @@ def finding_location(finding: dict[str, Any], root: Path) -> list[dict[str, Any]
         "source_path",
         "target_path",
         "artifact_path",
+        "report_path",
         "artifact",
         "source",
         "reference",
-        "report_path",
     ):
         uri = relative_uri(finding.get(key), root)
+        if uri and key in {"artifact", "source", "reference"}:
+            # These fields can contain labels or identifiers. Only an actual
+            # local file gives them a physical-path meaning.
+            try:
+                if not (root / unquote(uri)).is_file():
+                    continue
+            except (OSError, ValueError):
+                continue
         if uri:
-            return [{"physicalLocation": {"artifactLocation": {"uri": uri}}}]
+            return [{"physicalLocation": {"artifactLocation": {
+                "uri": uri, "uriBaseId": "%srcroot%",
+            }}}]
     return []
 
 
-def fingerprint(source_id: str, rule_id: str, finding: dict[str, Any], message: str) -> str:
-    basis = json.dumps(
-        {
-            "source": source_id,
-            "rule": rule_id,
-            "id": finding.get("id") or finding.get("rule_id") or finding.get("status"),
-            "message": message,
-            "path": finding.get("file") or finding.get("path") or finding.get("source_path") or finding.get("target_path"),
-        },
-        sort_keys=True,
-        default=str,
-    )
+def typed_json_value(value: Any) -> list[Any]:
+    """Encode each original JSON type so input cannot impersonate a path tag."""
+    if value is None:
+        return ["null"]
+    if type(value) is bool:
+        return ["boolean", value]
+    if type(value) is int:
+        return ["integer", str(value)]
+    if type(value) is float:
+        return ["float", value.hex()]
+    if type(value) is str:
+        return ["string", value]
+    if type(value) is list:
+        return ["array", [typed_json_value(item) for item in value]]
+    if type(value) is dict:
+        return ["object", [[key, typed_json_value(item)] for key, item in sorted(value.items())]]
+    raise TypeError(f"Unsupported structured finding value: {type(value).__name__}")
+
+
+def semantic_finding(finding: dict[str, Any], root: Path) -> dict[str, Any]:
+    """Exact report content, excluding only exporter-added traversal metadata.
+
+    Qualified locations normalize an equivalent native absolute/relative path.
+    Original values are recursively type-tagged; only qualified string paths
+    receive a separate path tag. Input JSON cannot mimic that tag. Unknown fields
+    and occurrence coordinates remain material.
+    """
+    value = {key: typed_json_value(item) for key, item in finding.items()
+             if key not in {"_naos_context_path", "_naos_self_check_id"}}
+    locations = finding_location(finding, root)
+    if locations:
+        for key in ("file", "path", "source_path", "target_path", "artifact_path", "report_path"):
+            original = finding.get(key)
+            uri = relative_uri(original, root)
+            if type(original) is str and uri is not None:
+                # Preserve a legacy line/column suffix in the identity even
+                # though the unchanged location helper omits its region.
+                raw = original
+                literal = isinstance(root, Path) and (root / raw).exists()
+                suffix = re.search(r":[1-9][0-9]*(?::[1-9][0-9]*)?$", raw) if not literal else None
+                value[key] = ["qualified-path-string", uri, suffix.group() if suffix else None]
+    return value
+
+
+def finding_signature(finding: dict[str, Any], root: Path) -> str:
+    return json.dumps(semantic_finding(finding, root), sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+
+
+def fingerprint(source_id: str, rule_id: str, finding: dict[str, Any], root: Path) -> str:
+    basis = json.dumps({"source": source_id, "rule": rule_id,
+                        "finding": semantic_finding(finding, root)},
+                       sort_keys=True, ensure_ascii=True, separators=(",", ":"))
     return hashlib.sha256(basis.encode("utf-8")).hexdigest()
 
 
@@ -298,6 +376,10 @@ def collect_source_findings(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if source.id == "capability_contracts":
         findings, metadata = load_capability_contract_findings(root)
+        findings = [{key: value for key, value in item.items()
+                     if key not in {"_naos_context_path", "_naos_self_check_id"}} for item in findings]
+        for index, item in enumerate(findings):
+            item["_naos_context_path"] = f"findings.{index}"
         return findings, {
             "id": source.id,
             "label": source.label,
@@ -351,7 +433,15 @@ def collect_source_findings(
     findings = []
     for context, item in iter_structured_findings(report):
         item = dict(item)
-        item.setdefault("_naos_context_path", ".".join(context))
+        item.pop("_naos_self_check_id", None)
+        item["_naos_context_path"] = ".".join(context)
+        if source.id == "self_check":
+            item["_naos_self_check_id"] = None
+            if len(context) >= 3 and context[0] == "checks" and context[1].isdigit():
+                checks = report.get("checks")
+                index = int(context[1])
+                if isinstance(checks, list) and index < len(checks) and isinstance(checks[index], dict):
+                    item["_naos_self_check_id"] = str(checks[index].get("id") or "unknown")
         findings.append(item)
     return findings, {
         "id": source.id,
@@ -398,12 +488,19 @@ def build_rule(rule_id: str, source: SourceDef, finding: dict[str, Any], profile
 
 def build_result(source: SourceDef, finding: dict[str, Any], profile: str, root: Path) -> tuple[str, dict[str, Any]]:
     source_finding_id = str(finding.get("rule_id") or finding.get("id") or finding.get("status") or "NAOS-FINDING")
-    rule_id = safe_rule_id(finding.get("rule_id") or finding.get("status") or f"{source.id}.{source_finding_id}", f"{source.id}.finding")
+    raw_identity = f"{source.id}.{source_finding_id}"
+    rule_id = safe_rule_id(raw_identity, f"{source.id}.finding")
+    # A structured pair preserves the boundary when either identity has dots;
+    # concatenation, even when hashed, would permit cross-producer aliases.
+    identity_pair = json.dumps([source.id, source_finding_id], ensure_ascii=True, separators=(",", ":"))
+    rule_id += "." + hashlib.sha256(identity_pair.encode("utf-8")).hexdigest()
     message = compact_message(finding)
     level = sarif_level(str(finding.get("severity") or ""), str(finding.get("status") or ""), source.advisory)
     properties = {
         "naos_source_report": source.id,
         "naos_source_finding_id": source_finding_id,
+        "naos_collected_from": ["self_check" if "_naos_self_check_id" in finding else source.id],
+        "naos_self_check_ids": [finding["_naos_self_check_id"]] if finding.get("_naos_self_check_id") else [],
         "naos_profile": profile,
         "naos_control_type": source.control_type,
         "naos_authority_layer": source.authority_layer,
@@ -433,13 +530,27 @@ def build_result(source: SourceDef, finding: dict[str, Any], profile: str, root:
         "ruleId": rule_id,
         "level": level,
         "message": {"text": message},
-        "partialFingerprints": {"naosFindingFingerprint": fingerprint(source.id, rule_id, finding, message)},
+        "partialFingerprints": {"naosFindingFingerprint": fingerprint(source.id, rule_id, finding, root)},
         "properties": properties,
     }
     locations = finding_location(finding, root)
     if locations:
         result["locations"] = locations
     return rule_id, result
+
+
+def _uses_report_ordinal_id(source: SourceDef, finding: dict[str, Any]) -> bool:
+    """Only new declared ordinal producers change exported display labels.
+
+    This is format selection, not authenticated source attribution. Raw source
+    identifiers remain in result properties and ordinary scanners inspect them.
+    """
+    prefixes = {"secret_hygiene": ("SH",), "evidence_classification": ("EC",),
+                "self_check": ("SH", "EC")}.get(source.id, ())
+    identifier = finding.get("id")
+    return (finding.get("id_scheme") == "report_ordinal_v1"
+            and not finding.get("rule_id") and type(identifier) is str
+            and any(re.fullmatch(prefix + r"-[1-9][0-9]*", identifier) for prefix in prefixes))
 
 
 def build_sarif(
@@ -450,9 +561,26 @@ def build_sarif(
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     rules: dict[str, dict[str, Any]] = {}
     results: list[dict[str, Any]] = []
+    seen: dict[tuple[str, str], dict[str, Any]] = {}
+    rule_labels: dict[str, str] = {}
     for source, findings in sources_and_findings:
         for finding in findings:
-            rule_id, result = build_result(source, finding, profile, root)
+            identity = (source.id, finding_signature(finding, root))
+            if identity in seen:
+                prior = seen[identity]["properties"]
+                collected_from = "self_check" if "_naos_self_check_id" in finding else source.id
+                prior["naos_collected_from"] = sorted(set(prior["naos_collected_from"]) | {collected_from})
+                if finding.get("_naos_self_check_id"):
+                    prior["naos_self_check_ids"] = sorted(set(prior["naos_self_check_ids"]) | {finding["_naos_self_check_id"]})
+                continue
+            identity_id, result = build_result(source, finding, profile, root)
+            # Keep the existing full content fingerprint and identity-pair
+            # collision boundary. Only the document-local display/reference
+            # label changes; raw source finding IDs remain in properties.
+            rule_id = (rule_labels.setdefault(identity_id, f"NAOS-D{len(rule_labels) + 1}")
+                       if _uses_report_ordinal_id(source, finding) else identity_id)
+            result["ruleId"] = rule_id
+            seen[identity] = result
             rules.setdefault(rule_id, build_rule(rule_id, source, finding, profile))
             results.append(result)
 
@@ -482,6 +610,56 @@ def build_sarif(
         ],
     }
     return sarif, rules
+
+
+# Explicit aliases for current self-check script stems whose registered source
+# IDs differ. Other registered scripts use naos_<source.id>; own/unknown checks
+# retain a check-specific self-check identity rather than guessed child authority.
+_SELF_CHECK_SOURCE_ALIASES = {
+    "naos_validate_claims": "claims_validation",
+    "naos_validate_test_evidence": "test_evidence_health",
+    "naos_ai_surface_budget": "ai_surface_context_budget",
+    "naos_agent_trace_validate": "agent_trace_validation",
+    "naos_semantic_candidate_readiness": "semantic_candidate_layer",
+}
+
+
+def route_self_check_findings(
+    sources: list[tuple[SourceDef, list[dict[str, Any]]]], root: Path,
+    include_advisory: bool,
+) -> tuple[list[tuple[SourceDef, list[dict[str, Any]]]], dict[str, int]]:
+    """Route exact delegated copies using the producer's recorded check ID.
+
+    This is declared provenance, not authenticated attribution. Equal top-level
+    aggregate copies are redundant only when a nested check provides the same
+    complete finding. A missing standalone child report never drops its copy.
+    """
+    registry = {source.id: source for source in DETERMINISTIC_SOURCES + ADVISORY_SOURCES}
+    routed: list[tuple[SourceDef, list[dict[str, Any]]]] = []
+    aggregate_duplicates = excluded_advisory = 0
+    for source, findings in sources:
+        if source.id != "self_check":
+            routed.append((source, findings))
+            continue
+        nested = {finding_signature(item, root) for item in findings if item.get("_naos_self_check_id")}
+        for item in findings:
+            check_id = item.get("_naos_self_check_id")
+            if not check_id and finding_signature(item, root) in nested:
+                aggregate_duplicates += 1
+                continue
+            origin = source
+            if check_id:
+                source_id = _SELF_CHECK_SOURCE_ALIASES.get(check_id, check_id.removeprefix("naos_"))
+                origin = registry.get(source_id) if check_id.startswith("naos_") else None
+                if origin is None or origin.id == "self_check":
+                    origin = SourceDef(f"self_check.{check_id}", f"Self Check: {check_id}", None,
+                                       source.control_type, source.authority_layer)
+            if origin.advisory and not include_advisory:
+                excluded_advisory += 1
+                continue
+            routed.append((origin, [item]))
+    return routed, {"aggregate_duplicates": aggregate_duplicates,
+                    "excluded_advisory_findings": excluded_advisory}
 
 
 def build_export(
@@ -529,7 +707,16 @@ def build_export(
                 }
             )
 
+    collected_count = sum(len(findings) for _, findings in sources_and_findings)
+    sources_and_findings, accounting = route_self_check_findings(sources_and_findings, root, include_advisory)
+    retained_count = sum(len(findings) for _, findings in sources_and_findings)
     sarif, rules = build_sarif(root=root, profile=profile, sources_and_findings=sources_and_findings)
+    results = sarif["runs"][0]["results"]
+    deterministic_count = sum(item["properties"]["naos_deterministic_or_advisory"] == "deterministic" for item in results)
+    advisory_count = len(results) - deterministic_count
+    accounting.update(collected_findings=collected_count,
+                      duplicate_findings=accounting["aggregate_duplicates"] + retained_count - len(results),
+                      exported_findings=len(results))
     summary = {
         "schema": SUMMARY_SCHEMA,
         "generated_at": generated_at,
@@ -538,6 +725,7 @@ def build_export(
         "output_path": None,
         "sarif_version": SARIF_VERSION,
         "input_reports": input_reports,
+        "export_accounting": accounting,
         "deterministic_findings_count": deterministic_count,
         "advisory_findings_count": advisory_count,
         "skipped_sources": skipped_sources,
@@ -595,13 +783,21 @@ def main(argv: list[str] | None = None) -> int:
         output.write_text(json.dumps(sarif, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         summary["output_path"] = str(output)
 
+    if output is None:
+        # --json remains a summary object; no-file callers can retrieve the
+        # actual document without losing the established summary fields.
+        summary["sarif"] = sarif
+        summary["output_delivery"] = "stdout"
+
     summary_output = Path(args.summary_output) if args.summary_output else report_output_path(root, naos_root, policy, "sarif_export_summary_report")
     write_report(summary_output, summary)
 
     if args.json:
         print(json.dumps(summary, indent=2, sort_keys=True))
+    elif output is None:
+        print(json.dumps(sarif, indent=2, sort_keys=True))
     else:
-        destination = str(output) if output else "stdout only"
+        destination = str(output)
         print(
             "NAOS SARIF export: "
             f"{summary['status']} "

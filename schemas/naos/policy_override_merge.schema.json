@@ -97,7 +97,7 @@
     "merge_strategy": {"type": "object"},
     "allowed_override_paths": {"type": "array", "items": {"type": "string"}},
     "protected_paths": {"type": "array", "items": {"type": "string"}},
-    "effective_policy_path": {"type": ["string", "null"]},
+    "effective_policy_path": {"type": ["string", "null"], "description": "Requested or resolved write target when a write is requested, otherwise null; its presence does not prove a write."},
     "override_summary": {"type": "object"},
     "protected_invariant_violations": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
     "schema_validation_results": {"type": "array", "items": {"type": "object"}},
@@ -108,7 +108,16 @@
     "limitations": {"type": "array", "items": {"type": "string"}},
     "not_claimed": {"type": "array", "items": {"type": "string"}},
     "human_review_required": {"type": "boolean"},
-    "summary": {"type": "object"}
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "effective_policy_written": {
+          "type": "boolean",
+          "description": "True only after this invocation successfully wrote the derived YAML; preexisting targets, rejected merges, dry-run and failed writes are false."
+        }
+      }
+    }
   },
   "$defs": {
     "finding": {

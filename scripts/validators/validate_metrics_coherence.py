@@ -28,7 +28,13 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+SCRIPT_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+from naos_console import configure_console_output  # noqa: E402
+import spec_header  # noqa: E402
 
 try:
     from validator_context import is_kit_repository, print_kit_skip
@@ -64,10 +70,17 @@ class RequirementStats:
     in_progress: List[str]
     planned: List[str]
     doc_only: List[str]
+    unresolved: List[str]
 
     @property
     def total(self) -> int:
-        return len(self.complete) + len(self.in_progress) + len(self.planned)
+        return (
+            len(self.complete)
+            + len(self.in_progress)
+            + len(self.planned)
+            + len(self.doc_only)
+            + len(self.unresolved)
+        )
 
     @property
     def completion_rate(self) -> float:
@@ -106,46 +119,24 @@ def parse_authoritative_source(
         raise FileNotFoundError(f"Authoritative source not found: {specs_path}")
 
     content = specs_path.read_text(encoding="utf-8")
-    fr_stats = RequirementStats([], [], [], [])
-    nfr_stats = RequirementStats([], [], [], [])
+    fr_stats = RequirementStats([], [], [], [], [])
+    nfr_stats = RequirementStats([], [], [], [], [])
 
-    current_req: Optional[str] = None
-    current_type: Optional[str] = None
-
-    for line in content.split("\n"):
-        fr_match = re.match(r"^## (FR-[A-Z0-9-]+):", line)
-        nfr_match = re.match(r"^## (NFR-\d+):", line)
-
-        if fr_match:
-            current_req, current_type = fr_match.group(1), "FR"
-        elif nfr_match:
-            current_req, current_type = nfr_match.group(1), "NFR"
-        elif current_req and "**Status**:" in line:
-            status = line.split("**Status**:")[1].strip()
-
-            if current_type == "FR":
-                if "COMPLETE" in status.upper() or "Implemented" in status:
-                    fr_stats.complete.append(current_req)
-                elif "In Progress" in status:
-                    fr_stats.in_progress.append(current_req)
-                elif "Documentation Only" in status:
-                    fr_stats.doc_only.append(current_req)
-                else:
-                    fr_stats.planned.append(current_req)
-            elif current_type == "NFR":
-                if any(
-                    k in status
-                    for k in ("Verified", "Implemented", "COMPLETE", "Complete")
-                ):
-                    nfr_stats.complete.append(current_req)
-                elif "In Progress" in status:
-                    nfr_stats.in_progress.append(current_req)
-                else:
-                    nfr_stats.planned.append(current_req)
-
-            if verbose:
-                print(f"  {current_req}: {status[:60]}")
-            current_req = current_type = None
+    for rid, status in spec_header.requirement_statuses(content).items():
+        stats = fr_stats if rid.startswith("FR-") else nfr_stats
+        state = spec_header.classify_requirement_status(status)
+        if state == "complete":
+            stats.complete.append(rid)
+        elif state == "in_progress":
+            stats.in_progress.append(rid)
+        elif state == "planned":
+            stats.planned.append(rid)
+        elif state == "documentation_only":
+            stats.doc_only.append(rid)
+        else:
+            stats.unresolved.append(rid)
+        if verbose:
+            print(f"  {rid}: {status or '[status missing]'}")
 
     return AuthoritativeMetrics(fr_stats, nfr_stats, str(specs_path))
 
@@ -216,8 +207,6 @@ def compare_metrics(auth: AuthoritativeMetrics, file_path: Path) -> List[str]:
     file_metrics = extract_metrics_from_file(file_path)
 
     if not file_metrics:
-        if auth.total_requirements == 0:
-            return []
         return [f"Could not extract metrics from {file_path}"]
 
     if (
@@ -240,11 +229,19 @@ def compare_metrics(auth: AuthoritativeMetrics, file_path: Path) -> List[str]:
         discrepancies.append(
             f"FR complete: file={file_metrics['fr_complete']}, authoritative={len(auth.fr.complete)}"
         )
+    if "fr_total" in file_metrics and file_metrics["fr_total"] != auth.fr.total:
+        discrepancies.append(
+            f"FR total: file={file_metrics['fr_total']}, authoritative={auth.fr.total}"
+        )
     if "nfr_complete" in file_metrics and file_metrics["nfr_complete"] != len(
         auth.nfr.complete
     ):
         discrepancies.append(
             f"NFR complete: file={file_metrics['nfr_complete']}, authoritative={len(auth.nfr.complete)}"
+        )
+    if "nfr_total" in file_metrics and file_metrics["nfr_total"] != auth.nfr.total:
+        discrepancies.append(
+            f"NFR total: file={file_metrics['nfr_total']}, authoritative={auth.nfr.total}"
         )
     return discrepancies
 
@@ -257,6 +254,8 @@ def print_authoritative_summary(auth: AuthoritativeMetrics) -> None:
     print(f"  ✅ Complete : {len(auth.fr.complete)}")
     print(f"  🔄 In Progress: {len(auth.fr.in_progress)}")
     print(f"  📋 Planned  : {len(auth.fr.planned)}")
+    print(f"  📄 Documentation only: {len(auth.fr.doc_only)}")
+    print(f"  ⚠️ Unresolved: {len(auth.fr.unresolved)}")
     print(
         f"  {Colors.BOLD}Total: {len(auth.fr.complete)}/{auth.fr.total} ({auth.fr.completion_rate:.1f}%){Colors.END}"
     )
@@ -264,6 +263,8 @@ def print_authoritative_summary(auth: AuthoritativeMetrics) -> None:
     print(f"  ✅ Verified : {len(auth.nfr.complete)}")
     print(f"  🔄 In Progress: {len(auth.nfr.in_progress)}")
     print(f"  📋 Planned  : {len(auth.nfr.planned)}")
+    print(f"  📄 Documentation only: {len(auth.nfr.doc_only)}")
+    print(f"  ⚠️ Unresolved: {len(auth.nfr.unresolved)}")
     print(
         f"  {Colors.BOLD}Total: {len(auth.nfr.complete)}/{auth.nfr.total} ({auth.nfr.completion_rate:.1f}%){Colors.END}"
     )
@@ -278,6 +279,7 @@ def print_authoritative_summary(auth: AuthoritativeMetrics) -> None:
 
 
 def main() -> int:
+    configure_console_output()
     parser = argparse.ArgumentParser(description="Validate metrics coherence")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
@@ -296,6 +298,13 @@ def main() -> int:
     except FileNotFoundError as e:
         print(f"{Colors.RED}ERROR: {e}{Colors.END}")
         return 2
+
+    if auth.total_requirements == 0:
+        print(
+            f"{Colors.RED}ERROR: no requirements parsed from {SPECS_PATH}; "
+            f"completion cannot be verified{Colors.END}"
+        )
+        return 1
 
     if args.verbose:
         print_authoritative_summary(auth)

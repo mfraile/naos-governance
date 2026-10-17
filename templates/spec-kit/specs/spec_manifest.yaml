@@ -67,7 +67,8 @@ traceability_codes:
     definition_patterns:
       - "\\b(AC-[0-9]{3}-[0-9]+)\\b"
   - id: ARCH
-    description: Architecture component anchors defined in 04-architecture.md.
+    description: Architecture components defined in the Components section or exact component headings.
+    definition_source: architecture_components
     required_profiles: [standard, assured]
     defined_in: [04-architecture.md]
     definition_patterns:

@@ -51,7 +51,7 @@ validation:
     - Check related tests, source-to-test mapping, and capability constraints where present
     - Route actionable research/autoresearch/trend-review findings into the control plane
     - Review changed agents, skills, prompts, instructions, workflows, module headers, policies, capabilities, gatekeepers, validators, evidence, dashboards, and AI tool surfaces for contradictions and excessive authority
-    - Use templates/skills/systemic-capability-wiring/SKILL.md as the canonical wiring checklist for capability, feature, validator, AI-surface, doc, source-module, or project-configuration changes
+    - Use .github/skills/systemic-capability-wiring/SKILL.md when installed, otherwise .github/skills/systemic-wiring/SKILL.md when installed or manual source/test and human review as the wiring checklist for capability, feature, validator, AI-surface, doc, source-module, or project-configuration changes
     - Run or recommend naos setup-recommendations when orienting adopters or module choices; use naos add setup-module <module_id> --profile <profile> --dry-run for selected installable modules and never silently enable readiness-only/deferred modules
     - Run or recommend naos memory-readiness before claiming memory or MCP access; memory is advisory recall only, repo evidence outranks memory, do not assume every tool has MCP, and MCP access is not guaranteed; durable writes require authorization and human review, secrets/customer data must not be stored, and unavailable memory means degraded recovery
     - Run or recommend naos task-context --task <id> for active-task handoff context; packs are derived and bounded, do not inject context automatically, and do not replace source artifacts or make memory authoritative

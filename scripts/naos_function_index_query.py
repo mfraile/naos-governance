@@ -31,6 +31,9 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from source_roots import iter_function_index_modules  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -127,12 +130,27 @@ def _load_optional_similarity_filter() -> dict:
             data = yaml.safe_load(f) or {}
     except (OSError, yaml.YAMLError):
         return default
+    if not isinstance(data, dict):
+        print('WARNING: optional similarity configuration must be a mapping; using tokens only', file=sys.stderr)
+        return default
     configured = data.get("optional_similarity_filter") or {}
     if not isinstance(configured, dict):
         return default
     merged = dict(default)
     merged.update({key: configured.get(key, value) for key, value in default.items()})
+    if type(merged['enabled']) is not bool:
+        print('WARNING: optional similarity enabled must be a YAML boolean; using tokens only', file=sys.stderr)
+        merged['enabled'] = False
     return merged
+
+
+def _approved_similarity_provider(config: dict) -> bool:
+    """Only current project configuration can authorize a provider load."""
+    return (config.get('enabled') is True
+            and config.get('provider') == 'local_sentence_transformers'
+            and isinstance(config.get('model'), str) and bool(config['model'].strip())
+            and (config.get('device') is None
+                 or isinstance(config['device'], str) and bool(config['device'].strip())))
 
 
 # ---------------------------------------------------------------------------
@@ -213,69 +231,65 @@ def build_similarity_index() -> None:
     func_count = 0
     tag_only_count = 0
 
-    for package, modules in index.items():
-        if not isinstance(modules, dict):
-            continue
-        for module_name, module_data in modules.items():
-            if not isinstance(module_data, dict):
+    for parts, module_data in iter_function_index_modules(index):
+        module_key = ".".join(parts)
+        module_count += 1
+        purpose = module_data.get("purpose", "")
+        is_tag_only = isinstance(purpose, str) and purpose.strip().startswith(
+            TAG_ONLY_PREFIX
+        )
+        if is_tag_only:
+            tag_only_count += 1
+
+        module_path = module_data.get("source_path") or f"{SRC_ROOT_VAL}/{'/'.join(parts)}.py"
+
+        for func_str in module_data.get("public", []):
+            if not isinstance(func_str, str):
                 continue
-            module_count += 1
-            purpose = module_data.get("purpose", "")
-            is_tag_only = isinstance(purpose, str) and purpose.strip().startswith(
-                TAG_ONLY_PREFIX
-            )
-            if is_tag_only:
-                tag_only_count += 1
+            func_count += 1
+            func_name = func_str.split("(")[0].strip().strip("'\"")
+            doc = ""
+            if "#" in func_str:
+                doc = func_str.split("#", 1)[1].strip()
 
-            module_path = f"{SRC_ROOT_VAL}/{package}/{module_name}.py"
+            key = f"{module_key}.{func_name}"
+            name_tokens = _tokenize(func_name)
+            doc_tokens = set() if is_tag_only else _tokenize(doc)
 
-            for func_str in module_data.get("public", []):
-                if not isinstance(func_str, str):
-                    continue
-                func_count += 1
-                func_name = func_str.split("(")[0].strip().strip("'\"")
-                doc = ""
-                if "#" in func_str:
-                    doc = func_str.split("#", 1)[1].strip()
+            entry: dict = {
+                "tokens": sorted(name_tokens),
+                "doc_tokens": sorted(doc_tokens),
+                "signature": func_str.split("#")[0].strip().strip("'\""),
+                "module": module_path,
+            }
+            entries[key] = entry
 
-                key = f"{package}.{module_name}.{func_name}"
-                name_tokens = _tokenize(func_name)
-                doc_tokens = set() if is_tag_only else _tokenize(doc)
+            if not is_tag_only and doc:
+                descriptions.append((key, f"{func_name} {doc}"))
+            elif not is_tag_only:
+                descriptions.append((key, func_name))
 
-                entry: dict = {
-                    "tokens": sorted(name_tokens),
-                    "doc_tokens": sorted(doc_tokens),
-                    "signature": func_str.split("#")[0].strip().strip("'\""),
-                    "module": module_path,
-                }
-                entries[key] = entry
+        for cls_str in module_data.get("classes", []):
+            if not isinstance(cls_str, str):
+                continue
+            cls_name = cls_str.split("[")[0].strip()
+            key = f"{module_key}.{cls_name}"
+            name_tokens = _tokenize(cls_name)
 
-                if not is_tag_only and doc:
-                    descriptions.append((key, f"{func_name} {doc}"))
-                elif not is_tag_only:
-                    descriptions.append((key, func_name))
+            entry = {
+                "tokens": sorted(name_tokens),
+                "doc_tokens": []
+                if is_tag_only
+                else sorted(_tokenize(purpose) if purpose else set()),
+                "signature": cls_str,
+                "module": module_path,
+            }
+            entries[key] = entry
 
-            for cls_str in module_data.get("classes", []):
-                if not isinstance(cls_str, str):
-                    continue
-                cls_name = cls_str.split("[")[0].strip()
-                key = f"{package}.{module_name}.{cls_name}"
-                name_tokens = _tokenize(cls_name)
-
-                entry = {
-                    "tokens": sorted(name_tokens),
-                    "doc_tokens": []
-                    if is_tag_only
-                    else sorted(_tokenize(purpose) if purpose else set()),
-                    "signature": cls_str,
-                    "module": module_path,
-                }
-                entries[key] = entry
-
-                if not is_tag_only:
-                    descriptions.append(
-                        (key, f"{cls_name} {purpose}" if purpose else cls_name)
-                    )
+            if not is_tag_only:
+                descriptions.append(
+                    (key, f"{cls_name} {purpose}" if purpose else cls_name)
+                )
 
     # Optional semantic provider: disabled by default and project-configured only.
     has_embeddings = False
@@ -285,8 +299,8 @@ def build_similarity_index() -> None:
     embedding_device = similarity_config.get("device")
     embedding_dim = None
 
-    if similarity_config.get("enabled"):
-        if embedding_provider != "local_sentence_transformers" or not embedding_model:
+    if similarity_config.get("enabled") is True:
+        if not _approved_similarity_provider(similarity_config):
             print(
                 "  WARNING: optional similarity is enabled, but provider/model "
                 "is not configured for local_sentence_transformers; index built "
@@ -381,32 +395,30 @@ def query_package(package_name: str) -> str:
     index = load_function_index()
 
     results: list[str] = []
-    for pkg, modules in index.items():
-        if not isinstance(modules, dict):
+    for parts, mod_data in iter_function_index_modules(index):
+        package = ".".join(parts[:-1])
+        if not package.startswith(package_name.replace("/", ".")):
             continue
-        if pkg != package_name and not pkg.startswith(package_name):
-            continue
+        purpose = mod_data.get("purpose", "")
+        used_by = mod_data.get("used_by", [])
 
-        for mod_name, mod_data in modules.items():
-            if not isinstance(mod_data, dict):
-                continue
-            purpose = mod_data.get("purpose", "")
-            used_by = mod_data.get("used_by", [])
-
-            results.append(f"\n## {pkg}.{mod_name}")
-            if purpose:
-                results.append(f"  Purpose: {purpose}")
-            for func_str in mod_data.get("public", []):
-                results.append(f"  - {func_str}")
-            for cls_str in mod_data.get("classes", []):
-                results.append(f"  - [class] {cls_str}")
-            if used_by:
-                results.append(f"  Used by: {', '.join(str(u) for u in used_by)}")
+        results.append(f"\n## {'.'.join(parts)}")
+        if purpose:
+            results.append(f"  Purpose: {purpose}")
+        for func_str in mod_data.get("public", []):
+            results.append(f"  - {func_str}")
+        for cls_str in mod_data.get("classes", []):
+            results.append(f"  - [class] {cls_str}")
+        if used_by:
+            results.append(f"  Used by: {', '.join(str(u) for u in used_by)}")
 
     if not results:
         return f"No package matching '{package_name}' found in FUNCTION_INDEX."
 
-    output = f"# Functions in {SRC_ROOT_VAL}/{package_name}/\n" + "\n".join(results)
+    heading = f"# Functions in {SRC_ROOT_VAL}/{package_name}/"
+    if any(data.get("source_path") and not data["source_path"].startswith(SRC_ROOT_VAL + "/") for _parts, data in iter_function_index_modules(index)):
+        heading = f"# Functions matching {package_name}/"
+    output = heading + "\n" + "\n".join(results)
     return _truncate_output(output)
 
 
@@ -434,8 +446,15 @@ def query_similar(phrase: str) -> str:
         )
 
     meta = sim_index.get("_meta", {})
+    if not isinstance(meta, dict):
+        meta = {}
     entries = sim_index.get("entries", {})
-    has_embeddings = meta.get("has_embeddings", False)
+    similarity_config = _load_optional_similarity_filter()
+    has_embeddings = (meta.get("has_embeddings") is True
+                      and _approved_similarity_provider(similarity_config)
+                      and meta.get('embedding_provider') == similarity_config['provider']
+                      and meta.get('embedding_model') == similarity_config['model']
+                      and meta.get('embedding_device') == similarity_config['device'])
 
     results: list[tuple[float, str, str, str]] = []
 
@@ -443,10 +462,8 @@ def query_similar(phrase: str) -> str:
         try:
             from sentence_transformers import SentenceTransformer
 
-            model_name = meta.get("embedding_model")
-            if not model_name:
-                raise ValueError("similarity index metadata is missing embedding_model")
-            device = meta.get("embedding_device")
+            model_name = similarity_config['model']
+            device = similarity_config['device']
             if device:
                 model = SentenceTransformer(model_name, device=device)
             else:
@@ -474,6 +491,9 @@ def query_similar(phrase: str) -> str:
                 return _truncate_output("\n".join(lines))
         except ImportError:
             pass
+        except Exception as exc:
+            print(f'WARNING: optional similarity query failed ({exc}); using tokens only', file=sys.stderr)
+            results.clear()
 
     # Jaccard fallback
     query_tokens = _tokenize(phrase)
@@ -537,27 +557,22 @@ def query_for_task(task_id: str) -> str:
         f"# Functions for {task_id} (requirements: {', '.join(requirements)})\n"
     ]
 
-    for pkg, modules in index.items():
-        if not isinstance(modules, dict):
+    for parts, mod_data in iter_function_index_modules(index):
+        purpose = mod_data.get("purpose", "")
+
+        if isinstance(purpose, str) and purpose.strip().startswith(TAG_ONLY_PREFIX):
             continue
-        for mod_name, mod_data in modules.items():
-            if not isinstance(mod_data, dict):
-                continue
-            purpose = mod_data.get("purpose", "")
 
-            if isinstance(purpose, str) and purpose.strip().startswith(TAG_ONLY_PREFIX):
-                continue
+        purpose_str = str(purpose).upper()
+        matches = [r for r in requirements if r.upper() in purpose_str]
+        if not matches:
+            continue
 
-            purpose_str = str(purpose).upper()
-            matches = [r for r in requirements if r.upper() in purpose_str]
-            if not matches:
-                continue
-
-            results.append(f"\n## {pkg}.{mod_name}")
-            results.append(f"  Purpose: {purpose}")
-            results.append(f"  Matches: {', '.join(matches)}")
-            for func_str in mod_data.get("public", []):
-                results.append(f"  - {func_str}")
+        results.append(f"\n## {'.'.join(parts)}")
+        results.append(f"  Purpose: {purpose}")
+        results.append(f"  Matches: {', '.join(matches)}")
+        for func_str in mod_data.get("public", []):
+            results.append(f"  - {func_str}")
 
     if len(results) == 1:
         return (

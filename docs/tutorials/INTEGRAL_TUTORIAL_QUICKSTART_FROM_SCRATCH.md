@@ -35,11 +35,15 @@ This writes only the preview directory. Review:
 
 ## 2. Activate explicitly
 
-> Portable preview generation is exercised on Linux with Python 3.11. Managed
-> `--activate` mutation is currently supported only on Darwin ARM64 with CPython
-> 3.11–3.13; Linux, Windows, and other unsupported tuples refuse before target
-> mutation. If this host is unsupported, stop after reviewing the preview and
-> perform activation later on a supported host.
+> Native macOS ARM64/APFS, Ubuntu x86_64/ext4 and Windows 11 x86_64/NTFS
+> have recorded Python 3.11–3.13 installation checks and selected workflow and
+> recovery evidence. These are separate checks: qualification for an activation,
+> update or receiving operation depends on its named route and evidence, not
+> only the operating system. Linux aarch64 is not qualified. Before activation,
+> check the [platform evidence and limits](../PLATFORM_ADAPTERS.md).
+> Preview generation and package installation
+> do not qualify filesystem recovery. On unsupported hosts, review an absent
+> external `--preview-dir` without activating.
 
 ```bash
 naos-governance init "$PROJECT" --new --tier quickstart --activate
@@ -83,11 +87,21 @@ deliberately select Lite if the project needs that real-project workflow.
 
 ## 5. Make one bounded project change
 
+Initialize Git in the new project before reviewing Git diffs or committing.
+Configure your Git author identity if needed before making a commit.
+
+```bash
+git init
+```
+
 1. State the exact file and behavior to change.
 2. Inspect current source and tests.
 3. Make the smallest coherent edit.
 4. Run the project's own canonical test command.
-5. Review the diff and commit through the installed hook.
+5. Review the diff and commit. The copied hook is inactive until you explicitly
+   review and integrate it from the Git worktree root. Preserve existing hook
+   paths and default hooks; follow the Installation Manual's hook-integration
+   boundary before claiming that a commit ran NAOS checks.
 
 Quickstart's hook and research record provide bounded governance evidence.
 They do not create a task lifecycle, approve a merge, admit evidence, or replace

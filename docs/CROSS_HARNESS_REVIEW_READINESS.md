@@ -16,6 +16,11 @@ It reads `naos/cross_harness_review_readiness.yaml` and writes
 `naos/reports/cross_harness_review_readiness.json`, with a session-scoped copy
 when session identity exists.
 
+A valid configuration with `enabled: false` reports `disabled`; it does not
+evaluate readiness prerequisites or report `ready`. Invalid configurations
+still report `invalid_config`, even when disabled. This status behavior is
+shared across macOS, Ubuntu and Windows.
+
 ## What It Checks
 
 The readiness report checks local configuration for:

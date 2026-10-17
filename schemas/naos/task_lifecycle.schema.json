@@ -57,7 +57,7 @@
     "schema": {"const": "naos.task_lifecycle.v1"},
     "generated_at": {"type": "string"},
     "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"type": "string"},
+    "status": {"type": "string", "enum": ["active_task", "completed_task", "registry_task", "task_not_found", "recovery_mode_mismatch", "unsupported_legacy_status", "active_task_not_found", "invalid_transition", "already_completed", "completed_card_collision", "invalid_task_lifecycle", "verification_prerequisites_failed", "completion_preview", "completed"]},
     "action": {"enum": ["inspect", "complete"]},
     "task_id": {"type": ["string", "null"]},
     "lifecycle_state": {"type": ["string", "null"]},

@@ -1,5 +1,5 @@
 ---
-model: "[ADAPT: e.g. claude-opus-4-5 | o1 | gemini-1.5-pro]"
+# Model omitted: adopter host selection applies; this does not pin or approve a model.
 naos_model_role: review
 description: "Code review agent — quality, security, and governance-evidence review"
 tools:

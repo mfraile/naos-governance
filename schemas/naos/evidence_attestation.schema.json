@@ -112,9 +112,18 @@
         "digest": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
         "size_bytes": {"type": ["integer", "null"]},
         "modified_time": {"type": ["string", "null"]},
-        "freshness": {"type": "object"}
-      }
+        "freshness": {
+          "type": "object",
+          "properties": {
+            "basis": {"const": "file_mtime"},
+            "source_freshness": {"const": "not_established"}
+          }
+        },
+        "creator_attribution": {"$ref": "#/$defs/creator_attribution"}
+      },
+      "allOf": [{"if": {"required": ["creator_attribution"], "properties": {"creator_attribution": {"properties": {"status": {"const": "declared"}}}}}, "then": {"required": ["generated_by"], "properties": {"generated_by": {"type": "object", "required": ["operator_id"], "properties": {"operator_id": {"type": "string", "minLength": 1, "maxLength": 128}, "operator_source": {"type": ["string", "null"]}}}}}}, {"if": {"required": ["creator_attribution"], "properties": {"creator_attribution": {"properties": {"status": {"const": "unknown"}}}}}, "then": {"properties": {"generated_by": {"type": "object", "properties": {"operator_id": {"type": "null"}}}}}}]
     },
+    "creator_attribution": {"type": "object", "additionalProperties": false, "required": ["status", "source", "reason", "content_sha256", "authenticated"], "properties": {"status": {"enum": ["declared", "unknown"]}, "source": {"enum": ["artifact.generated_by.operator_id", "none"]}, "reason": {"enum": ["content_metadata", "missing_metadata", "unsupported_format", "metadata_too_large", "invalid_metadata", "invalid_operator_id"]}, "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "authenticated": {"const": false}}, "allOf": [{"if": {"properties": {"status": {"const": "declared"}}}, "then": {"properties": {"source": {"const": "artifact.generated_by.operator_id"}, "reason": {"const": "content_metadata"}}}, "else": {"properties": {"source": {"const": "none"}}}}]},
     "missing_artifact": {
       "type": "object",
       "additionalProperties": true,

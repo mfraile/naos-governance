@@ -113,7 +113,6 @@ not_claimed:
 related_docs:
   - docs/CONTROL_PLANE.md
   - docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
-  - docs/decisions/ADR-0013-opencode-governed-activation-surface.md
 related_scripts:
   - scripts/naos_opencode_config_hygiene.py
   - scripts/naos_control_plane_review.py

@@ -21,8 +21,8 @@ gates:
     profile_behavior:
       quickstart: "Advisory install check only."
       lite: "Warn when expected guardrail files are missing."
-      standard: "Require install readiness evidence for governed workflow."
-      assured: "Block when core install evidence is missing."
+      standard: "Configured posture: require install readiness evidence for governed workflow. Effective severity may be lower until mapped capability maturity is reached."
+      assured: "Configured posture: block when core install evidence is missing. Effective severity may be lower until mapped capability maturity is reached."
     required_inputs:
       - ".ai/RULES.md"
     required_evidence:
@@ -50,8 +50,8 @@ gates:
     profile_behavior:
       quickstart: "Advisory context reminder."
       lite: "Warn when context files are incomplete."
-      standard: "Require configured context before governed work."
-      assured: "Block when configured context evidence is missing."
+      standard: "Configured posture: require configured context before governed work. Effective severity may be lower until mapped capability maturity is reached."
+      assured: "Configured posture: block when configured context evidence is missing. Effective severity may be lower until mapped capability maturity is reached."
     required_inputs:
       - ".ai/RULES.md"
       - "CLAUDE.md"
@@ -80,8 +80,8 @@ gates:
     profile_behavior:
       quickstart: "Advisory planning guidance."
       lite: "Warn when planning evidence is missing."
-      standard: "Require planning evidence for normal SDLC work."
-      assured: "Block when planning evidence is missing."
+      standard: "Configured posture: require planning evidence for normal SDLC work. Effective severity may be lower until mapped capability maturity is reached."
+      assured: "Configured posture: block when planning evidence is missing. Effective severity may be lower until mapped capability maturity is reached."
     required_inputs:
       - "naos/TASK_REGISTRY.yaml"
       - "naos/PLANNING_BASELINES.yaml"
@@ -108,6 +108,37 @@ gates:
         field: implementation_readiness.status
         allowed_values: [ready]
         profiles: [lite, standard, assured]
+    evidence_requirements:
+      "naos/reports/memory_context_readiness.json":
+        type: report
+        optional: true
+      "naos/reports/memory_provider_access.json":
+        type: report
+        optional: true
+      "naos/reports/memory_use_policy.json":
+        type: report
+        optional: true
+      "naos/reports/task_context_pack.json":
+        type: report
+        optional: true
+      "naos/reports/local_context_index.json":
+        type: report
+        optional: true
+      "naos/reports/local_context_query.json":
+        type: report
+        optional: true
+      "naos/reports/semantic_candidate_layer.json":
+        type: report
+        optional: true
+      "naos/reports/graph_context_readiness.json":
+        type: report
+        optional: true
+      "naos/reports/graph_context_query.json":
+        type: report
+        optional: true
+      "naos/reports/session_lifecycle.json":
+        type: report
+        optional: true
     validators:
       - id: task_registry
         script: scripts/naos_validate_task_registry.py
@@ -207,8 +238,8 @@ gates:
     profile_behavior:
       quickstart: "Advisory scope reminder."
       lite: "Warn when scope evidence is missing."
-      standard: "Require scope evidence before implementation."
-      assured: "Block when scope evidence or exception approval is missing."
+      standard: "Configured posture: require scope evidence before implementation. Effective severity may be lower until mapped capability maturity is reached."
+      assured: "Configured posture: block when scope evidence or exception approval is missing. Effective severity may be lower until mapped capability maturity is reached."
     required_inputs:
       - "naos/TASK_REGISTRY.yaml"
     required_evidence:
@@ -226,6 +257,37 @@ gates:
       - "naos/reports/graph_context_readiness.json"
       - "naos/reports/graph_context_query.json"
       - "naos/reports/session_lifecycle.json"
+    evidence_requirements:
+      "naos/reports/memory_context_readiness.json":
+        type: report
+        optional: true
+      "naos/reports/memory_provider_access.json":
+        type: report
+        optional: true
+      "naos/reports/memory_use_policy.json":
+        type: report
+        optional: true
+      "naos/reports/task_context_pack.json":
+        type: report
+        optional: true
+      "naos/reports/local_context_index.json":
+        type: report
+        optional: true
+      "naos/reports/local_context_query.json":
+        type: report
+        optional: true
+      "naos/reports/semantic_candidate_layer.json":
+        type: report
+        optional: true
+      "naos/reports/graph_context_readiness.json":
+        type: report
+        optional: true
+      "naos/reports/graph_context_query.json":
+        type: report
+        optional: true
+      "naos/reports/session_lifecycle.json":
+        type: report
+        optional: true
     validators:
       - id: truth_validation
         script: scripts/naos_validate_truth.py
@@ -302,8 +364,8 @@ gates:
     profile_behavior:
       quickstart: "Advisory anti-duplication reminder."
       lite: "Warn when function-index evidence is missing."
-      standard: "Require function-index or equivalent code-governance evidence."
-      assured: "Block when configured code-governance evidence is missing."
+      standard: "Configured posture: require function-index or equivalent code-governance evidence. Effective severity may be lower until mapped capability maturity is reached."
+      assured: "Configured posture: block when configured code-governance evidence is missing. Effective severity may be lower until mapped capability maturity is reached."
     required_inputs:
       - "src/"
     required_evidence:
@@ -315,6 +377,10 @@ gates:
       - "naos/reports/secret_hygiene.json"
       - "naos/reports/dependency_integrity.json"
       - "naos/reports/secure_coding_controls.json"
+    evidence_requirements:
+      "naos/reports/module_header_traceability.json":
+        type: report
+        optional: true
     validators:
       - id: code_quality_audit
         script: scripts/naos_code_quality_audit.py
@@ -379,8 +445,8 @@ gates:
     profile_behavior:
       quickstart: "Advisory only."
       lite: "Warn when test evidence is missing."
-      standard: "Require test evidence for normal SDLC work."
-      assured: "Block when configured high-risk test evidence is missing."
+      standard: "Configured posture: require test evidence for normal SDLC work. Effective severity may be lower until mapped capability maturity is reached."
+      assured: "Configured posture: block when configured high-risk test evidence is missing. Effective severity may be lower until mapped capability maturity is reached."
     required_inputs:
       - "tests/"
     required_evidence:
@@ -417,8 +483,8 @@ gates:
     profile_behavior:
       quickstart: "Advisory only."
       lite: "Warn when evidence summaries are missing."
-      standard: "Require configured evidence summaries."
-      assured: "Block when evidence pack or exception approval is missing."
+      standard: "Configured posture: require configured evidence summaries. Effective severity may be lower until mapped capability maturity is reached."
+      assured: "Configured posture: block when evidence pack or exception approval is missing. Effective severity may be lower until mapped capability maturity is reached."
     required_inputs:
       - "naos/reports/"
     required_evidence:
@@ -444,6 +510,37 @@ gates:
       - "naos/reports/test_quality_hygiene.json"
       - "naos/reports/dependency_integrity.json"
       - "naos/reports/secure_coding_controls.json"
+    evidence_requirements:
+      "naos/reports/module_header_traceability.json":
+        type: report
+        optional: true
+      "naos/reports/memory_context_readiness.json":
+        type: report
+        optional: true
+      "naos/reports/memory_provider_access.json":
+        type: report
+        optional: true
+      "naos/reports/memory_use_policy.json":
+        type: report
+        optional: true
+      "naos/reports/task_context_pack.json":
+        type: report
+        optional: true
+      "naos/reports/local_context_index.json":
+        type: report
+        optional: true
+      "naos/reports/local_context_query.json":
+        type: report
+        optional: true
+      "naos/reports/semantic_candidate_layer.json":
+        type: report
+        optional: true
+      "naos/reports/graph_context_readiness.json":
+        type: report
+        optional: true
+      "naos/reports/graph_context_query.json":
+        type: report
+        optional: true
     validators:
       - id: claims_validation
         script: scripts/naos_validate_claims.py
@@ -584,12 +681,15 @@ gates:
     profile_behavior:
       quickstart: "Not required."
       lite: "Not required."
-      standard: "Advisory only."
-      assured: "Warning unless explicitly configured as stronger."
+      standard: "Configured posture: advisory only. Effective severity may be lower until mapped capability maturity is reached."
+      assured: "Configured posture: warning unless explicitly configured as stronger. Effective severity may be lower until mapped capability maturity is reached."
     required_inputs:
       - "task_battery/"
     required_evidence:
       - "naos/reports/behavioral_evaluation.json"
+    evidence_requirements:
+      "naos/reports/behavioral_evaluation.json":
+        type: manual
     validators:
       - id: behavioral_evaluation_readiness
         status: manual
@@ -613,8 +713,8 @@ gates:
     profile_behavior:
       quickstart: "Not activated."
       lite: "Not activated."
-      standard: "Advisory design awareness only."
-      assured: "Advisory readiness review only unless a project deliberately configures it."
+      standard: "Configured posture: advisory design awareness only. Effective severity may be lower until mapped capability maturity is reached."
+      assured: "Configured posture: advisory readiness review only unless a project deliberately configures it. Effective severity may be lower until mapped capability maturity is reached."
     required_inputs:
       - "capabilities/runtime_handoff.yaml"
       - "capabilities/structured_substrate.yaml"
@@ -622,6 +722,9 @@ gates:
       - "capabilities/digital_twin_evaluation.yaml"
     required_evidence:
       - "naos/reports/advanced_readiness.json"
+    evidence_requirements:
+      "naos/reports/advanced_readiness.json":
+        type: manual
     validators:
       - id: advanced_architecture_readiness
         status: manual

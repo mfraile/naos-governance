@@ -9,23 +9,24 @@ status: hypothesis
 tier: 1
 
 observed_pattern: >
-  When baseline_compliance is measured from a single behavioral run (N=1), natural
-  stochastic variance of ±3-5 pp between consecutive runs causes the drift check
-  to fire ALERT for alert_threshold_pp=5 even when model behaviour is stable.
-  This is not a true regression — it is measurement noise masquerading as drift.
+  Hypothesis for separately authorized future behavioral measurements: a single
+  observation may not distinguish stochastic variation from a regression. This
+  seed has no confirming sessions and establishes no numerical variance bound
+  or sufficient repetition count.
 
 context: >
-  Applies to: any future behavioral drift invocation where baseline was established from N<3 runs.
-  The 5-pp alert threshold is too tight for N=1 baselines; N≥5 runs produce
-  a stable mean that tolerates the threshold correctly.
+  The shipped autoresearch runner compares deterministic grader reports with
+  --drift and an explicit --baseline PATH. It does not perform repeated model
+  invocations or infer semantic behavioral drift from those reports.
 
 mitigation: >
-  Always establish baseline with --runs 5 (or the runs value from monthly_drift_check
-  in autoresearch.yaml). Update baseline_compliance in autoresearch.yaml after each
-  scheduled drift check by taking the MEAN of that run's report, not a single value.
-  If N=1 drift check fires ALERT, rerun with --runs 5 before escalating.
-  The drift handler should log when it detects an N=1 baseline condition —
-  ensure this warning is not ignored.
+  For the shipped runner, use its documented --drift and --baseline PATH inputs
+  only after inspecting the baseline's provenance, profile and comparable scope.
+  Preserve the report and investigate changed evidence before interpreting an
+  alert. For a separately authorized behavioral experiment, agree a reviewed
+  sampling and uncertainty protocol before any provider invocation; record
+  repetitions and uncertainty in that experiment's evidence. This seed neither
+  supplies a repetition flag nor changes runner configuration or approval gates.
 
 evidence_count: 0
 first_observed: null

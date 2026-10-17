@@ -5,6 +5,8 @@
 # Depth: scaffold — advisory only, no blocking advanced gates
 #
 # REFERENCE document only — does NOT modify live project files.
+# Membership describes this named profile, not the current project installation.
+# Root AGENTS.md and actual files are authoritative for installed availability.
 # Use the NAOS CLI to extract and adapt these components for a new project.
 
 ---

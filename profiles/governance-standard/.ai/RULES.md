@@ -14,11 +14,13 @@ Use this file as the compact rule index. For command details, use
 `.github/skills/systemic-capability-wiring/SKILL.md`; for AI-surface budget
 warnings, use `.github/skills/ai-surface-health-review/SKILL.md` where installed.
 
+> **H: Human-review obligation**: Each `[H]` table row/heading binds the full rule and its `Review Rn [H]` evidence. Human reviewers must verify all applicable rule requirements and listed evidence, withholding approval until verified; waivers require existing project-policy authority. Deterministic triggers/refusals remain; passing checks does not prove full rule satisfaction.
+
 ## Enforcement Key
 
 | Mark | Meaning |
 | --- | --- |
-| BLOCKING | Must be satisfied or explicitly waived by project policy/human review. |
+| BLOCKING [H] | Must be satisfied or explicitly waived by project policy/human review. |
 | ADVISORY | Must be considered and documented when relevant; may become stricter by team policy. |
 | ADAPT | Project-specific details must be filled in before relying on the rule. |
 
@@ -26,34 +28,36 @@ warnings, use `.github/skills/ai-surface-health-review/SKILL.md` where installed
 
 | Rule | Standard posture |
 | --- | --- |
-| 1 Update existing files | BLOCKING |
-| 2 No archive folders | BLOCKING |
+| 1 Update existing files | BLOCKING [H] |
+| 2 No archive folders | BLOCKING [H] |
 | 3 PM infrastructure | ADAPT |
 | 4 Documentation impact | ADAPT |
-| 5 Exploration notes only | BLOCKING |
+| 5 Exploration notes only | BLOCKING [H] |
 | 6 README/status freshness | ADVISORY |
-| 7 Deep analysis protocol | BLOCKING |
-| 8 Bulk migration safety | BLOCKING |
+| 7 Deep analysis protocol | BLOCKING [H] |
+| 8 Bulk migration safety | BLOCKING [H] |
 | 9 Enhancement scope control | ADVISORY |
-| 10 License compliance | BLOCKING |
-| 11 Anti-duplication | ADVISORY unless project policy requires blocking |
+| 10 License compliance | BLOCKING [H] |
+| 11 Anti-duplication | ADVISORY unless project policy requires blocking [H] |
 | 12 Data flow invariants | ADAPT |
-| 13 Resilience and retry | BLOCKING |
-| 14 Event schema evolution | BLOCKING |
+| 13 Resilience and retry | BLOCKING [H] |
+| 14 Event schema evolution | BLOCKING [H] |
 | 15 Module boundaries | ADAPT |
 | 16 Spec alignment | ADAPT |
 | 17 Pre-coding context | ADAPT |
-| 18 Agent and skill governance | BLOCKING |
-| 19 Memory governance | BLOCKING |
-| 20 Dependency declaration | BLOCKING |
+| 18 Agent and skill governance | BLOCKING [H] |
+| 19 Memory governance | BLOCKING [H] |
+| 20 Dependency declaration | BLOCKING [H] |
 | 21 ML model governance | ADVISORY unless ML is production-critical |
 | 22 Artifact/resource management | ADVISORY |
 | 23 Project rule lifecycle | ADAPT |
-| 24 Work-item context brief | BLOCKING |
+| 24 Work-item context brief | BLOCKING [H] |
 | 25 Instinct recording | ADVISORY |
-| 26 Cognitive checkpoint | BLOCKING |
+| 26 Cognitive checkpoint | BLOCKING [H] |
 
-## Rule 1: Update Existing Files
+## Rule 1: Update Existing Files [H]
+
+> **Review R1 [H]**: Document searches; new-file justification/index; stated exceptions.
 
 Do not create throwaway summaries, final reports, or duplicate status files when a
 canonical file already exists. Update the current status, backlog, registry,
@@ -62,10 +66,19 @@ README, changelog, specs, or existing doc instead.
 **Policy-review patterns** (not comprehensively checked by pre-commit):
 `*_SUMMARY.md`, `*_ANALYSIS.md`, `*_PLAN.md`, `*_FINAL*.md`; hook source is narrower.
 
-## Rule 2: No Archive Folders
+## Rule 2: No Archive Folders [H]
 
-Do not create `archive/`, `old/`, `backup/`, or similar history folders. Git is
-the archive. Remove obsolete tracked files with normal version-control review.
+> **Review R2 [H]**: Changed paths; obsolete-file removal through Git.
+
+Do not retain obsolete files in shadow history folders; use normal Git removal
+and review instead. Legitimate archive/backup domain code is allowed, including
+`src/archive/domain.py` and `db_backup.py`.
+
+**Generated-hook scope**: blocks top-level `archive/`, `docs/archive/`, and
+`<NAOS_ROOT>/archive/` (default `naos/archive/`), plus `.bak`/`.backup` file
+extensions. Other obsolete copies remain subject to Review R2; a passing
+filename check does not establish their absence.
+
 
 ## Rule 3: Project PM Infrastructure - ADAPT
 
@@ -79,7 +92,9 @@ Before code, configuration, workflow, policy, or governance-surface changes,
 check whether root docs, specs, operations docs, quick references, manuals,
 capability contracts, gates, dashboards, or evidence docs require updates.
 
-## Rule 5: Exploration Notes Only
+## Rule 5: Exploration Notes Only [H]
+
+> **Review R5 [H]**: Exploration authority; research-card gates, exclusions and artifact paths.
 
 `docs/exploration/` may contain POCs, research notes, tool evaluations, and
 brainstorming. It is not authoritative for code/spec behavior unless promoted
@@ -92,7 +107,9 @@ Before pushing material changes to main, review README, current status,
 changelog, dashboard, and quick-start docs. If changed behavior affects adopters,
 refresh the relevant docs or record why no doc update is needed.
 
-## Rule 7: Deep Analysis Protocol
+## Rule 7: Deep Analysis Protocol [H]
+
+> **Review R7 [H]**: All seven principles and every completion-gate item.
 
 Apply evidence-first analysis to analytical work, bug fixes, dependency choices,
 and non-trivial implementation.
@@ -106,7 +123,9 @@ work requires reproduction and impact search; feature work requires affected-fil
 search, fallback, tests/evidence, and scope boundary; "think deeply" or
 "ultrathink" requires the full protocol.
 
-## Rule 8: Bulk Code Migration Safety
+## Rule 8: Bulk Code Migration Safety [H]
+
+> **Review R8 [H]**: Trigger scope and executed evidence for all five migration gates.
 
 For broad replacements or changes touching many files: enumerate occurrences,
 classify each occurrence, avoid corrupting comments/examples/string literals,
@@ -120,14 +139,18 @@ map impacts before implementation, evaluate viable alternatives, define fallback
 and rollback posture, keep adjacent opportunities out of scope, and update
 governance surfaces in the same change when behavior changes.
 
-## Rule 10: License Compliance
+## Rule 10: License Compliance [H]
+
+> **Review R10 [H]**: Licence verification at source; copyleft-risk/unknown/custom human sign-off.
 
 Do not add AGPL/GPL/copyleft-risk dependencies without explicit project approval.
 Verify license at source such as package metadata, PyPI, registry metadata, or
 LICENSE files; do not rely only on README badges. Declare approved dependencies
 with exact versions and update third-party/license records when applicable.
 
-## Rule 11: Anti-Duplication Protocol
+## Rule 11: Anti-Duplication Protocol — conditional [H]
+
+> **Review R11 [H]**: Index setup, queries/searches, task-card reuse and post-creation refresh.
 
 Before creating new functions, classes, scripts, validators, prompts, skills, or
 docs, inspect the existing codebase and indexes where present. Reuse or extend
@@ -139,14 +162,18 @@ Project teams must encode schema boundaries, data ownership, privacy rules,
 domain isolation, lifecycle routing, convergence points, and prohibited flows.
 Until adapted, agents must not infer data-flow authority from this generic file.
 
-## Rule 13: Resilience and Retry Conventions
+## Rule 13: Resilience and Retry Conventions [H]
+
+> **Review R13 [H]**: All external/error paths: configured timeouts, jitter, fail-fast, handling.
 
 External calls and failure paths need configured timeouts, retry only for
 transient failures, backoff with jitter, fail-fast for validation/auth/client
 errors, and no silent swallowing. Errors must be re-raised, logged at useful
 severity, surfaced to DLQ/evidence, or explicitly justified.
 
-## Rule 14: Event Schema Evolution
+## Rule 14: Event Schema Evolution [H]
+
+> **Review R14 [H]**: Event validation, additive changes, golden tests and breaking-version retention.
 
 Event and message schemas should be additive within a version, preserve backward
 compatibility, validate from raw payloads, maintain golden examples where useful,
@@ -170,7 +197,9 @@ slice, IO contract, existing implementation to reuse, risks, tests, evidence,
 and explicit out-of-scope. Use `naos/PRE_IMPLEMENTATION_ALIGNMENT.md` when the
 work is ambiguous or high risk.
 
-## Rule 18: Agent and Skill Governance
+## Rule 18: Agent and Skill Governance [H]
+
+> **Review R18 [H]**: Portable boundaries, model field, scope/budgets, handoffs and skill registration.
 
 Agents, prompts, skills, instructions, and workflows are governed surfaces.
 Keep frontmatter parseable, tools least-privilege, phase handoffs
@@ -178,7 +207,9 @@ human-mediated, and project specifics in project-context files or explicit
 overlays. Changing these surfaces requires AI-surface budget, systemic impact,
 and control-plane review routing as applicable.
 
-## Rule 19: Memory Governance
+## Rule 19: Memory Governance [H]
+
+> **Review R19 [H]**: Memory sensitive-content exclusions and governance authority.
 
 Memory is advisory recall, not evidence or authority. Do not store secrets, PII,
 customer data, credentials, regulated content, or sensitive project data in AI
@@ -186,7 +217,9 @@ memory. Durable memory writes require configured, authorized, verified,
 policy-permitted access plus explicit human approval. Repo evidence outranks
 memory.
 
-## Rule 20: Dependency Declaration
+## Rule 20: Dependency Declaration [H]
+
+> **Review R20 [H]**: Import/declaration parity, exact pins and clean-environment validation.
 
 Every new runtime, dev, model, service, integration, MCP server, or tool
 dependency must be declared in the proper manifest/config, versioned where
@@ -211,7 +244,9 @@ Define how project-specific rules are proposed, reviewed, accepted, deprecated,
 and enforced. New rules need ownership, affected surfaces, evidence expectations,
 and rollback/deprecation handling.
 
-## Rule 24: Work-Item Context Brief Protocol
+## Rule 24: Work-Item Context Brief Protocol [H]
+
+> **Review R24 [H]**: Every multi-step WI: brief ≤7 lines; prerequisites, files, goal, constraint.
 
 Each active work item should be recoverable from repository files: goal, scope,
 constraints, affected files, evidence, risks, decisions, current status, and next
@@ -223,7 +258,9 @@ Recurring AI/human failure patterns may become instincts before they become
 rules. Record the trigger, example, risk, proposed response, owner, and review
 date. Do not duplicate existing rules.
 
-## Rule 26: Cognitive Checkpoint Protocol
+## Rule 26: Cognitive Checkpoint Protocol [H]
+
+> **Review R26 [H]**: All triggers/fields/brackets and stop/handoff; supplied context is not proof.
 
 At phase transitions, long sessions, high context pressure, or before risky
 changes, checkpoint status, changed files, evidence, decisions, risks, and next

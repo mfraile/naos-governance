@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 import re
+import shlex
+import stat
 import sys
 import tomllib
 import urllib.error
@@ -57,6 +60,7 @@ NOT_CLAIMED = [
 ]
 LIMITATIONS = [
     "Offline mode checks repository-local declarations, lock-style pins, configured allowlists, and optional documentation install snippets only.",
+    "Unsupported-manifest discovery is a bounded filename inventory of selected roots/exclusions, not dependency parsing or whole-repository package review; concurrent filesystem changes are not an authenticated snapshot.",
     "Online registry checks are disabled by default and require explicit operator consent.",
     "Registry existence does not prove a package is safe, maintained, vulnerability-free, legitimate, or appropriate for use.",
     "Name-similarity findings are heuristic review evidence and can false-positive on legitimate package names.",
@@ -65,6 +69,9 @@ LIMITATIONS = [
     "Hash cross-checks compare configured local evidence only; they do not download artifacts or verify registry-hosted distributions.",
 ]
 DEFAULT_RULES = {
+    "unsupported_manifest_roots": ["."],
+    "unsupported_manifest_patterns": ["package.json", "go.mod", "pom.xml", "build.gradle*", "Cargo.toml", "*.csproj"],
+    "manifest_discovery_limits": {"max_entries": 10000, "max_depth": 32, "max_manifests": 1000},
     "manifest_files": ["pyproject.toml", "requirements.txt", "requirements/*.txt"],
     "lock_files": ["requirements.txt", "requirements/*.txt", "poetry.lock", "uv.lock", "Pipfile.lock"],
     "docs_roots": ["README.md", "docs", "INSTALLATION_MANUAL.md"],
@@ -150,8 +157,10 @@ def parse_requirement_line(line: str) -> tuple[str | None, bool]:
     if not match:
         return None, False
     name = normalize_package_name(match.group(1))
-    suffix = match.group(2)
-    pinned = "==" in suffix or "===" in suffix or " @ " in cleaned or cleaned.startswith(f"{match.group(1)} @")
+    # Environment marker comparisons are not package version pins.
+    requirement = cleaned.split(";", 1)[0]
+    suffix = match.group(2).split(";", 1)[0]
+    pinned = "==" in suffix or " @ " in requirement or requirement.startswith(f"{match.group(1)} @")
     return name, pinned
 
 
@@ -259,7 +268,7 @@ def expand_patterns(root: Path, patterns: list[str]) -> list[Path]:
 
 def relative(path: Path, root: Path) -> str:
     try:
-        return str(path.relative_to(root))
+        return path.relative_to(root).as_posix()
     except ValueError:
         return str(path)
 
@@ -570,14 +579,38 @@ def docs_files(root: Path, rules: dict[str, Any]) -> list[Path]:
 
 
 INSTALL_COMMAND_RE = re.compile(
-    r"\b(?:python\s+-m\s+pip|pip|pip3|uv|poetry|pipenv)\s+(?:install|add)\s+([^\n`;&|]+)",
+    r"""\b(?:python\s+-m\s+pip|pip|pip3|uv|poetry|pipenv)\s+(?:install|add)\s+((?:"[^"\n`]*"|'[^'\n`]*'|[^\n`;&|'"])+)""",
     re.IGNORECASE,
 )
 
 
+# Bounded literal snippet parsing, not pip execution or a complete shell parser.
+INSTALL_OPTIONS_WITH_OPERANDS = {
+    "-r", "--requirement", "-c", "--constraint", "-e", "--editable",
+    "-i", "--index-url", "--extra-index-url", "-f", "--find-links",
+    "--trusted-host", "-t", "--target", "--prefix", "--root", "--src",
+    "--platform", "--python-version", "--implementation", "--abi",
+    "-C", "--config-settings", "--upgrade-strategy", "--no-binary", "--only-binary",
+    "--proxy", "--retries", "--timeout", "--cert", "--client-cert",
+    "--cache-dir", "--log", "--progress-bar", "--root-user-action", "--report",
+}
+
+
 def parse_install_packages(command_args: str) -> list[tuple[str, bool]]:
+    try:
+        tokens = shlex.split(command_args, posix=True)
+    except ValueError:
+        # An incomplete quoted snippet provides no reliable literal operands.
+        return []
     packages: list[tuple[str, bool]] = []
-    for token in command_args.split():
+    skip_operand = False
+    for token in tokens:
+        if skip_operand:
+            skip_operand = False
+            continue
+        if token in INSTALL_OPTIONS_WITH_OPERANDS:
+            skip_operand = True
+            continue
         if token.startswith("-") or token in {"install", "add"}:
             continue
         name, pinned = parse_requirement_line(token)
@@ -596,6 +629,114 @@ def scan_docs_install_snippets(root: Path, rules: dict[str, Any]) -> list[dict[s
     return snippets
 
 
+def unsupported_manifest_inventory(root: Path, rules: dict[str, Any]) -> dict[str, Any]:
+    """Finite filename-only inventory; never parse unsupported dependency declarations."""
+    result: dict[str, Any] = {
+        "status": "complete", "scope": "selected_unsupported_manifest_inventory_only",
+        "roots": [], "patterns": [], "excluded_dirs": [], "entries_visited": 0,
+        "unsupported_manifests": [], "issues": [], "limits": {},
+    }
+    seen: set[str] = set()
+    stopped = False
+
+    def issue(path: str, reason: str) -> None:
+        result["issues"].append({"path": path, "reason": reason})
+        result["status"] = "incomplete"
+
+    try:
+        roots = rules.get("unsupported_manifest_roots", ["."])
+        patterns = rules.get("unsupported_manifest_patterns", DEFAULT_RULES["unsupported_manifest_patterns"])
+        excluded = rules.get("exclude_dirs", DEFAULT_RULES["exclude_dirs"])
+        if not isinstance(roots, list) or not roots or not isinstance(patterns, list) or not patterns:
+            raise ValueError("inventory roots and patterns must be nonempty lists")
+        if len(roots) > 100 or len(patterns) > 100:
+            raise ValueError("inventory root or pattern count exceeds finite bound")
+        if not isinstance(excluded, list) or len(excluded) > 1000 or any(not isinstance(x, str) or len(x) > 1024 for x in excluded):
+            raise ValueError("exclude_dirs must be a list of strings")
+        for value in roots:
+            if not isinstance(value, str) or not value or len(value) > 1024 or value.startswith("/") or Path(value).is_absolute() or any(x in value for x in ("\\", ":", "*", "?", "[")) or ".." in Path(value).parts:
+                raise ValueError("inventory roots must be literal project-relative paths")
+        for value in patterns:
+            if not isinstance(value, str) or not value or len(value) > 1024 or any(x in value for x in ("/", "\\", ":")) or value in (".", ".."):
+                raise ValueError("inventory patterns must match filenames only")
+        limits = rules.get("manifest_discovery_limits", DEFAULT_RULES["manifest_discovery_limits"])
+        caps = {"max_entries": 100000, "max_depth": 64, "max_manifests": 10000}
+        if not isinstance(limits, dict):
+            raise ValueError("manifest_discovery_limits must be a mapping")
+        limits = {key: limits.get(key, DEFAULT_RULES["manifest_discovery_limits"][key]) for key in caps}
+        if any(type(value) is not int or not 1 <= value <= caps[key] for key, value in limits.items()):
+            raise ValueError("manifest discovery limits outside finite supported bounds")
+        result.update(roots=sorted(set(roots)), patterns=sorted(set(patterns)), excluded_dirs=sorted(set(excluded)), limits=limits)
+    except ValueError as exc:
+        issue(".", str(exc))
+        return result
+
+    excluded_names = {x.casefold() for x in excluded}
+
+    def checked(path: Path) -> os.stat_result:
+        rel = path.relative_to(root)
+        for candidate in [root, *[root.joinpath(*rel.parts[:n]) for n in range(1, len(rel.parts) + 1)]]:
+            info = candidate.lstat()
+            if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+                raise ValueError("symlink_or_reparse_path_not_followed")
+            if not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
+                raise ValueError("non_regular_path_not_followed")
+        return info
+
+    def walk(path: Path, depth: int) -> None:
+        nonlocal stopped
+        if stopped:
+            return
+        rel = path.relative_to(root).as_posix()
+        if any(part.casefold() in excluded_names for part in path.relative_to(root).parts):
+            return
+        if rel in seen:
+            return
+        seen.add(rel)
+        if result["entries_visited"] >= limits["max_entries"]:
+            issue(rel, "max_entries_reached")
+            stopped = True
+            return
+        result["entries_visited"] += 1
+        try:
+            info = checked(path)
+            if stat.S_ISREG(info.st_mode):
+                matches = [pattern for pattern in result["patterns"] if fnmatch.fnmatchcase(path.name.casefold(), pattern.casefold())]
+                if matches:
+                    if len(result["unsupported_manifests"]) >= limits["max_manifests"]:
+                        issue(rel, "max_manifests_reached")
+                        stopped = True
+                    else:
+                        result["unsupported_manifests"].append({"path": rel, "matched_patterns": matches, "dependency_assessment": "not_assessed"})
+                return
+            if depth >= limits["max_depth"]:
+                issue(rel, "max_depth_reached")
+                return
+            names = []
+            with os.scandir(path) as entries:
+                for entry in entries:
+                    if len(names) >= limits["max_entries"] - result["entries_visited"]:
+                        issue(rel, "directory_entry_bound_reached")
+                        stopped = True
+                        return
+                    names.append(entry.name)
+            after = checked(path)
+            if (info.st_dev, info.st_ino, info.st_mtime_ns) != (after.st_dev, after.st_ino, after.st_mtime_ns):
+                issue(rel, "directory_changed_during_discovery")
+                return
+            for name in sorted(names):
+                walk(path / name, depth + 1)
+        except (OSError, ValueError) as exc:
+            issue(rel, str(exc) if isinstance(exc, ValueError) else type(exc).__name__)
+
+    for value in result["roots"]:
+        walk(root / value, 0)
+    result["unsupported_manifests"].sort(key=lambda row: row["path"])
+    if not result["issues"] and result["unsupported_manifests"]:
+        result["status"] = "partial"
+    return result
+
+
 def edit_distance(a: str, b: str) -> int:
     if a == b:
         return 0
@@ -603,6 +744,8 @@ def edit_distance(a: str, b: str) -> int:
         return len(b)
     if not b:
         return len(a)
+    # Restricted adjacent-transposition distance (optimal string alignment).
+    previous_previous: list[int] | None = None
     previous = list(range(len(b) + 1))
     for index_a, char_a in enumerate(a, start=1):
         current = [index_a]
@@ -614,14 +757,18 @@ def edit_distance(a: str, b: str) -> int:
                     previous[index_b - 1] + (0 if char_a == char_b else 1),
                 )
             )
-        previous = current
+            if previous_previous is not None and index_b > 1 and char_a == b[index_b - 2] and a[index_a - 2] == char_b:
+                current[-1] = min(current[-1], previous_previous[index_b - 2] + 1)
+        previous_previous, previous = previous, current
     return previous[-1]
 
 
 def nearest_known_package(name: str, known: set[str], threshold: int) -> tuple[str | None, int | None]:
     best_name: str | None = None
     best_distance: int | None = None
-    for candidate in known:
+    if name in known or threshold <= 0:
+        return None, None
+    for candidate in sorted(known):
         if candidate == name or abs(len(candidate) - len(name)) > threshold:
             continue
         distance = edit_distance(name, candidate)
@@ -731,6 +878,7 @@ def build_report(
     timeout: float,
 ) -> dict[str, Any]:
     severity = severity_for_profile(profile, policy)
+    manifest_inventory = unsupported_manifest_inventory(root, rules)
     packages = load_declared_packages(root, rules)
     locked = load_lockfile_packages(root, rules)
     allowlisted = {normalize_package_name(item) for item in list_value(rules.get("allowlisted_packages"))}
@@ -744,6 +892,18 @@ def build_report(
     provenance_files, provenance_packages, provenance_issues = load_provenance_evidence(root, rules)
     findings: list[dict[str, Any]] = []
     registry_results: dict[str, dict[str, Any]] = {}
+    for row in manifest_inventory["unsupported_manifests"]:
+        findings.append(finding(
+            f"package_reality.unsupported_manifest.{row['path']}", "advisory", "not_assessed",
+            "Unsupported dependency manifest is inventoried only; its dependencies were not reviewed.",
+            path=row["path"], matched_patterns=row["matched_patterns"],
+        ))
+    for index, row in enumerate(manifest_inventory["issues"], start=1):
+        findings.append(finding(
+            f"package_reality.manifest_inventory_incomplete.{index}", "advisory", "manifest_inventory_incomplete",
+            "Unsupported-manifest discovery was refused or bounded; clean coverage is not established.",
+            path=row["path"], reason=row["reason"],
+        ))
     findings.extend(findings_from_issues("sbom", sbom_issues, "advisory" if severity == "advisory" else "warning"))
     findings.extend(findings_from_issues("provenance", provenance_issues, severity))
 
@@ -952,6 +1112,9 @@ def build_report(
     summary = finding_counts(findings)
     summary.update(
         {
+            "unsupported_manifest_inventory_status": manifest_inventory["status"],
+            "unsupported_manifest_count": len(manifest_inventory["unsupported_manifests"]),
+            "manifest_inventory_issue_count": len(manifest_inventory["issues"]),
             "declared_packages": len(declared_names),
             "locked_packages": len(locked),
             "declared_without_lockfile_entry": sum(1 for name in declared_names if name not in locked and name not in allowlisted),
@@ -991,6 +1154,7 @@ def build_report(
             "human_approval_required_before_cost": True,
         },
         "summary": summary,
+        "unsupported_manifest_inventory": manifest_inventory,
         "scans": {
             "manifest_files": sorted(declared_by_source),
             "declared_packages": [

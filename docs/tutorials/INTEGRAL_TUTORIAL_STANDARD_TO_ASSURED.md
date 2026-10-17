@@ -143,7 +143,17 @@ plan-only semantics. Neither invocation applies the transition. Every legacy
 Review every preservation and mutation decision in
 `/tmp/naos-assured-plan.json`. Only unchanged `kit_owned_derived` regular files
 may be replaced. Adopter-owned, modified, ambiguous, unsafe, and out-of-scope
-paths must remain preserved. Record the exact lowercase `plan_sha256` value.
+paths must remain preserved. For current v3 managed plans, approve the SHA-256
+of the complete saved plan file, including its exact bytes; do not extract a
+nested digest or hash redirected console output:
+
+```bash
+python -c "import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())" /tmp/naos-assured-plan.json
+```
+
+Use the printed lowercase digest as `PLAN_DIGEST` below. Legacy POSIX content
+plans use their embedded `plan_sha256`; legacy Windows plans use
+`digest_sha256`. Do not substitute one plan format's approval identity for another.
 
 Do not substitute `naos init --activate`: on a valid managed project it routes
 to this same plan-only workflow and cannot bypass separate apply.

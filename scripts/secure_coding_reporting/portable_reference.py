@@ -8,6 +8,8 @@ from typing import Any
 
 import yaml
 
+from naos_evidence_contracts import _safe_file
+
 PORTABLE_SCHEMA = "naos.secure_coding_portable_reference_manifest.v1"
 PORTABLE_BOUNDARY = (
     "Portable adaptation changes filesystem paths only; the P1 register, binding, "
@@ -22,11 +24,19 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return value
 
 
-def _safe_regular_file(path: Path, label: str) -> Path:
-    if path.is_symlink():
-        raise ValueError(f"{label} must not be a symlink: {path}")
-    if not path.is_file():
-        raise ValueError(f"{label} is missing: {path}")
+def _checked_path(
+    path: Path, root: Path, label: str, *, allow_missing: bool = False
+) -> Path:
+    """Reuse stored-evidence no-link/reparse checks; not concurrent custody."""
+    try:
+        relative = path.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"{label} must remain within its source root: {path}") from exc
+    if ".." in relative.parts:
+        raise ValueError(f"{label} must remain within its source root: {path}")
+    state = _safe_file(root, path)
+    if state != "available" and not (allow_missing and state == "missing"):
+        raise ValueError(f"{label} is {state}: {path}")
     return path
 
 
@@ -34,13 +44,17 @@ def _safe_relative(raw: object, label: str) -> Path:
     if not isinstance(raw, str) or not raw.strip():
         raise ValueError(f"{label} must be a non-empty relative path")
     path = Path(raw)
-    if path.is_absolute() or ".." in path.parts:
+    if path.is_absolute() or path.drive or path.root or ".." in path.parts:
         raise ValueError(f"{label} must remain repository-relative: {raw}")
     return path
 
 
-def _copy_file(source: Path, destination: Path, label: str) -> None:
-    _safe_regular_file(source, label)
+def _copy_file(
+    source: Path, destination: Path, label: str, *, source_root: Path,
+    destination_root: Path,
+) -> None:
+    _checked_path(source, source_root, label)
+    _checked_path(destination, destination_root, label, allow_missing=True)
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
 
@@ -79,7 +93,8 @@ def validate_portable_references(
         root / naos_root / "secure_coding_control_render_manifest.yaml"
     )
     try:
-        _safe_regular_file(portable_manifest_path, "portable render manifest")
+        _safe_relative(naos_root, "NAOS root")
+        _checked_path(portable_manifest_path, root, "portable render manifest")
         portable = _load_yaml(portable_manifest_path)
         if portable.get("schema") != PORTABLE_SCHEMA:
             raise ValueError(
@@ -92,7 +107,7 @@ def validate_portable_references(
         )
         register_path = root / naos_root / register_rel
         register = _load_yaml(
-            _safe_regular_file(register_path, "portable canonical register")
+            _checked_path(register_path, root, "portable canonical register")
         )
 
         target_specs = portable.get("targets")
@@ -103,7 +118,7 @@ def validate_portable_references(
             kit_root / "configs/secure_coding_control_render_manifest.yaml"
         )
         canonical_manifest = _load_yaml(
-            _safe_regular_file(canonical_manifest_path, "canonical render manifest")
+            _checked_path(canonical_manifest_path, kit_root, "canonical render manifest")
         )
         canonical_targets = {
             item.get("path"): item
@@ -127,9 +142,12 @@ def validate_portable_references(
             )
             optional = spec.get("optional") is True
             project_path = root / project_rel
-            if not project_path.exists() and optional:
+            _checked_path(
+                project_path, root, f"portable target {project_rel}",
+                allow_missing=optional,
+            )
+            if optional and not project_path.exists():
                 continue
-            _safe_regular_file(project_path, f"portable target {project_rel}")
             source_key = source_rel.as_posix()
             canonical_target = canonical_targets.get(source_key)
             if canonical_target is None:
@@ -172,20 +190,26 @@ def validate_portable_references(
                 register_path,
                 virtual_root / canonical_register_rel,
                 "portable canonical register",
+                source_root=root, destination_root=virtual_root,
             )
             _copy_file(
                 kit_root / canonical_schema_rel,
                 virtual_root / canonical_schema_rel,
                 "canonical register schema",
+                source_root=kit_root, destination_root=virtual_root,
             )
             _copy_file(
                 kit_root / canonical_renderer_rel,
                 virtual_root / canonical_renderer_rel,
                 "canonical renderer",
+                source_root=kit_root, destination_root=virtual_root,
             )
 
             for source, canonical_rel, label in copy_plan:
-                _copy_file(source, virtual_root / canonical_rel, label)
+                _copy_file(
+                    source, virtual_root / canonical_rel, label,
+                    source_root=root, destination_root=virtual_root,
+                )
 
             for detector_id, entry in detector_catalog.items():
                 if not isinstance(entry, dict) or not isinstance(
@@ -198,14 +222,19 @@ def validate_portable_references(
                 )
                 project_source = root / detector_rel
                 kit_source = kit_root / detector_rel
-                if project_source.is_file() and not project_source.is_symlink():
-                    source = project_source
+                _checked_path(
+                    project_source, root, f"project detector host {detector_id}",
+                    allow_missing=True,
+                )
+                if project_source.is_file():
+                    source, source_root = project_source, root
                 else:
-                    source = kit_source
+                    source, source_root = kit_source, kit_root
                 _copy_file(
                     source,
                     virtual_root / detector_rel,
                     f"detector host {detector_id}",
+                    source_root=source_root, destination_root=virtual_root,
                 )
 
             canonical_view = {
@@ -217,6 +246,10 @@ def validate_portable_references(
                 "targets": selected_targets,
             }
             manifest_destination = virtual_root / canonical_manifest_rel
+            _checked_path(
+                manifest_destination, virtual_root, "canonical manifest destination",
+                allow_missing=True,
+            )
             manifest_destination.parent.mkdir(parents=True, exist_ok=True)
             manifest_destination.write_text(
                 yaml.safe_dump(canonical_view, sort_keys=False),

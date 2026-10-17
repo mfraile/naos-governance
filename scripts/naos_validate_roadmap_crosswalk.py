@@ -18,6 +18,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    controlled_utc_now_text,
     exit_code_for_summary,
     finding_counts,
     is_kit_repository,
@@ -29,6 +30,7 @@ from naos_policy import (  # noqa: E402
     status_from_counts,
     write_report,
 )
+from naos_validate_claims import evidence_verified  # noqa: E402
 
 IMPLEMENTED_STATES = {"implemented", "shipped", "done", "complete", "completed"}
 VALID_STATES = IMPLEMENTED_STATES | {"planned", "gated", "rejected", "deferred", "experimental"}
@@ -87,16 +89,43 @@ def load_crosswalk(path: Path | None) -> tuple[list[dict[str, Any]], str | None]
 
 def parse_markdown_crosswalk(path: Path) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
+    status_column: int | None = None
+
+    def cell_value(value: str) -> str:
+        # Formatting wrappers do not expand the accepted state vocabulary.
+        return value.strip().strip("`*").strip().casefold()
+
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")] if "|" in line else []
+        if cells and not ID_PATTERN.search(line):
+            status_columns = [index for index, cell in enumerate(cells)
+                              if cell_value(cell) in {"status", "state"}]
+            if status_columns:
+                status_column = status_columns[0] if len(status_columns) == 1 else None
+                continue
+            if not all(re.fullmatch(r":?-+:?", cell) for cell in cells):
+                status_column = None
         ids = ID_PATTERN.findall(line)
         if not ids:
+            if not cells:
+                status_column = None
             continue
-        state = ""
-        for candidate in VALID_STATES:
-            if re.search(rf"\b{re.escape(candidate)}\b", line, re.IGNORECASE):
-                state = candidate
-                break
-        entries.append({"id": ids[0], "status": state or "candidate", "line": line.strip()})
+        declared: list[str] = []
+        if cells and status_column is not None and status_column < len(cells):
+            declared.append(cell_value(cells[status_column]))
+        else:
+            # A declaration consumes the remaining text; competing or negated
+            # prose is not a state, even if it contains a recognized word.
+            matches = re.findall(r"\b(?:status|state)[ \t]*:[ \t]*([^|\r\n]+)", line, re.IGNORECASE)
+            declared.extend(cell_value(value) for value in matches)
+        if len(declared) == 1 and declared[0] in VALID_STATES | {"candidate"}:
+            state = declared[0]
+        elif declared or any(re.search(rf"\b{re.escape(value)}\b", line, re.IGNORECASE)
+                             for value in VALID_STATES):
+            state = "review_required"
+        else:
+            state = "candidate"
+        entries.append({"id": ids[0], "status": state, "line": line.strip()})
     return entries
 
 
@@ -118,18 +147,15 @@ def find_default_crosswalk(root: Path, naos_root: str) -> Path | None:
 
 
 def evidence_exists(root: Path, evidence: Any) -> bool:
-    if isinstance(evidence, str):
-        return (root / evidence).exists() or Path(evidence).exists()
+    """Require contained regular local support, using the claims contract.
+
+    Lists retain their existing any-supported-reference meaning. External
+    references may be included as context but cannot establish support, even
+    when they carry a caller-supplied verification flag.
+    """
     if isinstance(evidence, list):
         return any(evidence_exists(root, item) for item in evidence)
-    if isinstance(evidence, dict):
-        ref = evidence.get("path") or evidence.get("file") or evidence.get("url")
-        if not ref:
-            return False
-        if str(ref).startswith(("http://", "https://")):
-            return evidence.get("verified") is True
-        return evidence_exists(root, str(ref))
-    return False
+    return evidence_verified(root, evidence, {})
 
 
 def validate(
@@ -165,7 +191,9 @@ def validate(
                     "id": item_id,
                     "severity": "warning",
                     "status": "invalid_state",
-                    "message": f"Unknown crosswalk status: {state}",
+                    "message": ("Markdown crosswalk status is missing, ambiguous or unsupported; "
+                                "use one exact Status/State cell or explicit declaration."
+                                if state == "review_required" else f"Unknown crosswalk status: {state}"),
                 }
             )
         if state in IMPLEMENTED_STATES and not evidence_exists(root, entry.get("evidence")):
@@ -174,7 +202,7 @@ def validate(
                     "id": item_id,
                     "severity": severity,
                     "status": "implemented_without_evidence",
-                    "message": "Item is marked implemented/shipped without existing evidence.",
+                    "message": "Item is marked implemented/shipped without a contained regular local evidence file.",
                 }
             )
 
@@ -205,7 +233,10 @@ def validate(
 
     return {
         "schema": "naos.roadmap_crosswalk_validation.v1",
+        "generated_at": controlled_utc_now_text(),
         "profile": profile,
+        "project_root": str(root.resolve()),
+        "naos_root": naos_root,
         "status": status,
         "crosswalk_file": crosswalk_file,
         "summary": summary,
@@ -218,6 +249,9 @@ def validate(
         "limitations": [
             "Validation applies only to configured roadmap and crosswalk sources.",
             "Implemented or shipped status requires local evidence references.",
+            "Markdown states require one exact Status/State table cell or explicit declaration; ambiguous prose requires review.",
+            "Local support must be a project-relative regular file without symlink or reparse components; its content is not independently verified.",
+            "External references and verification flags alone do not establish implementation evidence.",
         ],
     }
 

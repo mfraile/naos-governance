@@ -1,7 +1,8 @@
 ---
-name: "cognitive-checkpoint"
-description: "Provide recovery-grade checkpoints at Rule 26 trigger points. Invoke at phase transitions, non-obvious discoveries, tool depth, context pressure, or pre-handoff."
-parameters: []
+name: cognitive-checkpoint
+description: Provide recovery-grade checkpoints at Rule 26 trigger points. Invoke at phase transitions, non-obvious discoveries, tool depth, context pressure, or pre-handoff.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # SKILL: cognitive-checkpoint
@@ -18,13 +19,21 @@ A cognitive checkpoint is a **structured memory save** that captures enough cont
 for ANY agent (including yourself after compaction) to resume exactly where you left off
 without re-reading every file.
 
-**Why it matters**: `wi9_recovery_with_both` scores 33% even with a story card AND Engram
-memory — because the checkpoints lack the 5 critical fields. This skill provides the template
-that makes checkpoints actually useful for recovery.
+**Why it matters**: A task card or memory entry can still omit the state needed
+for recovery. Capture the five fields below and verify recovery against current
+repository evidence. This template does not establish a measured recovery score
+or guarantee that another agent can resume correctly.
 
 **Memory requirement**: Use Engram only when memory/MCP access and durable writes are configured, authorized, verified, permitted by memory-use policy, and explicitly human-approved for durable write use. Run or consult `naos memory-readiness`, `naos memory-access`, and `naos memory-use-policy` before assuming access. If Engram is already installed but this project is not connected, run `naos memory check`. If memory is deferred, disabled, unauthorized, unverified, disallowed by memory-use policy, or unavailable, save the same structured payload into the active compact/task card and mark the project as using degraded recovery.
 
 ---
+
+The shipped memory-use policy disables automatic and durable write-back and
+reports enabling either flag as blocking. Under that baseline, use the compact
+or task-card fallback. Human permission alone does not establish configured,
+verified or policy-permitted access. The guarded `mem_*` examples below describe
+an external workflow only if every access and policy condition is met; they do
+not enable memory writes or replace the fallback.
 
 ## Quick Start
 
@@ -51,14 +60,20 @@ that makes checkpoints actually useful for recovery.
 
 ### PAUL Context Brackets (Rule 26 companion)
 
-> Every checkpoint MUST pre-declare the active PAUL bracket. Brackets are estimates of remaining context-window headroom and dictate behavioral changes. Use Copilot's status bar / Claude's `/context` to estimate.
+This is the normative PAUL bracket table for installed checkpoint guidance.
+For the same explicitly supplied estimate, `used = 100 - remaining`.
+Record the caller or identified host display that supplied the estimate; these
+instructions do not measure model context. If the percentage is absent, invalid
+or unavailable, declare `UNKNOWN`, not FRESH, and do not infer a measured value
+from a task type or static AI-surface budget. Continue the profile's phase,
+discovery, compaction and handoff checkpoint guidance when the signal is unknown.
 
-| Bracket | Headroom remaining | Behavioral change | Trigger interplay |
-|---|---|---|---|
-| **FRESH** | > 75% | Normal cadence. Speculative exploration permitted. | T1–T5 fire as written. |
-| **MODERATE** | 35–75% | Prefer focused tool calls; summarise verbose tool outputs before continuing. | T3 frequency raised: checkpoint every 4 tool calls. |
-| **DEEP** | 25–35% | No new exploration branches. Compact memory before any new agent invocation. Pre-handoff (T5) becomes mandatory before *any* sub-task. | Force a T1 + T5 checkpoint as soon as DEEP is entered. |
-| **CRITICAL** | < 25% | Save a full checkpoint, then hand off. | Normative stop; hook cannot intercept tools. |
+| Bracket | Headroom remaining | Used equivalent | Behavioral change | Trigger interplay |
+|---|---|---|---|---|
+| **FRESH** | 75 < remaining <= 100 | 0 <= used < 25 | Normal cadence. Speculative exploration permitted. | T1–T5 fire as written. |
+| **MODERATE** | 35 <= remaining <= 75 | 25 <= used <= 65 | Prefer focused tool calls; summarise verbose tool outputs before continuing. | T3 frequency raised: checkpoint every 4 tool calls. |
+| **DEEP** | 25 <= remaining < 35 | 65 < used <= 75 | No new exploration branches. Compact memory before any new agent invocation. Pre-handoff (T5) becomes mandatory before *any* sub-task. | Force a T1 + T5 checkpoint as soon as DEEP is entered. |
+| **CRITICAL** | 0 <= remaining < 25 | 75 < used <= 100 | Save a full checkpoint, then hand off. | Normative stop; hook cannot intercept tools. |
 
 **How to declare in a checkpoint:**
 ```

@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -27,10 +26,11 @@ from naos_policy import (  # noqa: E402
     is_kit_repository,
     kit_root,
     load_policy,
+    load_yaml_temporal_text,
     normalize_profile,
     report_default_path,
     report_output_path,
-    severity_for_profile,
+    resolve_report_rule_severity,
     status_from_counts,
     write_report,
 )
@@ -150,7 +150,7 @@ def as_mapping(value: Any) -> dict[str, Any]:
 
 
 def load_yaml_mapping(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = load_yaml_temporal_text(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"Expected YAML mapping: {path}")
     return data
@@ -200,13 +200,15 @@ def profile_posture(rules: dict[str, Any], profile: str) -> dict[str, Any]:
     return defaults.get(profile, defaults["quickstart"])
 
 
+def severity_for_rules_resolution(root: Path, naos_root: str, profile: str, policy: dict[str, Any], posture: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+    return resolve_report_rule_severity(
+        profile, policy, posture.get("severity"),
+        advisory=is_kit_repository(root, naos_root),
+    )
+
+
 def severity_for_rules(root: Path, naos_root: str, profile: str, policy: dict[str, Any], posture: dict[str, Any]) -> str:
-    if is_kit_repository(root, naos_root):
-        return "advisory"
-    configured = str(posture.get("severity") or "").strip()
-    if configured in {"advisory", "warning", "required", "blocking"}:
-        return configured
-    return severity_for_profile(profile, policy)
+    return severity_for_rules_resolution(root, naos_root, profile, policy, posture)[0]
 
 
 def finding(identifier: str, severity: str, status: str, message: str, actions: list[str] | None = None, **extra: Any) -> dict[str, Any]:
@@ -679,7 +681,7 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, in
     posture_rules_path, _ = resolve_seed_path(root, naos_root, policy, "learning_loop_rules", "learning_loop_rules.yaml", args.rules)
     rules = load_yaml_mapping(posture_rules_path) if posture_rules_path.exists() else {}
     posture = profile_posture(rules, profile)
-    severity = severity_for_rules(root, naos_root, profile, policy, posture)
+    severity, severity_downgrade = severity_for_rules_resolution(root, naos_root, profile, policy, posture)
     current_time = now_datetime()
 
     paths = {
@@ -698,7 +700,7 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, in
         ("state", active),
         ("history", history),
     ]
-    findings: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = [severity_downgrade] if severity_downgrade else []
     all_records: list[tuple[str, dict[str, Any], str]] = []
     seen_ids: dict[str, str] = {}
     duplicate_ids: list[str] = []

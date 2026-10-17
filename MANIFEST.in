@@ -11,6 +11,8 @@ recursive-include baselines *
 include configs/features.yaml
 include configs/profile_generated_surface_contract.json
 include configs/profile_rules_source.yaml
+include configs/source_modes.json
+include configs/generated_source_recipes.json
 include docs/COMPLIANCE_MAPPING.md
 include docs/OSFI_E23_MAPPING.md
 include docs/DORA_MAPPING.md
@@ -23,6 +25,12 @@ recursive-include docs/diagrams *.mmd
 recursive-exclude * __pycache__
 recursive-exclude * *.pyc
 recursive-exclude docs *
+include docs/PLATFORM_ADAPTERS.md
+include docs/AI_METADATA_SCOPE.md
+include docs/COMPLETED_CARD_INTEGRITY.md
+include docs/LANGUAGE_COVERAGE.md
+include docs/PROJECT_CONTEXT_FACTS.md
+include docs/UPGRADE_RECOVERY_BOUNDARIES.md
 include docs/COMPLIANCE_MAPPING.md
 include docs/OSFI_E23_MAPPING.md
 include docs/DORA_MAPPING.md
@@ -35,3 +43,24 @@ exclude configs/naos_private_project_coherence_overrides.json
 exclude configs/naos_public_export_manifest.yaml
 exclude schemas/naos/public_export_manifest.schema.json
 exclude scripts/naos_public_export.py
+
+# Kit dependencies referenced by distributed capability cards.
+include INSTALLATION_MANUAL.md
+include NAOS_CATALOG.md
+include README.md
+include ROADMAP.md
+include docs/ASI_AICM_MAPPING.md
+include docs/CI_DECLARATION_POSTURE.md
+include docs/CONFIGURATION_POSTURE_REVIEW.md
+include docs/CROSS_HARNESS_REVIEW_READINESS.md
+include docs/INDEX.md
+include docs/HOOK_ACTIVATION.md
+include docs/HOST_CONTEXT_BUDGET.md
+include docs/SYSTEMIC_CAPABILITY_WIRING.md
+include docs/TOOL_NEUTRAL_USAGE.md
+include docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
+include docs/tutorials/README.md
+include docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md
+include docs/tutorials/PROFESSIONAL_ADOPTION_ENGINE.md
+include plugins/naos-governance/.codex-plugin/plugin.json
+include plugins/naos-governance-claude-code/.claude-plugin/plugin.json

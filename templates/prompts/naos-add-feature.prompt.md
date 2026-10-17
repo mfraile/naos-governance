@@ -76,11 +76,16 @@ Update these files following `.ai/RULES.md`:
    - Extract schemas, existing code, acceptance criteria
    - This card is your FOCUS during implementation
 
-1. **specs/10-execution.md** — Add {{input:task_id}} to task matrix
-   - Include: ID, Title, Phase, Type, FR/NFR, Status, Owner, Target End, Acceptance
+1. **naos/TASK_REGISTRY.yaml** — Add {{input:task_id}} as the canonical task first.
+   - Include ID, title, requirement, phase, priority, owner, estimate and acceptance.
+   - Use planned lifecycle/not_started delivery/unverified verification for a new task.
+   - Preserve existing task records and the registry's identity fields.
 
-2. **naos/PROJECT_STATUS.md** — Add to work breakdown table
-   - Include: FR/NFR, Title, Owner, Status, Next Action, Target, Blocked?
+2. **Derived views** — Run `python scripts/workflows/sync_from_registry.py`, then `python scripts/workflows/sync_spec_statuses.py` after updating the registry.
+   - These Python commands work without Make; `make -f Makefile.naos gov-refresh` remains the full refresh wrapper where Make is installed.
+   - This derives the Task Matrix in `specs/10-execution.md` and `naos/PROJECT_STATUS.md`.
+   - Do not manually add rows inside `BEGIN/END TASK_MATRIX` or `BEGIN/END SYNC_*` markers.
+   - `sync_from_registry.py --team TEAM_ID` is a stdout-only preview; it does not publish shared views.
 
 3. **CHANGELOG.md** — Add under [Unreleased] > Added
    - Brief description with key features
@@ -93,7 +98,7 @@ Update these files following `.ai/RULES.md`:
 **Before updating**:
 1. ✅ **Rule 1**: Update existing files only (no new analysis/summary files)
 2. ✅ **Rule 2**: No archive folders
-3. ✅ **Rule 3**: PM status in ONE place (`naos/PROJECT_STATUS.md`)
+3. ✅ **Rule 3**: Task status in `naos/TASK_REGISTRY.yaml`; `naos/PROJECT_STATUS.md` is derived
 4. ✅ **Rule 4**: Verify impact on ALL documentation
 5. ✅ **Rule 8**: Inventory & Regeneration loop completed → `make -f Makefile.naos gov-refresh`
 6. ✅ **Rule 9**: Apply Ultra Deep Analysis for Enhancements — evidence-first, exhaustive impact map, alternatives considered, fallback defined

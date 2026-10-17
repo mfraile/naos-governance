@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +17,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    controlled_utc_now_text,
     build_generated_by,
     default_naos_root,
     exit_code_for_summary,
@@ -39,6 +39,7 @@ CONFIG_SCHEMA = "naos.calibration_shadow.v1"
 CONFIG_SCHEMA_PATH = SCRIPT_DIR.parent / "schemas" / "naos" / "calibration_shadow.schema.json"
 LIMITATIONS = [
     "Calibration shadow checks deterministic report metadata only.",
+    "The legacy ignore_fields declaration is deprecated; fixed metadata exclusions do not suppress schema, status, finding, source, or summary comparisons.",
     "It does not calibrate models, grade model behavior, inspect chat history, call providers, or call the network.",
     "A stable report shape does not prove semantic correctness, compliance, safety, evidence sufficiency, or release readiness.",
 ]
@@ -81,13 +82,17 @@ REQUIRED_NOT_CLAIMED = {
     "release authorization",
     "human review replacement",
 }
+FIXED_METADATA_EXCLUSIONS = (
+    "generated_at",
+    "session_id",
+    "operator_id",
+    "run_id",
+    "absolute_paths",
+)
 
 
 def utc_now() -> str:
-    fixed = os.environ.get("NAOS_FIXED_TIME")
-    if fixed:
-        return fixed
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return controlled_utc_now_text()
 
 
 def latest_session_id(root: Path, naos_root: str, policy: dict[str, Any]) -> str | None:
@@ -189,6 +194,17 @@ def validate_config(data: dict[str, Any] | None, parse_error: str | None, profil
     rules = data.get("comparison_rules")
     if not isinstance(rules, dict):
         findings.append(finding("calibration_shadow.comparison_rules", severity, "invalid_config", "comparison_rules must be a mapping."))
+    elif "ignore_fields" in rules and (
+        not isinstance(rules["ignore_fields"], list)
+        or any(type(name) is not str or name not in FIXED_METADATA_EXCLUSIONS
+               for name in rules["ignore_fields"])
+        or len(rules["ignore_fields"]) != len(set(rules["ignore_fields"]))
+    ):
+        findings.append(finding(
+            "calibration_shadow.deprecated_ignore_fields", severity, "invalid_config",
+            "Deprecated ignore_fields accepts only the five fixed metadata exclusions; "
+            "it does not control report comparisons.",
+        ))
     not_claimed = set(str(item) for item in data.get("not_claimed") or [])
     missing_non_claims = sorted(REQUIRED_NOT_CLAIMED - not_claimed)
     if missing_non_claims:
@@ -477,15 +493,17 @@ def evaluate_reports(config: dict[str, Any], root: Path, profile: str, policy: d
         "calibration_drift": drift,
         "unexpected_changes": unexpected_changes,
         "findings": findings,
-        "ignored_fields": [str(item) for item in rules.get("ignore_fields") or []],
+        "ignored_fields": list(FIXED_METADATA_EXCLUSIONS),
     }
 
 
-def status_for_report(profile: str, config_present: bool, config_valid: bool, drift_count: int, missing_required: int) -> str:
+def status_for_report(profile: str, config_present: bool, config_valid: bool, drift_count: int, missing_required: int, *, config_enabled: bool = True) -> str:
     if not config_present:
         return "missing_config"
     if not config_valid:
         return "invalid_config"
+    if not config_enabled:
+        return "disabled"
     if drift_count:
         return "drift_detected" if profile in {"quickstart", "lite"} else "review_required"
     if missing_required:
@@ -519,7 +537,7 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, in
         "calibration_drift": [],
         "unexpected_changes": [],
         "findings": [],
-        "ignored_fields": [],
+        "ignored_fields": list(FIXED_METADATA_EXCLUSIONS),
     }
     if not config_present:
         findings.append(
@@ -541,7 +559,10 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, in
     drift_count = len(evaluated["calibration_drift"])
     missing_required = sum(1 for item in evaluated["reports_missing"] if item.get("required"))
     summary = finding_counts(findings)
-    status = status_for_report(profile, config_present, config_valid, drift_count, missing_required)
+    status = status_for_report(
+        profile, config_present, config_valid, drift_count, missing_required,
+        config_enabled=data is not None and data.get("enabled") is True,
+    )
     session_id = latest_session_id(root, naos_root, policy)
     report = {
         "schema": SCHEMA,

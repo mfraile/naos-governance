@@ -10,6 +10,94 @@ semantics:
     - "automatic dependency updates"
     - "certification"
 
+# These exact producer outputs remain live artifact/gate observations. Human
+# source review binds their durable inputs instead of recursively binding reports
+# that themselves contain that review. Unknown files and authored baselines remain
+# byte witnesses. This declaration does not satisfy missing or adverse evidence.
+review_binding:
+  mode: declared_producer_inputs
+  derived_runtime_outputs:
+    - session_report_copies
+    - registered_audit_events
+    - local_context_index_sqlite
+    - session_index_report_references
+  derived_report_keys:
+    - agent_sponsor_registry_report
+    - agent_trace_validation_report
+    - agentic_workflow_review_report
+    - ai_component_inventory_report
+    - ai_surface_context_budget_report
+    - aivss_arithmetic_verification_report
+    - api_symbol_reality_report
+    - audit_log_summary_report
+    - behavioral_governance_readiness_report
+    - calibration_shadow_report
+    - capability_maturity_report
+    - claims_report
+    - control_plane_review_report
+    - cross_harness_review_readiness_report
+    - dashboard_markdown
+    - dashboard_summary_report
+    - dependency_integrity_report
+    - duplicate_function_hygiene_report
+    - evidence_attestation_report
+    - evidence_classification_report
+    - evidence_conflict_detection_report
+    - evidence_pack_report
+    - external_evidence_ingest_report
+    - function_index_report
+    - gate_evaluation_report
+    - gate_status_report
+    - governance_bypass_posture_report
+    - grader_assessment_report
+    - graph_context_query_report
+    - graph_context_readiness_report
+    - learning_loop_review_report
+    - llm_grader_readiness_report
+    - local_context_index_report
+    - local_context_query_report
+    - memory_context_readiness_report
+    - memory_provider_access_report
+    - memory_use_policy_report
+    - model_provider_policy_report
+    - model_telemetry_evidence_report
+    - module_header_traceability_report
+    - opencode_config_hygiene_report
+    - operator_attribution_report
+    - package_reality_report
+    - plan_coherence_report
+    - policy_override_merge_report
+    - pr_governance_summary_report
+    - pr_risk_classification_report
+    - pre_implementation_alignment_review_report
+    - roadmap_report
+    - sarif_export_summary_report
+    - sarif_report
+    - secret_hygiene_report
+    - secure_coding_controls_report
+    - conformance_latest_report
+    - secure_coding_reference_integrity_report
+    - secure_coding_reporting_report
+    - self_check_report
+    - self_check_dependency_resolution_report
+    - self_check_dependency_inputs
+    - semantic_candidate_layer_report
+    - session_identity_report
+    - session_lifecycle_report
+    - setup_recommendations_report
+    - spec_assembly_worksheet_report
+    - spec_cascade_report
+    - spec_pack_contract_report
+    - spec_pack_materialization_report
+    - sqlite_write_coordination_report
+    - static_grader_report
+    - systemic_impact_report
+    - task_claim_report
+    - task_context_pack_report
+    - test_evidence_report
+    - test_quality_hygiene_report
+    - ci_readiness
+
 defaults:
   freshness_window_days: 30
   severity_by_profile:
@@ -79,6 +167,7 @@ changed_path_routing:
   semantics:
     kit_source: "source_patterns classify NAOS-governance development and canonical kit artifacts; they are not adopter installation content by implication."
     adopter_generated: "generated_patterns classify portable project files emitted or explicitly installed into adopter repositories."
+    adopter_declared: "adopter_patterns classify explicitly declared adopter-authored product source, tests and package metadata; they are not generated installation content."
     not_claimed: "Matching either role does not prove semantic completeness, installation, activation, approval, or release readiness."
   governed_patterns:
     - "**"
@@ -89,6 +178,39 @@ changed_path_routing:
         - ".github/ISSUE_TEMPLATE/**"
       reason: "Repository-hosting administration is explicit metadata, not a NAOS governance-kit or generated-adopter control surface."
   routing_families:
+    # These are adopter-authored product paths, not kit sources or files emitted
+    # by NAOS. Extend this exact declaration for another project source layout.
+    - route_id: route_adopter_product
+      name: "Declared adopter source, tests, and package metadata"
+      source_patterns: []
+      generated_patterns: []
+      adopter_patterns:
+        - "src/**"
+        - "app/**"
+        - "apps/**"
+        - "packages/**"
+        - "lib/**"
+        - "tests/**"
+        - "package.json"
+        - "package-lock.json"
+        - "pnpm-lock.yaml"
+        - "yarn.lock"
+        - "pyproject.toml"
+        - "requirements*.txt"
+        - "setup.cfg"
+        - "setup.py"
+        - "go.mod"
+        - "go.sum"
+        - "Cargo.toml"
+        - "Cargo.lock"
+        - "pom.xml"
+        - "build.gradle"
+        - "build.gradle.kts"
+      review_triggers: [adopter_product_change]
+      targets: [requirements, tests, evidence, control_plane_review]
+      required_review_outputs:
+        - "Review the exact product change against declared requirements and affected tests."
+        - "Record source/test evidence and any governance impact or supported no-change rationale."
     - route_id: route_cli_build_package
       name: "CLI, build, installation, and package surfaces"
       source_patterns:
@@ -102,11 +224,13 @@ changed_path_routing:
         - "pyproject.toml"
         - "requirements*.txt"
         - "MANIFEST.in"
+        - ".gitattributes"
         - "setup.cfg"
         - "setup.py"
         - "templates/Makefile*.naos"
         - "templates/Makefile.naos*"
       generated_patterns:
+        - ".gitattributes"
         - "Makefile.naos*"
         - "naos_governance/**/*.py"
       review_triggers: [cli_build_or_install_change]
@@ -121,6 +245,9 @@ changed_path_routing:
         - "autoresearch/**/*.py"
       generated_patterns:
         - "scripts/**/*.py"
+        - "scripts/workflows/gatekeepers.baseline.yaml"
+        - "scripts/workflows/ai_code_provenance.baseline.yaml"
+        - "scripts/workflows/compliance_posture.baseline.yaml"
         - ".github/autoresearch/**"
         - "reports/**"
       review_triggers: [script_or_report_producer_change]
@@ -142,6 +269,7 @@ changed_path_routing:
       source_patterns:
         - ".github/workflows/**"
         - ".github/run_test_shard.py"
+        - ".github/windows_test_job.py"
         - ".github/test-duration-baseline.json"
         - "templates/workflows/**"
         - "plugins/**/hooks/**"
@@ -191,8 +319,10 @@ changed_path_routing:
         - "templates/rules-chain/**"
         - "templates/cursor-rules/**"
         - "templates/instincts/**"
+        - "templates/git/gitignore"
         - "archetypes/**"
       generated_patterns:
+        - ".gitignore"
         - "naos/**"
         - "specs/**"
         - ".cursor/**"
@@ -212,6 +342,7 @@ changed_path_routing:
         - "templates/structural-seeds/naos/*handoff*.yaml"
       generated_patterns:
         - ".github/agents/**"
+        - ".github/NAOS_AGENTS.md"
         - "naos/*handoff*.yaml"
       review_triggers: [agent_manifest_or_handoff_change]
       targets: [agents, ai_surface_catalogue, ai_surface_context_budget, skills, instructions, tests, docs, security]
@@ -323,6 +454,7 @@ changed_path_routing:
         - "**/skills/**"
       generated_patterns:
         - ".github/skills/**"
+        - ".agents/skills/**"
       review_triggers: [skill_or_operator_procedure_change]
       targets: [skills, ai_surfaces, adapter_coherence, adapter_propagation, tests, docs]
 
@@ -331,13 +463,17 @@ changed_path_routing:
       source_patterns:
         - "templates/instructions/**"
         - "templates/instruction-triple/**"
+        - "templates/host-guidance/*.md"
         - "templates/rules-chain/**"
         - "profiles/**/.ai/RULES.md"
       generated_patterns:
         - ".github/instructions/**"
+        - ".github/naos-guidance/*.md"
         - ".github/copilot-instructions.md"
         - ".github/project-context.md"
         - "CLAUDE.md"
+        - "AGENTS.md"
+        - "GEMINI.md"
         - ".ai/RULES.md"
       review_triggers: [instruction_or_rules_change]
       targets: [instructions, agents, prompts, skills, ai_surface_context_budget, tests, docs]
@@ -358,6 +494,7 @@ changed_path_routing:
       source_patterns:
         - "plugins/**"
         - "templates/integrations/**"
+        - "templates/host-adapters/**"
       generated_patterns:
         - ".claude-plugin/**"
       review_triggers: [plugin_adapter_or_integration_change]
@@ -434,9 +571,12 @@ changed_path_routing:
         - "docs/*PRIVACY*.md"
         - "scripts/secure_coding_reporting/**"
         - "secure_coding_reporting_cli.py"
+        - "scripts/naos_secret_public_literals.json"
       generated_patterns:
         - "SECURITY.md"
+        - ".claude/rules/security.md"
         - "naos/*secure*.yaml"
+        - "scripts/naos_secret_public_literals.json"
       review_triggers: [security_or_privacy_surface_change]
       targets: [security, privacy, tests, docs]
 
@@ -552,6 +692,14 @@ artifact_families:
   - family_id: capabilities
     name: "Capability Contracts"
     enabled: true
+    repository_roles:
+    - kit_source
+    - adopter_project
+    minimum_expected_by_role:
+      kit_source:
+      - capabilities/*.yaml
+      adopter_project:
+      - naos/capabilities/*.yaml
     file_patterns:
       - "capabilities/*.yaml"
       - "naos/capabilities/*.yaml"
@@ -570,6 +718,16 @@ artifact_families:
   - family_id: secure_coding_controls
     name: "Secure-Coding and Agentic-Coding Controls"
     enabled: true
+    repository_roles:
+    - kit_source
+    - adopter_project
+    minimum_expected_by_role:
+      kit_source:
+      - configs/secure_coding_control_register.yaml
+      - capabilities/secure_coding_controls.yaml
+      adopter_project:
+      - naos/secure_coding_control_register.yaml
+      - naos/capabilities/secure_coding_controls.yaml
     file_patterns:
       - "configs/secure_coding_control_register.yaml"
       - "configs/secure_coding_control_render_manifest.yaml"
@@ -616,6 +774,14 @@ artifact_families:
   - family_id: policies
     name: "Central Policy"
     enabled: true
+    repository_roles:
+    - kit_source
+    - adopter_project
+    minimum_expected_by_role:
+      kit_source:
+      - policies/default_policy.yaml
+      adopter_project:
+      - naos/policy/default_policy.yaml
     file_patterns:
       - "policies/default_policy.yaml"
       - "naos/policy/default_policy.yaml"
@@ -671,6 +837,14 @@ artifact_families:
   - family_id: scripts
     name: "Scripts"
     enabled: true
+    repository_roles:
+    - kit_source
+    - adopter_project
+    minimum_expected_by_role:
+      kit_source:
+      - cli.py
+      adopter_project:
+      - scripts/naos_self_check.py
     file_patterns:
       - "scripts/**/*.py"
       - "cli.py"
@@ -693,6 +867,8 @@ artifact_families:
   - family_id: package_install_artifacts
     name: "Python Package and Installed-Console Artifacts"
     enabled: true
+    repository_roles:
+    - kit_source
     file_patterns:
       - "pyproject.toml"
       - "MANIFEST.in"
@@ -882,6 +1058,8 @@ artifact_families:
   - family_id: tutorials
     name: "Tutorials"
     enabled: true
+    repository_roles:
+    - kit_source
     file_patterns:
       - "docs/tutorials/*.md"
     minimum_expected:
@@ -899,6 +1077,14 @@ artifact_families:
   - family_id: quick_reference
     name: "Quick Reference"
     enabled: true
+    repository_roles:
+    - kit_source
+    - adopter_project
+    minimum_expected_by_role:
+      kit_source:
+      - templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md
+      adopter_project:
+      - naos/NAOS_QUICK_REFERENCE.md
     file_patterns:
       - "templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md"
       - "naos/NAOS_QUICK_REFERENCE.md"
@@ -1252,6 +1438,14 @@ artifact_families:
       - "Planning-baseline convergence does not prove requirements, architecture, or plan quality and does not authorize implementation, task closure, merge, release, or publication."
 
   - family_id: task_claim_report
+    repository_roles:
+    - kit_source
+    - adopter_project
+    review_source_patterns_by_role:
+      kit_source:
+      - templates/structural-seeds/naos/task_claims.yaml
+      adopter_project:
+      - naos/task_claims.yaml
     name: "Task Claim Report"
     enabled: true
     file_patterns:
@@ -1297,6 +1491,12 @@ artifact_families:
       - "Release does not mean task complete, accepted, approved, or conflict-free."
 
   - family_id: evidence_conflicts
+    review_source_patterns:
+      - "naos/control_plane_review_items.yaml"
+      - "naos/control_plane_review_rules.yaml"
+      - "naos/evidence_review_attestations.yaml"
+      - "naos/sessions_index.json"
+      - "naos/audit_log/*/*.jsonl"
     name: "Evidence Conflicts"
     enabled: true
     file_patterns:
@@ -1326,6 +1526,12 @@ artifact_families:
       - "Outcome conflicts do not identify which reviewer is correct."
 
   - family_id: separation_of_duties_warning
+    review_source_patterns:
+      - "naos/control_plane_review_items.yaml"
+      - "naos/control_plane_review_rules.yaml"
+      - "naos/evidence_review_attestations.yaml"
+      - "naos/sessions_index.json"
+      - "naos/audit_log/*/*.jsonl"
     name: "Separation-of-Duties Warning"
     enabled: true
     file_patterns:
@@ -1426,6 +1632,9 @@ artifact_families:
       - ".agents/mcp_config.json"
       - ".kilo/kilo.jsonc"
       - "opencode.json"
+      - ".github/mcp.json"
+      - ".codex/config.toml"
+      - ".gemini/settings.json"
       - ".engram/config.json"
     minimum_expected: []
     related_families: [memory_provider_access_rules, mcp_config_declarations, platform_memory_access, memory_access_overclaim, memory_write_authorization, ci_memory_access, memory_context_rules, memory_authorization_matrix, ai_context_continuity, setup_recommendations, control_plane_review, evidence, dashboard, gatekeepers, capability_state, ai_surfaces_using_memory, manuals, tutorials, known_gaps, residual_risks]
@@ -1479,6 +1688,9 @@ artifact_families:
       - ".agents/mcp_config.json"
       - ".kilo/kilo.jsonc"
       - "opencode.json"
+      - ".github/mcp.json"
+      - ".codex/config.toml"
+      - ".gemini/settings.json"
       - ".engram/config.json"
       - "scripts/naos_mcp_config_registry.py"
       - "naos/reports/memory_provider_access.json"
@@ -1839,6 +2051,9 @@ artifact_families:
       - ".agents/mcp_config.json"
       - ".kilo/kilo.jsonc"
       - "opencode.json"
+      - ".github/mcp.json"
+      - ".codex/config.toml"
+      - ".gemini/settings.json"
       - ".engram/config.json"
       - "docs/ENGRAM_SETUP.md"
     minimum_expected: []
@@ -1871,6 +2086,9 @@ artifact_families:
       - ".agents/mcp_config.json"
       - ".kilo/kilo.jsonc"
       - "opencode.json"
+      - ".github/mcp.json"
+      - ".codex/config.toml"
+      - ".gemini/settings.json"
       - ".engram/config.json"
       - "scripts/naos_mcp_config_registry.py"
       - "naos/reports/memory_provider_access.json"
@@ -1903,6 +2121,21 @@ artifact_families:
       - "templates/cursor-rules/*"
       - "templates/rules-chain/.ai/*"
       - "AGENTS.md"
+    file_patterns_by_role:
+      adopter_project:
+        - "templates/agents/**/*.md"
+        - "templates/instructions/*.md"
+        - "templates/instruction-triple/*.md"
+        - "templates/prompts/*.md"
+        - "templates/cursor-rules/*"
+        - "templates/rules-chain/.ai/*"
+        - "AGENTS.md"
+        - ".github/agents/**/*.md"
+        - ".github/instructions/*.md"
+        - ".github/prompts/*.md"
+        - ".cursor/rules/*"
+        - ".ai/*"
+        - ".github/copilot-instructions.md"
     minimum_expected: []
     related_families: [memory_context_rules, memory_authorization_matrix, memory_provider_access, platform_memory_access, memory_access_overclaim, ai_context_continuity, mcp_tool_access, control_plane_review, manuals, claims]
     review_triggers: [ai_memory_guidance_change, ai_surface_memory_claim_change]
@@ -1975,6 +2208,16 @@ artifact_families:
       - "Task context packs are derived and non-authoritative; they are not approval, evidence authority, complete coherence proof, or automatic context injection."
 
   - family_id: context_packs
+    review_source_patterns_by_role:
+      adopter_project:
+      - naos/task_context_pack_rules.yaml
+      - naos/task_lifecycle_contract.yaml
+      - naos/TASK_REGISTRY.yaml
+      - naos/active/*.md
+      - naos/completed/*.md
+      - naos/completed_history.yaml
+      - specs/**/*
+      - naos/capabilities/*.yaml
     name: "Derived Context Packs"
     enabled: true
     file_patterns:
@@ -2273,7 +2516,7 @@ artifact_families:
     human_review_required: true
     rationale: "Semantic/vector retrieval can create false authority if not bounded and reviewed."
     limitations:
-      - "No semantic/vector runtime is implemented by Group 26 readiness."
+      - "Semantic-candidate readiness implements no semantic/vector runtime; optional repository-intelligence engines have their own activation contract."
 
   - family_id: semantic_candidate_layer
     name: "Semantic Candidate Layer Readiness"
@@ -2316,12 +2559,12 @@ artifact_families:
     review_triggers: [graph_layer_design_change, graph_traversal_enablement, graph_context_rules_change, graph_context_query_change, graph_runtime_enablement_finding, stale_graph_link_finding, sensitive_graph_link_finding, global_graph_scan_finding]
     impact_targets: [local_context_index, local_context_query, graph_context_query, task_context_pack, setup_recommendations, control_plane_review, evidence, dashboard, gatekeepers, capability_state, ai_surfaces, known_gaps, residual_risks, manuals]
     required_review_outputs:
-      - "Record that NetworkX, GraphML, graph algorithms, and global graph traversal remain deferred unless explicitly implemented and reviewed."
+      - "Record that graph-context readiness/query do not enable NetworkX, GraphML, graph algorithms, or global traversal. Repository intelligence separately supports an explicitly selected, eligible optional NetworkX/GraphML engine."
       - "Keep any future graph traversal bounded from vetted seed nodes."
     human_review_required: true
     rationale: "Graph traversal can amplify context bloat or stale relationships if not bounded."
     limitations:
-      - "No graph runtime is implemented by Group 27 readiness."
+      - "Graph-context readiness/query implement no graph runtime; this does not describe the separate optional repository-intelligence engine."
 
   - family_id: graph_context_readiness
     name: "Graph Context Readiness"
@@ -2385,6 +2628,10 @@ artifact_families:
       - "Graph query is a deterministic explicit-link report, not graph runtime or algorithmic reasoning."
 
   - family_id: explicit_artifact_links
+    review_source_patterns:
+      - "naos/task_context_pack_rules.yaml"
+      - "naos/local_context_index_rules.yaml"
+      - "naos/graph_context_rules.yaml"
     name: "Explicit Artifact Links"
     enabled: true
     file_patterns:
@@ -2442,6 +2689,9 @@ artifact_families:
       - "Terminology review reduces risk but does not prove interpretation."
 
   - family_id: stale_graph_links
+    review_source_patterns:
+      - "naos/graph_context_rules.yaml"
+      - "naos/local_context_index_rules.yaml"
     name: "Stale Graph Links"
     enabled: true
     file_patterns:
@@ -2542,6 +2792,9 @@ artifact_families:
       - "Atomic file writes reduce partial-write risk but do not provide full multi-writer coordination."
 
   - family_id: namespaced_reports
+    review_source_patterns:
+      - "naos/session_lifecycle_rules.yaml"
+      - "naos/policy/default_policy.yaml"
     name: "Namespaced Reports"
     enabled: true
     file_patterns:
@@ -2559,6 +2812,9 @@ artifact_families:
       - "M1 does not migrate every report writer to session-aware output."
 
   - family_id: latest_report_compatibility
+    review_source_patterns:
+      - "naos/session_lifecycle_rules.yaml"
+      - "naos/policy/default_policy.yaml"
     name: "Latest Report Compatibility"
     enabled: true
     file_patterns:
@@ -2576,6 +2832,20 @@ artifact_families:
       - "Latest-report paths do not isolate concurrent runs."
 
   - family_id: multi_user_foundation
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - naos/sessions_index.json
+      - naos/sessions/*/reports/*.json
+      - docs/CONTROL_PLANE.md
+      - templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md
+      adopter_project:
+      - naos/sessions_index.json
+      - naos/sessions/*/reports/*.json
+      - docs/CONTROL_PLANE.md
+      - naos/NAOS_QUICK_REFERENCE.md
     name: "Multi-User Foundation"
     enabled: true
     file_patterns:
@@ -2590,7 +2860,7 @@ artifact_families:
     required_review_outputs:
       - "Keep multi-user foundations scoped to their reports and metadata; re-audit and export refresh are required before public release."
     human_review_required: true
-    rationale: "Maintainer scope now requires regulated team readiness before public v1.0.0 release."
+    rationale: "Regulated-team readiness requires explicit project scope and human review; readiness is not regulatory or release approval."
     limitations:
       - "Session, operator, SQLite coordination, audit-log, evidence-conflict, task-claim, policy-overlay, team-gatekeeper, and PR-time CI controls remain review evidence and do not provide authorization, approval, deployment, or release decisions."
 
@@ -2616,6 +2886,18 @@ artifact_families:
       - "Lifecycle reports are checklists, not task completion, evidence authority, proof, approval, or memory automation."
 
   - family_id: session_start
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - naos/reports/session_lifecycle.json
+      - templates/prompts/*start*.prompt.md
+      - templates/agents/**/*.md
+      adopter_project:
+      - naos/reports/session_lifecycle.json
+      - .github/prompts/*start*.prompt.md
+      - .github/agents/**/*.md
     name: "Session Start"
     enabled: true
     file_patterns:
@@ -2634,6 +2916,18 @@ artifact_families:
       - "Session-start output does not prove readiness or replace active task cards."
 
   - family_id: session_checkpoint
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - naos/reports/session_lifecycle.json
+      - templates/skills/cognitive-checkpoint/SKILL.md
+      - templates/skills/strategic-compact/SKILL.md
+      adopter_project:
+      - naos/reports/session_lifecycle.json
+      - .github/skills/cognitive-checkpoint/SKILL.md
+      - .github/skills/strategic-compact/SKILL.md
     name: "Session Checkpoint"
     enabled: true
     file_patterns:
@@ -2652,6 +2946,18 @@ artifact_families:
       - "Checkpoint reports are not evidence authority or durable memory."
 
   - family_id: session_end
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - naos/reports/session_lifecycle.json
+      - templates/prompts/*end*.prompt.md
+      - templates/prompts/*complete*.prompt.md
+      adopter_project:
+      - naos/reports/session_lifecycle.json
+      - .github/prompts/*end*.prompt.md
+      - .github/prompts/*complete*.prompt.md
     name: "Session End"
     enabled: true
     file_patterns:
@@ -2706,6 +3012,14 @@ artifact_families:
       - "Freshness checks are metadata heuristics, not proof of correctness."
 
   - family_id: checkpoint_gap
+    repository_roles:
+    - kit_source
+    - adopter_project
+    review_source_patterns_by_role:
+      kit_source:
+      - templates/structural-seeds/naos/session_lifecycle_rules.yaml
+      adopter_project:
+      - naos/session_lifecycle_rules.yaml
     name: "Checkpoint Gap"
     enabled: true
     file_patterns:
@@ -2723,6 +3037,20 @@ artifact_families:
       - "A checkpoint report does not create or approve compact files."
 
   - family_id: lifecycle_hook_overclaim
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - .claude/settings.json
+      - templates/agents/**/*.md
+      - templates/instructions/*.md
+      - templates/prompts/*.prompt.md
+      adopter_project:
+      - .claude/settings.json
+      - .github/agents/**/*.md
+      - .github/instructions/*.md
+      - .github/prompts/*.prompt.md
     name: "Lifecycle Hook Overclaim"
     enabled: true
     file_patterns:
@@ -2831,6 +3159,18 @@ artifact_families:
   - family_id: pr_time_ci
     name: "PR-Time CI Governance"
     enabled: true
+    repository_roles:
+    - kit_source
+    - adopter_project
+    minimum_expected_by_role:
+      kit_source:
+      - templates/workflows/naos-pr-governance.yml.example
+      - schemas/naos/pr_risk_classification.schema.json
+      - schemas/naos/pr_governance_summary.schema.json
+      adopter_project:
+      - naos/workflows/examples/naos-pr-governance.yml.example
+      - schemas/naos/pr_risk_classification.schema.json
+      - schemas/naos/pr_governance_summary.schema.json
     file_patterns:
       - "templates/workflows/naos-pr-governance.yml.example"
       - "scripts/naos_pr_risk_classification.py"
@@ -2838,6 +3178,7 @@ artifact_families:
       - "schemas/naos/pr_risk_classification.schema.json"
       - "naos/reports/pr_governance_summary.json"
       - "schemas/naos/pr_governance_summary.schema.json"
+      - "naos/workflows/examples/naos-pr-governance.yml.example"
     minimum_expected:
       - "templates/workflows/naos-pr-governance.yml.example"
       - "schemas/naos/pr_risk_classification.schema.json"
@@ -2896,6 +3237,9 @@ artifact_families:
       - "A ready PR governance summary is review evidence, not approval, certification, or proof of compliance."
 
   - family_id: ci_gate_evaluation
+    review_source_patterns:
+      - "naos/gatekeepers.yaml"
+      - "naos/policy/default_policy.yaml"
     name: "CI Gate Evaluation"
     enabled: true
     file_patterns:
@@ -2914,6 +3258,11 @@ artifact_families:
       - "CI gate results do not approve work, authorize deployment, or prove compliance."
 
   - family_id: ci_evidence_artifacts
+    review_source_patterns:
+      - "naos/gatekeepers.yaml"
+      - "naos/policy/default_policy.yaml"
+      - "naos/evidence_attestation_rules.yaml"
+      - "naos/evidence_review_attestations.yaml"
     name: "CI Evidence Artifacts"
     enabled: true
     file_patterns:
@@ -2932,6 +3281,26 @@ artifact_families:
       - "Artifact retention is adopter-controlled and can expose governance metadata."
 
   - family_id: optional_tool_integrations
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - templates/integrations/**/*
+      - templates/structural-seeds/naos/setup_module_catalog.yaml
+      - docs/TOOL_NEUTRAL_USAGE.md
+      adopter_project:
+      - naos/integrations/**/*
+      - naos/setup_module_catalog.yaml
+      - docs/TOOL_NEUTRAL_USAGE.md
+    minimum_expected_by_role:
+      kit_source:
+      - templates/integrations/spec-kit/README.md
+      - templates/integrations/claude-code/README.md
+      - templates/integrations/codex-plugin/README.md
+      adopter_project:
+      - naos/setup_module_catalog.yaml
+      - docs/TOOL_NEUTRAL_USAGE.md
     name: "Optional Tool Integrations"
     enabled: true
     file_patterns:
@@ -2956,6 +3325,8 @@ artifact_families:
   - family_id: spec_kit_adapter
     name: "Spec-Kit Adapter Template"
     enabled: true
+    repository_roles:
+    - kit_source
     file_patterns:
       - "templates/integrations/spec-kit/README.md"
       - "templates/integrations/spec-kit/extension-manifest.json"
@@ -2977,6 +3348,8 @@ artifact_families:
   - family_id: claude_code_hooks
     name: "Claude Code Hook Templates"
     enabled: true
+    repository_roles:
+    - kit_source
     file_patterns:
       - "templates/integrations/claude-code/README.md"
       - "templates/integrations/claude-code/settings*.json"
@@ -2997,6 +3370,8 @@ artifact_families:
   - family_id: codex_plugin_adapter
     name: "Codex Plugin Adapter"
     enabled: true
+    repository_roles:
+    - kit_source
     file_patterns:
       - "plugins/naos-governance/**/*"
       - "templates/integrations/codex-plugin/**/*"
@@ -3021,6 +3396,8 @@ artifact_families:
   - family_id: claude_code_plugin_adapter
     name: "Claude Code Plugin Adapter"
     enabled: true
+    repository_roles:
+    - kit_source
     file_patterns:
       - "plugins/naos-governance-claude-code/**/*"
       - "templates/integrations/claude-code-plugin/**/*"
@@ -3045,8 +3422,42 @@ artifact_families:
       - "The plugin source is not proof of live Claude Code installation and does not activate MCP, hooks, memory, settings, providers, or automation."
 
   - family_id: adapter_coherence
+    file_patterns_by_role:
+      kit_source:
+      - scripts/naos_adapter_coherence.py
+      - templates/structural-seeds/naos/adapter_coherence_rules.yaml
+      - templates/structural-seeds/naos/adapter_propagation_state.yaml
+      - schemas/naos/adapter_coherence*.json
+      - schemas/naos/adapter_propagation_state.schema.json
+      - naos/reports/adapter_coherence.json
+      - naos/adapter_coherence_rules.yaml
+      - naos/adapter_propagation_state.yaml
+      adopter_project:
+      - scripts/naos_adapter_coherence.py
+      - templates/structural-seeds/naos/adapter_coherence_rules.yaml
+      - templates/structural-seeds/naos/adapter_propagation_state.yaml
+      - schemas/naos/adapter_coherence*.json
+      - schemas/naos/adapter_propagation_state.schema.json
+      - naos/reports/adapter_coherence.json
+      - naos/adapter_coherence_rules.yaml
+      - naos/adapter_propagation_state.yaml
+      - naos/integrations/**/*
     name: "Adapter Coherence Review"
     enabled: true
+    repository_roles:
+    - kit_source
+    - adopter_project
+    minimum_expected_by_role:
+      kit_source:
+      - scripts/naos_adapter_coherence.py
+      - templates/structural-seeds/naos/adapter_coherence_rules.yaml
+      - templates/structural-seeds/naos/adapter_propagation_state.yaml
+      - schemas/naos/adapter_coherence_report.schema.json
+      adopter_project:
+      - scripts/naos_adapter_coherence.py
+      - naos/adapter_coherence_rules.yaml
+      - naos/adapter_propagation_state.yaml
+      - schemas/naos/adapter_coherence_report.schema.json
     file_patterns:
       - "scripts/naos_adapter_coherence.py"
       - "templates/structural-seeds/naos/adapter_coherence_rules.yaml"
@@ -3054,6 +3465,8 @@ artifact_families:
       - "schemas/naos/adapter_coherence*.json"
       - "schemas/naos/adapter_propagation_state.schema.json"
       - "naos/reports/adapter_coherence.json"
+      - "naos/adapter_coherence_rules.yaml"
+      - "naos/adapter_propagation_state.yaml"
     minimum_expected:
       - "scripts/naos_adapter_coherence.py"
       - "templates/structural-seeds/naos/adapter_coherence_rules.yaml"
@@ -3070,6 +3483,28 @@ artifact_families:
       - "The report checks static files only and does not repair adapter drift automatically."
 
   - family_id: adapter_propagation
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - plugins/naos-governance/**/*
+      - plugins/naos-governance-claude-code/**/*
+      - templates/integrations/**/*
+      - templates/skills/**/*
+      - templates/instructions/**/*
+      - templates/agents/**/*
+      - templates/structural-seeds/naos/adapter_propagation_state.yaml
+      - templates/structural-seeds/naos/learning_*.yaml
+      adopter_project:
+      - plugins/naos-governance/**/*
+      - plugins/naos-governance-claude-code/**/*
+      - naos/integrations/**/*
+      - .github/skills/**/*
+      - .github/instructions/**/*
+      - .github/agents/**/*
+      - naos/adapter_propagation_state.yaml
+      - naos/learning_*.yaml
     name: "Adapter Propagation"
     enabled: true
     file_patterns:
@@ -3096,6 +3531,8 @@ artifact_families:
   - family_id: tool_neutral_usage
     name: "Tool-Neutral Usage"
     enabled: true
+    repository_roles:
+    - kit_source
     file_patterns:
       - "docs/TOOL_NEUTRAL_USAGE.md"
       - "README.md"
@@ -3114,6 +3551,18 @@ artifact_families:
       - "Third-party tool examples are usage patterns, not official support or certification."
 
   - family_id: integration_activation_boundary
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - templates/integrations/**/README.md
+      - templates/integrations/claude-code/settings*.json
+      - templates/structural-seeds/naos/setup_module_catalog.yaml
+      adopter_project:
+      - naos/integrations/**/README.md
+      - naos/integrations/claude-code/settings*.json
+      - naos/setup_module_catalog.yaml
     name: "Integration Activation Boundary"
     enabled: true
     file_patterns:
@@ -3132,6 +3581,15 @@ artifact_families:
       - "NAOS does not overwrite active IDE or assistant settings without explicit adopter action."
 
   - family_id: integration_secret_risk
+    file_patterns_by_role:
+      kit_source:
+      - templates/integrations/**/*
+      - docs/TOOL_NEUTRAL_USAGE.md
+      - SECURITY.md
+      adopter_project:
+      - naos/integrations/**/*
+      - docs/TOOL_NEUTRAL_USAGE.md
+      - SECURITY.md
     name: "Integration Secret Risk"
     enabled: true
     file_patterns:
@@ -3150,6 +3608,18 @@ artifact_families:
       - "Adopters remain responsible for reviewing any local artifacts before sharing or uploading them."
 
   - family_id: integration_context_injection_risk
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - templates/integrations/claude-code/**/*
+      - docs/TOOL_NEUTRAL_USAGE.md
+      - templates/instruction-triple/CLAUDE.md
+      adopter_project:
+      - naos/integrations/claude-code/**/*
+      - docs/TOOL_NEUTRAL_USAGE.md
+      - CLAUDE.md
     name: "Integration Context Injection Risk"
     enabled: true
     file_patterns:
@@ -3168,6 +3638,9 @@ artifact_families:
       - "Hook output is advisory guidance and does not replace task context, evidence, source artifacts, or human review."
 
   - family_id: effective_gatekeeper_resolution
+    review_source_patterns:
+      - "naos/gatekeepers.yaml"
+      - "naos/policy/default_policy.yaml"
     name: "Effective Gatekeeper Resolution"
     enabled: true
     file_patterns:
@@ -3654,6 +4127,10 @@ artifact_families:
       - "Composite report shape is a review container, not a CompositeGrader runtime."
 
   - family_id: grader_dimension_results
+    review_source_patterns:
+      - "naos/agent_trace_events.yaml"
+      - "scripts/naos_static_grader.py"
+      - ".github/autoresearch/graders/static.py"
     name: "Grader Dimension Results"
     enabled: true
     file_patterns:
@@ -3699,6 +4176,20 @@ artifact_families:
       - "Overclaim detection is text/rule based and requires reviewer judgment."
 
   - family_id: cost_budget_posture
+    repository_roles:
+    - kit_source
+    - adopter_project
+    file_patterns_by_role:
+      kit_source:
+      - naos/reports/static_grader_report.json
+      - naos/reports/grader_assessment.json
+      - templates/structural-seeds/configs/naos_autoresearch.yaml
+      - capabilities/static_grader.yaml
+      adopter_project:
+      - naos/reports/static_grader_report.json
+      - naos/reports/grader_assessment.json
+      - configs/naos_autoresearch.yaml
+      - naos/capabilities/static_grader.yaml
     name: "Cost/Budget Posture"
     enabled: true
     file_patterns:
@@ -3839,7 +4330,7 @@ artifact_families:
     required_review_outputs:
       - "Block or route any unexpected LLM runtime, provider, external API, model dependency, credential, or cost enablement."
     human_review_required: true
-    rationale: "Group 42D is readiness-only; runtime enablement is out of scope."
+    rationale: "This readiness surface does not enable runtime behavior."
     limitations:
       - "This family detects configuration posture; it does not inspect live provider behavior."
 
@@ -4299,6 +4790,10 @@ artifact_families:
       - "Classification is orthogonal to severity and is not truth proof, issue resolution, approval, or proof of compliance."
 
   - family_id: evidence_provenance
+    review_source_patterns:
+      - "naos/evidence_classification_policy.yaml"
+      - "naos/evidence_attestation_rules.yaml"
+      - "naos/evidence_review_attestations.yaml"
     name: "Evidence Provenance"
     enabled: true
     file_patterns:
@@ -4334,6 +4829,8 @@ artifact_families:
       - "The categories improve review structure but do not guarantee perfect accuracy."
 
   - family_id: missing_finding_classification
+    review_source_patterns:
+      - "naos/evidence_classification_policy.yaml"
     name: "Missing Finding Classification"
     enabled: true
     file_patterns:
@@ -4390,6 +4887,14 @@ artifact_families:
       - "The core kit does not implement DSSE signing, signature verification, key custody, or signed attestations."
 
   - family_id: attestation_boundary
+    repository_roles:
+    - kit_source
+    - adopter_project
+    review_source_patterns_by_role:
+      kit_source:
+      - templates/structural-seeds/naos/cross_harness_review_readiness.yaml
+      adopter_project:
+      - naos/cross_harness_review_readiness.yaml
     name: "Attestation Boundary"
     enabled: true
     file_patterns:
@@ -4511,6 +5016,9 @@ artifact_families:
       - "Challenge reports identify review needs; they do not make decisions or validate correctness."
 
   - family_id: known_gaps
+    review_source_patterns_by_role:
+      adopter_project:
+      - naos/local_context_index_rules.yaml
     name: "Known Gaps"
     enabled: true
     file_patterns:
@@ -4550,6 +5058,9 @@ artifact_families:
   - family_id: ai_surface_catalogue
     name: "AI Surface Catalogue"
     enabled: true
+    repository_roles:
+    - kit_source
+    - adopter_project
     file_patterns:
       - "configs/naos_ai_surface_catalogue.yaml"
     minimum_expected: []
@@ -4685,6 +5196,6 @@ artifact_families:
       - "Route duplicate-function, secret-like, weak-test, undeclared-import, package-reality, and API-symbol reality findings through human review or explicit waivers."
       - "Keep docs and claims clear that deterministic hygiene is not semantic correctness, secret-free, behavioral correctness, API-behavior proof, package-safety, approval, or proof of compliance."
     human_review_required: true
-    rationale: "The MYDDZ forensic assessment identified deterministic hygiene classes that should be wired as local controls rather than isolated scripts."
+    rationale: "Deterministic hygiene findings need explicit local control-plane wiring and review rather than isolated script results."
     limitations:
       - "These controls reduce obvious deterministic risk classes; they do not replace semantic review, dedicated secret scanning, SCA, or human judgement."

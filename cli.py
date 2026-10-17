@@ -2,7 +2,7 @@
 """
 NAOS CLI — Governance-as-Code for AI-assisted software development.
 
-Entry point for the `naos` command installed via `pip install naos-governance`.
+Entry point for `naos`, installed from a selected checksum-verified NAOS artifact.
 Dispatches to `naos init` (scaffolder), `naos add` (progressive enhancement),
 `naos upgrade` (digest-bound profile transitions), and `naos memory` (Engram onboarding).
 
@@ -12,8 +12,13 @@ Also supports direct execution: `python -m naos_governance.cli`
 from __future__ import annotations
 
 import argparse
+import base64
+import configparser
+import csv
+import hashlib
 import importlib
 import importlib.util
+from importlib import metadata
 import inspect
 import os
 import shutil
@@ -112,6 +117,7 @@ SCRIPT_COMMANDS = {
     "evidence-classification": "scripts/naos_evidence_classification.py",
     "cross-harness-review-readiness": "scripts/naos_cross_harness_review_readiness.py",
     "self-check": "scripts/naos_self_check.py",
+    "ci-readiness": "scripts/naos_ci_readiness.py",
     "roadmap-crosswalk": "scripts/naos_validate_roadmap_crosswalk.py",
     "function-index-health": "scripts/naos_function_index_health.py",
     "test-evidence-map": "scripts/naos_test_evidence_map.py",
@@ -224,19 +230,26 @@ def _run_script_command(command: str, relative_path: str) -> int:
     if spec is None or spec.loader is None:
         print(f"  [ERROR] Could not load script for command {command!r}: {relative_path}")
         return 2
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    # Match standalone-script sibling imports without leaking this dispatch
+    # context into nested or subsequent CLI calls.
+    previous_sys_path = sys.path[:]
+    sys.path.insert(0, str(script_path.parent))
+    try:
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)  # type: ignore[union-attr]
 
-    command_main = getattr(module, "main", None)
-    if command_main is None:
-        print(f"  [ERROR] Script for command {command!r} has no main()")
-        return 2
+        command_main = getattr(module, "main", None)
+        if command_main is None:
+            print(f"  [ERROR] Script for command {command!r} has no main()")
+            return 2
 
-    signature = inspect.signature(command_main)
-    if len(signature.parameters) == 0:
-        return int(command_main())
-    return int(command_main(sys.argv[1:]))
+        signature = inspect.signature(command_main)
+        if len(signature.parameters) == 0:
+            return int(command_main())
+        return int(command_main(sys.argv[1:]))
+    finally:
+        sys.path[:] = previous_sys_path
 
 
 def _run_nested_cli_command(command: str, args: list[str]) -> int:
@@ -319,7 +332,7 @@ def _run_first_run(argv: list[str]) -> int:
     steps: list[tuple[str, str, Callable[[], int]]] = [
         (
             "Doctor",
-            "python -m naos_governance.cli doctor",
+            f"{preferred} doctor",
             _print_doctor,
         ),
     ]
@@ -410,8 +423,8 @@ def _run_first_run(argv: list[str]) -> int:
         if guided_pause:
             print("NAOS first-run paused before adoption reports were written.")
             print(
-                "Activate and validate the recommended repository intelligence, "
-                "then rerun first-run."
+                "Resolve the repository-intelligence blockers and follow the specific "
+                "next action above, then rerun first-run."
             )
         else:
             print("NAOS first-run stopped before completion.")
@@ -496,13 +509,52 @@ def _looks_like_naos_console_script(path: Path) -> bool:
     return any(fragment in text for fragment in expected_fragments)
 
 
+def _matches_installed_windows_launcher(path: Path, command_name: str) -> bool:
+    """Identify a launcher from this distribution's entry point and RECORD bytes.
+
+    This is local installation evidence, not authentication of the distribution.
+    Never execute a PATH candidate to establish its identity.
+    """
+    if path.name.casefold() != f"{command_name}.exe".casefold():
+        return False
+    try:
+        distribution = metadata.distribution("naos-governance")
+        try:
+            entries = list(distribution.entry_points)
+            files = list(distribution.files or ())
+        except (configparser.Error, csv.Error, TypeError):
+            # metadata implementations differ: malformed rows can fail in the
+            # parser or while constructing EntryPoint/PackagePath objects.
+            return False
+        named_entries = [entry for entry in entries
+                         if entry.group == "console_scripts" and entry.name == command_name]
+        if len(named_entries) != 1 or named_entries[0].value != "naos_governance.cli:main":
+            return False
+        if Path(distribution.locate_file("naos_governance/cli.py")).resolve() != Path(__file__).resolve():
+            return False
+        matching_files = [entry for entry in files
+                          if Path(distribution.locate_file(entry)).resolve() == path.resolve()]
+        if len(matching_files) != 1:
+            return False
+        entry = matching_files[0]
+        if entry.hash is None or entry.hash.mode != "sha256" or entry.size is None:
+            return False
+        data = path.read_bytes()
+        digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode("ascii")
+        return len(data) == entry.size and digest == entry.hash.value
+    except (metadata.PackageNotFoundError, OSError, ValueError):
+        return False
+    return False
+
+
 def _resolved_command_status(command_name: str) -> tuple[str, str]:
     resolved = shutil.which(command_name)
     if resolved is None:
         return "missing", "not found on PATH"
 
     path = Path(resolved)
-    if _looks_like_naos_console_script(path):
+    if (_matches_installed_windows_launcher(path, command_name)
+            if path.suffix.casefold() == ".exe" else _looks_like_naos_console_script(path)):
         return "ok", str(path)
 
     return "warning", str(path)
@@ -551,13 +603,14 @@ def _print_doctor() -> int:
         print("The package is importable through this Python environment, but no")
         print("PATH command clearly resolves to the installed NAOS CLI.")
         print("Use `python -m naos_governance.cli ...` until PATH is fixed, or")
-        print("reinstall in the active environment so `naos-governance` is present.")
+        print("reinstall the selected checksum-verified artifact in this environment")
+        print("so `naos-governance` is present (see INSTALLATION_MANUAL.md).")
         print("If bare `naos` opens another tool, treat that as a local command")
         print("collision, not a NAOS validation failure.")
 
     print("")
     print("First-run examples:")
-    print("  python -m naos_governance.cli doctor")
+    print(f"  {preferred} doctor")
     print(f"  {preferred} first-run --profile standard --mode brownfield")
     print(f"  {preferred} first-run --profile standard --mode greenfield")
     print("")
@@ -577,6 +630,7 @@ _HELP_USAGE_ROWS = (
     ("naos upgrade PROJECT --tier T [--dry-run] [--plan-out FILE]", "Plan a content-aware profile transition"),
     ("naos upgrade PROJECT --apply-plan FILE --expect-plan-digest SHA256", "Apply one exact immutable transition plan"),
     ("naos upgrade PROJECT --recover", "Recover managed-content transactions"),
+    ("naos upgrade PROJECT --inspect-provenance", "Inspect portable v3 history without mutation"),
     ("naos memory [explain|check|setup|status]", "Record/check Engram onboarding posture"),
     ("naos doctor", "Diagnose install, PATH, and command-resolution state"),
     ("naos first-run [project_path] [options]", "Run safe first-contact evidence route"),
@@ -669,7 +723,8 @@ _HELP_USAGE_ROWS = (
     ("naos calibration-shadow [options]", "Compare deterministic reports to calibration-shadow expectations"),
     ("naos evidence-classification [options]", "Classify finding provenance for review"),
     ("naos cross-harness-review-readiness [options]", "Report future cross-harness/DSSE readiness boundaries"),
-    ("naos self-check [options]", "Run control-plane self-conformance"),
+    ("naos self-check [options]", "Inspect live self-conformance; --refresh publishes reports"),
+    ("naos ci-readiness [options]", "Collect and evaluate local readiness evidence"),
     ("naos roadmap-crosswalk [options]", "Validate roadmap/recommendation crosswalk"),
     ("naos function-index-health [options]", "Report FUNCTION_INDEX health"),
     ("naos test-evidence-map [options]", "Build source-to-test evidence map"),
@@ -704,6 +759,7 @@ _HELP_USAGE_GROUP_COMMANDS = (
             "naos upgrade PROJECT --tier T [--dry-run] [--plan-out FILE]",
             "naos upgrade PROJECT --apply-plan FILE --expect-plan-digest SHA256",
             "naos upgrade PROJECT --recover",
+            "naos upgrade PROJECT --inspect-provenance",
             "naos memory [explain|check|setup|status]",
             "naos doctor",
             "naos first-run [project_path] [options]",
@@ -819,6 +875,7 @@ _HELP_USAGE_GROUP_COMMANDS = (
             "naos evidence-classification [options]",
             "naos cross-harness-review-readiness [options]",
             "naos self-check [options]",
+            "naos ci-readiness [options]",
             "naos roadmap-crosswalk [options]",
             "naos function-index-health [options]",
             "naos test-evidence-map [options]",

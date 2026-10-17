@@ -1,19 +1,8 @@
 ---
-name: "governed-coding-execution"
-description: "Orchestrate evidence-first implementation from bounded task context through source inspection, minimal change, tests, diff review, deterministic evidence, completion-claim verification, and human handoff. Invoke for material code, configuration, schema, workflow, security, or governance-surface changes, and before claiming implementation is complete, done, fixed, or passing."
-parameters:
-  - name: task
-    description: "Optional task, requirement, FR/NFR/SCEN id, or work-item identifier to anchor execution."
-    required: false
-    default: ""
-  - name: phase
-    description: "Execution phase: prepare, implement, verify, or handoff."
-    required: false
-    default: "verify"
-  - name: risk
-    description: "Risk posture: auto, low, moderate, high, or critical. Raise verification effort for security, data, schema, and control-surface changes."
-    required: false
-    default: "auto"
+name: governed-coding-execution
+description: Orchestrate evidence-first implementation from bounded task context through source inspection, minimal change, tests, diff review, deterministic evidence, completion-claim verification, and human handoff. Invoke for material code, configuration, schema, workflow, security, or governance-surface changes, and before claiming implementation is complete, done, fixed, or passing.
+metadata:
+  naos-parameters: '[{"name":"task","description":"Optional task, requirement, FR/NFR/SCEN id, or work-item identifier to anchor execution.","required":false,"default":""},{"name":"phase","description":"Execution phase: prepare, implement, verify, or handoff.","required":false,"default":"verify"},{"name":"risk","description":"Risk posture: auto, low, moderate, high, or critical. Raise verification effort for security, data, schema, and control-surface changes.","required":false,"default":"auto"}]'
 ---
 
 # Skill: Governed Coding Execution

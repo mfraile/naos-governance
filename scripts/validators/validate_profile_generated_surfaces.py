@@ -18,6 +18,8 @@ import tempfile
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
+import yaml
+
 KIT_ROOT = Path(__file__).resolve().parents[2]
 if str(KIT_ROOT) not in sys.path:
     sys.path.insert(0, str(KIT_ROOT))
@@ -32,6 +34,52 @@ PROFILE_ORDER = ("quickstart", "lite", "standard", "assured")
 GENERATION_TIMEOUT_SECONDS = 180
 COMMAND_TIMEOUT_SECONDS = 60
 MAKE_TARGET_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+PRESET_INCLUDED_SECTIONS = ("skills", "agents", "scripts", "configs")
+PRESET_REFERENCE_RE = re.compile(
+    r"^governance-(quickstart|lite|standard|assured)\.yaml#"
+    r"(skills|agents|scripts|configs)\.included$"
+)
+
+
+class UniqueKeyLoader(yaml.SafeLoader):
+    """Reject ambiguous preset YAML while retaining SafeLoader's value rules."""
+
+
+def _unique_yaml_mapping(loader: UniqueKeyLoader, node: yaml.MappingNode) -> dict[Any, Any]:
+    result: dict[Any, Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=True)
+        if not isinstance(key, str):
+            raise ValueError("Preset YAML mapping keys must be strings")
+        if key in result:
+            raise ValueError(f"Duplicate preset YAML key: {key!r}")
+        result[key] = loader.construct_object(value_node, deep=True)
+    return result
+
+
+UniqueKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _unique_yaml_mapping
+)
+
+
+def _preset_kit_source(target: str) -> str:
+    """Map an installed target to the initializer's current kit copy origin."""
+    for installed_prefix, source_prefix in (
+        (".github/skills/", "templates/skills/"),
+        (".github/agents/", "templates/agents/"),
+        (".github/autoresearch/", "autoresearch/"),
+        ("configs/", "templates/structural-seeds/configs/"),
+        ("scripts/", "scripts/"),
+    ):
+        if target.startswith(installed_prefix):
+            return source_prefix + target[len(installed_prefix):]
+    exact = {
+        "naos/policy/default_policy.yaml": "policies/default_policy.yaml",
+        "naos/profile_generated_surface_contract.json": "configs/profile_generated_surface_contract.json",
+    }
+    if target in exact:
+        return exact[target]
+    raise ValueError(f"No kit source mapping for included target: {target}")
 
 
 def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -256,6 +304,279 @@ def validate_profile_preset_copies(
     return findings
 
 
+def validate_preset_included_surfaces(
+    profile: str,
+    destination: Path,
+    *,
+    templates_path: Path = PROFILE_TEMPLATES_PATH,
+    source_root: Path = KIT_ROOT,
+) -> list[dict[str, str]]:
+    """Check each preset inclusion at its kit origin and generated target.
+
+    ``see`` entries inherit declarations, not files: an inherited Standard path
+    must also be present in a generated Assured project. Generated copies may
+    intentionally transform source bytes, so this checks file identity/existence
+    rather than byte equality. Preset-copy bytes have a separate check.
+    """
+    findings: list[dict[str, str]] = []
+    cache: dict[str, dict[str, Any]] = {}
+
+    def load_preset(name: str) -> dict[str, Any]:
+        if name not in PROFILE_ORDER:
+            raise ValueError(f"unknown preset profile: {name}")
+        if name not in cache:
+            relative = f"governance-{name}.yaml"
+            if _symlink_component(templates_path, relative):
+                raise ValueError(f"preset source has a symlink component: {relative}")
+            path = templates_path / relative
+            data = yaml.load(path.read_text(encoding="utf-8"), Loader=UniqueKeyLoader)
+            if not isinstance(data, dict) or data.get("id") != f"governance-{name}":
+                raise ValueError(f"invalid preset identity: {relative}")
+            cache[name] = data
+        return cache[name]
+
+    def entries(name: str, section: str, ancestors: tuple[tuple[str, str], ...]):
+        key = (name, section)
+        if key in ancestors:
+            raise ValueError(f"cyclic preset inclusion: {name}.{section}")
+        value = load_preset(name).get(section)
+        included = value.get("included") if isinstance(value, dict) else None
+        if not isinstance(included, list):
+            raise ValueError(f"{name}.{section}.included must be a list")
+        for index, item in enumerate(included):
+            if not isinstance(item, dict):
+                raise ValueError(f"{name}.{section}.included[{index}] must be a mapping")
+            if "see" in item:
+                if set(item) != {"see"} or not isinstance(item["see"], str):
+                    raise ValueError(f"{name}.{section}.included[{index}] has invalid inheritance")
+                match = PRESET_REFERENCE_RE.fullmatch(item["see"])
+                if match is None or match.group(2) != section:
+                    raise ValueError(f"{name}.{section}.included[{index}] has invalid reference")
+                yield from entries(match.group(1), section, (*ancestors, key))
+                continue
+            if not isinstance(item.get("id"), str) or not item["id"]:
+                raise ValueError(f"{name}.{section}.included[{index}] needs an id")
+            target = _validated_relative_path(
+                item.get("path"), f"{name}.{section}.included[{index}].path"
+            )
+            source = _validated_relative_path(
+                _preset_kit_source(target), f"{name}.{section}.included[{index}].origin"
+            )
+            yield section, item["id"], source, target
+
+    try:
+        seen_targets: set[str] = set()
+        for section in PRESET_INCLUDED_SECTIONS:
+            for _, identifier, source, target in entries(profile, section, ()):
+                detail = f"{section}.{identifier}: {source} -> {target}"
+                if target in seen_targets:
+                    findings.append({"profile": profile, "kind": "preset_target_duplicate", "detail": detail})
+                seen_targets.add(target)
+                source_symlink = _symlink_component(source_root, source)
+                if source_symlink or not (source_root / source).is_file():
+                    findings.append({
+                        "profile": profile,
+                        "kind": "preset_source_missing",
+                        "detail": f"{detail}: symlink component {source_symlink}" if source_symlink else detail,
+                    })
+                target_symlink = _symlink_component(destination, target)
+                if target_symlink or not (destination / target).is_file():
+                    findings.append({
+                        "profile": profile,
+                        "kind": "preset_target_missing",
+                        "detail": f"{detail}: symlink component {target_symlink}" if target_symlink else detail,
+                    })
+    except (OSError, ValueError, yaml.YAMLError) as exc:
+        findings.append({"profile": profile, "kind": "preset_contract_invalid", "detail": str(exc)})
+    return findings
+
+
+# A finite executable/resource namespace, not a general Markdown link checker.
+# Dynamic task paths, project examples and optional integrations remain distinct
+# from concrete installed NAOS scripts/host routes.
+INSTRUCTION_REFERENCE_RE = re.compile(
+    r"(?<![A-Za-z0-9_./:-])(?:scripts/[A-Za-z0-9_./-]+\.py|"
+    r"\.github/(?:NAOS_AGENTS\.md|skills/[a-z0-9-]+/SKILL\.md|agents/[a-z0-9-]+\.agent\.md|"
+    r"instructions/[a-z0-9-]+\.instructions\.md|prompts/[A-Za-z0-9_-]+(?:\.prompt)?\.md|"
+    r"naos-guidance/[a-z0-9-]+\.md|autoresearch/[A-Za-z0-9_./-]+\.(?:py|yaml))|"
+    r"templates/[A-Za-z0-9_./-]+)"
+)
+
+
+# These are the four literal F27 fenced-YAML workflow artifacts, not an
+# arbitrary Markdown/YAML execution mechanism or a project-wide new gate.
+F27_YAML_WORKFLOWS = {"d-commit", "d-start", "w-plan", "w-review"}
+
+
+def validate_prompt_yaml_blocks(relative: str, body: str) -> list[str]:
+    """Parse original workflow examples and require their declared next_action.
+
+    YAML values remain authored/manual examples. Parsing is not authorization,
+    execution, task completion, input expansion or host invocation evidence.
+    """
+    name = Path(relative).name.removesuffix(".prompt.md")
+    selected = (relative.startswith(".github/prompts/") and name.removeprefix("naos-") in F27_YAML_WORKFLOWS)
+    if relative.startswith(".agents/skills/") and relative.endswith("/SKILL.md"):
+        selected = Path(relative).parent.name.removeprefix("naos-workflow-") in F27_YAML_WORKFLOWS
+    if not selected:
+        return []
+    errors: list[str] = []
+    fence: str | None = None
+    content: list[str] = []
+    found_next_action = False
+    for number, line in enumerate(body.splitlines(), 1):
+        if fence is None:
+            opening = re.fullmatch(r"\s{0,3}(`{3,}|~{3,})[ \t]*(?:yaml|yml)[ \t]*", line)
+            if opening:
+                fence = opening.group(1)
+                content = []
+            continue
+        if re.fullmatch(r"\s{0,3}" + re.escape(fence) + r"[ \t]*", line):
+            try:
+                value = yaml.load("\n".join(content), Loader=UniqueKeyLoader)
+                if isinstance(value, dict) and "next_action" in value:
+                    action = value["next_action"]
+                    if (not isinstance(action, dict)
+                            or not all(isinstance(action.get(key), str) and action[key].strip()
+                                       for key in ("label", "preferred_command", "reason"))
+                            or not isinstance(action.get("constraints"), list)
+                            or not all(isinstance(item, str) for item in action["constraints"])):
+                        errors.append(f"line {number}: malformed next_action example")
+                    else:
+                        found_next_action = True
+            except (ValueError, yaml.YAMLError, RecursionError) as exc:
+                errors.append(f"line {number}: invalid fenced YAML: {exc}")
+            fence = None
+        else:
+            content.append(line)
+    if fence is not None:
+        errors.append("unterminated fenced YAML")
+    if not found_next_action:
+        errors.append("required next_action fenced YAML example missing or invalid")
+    return errors
+
+
+def validate_instruction_references(
+    profile: str, destination: Path, *, required_surfaces: list[str] | None = None,
+) -> list[dict[str, str]]:
+    """Check concrete emitted dependencies, allowing explicit kit/absence protocols.
+
+    This proves neither host loading nor runtime execution. It deliberately does
+    not turn absent dynamic task outputs or project-specific ADAPT examples into
+    installed-file requirements.
+    """
+    findings: list[dict[str, str]] = []
+    resolved_root = destination.resolve()
+
+    def contained_file(relative: str) -> bool:
+        # Pure validation precedes every reference-specific filesystem probe.
+        checked = _validated_relative_path(relative, "instruction reference")
+        if _symlink_component(destination, checked):
+            return False
+        candidate = destination / checked
+        try:
+            if not candidate.resolve().is_relative_to(resolved_root):
+                return False
+        except (OSError, RuntimeError, ValueError):
+            return False
+        return candidate.is_file()
+
+    # Applicability comes from the same profile contract used by generation;
+    # the finite core/detail family distinguishes required instructions from
+    # optional arbitrary Markdown encountered by the reference scanner.
+    declared = (required_surfaces if required_surfaces is not None else
+                load_contract()["profiles"][profile]["required_surfaces"])
+    core = {"AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md",
+            ".github/project-context.md", ".github/NAOS_AGENTS.md"}
+    for relative in declared:
+        if (relative in core or relative.startswith((".github/naos-guidance/", ".claude/rules/"))
+                or relative in {".github/instructions/security.instructions.md",
+                                ".cursor/rules/naos-security-standards.mdc"}):
+            if not contained_file(relative):
+                findings.append({"profile": profile, "kind": "required_instruction_surface_missing",
+                                 "detail": relative})
+
+    roots = (".github/skills", ".github/agents", ".github/prompts",
+             ".github/instructions", ".github/naos-guidance", ".agents/skills", ".cursor/rules", ".claude/rules")
+    surfaces = {destination / name for name in ("AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md", ".github/NAOS_AGENTS.md")}
+    for relative in roots:
+        if _symlink_component(destination, relative):
+            findings.append({"profile": profile, "kind": "instruction_surface_unsafe", "detail": relative})
+            continue
+        surfaces.update(path for path in (destination / relative).rglob("*")
+                        if path.suffix in {".md", ".mdc"})
+    for path in sorted(surfaces):
+        relative = path.relative_to(destination).as_posix()
+        if _symlink_component(destination, relative):
+            findings.append({"profile": profile, "kind": "instruction_surface_unsafe", "detail": relative})
+            continue
+        if not path.is_file():
+            continue
+        body = path.read_text(encoding="utf-8")
+        # Agent/skill/instruction frontmatter is a separate host contract.
+        if body.startswith("---\n"):
+            parts = body[4:].split("\n---", 1)
+            if len(parts) == 2:
+                body = parts[1]
+        for detail in validate_prompt_yaml_blocks(relative, body):
+            findings.append({"profile": profile, "kind": "prompt_yaml_invalid", "detail": relative + ": " + detail})
+        for number, line in enumerate(body.splitlines(), 1):
+            # Native prompt links are relative to the prompt. Resolve only the
+            # named instruction/workflow namespace, without treating arbitrary
+            # project examples or remote URLs as installed dependencies.
+            import posixpath
+            for link in re.finditer(r"(?<!!)\[[^]\n]+\]\(([^)\s]+)\)", line):
+                operand = link.group(1)
+                if operand.startswith("#") or re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", operand):
+                    continue
+                target = operand.split("#", 1)[0]
+                canonical = posixpath.normpath(posixpath.join(posixpath.dirname(relative), target))
+                if not (target.endswith((".instructions.md", ".prompt.md")) or canonical.startswith(
+                        (".github/instructions/", ".github/prompts/", ".github/skills/", ".github/naos-guidance/"))):
+                    continue
+                try:
+                    _validated_relative_path(canonical, "instruction link")
+                except ValueError:
+                    findings.append({"profile": profile, "kind": "instruction_reference_unsafe", "detail": f"{relative}:{number}: {operand}"})
+                    continue
+                if not contained_file(canonical):
+                    findings.append({"profile": profile, "kind": "instruction_link_missing", "detail": f"{relative}:{number}: {operand}"})
+            for match in INSTRUCTION_REFERENCE_RE.finditer(line):
+                target = match.group(0)
+                # Reject traversal/non-normalized operands before lstat,
+                # resolve or is_file; outside presence cannot satisfy a route.
+                try:
+                    _validated_relative_path(target, "instruction reference")
+                except ValueError:
+                    findings.append({"profile": profile, "kind": "instruction_reference_unsafe",
+                                     "detail": f"{relative}:{number}: {target}"})
+                    continue
+                available = contained_file(target)
+                if not target.startswith((".github/", "templates/")):
+                    support_relative = (path.parent.relative_to(destination) / target).as_posix()
+                    available = available or contained_file(support_relative)
+                if available:
+                    continue
+                # The canonical register renderer records its KIT source in a
+                # provenance attribution. The brownfield adapter deliberately
+                # preserves this generated block in its source namespace. This
+                # attribution is neither a local executable dependency nor an
+                # exemption for commands elsewhere in the same document.
+                if (target == "scripts/naos_render_secure_coding_controls.py"
+                        and line.startswith("> Generated from `configs/secure_coding_control_register.yaml` version ")):
+                    continue
+                explicit_absence = line[match.end():].startswith(f" [not installed in {profile};")
+                manual = "manual check (" in line and f"not installed in {profile}" in line
+                comment = line.lstrip().startswith("# Profile fallback:")
+                if not (explicit_absence or manual or comment):
+                    findings.append({"profile": profile, "kind": "instruction_reference_missing",
+                                     "detail": f"{relative}:{number}: {target}"})
+            if re.match(r"\s*(?:python\d*|conda run|bash|sh|make -f Makefile\.naos)\s", line) and "not installed in " in line:
+                findings.append({"profile": profile, "kind": "unavailable_instruction_command",
+                                 "detail": f"{relative}:{number}: {line.strip()}"})
+    return findings
+
+
 def validate_generated_profile(
     profile: str,
     profile_contract: dict[str, Any],
@@ -310,6 +631,10 @@ def validate_generated_profile(
                 })
 
         findings.extend(validate_profile_preset_copies(profile, destination))
+        findings.extend(validate_preset_included_surfaces(profile, destination))
+        findings.extend(validate_instruction_references(
+            profile, destination, required_surfaces=profile_contract.get("required_surfaces") or [],
+        ))
 
         generated_contract = destination / "naos" / "profile_generated_surface_contract.json"
         generated_contract_symlink = _symlink_component(

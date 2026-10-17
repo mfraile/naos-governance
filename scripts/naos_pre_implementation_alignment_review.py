@@ -168,15 +168,17 @@ def alignment_path(root: Path, naos_root: str, policy: dict[str, Any], explicit:
 
 def extract_frontmatter(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")
     except Exception as exc:
         return None, str(exc)
     if not text.startswith("---\n"):
         return None, "alignment file is missing YAML frontmatter"
-    end = text.find("\n---", 4)
-    if end == -1:
+    lines = text.split("\n")
+    end = next((index for index, line in enumerate(lines[1:], 1)
+                if line.rstrip(" \t") == "---"), None)
+    if end is None:
         return None, "alignment file has unterminated YAML frontmatter"
-    raw = text[4:end]
+    raw = "\n".join(lines[1:end])
     try:
         data = yaml.safe_load(raw) or {}
     except Exception as exc:

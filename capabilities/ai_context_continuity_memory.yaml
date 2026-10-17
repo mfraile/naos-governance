@@ -28,7 +28,7 @@ profiles:
   assured:
     target_maturity: L3
     enforcement: blocking
-    notes: "May block when memory write access, MCP access, or source-of-truth posture creates unmanaged governance risk."
+    notes: "May block when memory write access, MCP access, or source-authority posture creates unmanaged governance risk."
 authority:
   may_read:
     - "naos/memory_context_rules.yaml"
@@ -113,7 +113,7 @@ dashboard_signals:
   - "memory_use_policy.summary.policy_items_valid_but_access_unverified"
 maturity_path:
   L0: "Capability contract, rules schema, report schema, seed rules, and authorization matrix exist."
-  L1: "Project declares memory provider posture, source-of-truth hierarchy, forbidden categories, access-verification posture, and fallback behavior."
+  L1: "Project declares memory provider posture, source-authority hierarchy, forbidden categories, access-verification posture, and fallback behavior."
   L2: "Project declares platform/tool authorization for read, draft write, approved write, and admin access, and keeps configured provider/MCP access separate from verified access."
   L3: "Evidence pack, dashboard, gates, setup recommendations, systemic impact, and control-plane review expose memory-readiness and memory-access findings."
   L4: "Memory conflicts, stale recall, access changes, write authorization, and context-pack readiness are routed through human review and control-plane decisions."

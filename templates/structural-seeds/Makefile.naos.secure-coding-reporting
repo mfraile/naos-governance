@@ -3,6 +3,8 @@
 
 PYTHON ?= python
 NAOS_PROFILE ?= lite
+NAOS_P3_DISPATCH = import importlib.util, runpy, sys; entry = sys.argv.pop(1); runpy.run_module('naos_governance.secure_coding_reporting_cli', run_name='__main__', alter_sys=True) if importlib.util.find_spec('naos_governance') is not None else runpy.run_path(entry, run_name='__main__')
+NAOS_P3_SCRIPT ?= scripts/naos_secure_coding_reporting.py
 NAOS_ROOT ?= naos
 NAOS_POLICY ?=
 NAOS_STRICT ?=
@@ -14,21 +16,7 @@ NAOS_P3_ARGS := --profile $(NAOS_PROFILE) --naos-root $(NAOS_ROOT) $(NAOS_POLICY
 .PHONY: naos-secure-coding-reporting naos-secure-coding-reporting-project
 
 naos-secure-coding-reporting: ## Refresh P1/P2 sources and generate the five P3 dimensions
-	@echo "[naos-secure-coding-reporting] profile=$(NAOS_PROFILE)"
-	@if command -v naos-secure-coding-reporting >/dev/null 2>&1; then \
-		naos-secure-coding-reporting $(NAOS_P3_ARGS) --refresh-sources; \
-	elif [ -f scripts/naos_secure_coding_reporting.py ]; then \
-		$(PYTHON) scripts/naos_secure_coding_reporting.py $(NAOS_P3_ARGS) --refresh-sources; \
-	else \
-		$(PYTHON) -m naos_governance.secure_coding_reporting_cli $(NAOS_P3_ARGS) --refresh-sources; \
-	fi
+	@"$(PYTHON)" -c "$(NAOS_P3_DISPATCH)" "$(NAOS_P3_SCRIPT)" $(NAOS_P3_ARGS) --refresh-sources
 
 naos-secure-coding-reporting-project: ## Project P3 into existing dashboard/evidence artifacts
-	@echo "[naos-secure-coding-reporting-project] profile=$(NAOS_PROFILE)"
-	@if command -v naos-secure-coding-reporting >/dev/null 2>&1; then \
-		naos-secure-coding-reporting $(NAOS_P3_ARGS) --refresh-sources --project; \
-	elif [ -f scripts/naos_secure_coding_reporting.py ]; then \
-		$(PYTHON) scripts/naos_secure_coding_reporting.py $(NAOS_P3_ARGS) --refresh-sources --project; \
-	else \
-		$(PYTHON) -m naos_governance.secure_coding_reporting_cli $(NAOS_P3_ARGS) --refresh-sources --project; \
-	fi
+	@"$(PYTHON)" -c "$(NAOS_P3_DISPATCH)" "$(NAOS_P3_SCRIPT)" $(NAOS_P3_ARGS) --refresh-sources --project

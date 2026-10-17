@@ -4,11 +4,16 @@
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
+from threading import RLock
+from copy import deepcopy
 import os
 import getpass
+import unicodedata
 import re
 import secrets
 import stat
+import sys
 import subprocess
 import errno
 import tempfile
@@ -17,6 +22,315 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+
+# Only explicit operand readers opt in. Every call receives freshly read bytes
+# or text. Cached graphs are private; exceptions and observations are not cached.
+# Runtime code/state monkeypatches inside existing loader callables are outside
+# this contract; registered constructor/resolver changes bypass memoization.
+_OPERAND_YAML_MAX_INPUT_BYTES = 256 * 1024
+_OPERAND_YAML_MAX_TOTAL_BYTES = 2 * 1024 * 1024
+_OPERAND_YAML_MAX_ENTRIES = 128
+_OPERAND_YAML_CACHE = OrderedDict()
+_OPERAND_YAML_CACHE_BYTES = 0
+_OPERAND_YAML_LOCK = RLock()
+
+
+def _operand_yaml_loader_signature(loader):
+    try:
+        return (
+            loader,
+            tuple((base, tuple((name, id(value), value)
+                              for name, value in vars(base).items()
+                              if callable(value))) for base in loader.__mro__),
+            tuple((key, id(value), value)
+                  for key, value in loader.yaml_constructors.items()),
+            tuple((key, id(value), value)
+                  for key, value in loader.yaml_multi_constructors.items()),
+            frozenset((key, tuple(value))
+                      for key, value in loader.yaml_implicit_resolvers.items()),
+            tuple(loader.yaml_path_resolvers.items()),
+        )
+    except (TypeError, RuntimeError):
+        # Valid custom resolver shapes may not support a stable fingerprint.
+        # They remain available to the ordinary parser, including at import.
+        return None
+
+
+_OPERAND_YAML_BASELINE = _operand_yaml_loader_signature(yaml.SafeLoader)
+# Stateful third-party constructors are not known to be deterministic, even if
+# already registered before this module was imported. Never memoize them.
+_OPERAND_YAML_STANDARD_CONSTRUCTORS = _OPERAND_YAML_BASELINE is not None and all(
+    getattr(value, "__module__", "") == "yaml.constructor"
+    for value in yaml.SafeLoader.yaml_constructors.values()
+) and not yaml.SafeLoader.yaml_multi_constructors and all(
+    isinstance(pattern, re.Pattern)
+    for resolvers in yaml.SafeLoader.yaml_implicit_resolvers.values()
+    for _, pattern in resolvers
+)
+
+
+# Optional LibYAML acceleration is confined to exact bytes/text operands. Both
+# implementations must retain their import-time code/registries and use the
+# same safe constructors/resolvers. This is not a blanket equivalence claim:
+# malformed accelerated parses are retried by the original pure loader so its
+# exception type, marks and text remain authoritative.
+_OPERAND_YAML_SAFE_CONSTRUCTORS = {
+    **{f"tag:yaml.org,2002:{tag}": getattr(yaml.constructor.SafeConstructor, f"construct_yaml_{tag}")
+       for tag in ("null", "bool", "int", "float", "binary", "timestamp", "omap",
+                   "pairs", "set", "str", "seq", "map")},
+    None: yaml.constructor.SafeConstructor.construct_undefined,
+}
+_OPERAND_YAML_C_LOADER = getattr(yaml, "CSafeLoader", None)
+if (not isinstance(_OPERAND_YAML_C_LOADER, type)
+        or _OPERAND_YAML_C_LOADER.__module__ != "yaml.cyaml"
+        or _OPERAND_YAML_C_LOADER.__name__ != "CSafeLoader"):
+    _OPERAND_YAML_C_LOADER = None
+_OPERAND_YAML_C_BASELINE = (
+    _operand_yaml_loader_signature(_OPERAND_YAML_C_LOADER)
+    if _OPERAND_YAML_C_LOADER is not None else None
+)
+
+
+def _operand_yaml_c_compatible():
+    try:
+        return (
+            _OPERAND_YAML_STANDARD_CONSTRUCTORS
+            and yaml.SafeLoader.yaml_constructors == _OPERAND_YAML_SAFE_CONSTRUCTORS
+            and _OPERAND_YAML_BASELINE is not None
+            and _OPERAND_YAML_C_BASELINE is not None
+            and getattr(yaml, "CSafeLoader", None) is _OPERAND_YAML_C_LOADER
+            and _operand_yaml_loader_signature(yaml.SafeLoader) == _OPERAND_YAML_BASELINE
+            and _operand_yaml_loader_signature(_OPERAND_YAML_C_LOADER) == _OPERAND_YAML_C_BASELINE
+            and _OPERAND_YAML_C_BASELINE[2:] == _OPERAND_YAML_BASELINE[2:]
+        )
+    except (TypeError, RuntimeError, AttributeError):
+        return False
+
+
+_OPERAND_YAML_C_TEXT_OUTSIDE_SUBSET = re.compile(r"%|[^\x20-\x7e\r\n]")
+_OPERAND_YAML_C_BYTES_OUTSIDE_SUBSET = re.compile(rb"%|[^\x20-\x7e\r\n]")
+
+
+_OPERAND_YAML_RECURSION_LIMIT = sys.getrecursionlimit()
+
+
+def _operand_yaml_c_recursion_budget():
+    # A shallower caller budget can make the pure composer refuse even shallow
+    # YAML. Keep that path authoritative; frame inspection is local only.
+    if sys.getrecursionlimit() != _OPERAND_YAML_RECURSION_LIMIT:
+        return False
+    try:
+        frame = sys._getframe()
+        depth = 0
+        while frame is not None:
+            depth += 1
+            frame = frame.f_back
+        return _OPERAND_YAML_RECURSION_LIMIT - depth >= 768
+    except Exception:
+        # Audit/runtime instrumentation may refuse optional frame inspection.
+        # Preserve BaseException interruption behavior; ordinary failures stay pure.
+        return False
+    finally:
+        frame = None
+
+
+def _operand_yaml_c_operand(content):
+    # Pure/C acceptance differs for tabs and percent-escaped NUL tag suffixes.
+    # Admit printable ASCII plus CR/LF only, without percent syntax. Unsupported
+    # encodings, controls, directives and tag URI escapes keep the pure parser.
+    if isinstance(content, bytes):
+        if _OPERAND_YAML_C_BYTES_OUTSIDE_SUBSET.search(content) is not None:
+            return False
+        text = content.decode("ascii")
+    elif isinstance(content, str):
+        if _OPERAND_YAML_C_TEXT_OUTSIDE_SUBSET.search(content) is not None:
+            return False
+        text = content
+    else:
+        return False
+    # Pure composition recurses while C composition does not. Conservative
+    # lexical bounds deliberately overcount brackets inside scalars: deep or
+    # ambiguous operands stay pure, rather than admitting C-only deep graphs.
+    if text.count("[") + text.count("{") > 32:
+        return False
+    for line in text.splitlines():
+        if len(line) - len(line.lstrip(" ")) > 64:
+            return False
+        prefix = line.lstrip(" ")
+        sequences = 0
+        while prefix.startswith("- "):
+            sequences += 1
+            if sequences > 32:
+                return False
+            prefix = prefix[2:].lstrip(" ")
+    return True
+
+
+def _operand_yaml_parse(content, pure_loader, accelerated_loader=None,
+                        accelerated_baseline=None):
+    if (accelerated_loader is None or accelerated_baseline is None
+            or not _operand_yaml_c_recursion_budget()
+            or not _operand_yaml_c_operand(content)
+            or not _operand_yaml_c_compatible()
+            or _operand_yaml_loader_signature(accelerated_loader) != accelerated_baseline):
+        return yaml.load(content, Loader=pure_loader)
+    try:
+        return yaml.load(content, Loader=accelerated_loader)
+    except Exception:
+        # Do not propagate C-parser diagnostics or retain failed observations.
+        return yaml.load(content, Loader=pure_loader)
+
+
+def _operand_yaml_unique_loader(base_loader=None):
+    # Recreate on uncached calls to retain the reader's current SafeLoader
+    # inheritance semantics after an external constructor/resolver mutation.
+    class UniqueLoader(base_loader or yaml.SafeLoader):
+        pass
+
+    def mapping(loader, node):
+        result = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node)
+            if not isinstance(key, str) or key in result:
+                raise ValueError("Duplicate or nonstring review-record key")
+            result[key] = loader.construct_object(value_node)
+        return result
+
+    UniqueLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping
+    )
+    return UniqueLoader
+
+
+_OPERAND_YAML_UNIQUE_LOADER = _operand_yaml_unique_loader()
+_OPERAND_YAML_UNIQUE_BASELINE = _operand_yaml_loader_signature(_OPERAND_YAML_UNIQUE_LOADER)
+_OPERAND_YAML_C_UNIQUE_LOADER = (
+    _operand_yaml_unique_loader(_OPERAND_YAML_C_LOADER)
+    if _OPERAND_YAML_C_LOADER is not None else None
+)
+_OPERAND_YAML_C_UNIQUE_BASELINE = (
+    _operand_yaml_loader_signature(_OPERAND_YAML_C_UNIQUE_LOADER)
+    if _OPERAND_YAML_C_UNIQUE_LOADER is not None else None
+)
+_OPERAND_YAML_C_ENABLED_BASELINE = _operand_yaml_c_compatible()
+
+
+def _operand_yaml_parse_selected(content, pure_loader, unique_string_keys):
+    accelerated = (_OPERAND_YAML_C_UNIQUE_LOADER if unique_string_keys
+                   else _OPERAND_YAML_C_LOADER)
+    baseline = (_OPERAND_YAML_C_UNIQUE_BASELINE if unique_string_keys
+                else _OPERAND_YAML_C_BASELINE)
+    return _operand_yaml_parse(content, pure_loader, accelerated, baseline)
+
+
+
+def load_operand_yaml(content: bytes | str, *, unique_string_keys: bool = False):
+    """Parse exact content using the ordinary or strict review-record semantics."""
+    global _OPERAND_YAML_CACHE_BYTES
+    size = len(content) if isinstance(content, bytes) else len(content.encode("utf-8"))
+    try:
+        unchanged = (
+            _OPERAND_YAML_STANDARD_CONSTRUCTORS
+            and (not _OPERAND_YAML_C_ENABLED_BASELINE or (
+                _operand_yaml_c_compatible()
+                and (not unique_string_keys or _operand_yaml_loader_signature(
+                    _OPERAND_YAML_C_UNIQUE_LOADER) == _OPERAND_YAML_C_UNIQUE_BASELINE)))
+            and _operand_yaml_loader_signature(yaml.SafeLoader) == _OPERAND_YAML_BASELINE
+            and (not unique_string_keys or _operand_yaml_loader_signature(
+                _OPERAND_YAML_UNIQUE_LOADER
+            ) == _OPERAND_YAML_UNIQUE_BASELINE)
+        )
+    except (TypeError, RuntimeError):
+        # Concurrent registry changes also remain ordinary uncached parses.
+        unchanged = False
+    if (size > _OPERAND_YAML_MAX_INPUT_BYTES
+            or size > _OPERAND_YAML_MAX_TOTAL_BYTES or not unchanged):
+        loader = _operand_yaml_unique_loader() if unique_string_keys else yaml.SafeLoader
+        return _operand_yaml_parse_selected(content, loader, unique_string_keys)
+    # bytes and str are deliberately distinct exact operands; neither source
+    # paths nor hashes stand in for freshly observed content.
+    key = (unique_string_keys, type(content), content)
+    with _OPERAND_YAML_LOCK:
+        if key in _OPERAND_YAML_CACHE:
+            value, _ = _OPERAND_YAML_CACHE[key]
+            _OPERAND_YAML_CACHE.move_to_end(key)
+            return deepcopy(value)
+        loader = _OPERAND_YAML_UNIQUE_LOADER if unique_string_keys else yaml.SafeLoader
+        value = _operand_yaml_parse_selected(content, loader, unique_string_keys)
+        # Copy before insertion: deepcopy failures cannot leave a cached value.
+        result = deepcopy(value)
+        while _OPERAND_YAML_CACHE and (len(_OPERAND_YAML_CACHE) >= _OPERAND_YAML_MAX_ENTRIES
+                          or _OPERAND_YAML_CACHE_BYTES + size > _OPERAND_YAML_MAX_TOTAL_BYTES):
+            _, (_, removed_size) = _OPERAND_YAML_CACHE.popitem(last=False)
+            _OPERAND_YAML_CACHE_BYTES -= removed_size
+        _OPERAND_YAML_CACHE[key] = (value, size)
+        _OPERAND_YAML_CACHE_BYTES += size
+        return result
+
+
+class _TemporalTextLoader(yaml.SafeLoader):
+    """Opt-in loader for JSON-bound evidence; timestamps retain their text."""
+
+
+_TemporalTextLoader.add_constructor(
+    "tag:yaml.org,2002:timestamp", yaml.SafeLoader.construct_scalar
+)
+
+
+def load_yaml_temporal_text(text: str) -> Any:
+    """Keep YAML dates/datetimes as strings for explicit reporter validation.
+
+    Other SafeLoader types are unchanged. This does not alter yaml.safe_load
+    or coerce malformed temporal text into a valid date.
+    """
+    return yaml.load(text, Loader=_TemporalTextLoader)
+
+
+def normalize_boolean_settings(
+    settings: dict[str, Any], paths: tuple[str, ...], *, prefix: str = "rules"
+) -> tuple[dict[str, Any], list[str]]:
+    """Validate present boolean leaves without granting truthiness authority.
+
+    Absent optional keys retain consumer defaults. Present non-booleans,
+    including null, become false and are returned as diagnostic paths. The
+    caller must emit those diagnostics before claiming readiness. ``*`` visits
+    entries of a mapping or list; input objects are never modified. This is
+    opt-in leaf validation, not a replacement for a consumer's schema or
+    mandatory explicit-value checks. Diagnostics do not include input values.
+    """
+    result = deepcopy(settings)
+    invalid: set[str] = set()
+
+    def visit(node: Any, parts: list[str], location: str) -> None:
+        if parts[0] == "*":
+            entries = node.items() if isinstance(node, dict) else enumerate(node) if isinstance(node, list) else ()
+            for key, value in entries:
+                visit(value, parts[1:], f"{location}.{key}")
+            return
+        if not isinstance(node, dict) or parts[0] not in node:
+            return
+        key = parts[0]
+        path = f"{location}.{key}"
+        if len(parts) > 1:
+            visit(node[key], parts[1:], path)
+        elif not isinstance(node[key], bool):
+            invalid.add(path)
+            node[key] = False
+
+    for path in paths:
+        visit(result, path.split("."), prefix)
+    return result, sorted(invalid)
+
+
+def nonnegative_integer_setting(settings: Any, key: str, default: int, *, context: str) -> int:
+    """Read a bounded day/count setting without truthiness or numeric coercion."""
+    if not isinstance(settings, dict):
+        raise ValueError(f"{context} must be a mapping")
+    value = settings.get(key, default)
+    if type(value) is not int or value < 0:
+        raise ValueError(f"{context}.{key} must be a nonnegative integer")
+    return value
 
 
 def controlled_now_utc() -> datetime:
@@ -91,6 +405,7 @@ SAFE_FALLBACK_POLICY: dict[str, Any] = {
         "package_reality_rules": "package_reality_rules.yaml",
         "package_reality_provenance": "package_reality_provenance.yaml",
         "self_check_report": "self_check.json",
+        "self_check_dependency_resolution_report": "self_check_dependency_resolution.json",
         "capability_maturity_report": "capability_maturity.json",
         "capability_state": "capability_state.yaml",
         "systemic_impact_report": "systemic_impact_review.json",
@@ -320,7 +635,9 @@ OPERATOR_ID_MAX_LENGTH = 128
 OPERATOR_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@+-]{0,127}$")
 OPERATOR_LIMITATIONS = [
     "Operator attribution records local identity signals only; it is not authentication, authorization, non-repudiation, task ownership, or separation-of-duties evidence.",
-    "Git identity is read from local git config only; no network identity provider is queried.",
+    "Git identity is read from repository-local git config only; effective/global Git identity is intentionally not consulted and no network identity provider is queried.",
+    "Explicit NAOS_OPERATOR_ID keeps its strict ASCII grammar; local Git/OS names accept bounded Unicode letters, numbers, combining marks and spaces, while Git email also accepts bot brackets.",
+    "Invalid higher-priority signals that force fallback remain review findings; unused lower-priority signals do not create invalid-identifier findings.",
     "Operator identifiers may be personal data and should be handled according to the adopter's privacy policy.",
 ]
 OPERATOR_NOT_CLAIMED = [
@@ -352,6 +669,14 @@ def validate_operator_value(value: str | None, source: str) -> tuple[str | None,
         reason = "too_long"
     elif "/" in cleaned or "\\" in cleaned or ".." in cleaned:
         reason = "path_like_or_traversal"
+    elif source in {"git_email", "git_name", "os_user"}:
+        punctuation = " ._:@+-" + ("[]" if source == "git_email" else "")
+        if not cleaned[0].isalnum() or any(
+            unicodedata.category(character)[0] not in {"L", "N", "M"}
+            and character not in punctuation
+            for character in cleaned
+        ):
+            reason = "invalid_pattern"
     elif not OPERATOR_ID_PATTERN.fullmatch(cleaned):
         reason = "invalid_pattern"
     if reason:
@@ -367,11 +692,14 @@ def validate_operator_value(value: str | None, source: str) -> tuple[str | None,
 
 
 def local_git_config(root: Path, key: str) -> str | None:
+    """Read repository-local identity only; global/effective identity is excluded."""
     try:
         result = subprocess.run(
             ["git", "config", "--local", "--get", key],
             cwd=root,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             check=False,
@@ -385,35 +713,26 @@ def local_git_config(root: Path, key: str) -> str | None:
 
 def resolve_operator_attribution(root: Path | None = None, env: dict[str, str] | None = None) -> dict[str, Any]:
     root = root or Path.cwd()
-    env = env or os.environ
+    env = os.environ if env is None else env
     invalid_operator_findings: list[dict[str, Any]] = []
-
-    env_operator, env_invalid, env_detected = validate_operator_value(env.get("NAOS_OPERATOR_ID"), "env")
-    if env_invalid:
-        invalid_operator_findings.append(env_invalid)
-    git_email, git_email_invalid, git_email_detected = validate_operator_value(local_git_config(root, "user.email"), "git_email")
-    if git_email_invalid:
-        invalid_operator_findings.append(git_email_invalid)
-    git_name, git_name_invalid, git_name_detected = validate_operator_value(local_git_config(root, "user.name"), "git_name")
-    if git_name_invalid:
-        invalid_operator_findings.append(git_name_invalid)
-    try:
-        os_user, os_user_invalid, os_user_detected = validate_operator_value(getpass.getuser(), "os_user")
-        if os_user_invalid:
-            invalid_operator_findings.append(os_user_invalid)
-    except Exception:
-        os_user = None
-        os_user_detected = False
-
-    candidates = [
-        ("env", env_operator),
-        ("git_email", git_email),
-        ("git_name", git_name),
-        ("os_user", os_user),
+    raw_candidates = [
+        ("env", env.get("NAOS_OPERATOR_ID")),
+        ("git_email", local_git_config(root, "user.email")),
+        ("git_name", local_git_config(root, "user.name")),
     ]
+    try:
+        raw_candidates.append(("os_user", getpass.getuser()))
+    except Exception:
+        raw_candidates.append(("os_user", None))
+    detected = {source: bool(value is not None and str(value).strip()) for source, value in raw_candidates}
     operator_source = "unknown"
     operator_id: str | None = None
-    for source, value in candidates:
+    # Rejected higher-priority inputs explain a fallback. Once attribution is
+    # resolved, lower-priority values are detected metadata only, not warnings.
+    for source, raw in raw_candidates:
+        value, invalid, _ = validate_operator_value(raw, source)
+        if invalid:
+            invalid_operator_findings.append(invalid)
         if value:
             operator_source = source
             operator_id = value
@@ -425,13 +744,16 @@ def resolve_operator_attribution(root: Path | None = None, env: dict[str, str] |
         "operator_source": operator_source,
         "operator_resolution_order": OPERATOR_RESOLUTION_ORDER,
         "operator_attribution_status": status,
-        "git_user_email_detected": bool(git_email_detected),
-        "git_user_name_detected": bool(git_name_detected),
-        "env_operator_id_detected": bool(env_detected),
-        "os_user_detected": bool(os_user_detected),
+        "git_user_email_detected": detected["git_email"],
+        "git_user_name_detected": detected["git_name"],
+        "env_operator_id_detected": detected["env"],
+        "os_user_detected": detected["os_user"],
         "invalid_operator_findings": invalid_operator_findings,
         "operator_id_validation": {
             "safe_pattern": OPERATOR_ID_PATTERN.pattern,
+            "safe_pattern_applies_to": "NAOS_OPERATOR_ID",
+            "local_identity_syntax": "Unicode letters/numbers/combining marks, ASCII spaces and ._:@+-; Git email additionally permits []",
+            "invalid_signal_policy": "attempted_sources_through_selected_source",
             "max_length": OPERATOR_ID_MAX_LENGTH,
             "surrounding_whitespace_normalized": True,
             "path_traversal_rejected": True,
@@ -640,6 +962,49 @@ def severity_for_profile(profile: str, policy: dict[str, Any], advisory: bool = 
     return str(mapping.get(profile) or "advisory")
 
 
+def resolve_report_rule_severity(
+    profile: str,
+    policy: dict[str, Any],
+    requested: Any,
+    *,
+    advisory: bool = False,
+    review_required: bool = False,
+    preserve_lower_request: bool = False,
+    allow_none: bool = False,
+) -> tuple[str, dict[str, Any] | None]:
+    """Apply an assured policy floor to reporter rules, independent of gate maturity.
+
+    Kit reports remain advisory. Lower profiles retain valid requested severity;
+    in particular, optional memory readiness is advisory in lite. The floor is
+    relative to the selected policy, not an integrity pin or approval authority.
+    Context and module-header rule schemas also allow ``none``, below advisory;
+    posture reporters retain their existing request vocabulary.
+    """
+    if advisory:
+        return "advisory", None
+    if profile != "assured" and preserve_lower_request and requested:
+        return str(requested), None
+    configured = str(requested or "").strip()
+    if review_required and configured == "review_required":
+        configured = "required" if profile == "standard" else "blocking" if profile == "assured" else "warning"
+    order = {"none": -1, "advisory": 0, "warning": 1, "required": 2, "blocking": 3}
+    policy_severity = severity_for_profile(profile, policy)
+    if configured not in order or (configured == "none" and not allow_none):
+        return policy_severity, None
+    if profile != "assured" or order[configured] >= order.get(policy_severity, 0):
+        return configured, None
+    return policy_severity, {
+        "id": "severity_downgrade_attempt",
+        "severity": "blocking",
+        "status": "blocked",
+        "message": "Assured reporter rules cannot lower the selected policy severity.",
+        "requested_severity": configured,
+        "policy_severity": policy_severity,
+        "effective_severity": policy_severity,
+        "required_next_actions": ["Review the rule severity against the selected policy; keep policy changes subject to project governance."],
+    }
+
+
 def finding_counts(findings: list[dict[str, Any]]) -> dict[str, int]:
     return {
         "blocking": sum(1 for finding in findings if finding.get("severity") == "blocking"),
@@ -782,7 +1147,8 @@ def report_output_path(
     if candidate.is_dir() and not is_kit_repository(root, naos_root):
         reports_dir = str(policy.get("paths", {}).get("reports_dir") or "reports")
         filename = str(policy.get("paths", {}).get(filename_key) or filename_key)
-        return safe_policy_path(candidate, reports_dir, filename, field=filename_key)
+        from naos_self_check_inspection import inspection_report_output_path
+        return inspection_report_output_path(root, naos_root, safe_policy_path(candidate, reports_dir, filename, field=filename_key))
     return None
 
 
@@ -824,7 +1190,8 @@ def report_default_path(root: Path, naos_root: str, policy: dict[str, Any], file
     candidate = naos_root_path(root, naos_root)
     reports_dir = str(policy.get("paths", {}).get("reports_dir") or "reports")
     filename = str(policy.get("paths", {}).get(filename_key) or filename_key)
-    return safe_policy_path(candidate, reports_dir, filename, field=filename_key)
+    from naos_self_check_inspection import inspection_input_path
+    return inspection_input_path(root, naos_root, safe_policy_path(candidate, reports_dir, filename, field=filename_key))
 
 
 def sessions_root_path(root: Path, naos_root: str, policy: dict[str, Any]) -> Path:
@@ -877,6 +1244,10 @@ def _absolute_lexical_path(path: Path, *, resolve_parent_symlinks: bool = False)
     if resolve_parent_symlinks:
         return absolute.parent.resolve(strict=False) / absolute.name
     return absolute
+
+
+def _secure_windows_report_writes_supported() -> bool:
+    return os.name == "nt"
 
 
 def _secure_directory_fd_writes_supported() -> bool:
@@ -992,7 +1363,7 @@ def _write_report_with_directory_fd(
             ) from last_collision
         if existing is not None:
             os.fchmod(temporary_fd, stat.S_IMODE(existing.st_mode))
-        with os.fdopen(temporary_fd, "w", encoding="utf-8") as handle:
+        with os.fdopen(temporary_fd, "w", encoding="utf-8", newline="\n") as handle:
             temporary_fd = -1
             handle.write(data)
             handle.flush()
@@ -1069,7 +1440,7 @@ def _write_report_portable_fallback(
     try:
         if existing_mode is not None and hasattr(os, "fchmod"):
             os.fchmod(temporary_fd, existing_mode)
-        with os.fdopen(temporary_fd, "w", encoding="utf-8") as handle:
+        with os.fdopen(temporary_fd, "w", encoding="utf-8", newline="\n") as handle:
             temporary_fd = -1
             handle.write(data)
             handle.flush()
@@ -1092,8 +1463,11 @@ def write_report(
     *,
     strict_parent_topology: bool = False,
 ) -> None:
+    from naos_self_check_inspection import logicalize_payload, inspection_publish_path
+    logicalize_payload(report)
     if path is None:
         return
+    path = inspection_publish_path(path)
     data = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if _secure_directory_fd_writes_supported():
         _write_report_with_directory_fd(
@@ -1101,6 +1475,10 @@ def write_report(
             data,
             strict_parent_topology=strict_parent_topology,
         )
+    elif strict_parent_topology and _secure_windows_report_writes_supported():
+        from naos_windows_report import write_strict_report
+
+        write_strict_report(path, data)
     elif strict_parent_topology:
         raise RuntimeError(
             "Strict report-parent topology requires secure directory-descriptor writes on this platform; "
@@ -1126,7 +1504,8 @@ def write_report_with_session(
         report,
         strict_parent_topology=strict_parent_topology,
     )
-    if session_path is not None and session_path != latest_path:
+    from naos_self_check_inspection import inspection_session_copy_active
+    if session_path is not None and session_path != latest_path and not inspection_session_copy_active():
         write_report(
             session_path,
             report,

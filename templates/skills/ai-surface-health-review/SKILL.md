@@ -1,7 +1,8 @@
 ---
-name: "ai-surface-health-review"
-description: "Review and remediate NAOS AI-surface context-budget findings. Invoke when naos-ai-surface-budget reports warning/degraded posture or when slimming prompts, agents, instructions, workflows, skills, manuals, or quick references."
-parameters: []
+name: ai-surface-health-review
+description: Review and remediate NAOS AI-surface context-budget findings. Invoke when naos-ai-surface-budget reports warning/degraded posture or when slimming prompts, agents, instructions, workflows, skills, manuals, or quick references.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Skill: AI-Surface Health Review

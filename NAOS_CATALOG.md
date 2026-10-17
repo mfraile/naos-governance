@@ -245,8 +245,9 @@ guidance without changing the AI's mode. Load via "use the X skill" or
 | `systemic-wiring` | `systemic-wiring/` | Generic cross-project wiring check for modules, APIs, schemas, config, docs, tests, hooks, dependencies, AI-assisted changes, and operational surfaces | Any project change that may leave orphaned artifacts, stale catalogues, or cross-surface contradictions |
 | `test-driven-development` | `test-driven-development/` | Acceptance-linked TDD protocol: scenario link, failing test, minimal implementation, refactor, evidence | Implementing behavior tied to FR/NFR/SCEN acceptance evidence |
 
-Skill files include validated YAML frontmatter. Every `SKILL.md` must declare
-`parameters` and include a body section such as `## When to Use` or
+NAOS-authored skill files include portable YAML frontmatter with `name` and
+`description`. Optional inputs use JSON text in `metadata.naos-parameters`; any
+manual base reference uses `metadata.naos-extends`. Include a body section such as `## When to Use` or
 `## When to Invoke...` so invocation guidance remains visible and auditable.
 
 ---
@@ -1224,7 +1225,7 @@ leaves audit trails incomplete; Quickstart does not install the slash prompt.
 
 - [INSTALLATION_MANUAL.md](./INSTALLATION_MANUAL.md) — full installation guide
 - [docs/COMPLIANCE_MAPPING.md](./docs/COMPLIANCE_MAPPING.md) — regulatory framework mapping
-- [schemas/team_config.schema.yaml](./schemas/team_config.schema.yaml) — multi-team registry configuration schema
+- [schemas/team_config.schema.yaml](./schemas/team_config.schema.yaml) — Draft 2020-12 team-control schema for a registry document; duplicate team IDs and enabled scope references are checked by the shared runtime validator
 - [templates/prompts/](./templates/prompts/) — all prompt source files
 - [templates/agents/](./templates/agents/) — all agent source files
 - [templates/skills/](./templates/skills/) — all skill source files
@@ -1284,3 +1285,17 @@ information, candidate summaries, traceability gaps, collisions, protected
 files, and next actions. These reports do not approve work, validate maturity,
 prove security, prove runtime safety, prove requirements completeness, or prove
 legal/regulatory posture.
+
+## Additional implemented CLI routes
+
+The checked CLI documentation set is `DOC_FILES` in the implementation-reality validator, including this catalog and the generated quick-reference seed. Each implemented command and alias must appear in at least one checked document; flags are options rather than separate commands. These routes delegate to their shipped source; listing a route does not activate its optional runtime.
+
+- `naos agent-orchestration-plan` — delegates to `scripts/naos_agent_orchestration_plan.py`.
+- `naos agentic-workflow-review` — delegates to `scripts/naos_agentic_workflow_review.py`.
+- `naos calibration-shadow` — delegates to `scripts/naos_calibration_shadow.py`.
+- `naos cross-harness-review-readiness` — delegates to `scripts/naos_cross_harness_review_readiness.py`.
+- `naos evidence-classification` — delegates to `scripts/naos_evidence_classification.py`.
+- `naos failure-mode-posture` — delegates to `scripts/naos_failure_mode_posture.py`.
+- `naos pre-implementation-alignment-review` — delegates to `scripts/naos_pre_implementation_alignment_review.py`.
+- `naos secure-coding-controls` — delegates to `scripts/naos_secure_coding_controls.py`.
+- `naos secure-coding-reporting` — delegates to `scripts/naos_secure_coding_reporting.py`.

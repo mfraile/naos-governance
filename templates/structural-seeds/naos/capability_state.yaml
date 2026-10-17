@@ -280,7 +280,7 @@ capabilities:
     parameters:
       default_make_mode: "Dry-run unless SPEC_PACK_MATERIALIZE_ARGS is overridden."
       overwrite_policy: "Existing regular specs are skipped unless --force is explicit; force never relaxes path or file-type checks."
-      refusal_policy: "Invalid manifests, missing/unsafe sources, unsafe report sinks, out-of-project/symlink/non-regular targets, and apply requests outside the executed macOS/POSIX tuple block before any spec file is changed."
+      refusal_policy: "Invalid manifests, missing/unsafe sources, unsafe report sinks, out-of-project/symlink/non-regular targets, and apply requests outside native macOS/Linux/Windows with CPython 3.11-3.13 block before any spec file is changed."
       transaction_model: "Each leaf uses a same-directory temporary install; if post-install cleanup fails, the target stays counted as copied and the residue is blocking evidence. Executed evidence is macOS-local, and a multi-file run is sequential with no rollback."
     evidence_roots:
       - naos/reports

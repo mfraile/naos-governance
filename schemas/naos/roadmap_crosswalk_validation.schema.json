@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:roadmap_crosswalk_validation:v1",
+  "title": "NAOS Roadmap Crosswalk Validation Report",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "generated_at", "profile", "project_root", "naos_root", "status", "crosswalk_file", "summary", "counts", "findings", "limitations"],
+  "properties": {
+    "schema": {"const": "naos.roadmap_crosswalk_validation.v1"},
+    "generated_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "project_root": {"type": "string", "minLength": 1},
+    "naos_root": {"type": "string", "minLength": 1},
+    "status": {"enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "crosswalk_file": {"type": ["string", "null"]},
+    "summary": {"$ref": "#/$defs/summary"},
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["crosswalk_entries", "roadmap_ids", "referenced_ids"],
+      "properties": {
+        "crosswalk_entries": {"type": "integer", "minimum": 0},
+        "roadmap_ids": {"type": "integer", "minimum": 0},
+        "referenced_ids": {"type": "integer", "minimum": 0}
+      }
+    },
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["blocking", "required", "warnings", "advisory", "total_findings"],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0}
+      }
+    },
+    "finding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"enum": ["advisory", "warning", "required", "blocking"]},
+        "status": {"enum": ["not_configured", "invalid_state", "implemented_without_evidence", "referenced_id_not_in_roadmap", "unmapped_id"]},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}

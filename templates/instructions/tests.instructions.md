@@ -8,22 +8,29 @@ applyTo: "tests/**/*.py"
 
 ## Running Tests
 
-```bash
-# Load env vars FIRST (required)
-set -a && source .env && set +a
-pytest -q tests/unit tests/acceptance        # recommended gate
-pytest -m llm_smoke -q                       # LLM tests only
+[ADAPT] Inspect the project's documented test runner, configuration, directories,
+markers and environment-loading mechanism first. Do not execute a `.env` file as
+shell code or assume it is required. Prefer the selected environment's Python;
+use the project's configured dotenv loader only if it exists.
+
+```text
+Python/pytest example only when installed and these directories exist:
+python -m pytest -q tests/unit tests/acceptance
+Optional llm_smoke marker only when declared and provider access is authorized:
+python -m pytest -m llm_smoke -q
 ```
 
-## NEVER Use `conda run` for Tests
+## Selected test environment
 
-`conda run` buffers all stdout, creates zombie processes. Always use direct `pytest`.
+Use the selected environment's documented test command directly when possible.
+Do not assume an environment manager, pytest installation or buffering behavior
+that has not been observed for this project.
 
 ## Fixtures
 
-- **Session-scoped**: `test_client`, `test_db_url`, `jwt_keys`
-- **Request-scoped**: `client` (with CSRF), `csrf_token`, `auth_headers`
-- Test data: Use pytest fixtures in `tests/conftest.py`, never hardcode UUIDs or emails.
+- [ADAPT] Inspect actual fixture definitions and scopes in `conftest.py` or the project's equivalent before using them.
+- Example names such as `test_client`, `test_db_url`, `jwt_keys`, `csrf_token` and `auth_headers` are not shipped project APIs. Use them only if defined.
+- Keep synthetic test identities and data explicit; do not reuse real customer data.
 
 ## Markers
 
@@ -39,11 +46,11 @@ pytest -m llm_smoke -q                       # LLM tests only
 
 ## Database Testing
 
-- Tests use SQLite by default (CI). Use `[ADAPT: your timezone utility, e.g. ensure_aware()]` for timestamp comparisons (SQLite strips tzinfo). Test on both SQLite and PostgreSQL for ORM-backed code.
+- [ADAPT] Inspect the project's actual CI database and timestamp behavior. Use its existing timezone-aware comparison helper if one exists; do not invent `ensure_aware()`. Test each supported backend when the change depends on backend behavior.
 
 ## ASGI / Event Bus Testing
 
-- Set `TESTING=true` to skip blocking consumer loops. Never call blocking loops on the ASGI lifespan thread.
+- [ADAPT] Use `TESTING=true` only if the application implements that guard. For ASGI applications, avoid blocking the lifespan thread; use the project's supported test lifecycle controls.
 
 ## Coverage
 

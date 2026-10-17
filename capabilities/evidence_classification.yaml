@@ -52,6 +52,7 @@ constraints:
   - "Classification is orthogonal to severity."
   - "Inferred classifications are candidates requiring review unless explicitly declared by a source finding."
   - "Missing provenance must remain visible."
+  - "Text gap/risk disclosures remain visible unclassified context requiring human review; ready finding classification does not resolve them."
   - "Must not claim correctness, compliance, regulator acceptance, or approval."
 required_evidence:
   - "schemas/naos/evidence_classification_policy.schema.json"
@@ -73,6 +74,7 @@ dashboard_signals:
   - "evidence_classification_report.classification_counts"
   - "evidence_classification_report.missing_classification"
   - "evidence_classification_report.human_review_required"
+  - "evidence_classification_report.unclassified_context_counts"
 maturity_path:
   L0: "Capability contract, schema, seed, and review script exist."
   L1: "Generated projects receive an evidence classification policy and can produce a report."

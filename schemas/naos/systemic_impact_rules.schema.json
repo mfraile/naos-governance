@@ -25,6 +25,16 @@
         }
       }
     },
+    "review_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "derived_report_keys"],
+      "properties": {
+        "mode": {"const": "declared_producer_inputs"},
+        "derived_runtime_outputs": {"type": "array", "uniqueItems": true, "items": {"enum": ["session_report_copies", "registered_audit_events", "local_context_index_sqlite", "session_index_report_references"]}},
+        "derived_report_keys": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["conformance_latest_report", "agent_sponsor_registry_report", "agent_trace_validation_report", "agentic_workflow_review_report", "ai_component_inventory_report", "ai_surface_context_budget_report", "aivss_arithmetic_verification_report", "api_symbol_reality_report", "audit_log_summary_report", "behavioral_governance_readiness_report", "calibration_shadow_report", "capability_maturity_report", "claims_report", "control_plane_review_report", "cross_harness_review_readiness_report", "dashboard_markdown", "dashboard_summary_report", "dependency_integrity_report", "duplicate_function_hygiene_report", "evidence_attestation_report", "evidence_classification_report", "evidence_conflict_detection_report", "evidence_pack_report", "external_evidence_ingest_report", "function_index_report", "gate_evaluation_report", "gate_status_report", "governance_bypass_posture_report", "grader_assessment_report", "graph_context_query_report", "graph_context_readiness_report", "learning_loop_review_report", "llm_grader_readiness_report", "local_context_index_report", "local_context_query_report", "memory_context_readiness_report", "memory_provider_access_report", "memory_use_policy_report", "model_provider_policy_report", "model_telemetry_evidence_report", "module_header_traceability_report", "opencode_config_hygiene_report", "operator_attribution_report", "package_reality_report", "plan_coherence_report", "policy_override_merge_report", "pr_governance_summary_report", "pr_risk_classification_report", "pre_implementation_alignment_review_report", "roadmap_report", "sarif_export_summary_report", "sarif_report", "secret_hygiene_report", "secure_coding_controls_report", "secure_coding_reference_integrity_report", "secure_coding_reporting_report", "self_check_report", "self_check_dependency_resolution_report", "self_check_dependency_inputs", "semantic_candidate_layer_report", "session_identity_report", "session_lifecycle_report", "setup_recommendations_report", "spec_assembly_worksheet_report", "spec_cascade_report", "spec_pack_contract_report", "spec_pack_materialization_report", "sqlite_write_coordination_report", "static_grader_report", "systemic_impact_report", "task_claim_report", "task_context_pack_report", "test_evidence_report", "test_quality_hygiene_report", "ci_readiness"]}}
+      }
+    },
     "defaults": {
       "type": "object",
       "additionalProperties": true,
@@ -93,6 +103,7 @@
           "properties": {
             "kit_source": {"type": "string"},
             "adopter_generated": {"type": "string"},
+            "adopter_declared": {"type": "string"},
             "not_claimed": {"type": "string"}
           }
         },
@@ -149,6 +160,13 @@
           "type": "array",
           "items": {"type": "string"}
         },
+        "adopter_patterns": {
+          "description": "Explicit adopter-authored paths; distinct from generated destinations and kit sources.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
         "review_triggers": {
           "type": "array",
           "items": {"type": "string"},
@@ -170,6 +188,11 @@
       "additionalProperties": true,
       "required": ["family_id", "name", "enabled", "file_patterns"],
       "properties": {
+        "review_source_patterns": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "review_source_patterns_by_role": {"type": "object", "additionalProperties": false, "minProperties": 1, "properties": {"kit_source": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "adopter_project": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}},
+        "repository_roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["kit_source", "adopter_project"]}},
+        "file_patterns_by_role": {"type": "object", "additionalProperties": false, "minProperties": 1, "properties": {"kit_source": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "adopter_project": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}},
+        "minimum_expected_by_role": {"type": "object", "additionalProperties": false, "minProperties": 1, "properties": {"kit_source": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "adopter_project": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}},
         "family_id": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"

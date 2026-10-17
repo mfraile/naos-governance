@@ -11,21 +11,25 @@ Security model:
  - No auto-modification of .gitignore or .git/hooks without consent
 """
 import argparse
+import hashlib
 import json
 import os
 import re
 import shlex
 import shutil
 import stat
+import subprocess
 import sys
-import tempfile
 import textwrap
+import time
 from pathlib import Path
 from typing import Any, Callable, NoReturn
 
 import yaml
 
 try:
+    from .scripts.validators.frontmatter_utils import skill_authoring_metadata
+    from .scripts.naos_console import configure_console_output
     from .naos_profile_rules import load_profile_rules_source
     from .upgrade_contract.canonical import canonical_sha256
     from .upgrade_contract.planner import (
@@ -45,11 +49,20 @@ try:
         begin_greenfield_root,
         build_greenfield_root_intent,
         commit_managed_content_enrollment,
+        managed_content_creator_identity,
         finalize_greenfield_root,
         inspect_managed_content_manifest,
         inspect_managed_content_scope,
     )
     from .upgrade_contract.security import source_metadata_contract
+    from .upgrade_contract.private_preview import PrivatePreviewAddress, create_temporary_preview
+    from .upgrade_contract.source_origins import SourceOrigins
+    from .upgrade_contract.source_modes import SourceModeError, mode_row
+    from .upgrade_contract.generated_recipes import (
+        MAX_INPUTS, MAX_INPUT_BYTES, MAX_TOTAL_INPUT_BYTES, OverlayInputObserver,
+        bounded_canonical_input,
+    )
+    from .upgrade_contract.windows_provenance import ValidatedWindowsProvenance
     from .upgrade_contract.transaction import (
         TransactionPrimitiveError,
         apply_create_only_plan,
@@ -58,6 +71,9 @@ try:
         recover_create_only_transactions,
     )
     from .scripts.naos_emit_capabilities import (
+        default_agent_files,
+        default_skill_files,
+        default_instruction_files,
         emit_catalogue,
         render_catalogue,
         write_catalogue,
@@ -66,6 +82,8 @@ except ImportError:  # Direct checkout execution: python naos_init.py ...
     _KIT_IMPORT_ROOT = Path(__file__).resolve().parent
     if str(_KIT_IMPORT_ROOT) not in sys.path:
         sys.path.insert(0, str(_KIT_IMPORT_ROOT))
+    from scripts.validators.frontmatter_utils import skill_authoring_metadata
+    from scripts.naos_console import configure_console_output
     from naos_profile_rules import load_profile_rules_source
     from upgrade_contract.canonical import canonical_sha256  # type: ignore[no-redef]
     from upgrade_contract.planner import (  # type: ignore[no-redef]
@@ -85,6 +103,7 @@ except ImportError:  # Direct checkout execution: python naos_init.py ...
         begin_greenfield_root,
         build_greenfield_root_intent,
         commit_managed_content_enrollment,
+        managed_content_creator_identity,
         finalize_greenfield_root,
         inspect_managed_content_manifest,
         inspect_managed_content_scope,
@@ -92,6 +111,14 @@ except ImportError:  # Direct checkout execution: python naos_init.py ...
     from upgrade_contract.security import (  # type: ignore[no-redef]
         source_metadata_contract,
     )
+    from upgrade_contract.private_preview import PrivatePreviewAddress, create_temporary_preview
+    from upgrade_contract.source_origins import SourceOrigins  # type: ignore[no-redef]
+    from upgrade_contract.source_modes import SourceModeError, mode_row  # type: ignore[no-redef]
+    from upgrade_contract.generated_recipes import (  # type: ignore[no-redef]
+        MAX_INPUTS, MAX_INPUT_BYTES, MAX_TOTAL_INPUT_BYTES, OverlayInputObserver,
+        bounded_canonical_input,
+    )
+    from upgrade_contract.windows_provenance import ValidatedWindowsProvenance  # type: ignore[no-redef]
     from upgrade_contract.transaction import (  # type: ignore[no-redef]
         TransactionPrimitiveError,
         apply_create_only_plan,
@@ -100,6 +127,9 @@ except ImportError:  # Direct checkout execution: python naos_init.py ...
         recover_create_only_transactions,
     )
     from scripts.naos_emit_capabilities import (  # type: ignore[no-redef]
+        default_agent_files,
+        default_skill_files,
+        default_instruction_files,
         emit_catalogue,
         render_catalogue,
         write_catalogue,
@@ -169,6 +199,7 @@ def _persist_generated_policy_profile(policy_path: Path, tier: str) -> None:
     policy_path.write_text(
         content.replace(marker, f"  default: {tier}", 1),
         encoding="utf-8",
+        newline="\n",
     )
 
 
@@ -183,7 +214,34 @@ def _preferred_installed_init_command() -> list[str]:
         return ["naos-governance", "init"]
     if shutil.which("naos"):
         return ["naos", "init"]
-    return [sys.executable, Path(__file__).name]
+    return [sys.executable, str(Path(__file__).resolve())]
+
+
+def _format_activation_command(parts: list[object], *, windows: bool | None = None) -> str:
+    """Render one argv for PowerShell on Windows or a POSIX shell elsewhere."""
+    use_powershell = os.name == "nt" if windows is None else windows
+    if use_powershell:
+        # Windows PowerShell 5.1 reserializes native argv incorrectly for empty
+        # strings, embedded quotes and spaced paths ending in a backslash.
+        # Supply the CRT command line directly, without another shell parse.
+        executable, *arguments = (str(part) for part in parts)
+        def quote(value: str) -> str:
+            # PowerShell treats typographic apostrophes as delimiters too.
+            return "'" + "".join(char * 2 if char in "'‘’‚‛" else char
+                                 for char in value) + "'"
+
+        return (
+            "& { $naosStart = New-Object System.Diagnostics.ProcessStartInfo; "
+            f"$naosStart.FileName = {quote(executable)}; "
+            f"$naosStart.Arguments = {quote(subprocess.list2cmdline(arguments))}; "
+            "$naosStart.UseShellExecute = $false; "
+            "$naosStart.WorkingDirectory = $PWD.ProviderPath; "
+            "$naosProcess = [System.Diagnostics.Process]::Start($naosStart); "
+            "try { $naosProcess.WaitForExit(); "
+            "$global:LASTEXITCODE = $naosProcess.ExitCode } "
+            "finally { $naosProcess.Dispose() } }"
+        )
+    return shlex.join(str(part) for part in parts)
 
 
 def _preferred_installed_naos_command() -> str:
@@ -476,25 +534,104 @@ def _make_template_context(
 def _populate_templates(preview_dir: Path, ctx: dict[str, str]) -> None:
     """
     Apply signal-based auto-population to instruction-triple template files.
-    Uses string.Template.safe_substitute() — unknown $xxx markers are left intact.
+    Unknown signal placeholders receive ADAPT fallbacks; other $xxx markers remain intact.
     Files modified in-place within preview_dir.
     """
     from string import Template
 
-    target_files = ("project-context.md", "CLAUDE.md", "copilot-instructions.md")
+    target_files = (".github/project-context.md", "CLAUDE.md",
+                    ".github/copilot-instructions.md")
     for tpl_name in target_files:
         tpl_path = preview_dir / tpl_name
         if not tpl_path.exists():
             continue
-        content = tpl_path.read_text(errors="replace")
+        content = tpl_path.read_text(encoding="utf-8", errors="replace")
         populated = Template(content).safe_substitute(ctx)
-        tpl_path.write_text(populated)
+        populated = re.sub(
+            r"\$(?:\{(signal_[A-Za-z0-9_]+)\}|(signal_[A-Za-z0-9_]+))",
+            lambda match: "[ADAPT: " + (match.group(1) or match.group(2)) + "]",
+            populated,
+        )
+        tpl_path.write_text(populated, encoding="utf-8", newline="\n")
 
 
-def _copy_generated_script(src: Path, dest: Path) -> None:
-    shutil.copy2(src, dest)
+
+def _provisional_archetype_context(content: str, archetype: str, tier: str) -> str:
+    """Render a preset as proposals, never as evidence of the adopter's stack.
+
+    Selection origin is not preserved by managed replay. Apply identical
+    semantics to explicit and inferred selections instead of inventing a
+    confirmation flag. Fenced examples remain literal, under ADAPT guidance.
+    """
+    def proposal(value: str) -> str:
+        if "[ADAPT:" in value:
+            # Preserve existing adaptation blocks, including partial values.
+            return value if value.startswith("[ADAPT:") else "Proposed " + value
+        return "[ADAPT: proposed " + value + "]"
+
+    def table_separator(line: str) -> bool:
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        return line.strip().startswith("|") and all(
+            re.fullmatch(r":?-{3,}:?", cell) for cell in cells
+        )
+
+    rendered = [
+        "# Project Context", "",
+        "## NAOS Configuration Choices", "",
+        f"- NAOS profile: governance-{tier}",
+        f"- Selected archetype: {archetype}", "",
+        "These are scaffolder configuration choices, not verified architecture.", "",
+        "## Proposed Archetype Guidance", "",
+    ]
+    lines = content.splitlines()
+    in_fence = False
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            if not in_fence:
+                rendered.extend(["[ADAPT: Proposed preset example; confirm or replace before use.]", ""])
+            in_fence = not in_fence
+            rendered.append(line)
+        elif in_fence or not stripped or stripped == "---":
+            rendered.append(line)
+        elif stripped.startswith("#"):
+            level = len(stripped) - len(stripped.lstrip("#"))
+            title = stripped[level:].strip()
+            # Keep the original relative hierarchy below the guidance section.
+            rendered.append("#" * min(level + 2, 6) + " " + proposal(title))
+        elif stripped.startswith("|"):
+            next_line = lines[index + 1] if index + 1 < len(lines) else ""
+            if table_separator(line) or table_separator(next_line):
+                rendered.append(line)
+            else:
+                cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+                rendered.append("| " + " | ".join(
+                    [cells[0], *(proposal(cell) for cell in cells[1:])]
+                ) + " |")
+        else:
+            # Leave Markdown containers outside the adaptation marker.
+            match = re.match(r"^(\s*(?:>\s*)*(?:(?:[-+*]|\d+[.)])\s+)?)(.*)$", line)
+            prefix, value = match.groups()
+            field = re.match(r"(\*\*[^*]+\*\*:\s*)(.*)", value)
+            if field:
+                rendered.append(prefix + field.group(1) + proposal(field.group(2)))
+            else:
+                rendered.append(prefix + proposal(value))
+    return "\n".join(rendered) + "\n"
+
+
+def _copy_generated_script(
+    src: Path, dest: Path, *, source_origins: SourceOrigins | None = None,
+    copied_tool_outputs: set[Path] | None = None,
+) -> None:
+    if source_origins is None:
+        shutil.copy2(src, dest)
+    else:
+        source_origins.copy2(src, dest)
     if dest.suffix != ".py":
         return
+    if copied_tool_outputs is not None:
+        copied_tool_outputs.add(dest)
 
     text = dest.read_text(encoding="utf-8")
     if "# AUTO-GENERATED" in text[:2048]:
@@ -503,9 +640,65 @@ def _copy_generated_script(src: Path, dest: Path) -> None:
     marker = "# AUTO-GENERATED: Copied by naos init from the NAOS kit.\n"
     if text.startswith("#!"):
         first_line, _, rest = text.partition("\n")
-        dest.write_text(f"{first_line}\n{marker}{rest}", encoding="utf-8")
+        dest.write_text(f"{first_line}\n{marker}{rest}", encoding="utf-8", newline="\n")
     else:
-        dest.write_text(f"{marker}{text}", encoding="utf-8")
+        dest.write_text(f"{marker}{text}", encoding="utf-8", newline="\n")
+
+
+def _finalize_copied_tool_content(
+    preview_dir: Path, copied_tool_outputs: set[Path],
+    *, source_origins: SourceOrigins | None = None,
+) -> None:
+    """Commit only writer-known final copy outputs in the selected validator.
+
+    No existing adopter tree, marker, or external manifest is consulted. The
+    control trusts the generator/validator; hashes establish content identity.
+    """
+    validator_paths = [path for path in copied_tool_outputs if (
+        path.relative_to(preview_dir).parts[0] in {"scripts", "naos_tools"}
+        and path.relative_to(preview_dir).parts[1:]
+        == ("validators", "validate_traceability_headers.py"))]
+    if not validator_paths:
+        return
+    if len(validator_paths) != 1 or len(copied_tool_outputs) > MAX_INPUTS - 1:
+        raise SourceModeError("Copied-tool content inventory is ambiguous or oversized")
+    validator = validator_paths[0]
+    destination = validator.relative_to(preview_dir).as_posix()
+    inputs: list[tuple[str, bytes]] = []
+    content: dict[str, dict[str, str]] = {}
+    remaining = MAX_TOTAL_INPUT_BYTES
+    for path in sorted(copied_tool_outputs):
+        relative = path.relative_to(preview_dir)
+        if (relative.parts[0] not in {"scripts", "naos_tools"}
+                or relative.suffix != ".py"):
+            raise SourceModeError("Copied-tool content output is outside its role")
+        cursor = preview_dir
+        for part in relative.parts[:-1]:
+            cursor = cursor / part
+            if cursor.is_symlink() or not cursor.is_dir():
+                raise SourceModeError("Linked or invalid copied-tool ancestor")
+        raw = SourceOrigins._bounded_bytes(path, remaining=min(MAX_INPUT_BYTES, remaining))
+        remaining -= len(raw)
+        inputs.append(("generated/" + relative.as_posix(), raw))
+        if path != validator:
+            content[relative.as_posix()] = {
+                "sha256": hashlib.sha256(raw).hexdigest(), "size_decimal": str(len(raw)),
+            }
+    raw_validator = dict(inputs)["generated/" + destination]
+    begin = "# BEGIN NAOS COPIED TOOL CONTENT\n"
+    end = "# END NAOS COPIED TOOL CONTENT"
+    template = raw_validator.decode("utf-8")
+    if template.count(begin) != 1 or template.count(end) != 1:
+        raise SourceModeError("Copied validator has no unique tool-content slot")
+    start = template.index(begin) + len(begin)
+    finish = template.index(end)
+    if finish <= start or template[start:finish] != "COPIED_TOOL_CONTENT = {}\n":
+        raise SourceModeError("Copied validator tool-content slot was already materialized")
+    rendered = (template[:start] + "COPIED_TOOL_CONTENT = "
+                + json.dumps(content, sort_keys=True, indent=4) + "\n" + template[finish:])
+    if source_origins is not None:
+        source_origins.record_copied_tool_content(destination, sorted(inputs))
+    validator.write_text(rendered, encoding="utf-8", newline="\n")
 
 
 def _is_generated_cache_artifact(rel: Path) -> bool:
@@ -574,18 +767,27 @@ class ActivationPreflightRefusal(ValueError):
     """Activation was refused before any activation destination was changed."""
 
 
-def prepare_preview_dir(preview_dir: Path, project_path: Path) -> None:
+def prepare_preview_dir(
+    preview_dir: Path, project_path: Path, *,
+    private_preview_address: PrivatePreviewAddress | None = None,
+) -> None:
+    io_preview = preview_dir
+    if private_preview_address is not None:
+        private_preview_address.require_root(preview_dir)
+        io_preview = Path(private_preview_address.io_root)
     try:
-        preview_metadata = preview_dir.lstat()
+        preview_metadata = io_preview.lstat()
     except FileNotFoundError:
         preview_metadata = None
-    if preview_metadata is not None and preview_dir.is_symlink():
+    if preview_metadata is not None and io_preview.is_symlink():
         raise ExistingPreviewRefusal(
             "Preview path is an existing symbolic link; refusing to replace content "
             f"without provenance: {preview_dir}"
         )
 
-    preview_resolved = preview_dir.resolve(strict=False)
+    preview_resolved = io_preview.resolve(strict=False)
+    if private_preview_address is not None:
+        preview_resolved = private_preview_address.resolved_ordinary_root(preview_resolved)
     project_resolved = project_path.resolve(strict=False)
     if preview_resolved == project_resolved or _is_within(project_resolved, preview_resolved):
         raise UnsupportedPreviewLocation(
@@ -595,7 +797,7 @@ def prepare_preview_dir(preview_dir: Path, project_path: Path) -> None:
         preview_resolved,
         project_resolved,
     ) or _is_same_or_descendant_by_identity(
-        preview_resolved,
+        io_preview if private_preview_address is not None else preview_resolved,
         project_resolved,
     )
     canonical_in_project_preview = (
@@ -620,7 +822,7 @@ def prepare_preview_dir(preview_dir: Path, project_path: Path) -> None:
             f"provenance: {preview_dir}"
         )
     try:
-        preview_dir.mkdir(parents=True, exist_ok=False)
+        io_preview.mkdir(parents=True, exist_ok=False)
     except FileExistsError as exc:
         raise ExistingPreviewRefusal(
             "Preview path appeared before creation; refusing to replace content "
@@ -806,6 +1008,8 @@ def _revalidate_brownfield_init_prestart(
             (closing.get("installation") or {}).get("next_action")
             or "resolve repository-intelligence pre-start requirements"
         )
+        if closing.get("error"):
+            action += " Reason: " + str(closing["error"])
         raise ActivationPreflightRefusal(
             "repository intelligence changed before activation; " + action
         )
@@ -817,9 +1021,23 @@ def _revalidate_brownfield_init_prestart(
         )
 
 
+def _windows_cli():
+    """Select native Windows before entering POSIX provenance or FFI paths."""
+    if sys.platform != "win32":
+        return None
+    try:
+        from .upgrade_contract import windows_cli
+    except ImportError:
+        from upgrade_contract import windows_cli
+    return windows_cli
+
+
 def _validated_current_managed_paths(project_path: Path) -> set[str]:
     """Return only provenance-validated, byte/metadata-current managed paths."""
 
+    windows = _windows_cli()
+    if windows is not None:
+        return windows.current_paths(project_path)
     root = project_path.resolve(strict=True)
     scope = inspect_managed_content_scope(root)
     manifest_path = root / MANAGED_CONTENT_MANIFEST_RELATIVE
@@ -861,17 +1079,52 @@ def _route_managed_init_transition(
     is always plan-only; init must never recreate or replace an owned leaf.
     """
 
-    inspection = inspect_managed_content_manifest(project_path)
-    if not inspection.apply_eligible or inspection.snapshot is None:
-        return None
-    previous_inputs = inspection.snapshot.get("previous_inputs")
+    try:
+        from .upgrade_contract.v3_recovery import has_v3_control, _present
+        from .upgrade_contract.joint_capture import capture_portable_working_tree
+        from .upgrade_contract.rebind_store_inspection import ROOT as v3_store_root
+    except ImportError:
+        from upgrade_contract.v3_recovery import has_v3_control, _present
+        from upgrade_contract.joint_capture import capture_portable_working_tree
+        from upgrade_contract.rebind_store_inspection import ROOT as v3_store_root
+    portable_v3 = has_v3_control(project_path)
+    if portable_v3:
+        # Validate portable history/current capture before reading any legacy
+        # enrollment. Presence alone grants no receiving-checkout authority.
+        pair = capture_portable_working_tree(project_path)
+        previous_inputs = pair.portable.inputs
+        if not _present(project_path, v3_store_root):
+            requirement = (
+                "explicit preserved-history migration; legacy storage exists"
+                if _present(project_path, ".naos/upgrade-v1")
+                else "explicit receiving rebind; local storage is absent"
+            )
+            print(
+                "NOT_APPLIED: portable v3 history requires " + requirement +
+                " before managed init review. The project was preserved.",
+                file=sys.stderr,
+            )
+            return 3
+    else:
+        windows = _windows_cli()
+        if windows is not None:
+            snapshot = windows.inspect(project_path)
+            if snapshot is None or snapshot.previous_inputs is None:
+                return None
+            previous_inputs = snapshot.previous_inputs
+        else:
+            inspection = inspect_managed_content_manifest(project_path)
+            if not inspection.apply_eligible or inspection.snapshot is None:
+                return None
+            previous_inputs = inspection.snapshot.get("previous_inputs")
     if not isinstance(previous_inputs, dict):
         raise ActivationPreflightRefusal(
             "managed-content provenance has no preserved initialization inputs"
         )
     previous_profile = previous_inputs.get("profile")
     if not (
-        args.activate
+        portable_v3
+        or args.activate
         or args.dry_run
         or previous_profile != requested_profile
     ):
@@ -921,15 +1174,27 @@ def _route_managed_init_transition(
             from . import naos_upgrade as upgrade_module
         except ImportError:
             import naos_upgrade as upgrade_module  # type: ignore[no-redef]
-        return upgrade_module.plan_profile_transition(
+        status = upgrade_module.plan_profile_transition(
             project_path,
             requested_profile=requested_profile,
+            summary_only=True,
         )
+        # A successful plan does not fulfill an explicit activation request.
+        # Preserve planner failures and the success status of ordinary previews.
+        return 3 if args.activate and status == 0 else status
     except (OSError, RuntimeError, ValueError) as exc:
         print(
             f"NOT_APPLIED: managed init transition planning failed: {exc}",
             file=sys.stderr,
         )
+        if portable_v3:
+            print(
+                "For a moved/copied project, inspect with `naos upgrade PROJECT "
+                "--inspect-receiving-store`; explicit receiving rebind is required "
+                "before managed changes. Do not delete existing local or legacy "
+                "history.",
+                file=sys.stderr,
+            )
         return 3
 
 
@@ -944,13 +1209,16 @@ def _iter_detection_paths(
 ):
     """Yield project paths without entering the operation-owned preview root."""
 
+    ignored_directories = {".git", "node_modules", ".venv", "venv", "__pycache__"}
     first_level = True
     for current_root, directory_names, file_names in os.walk(
         project_path,
         topdown=True,
         followlinks=False,
     ):
-        directory_names.sort()
+        directory_names[:] = sorted(
+            name for name in directory_names if name not in ignored_directories
+        )
         file_names.sort()
         if first_level:
             directory_names[:] = [
@@ -1128,6 +1396,7 @@ def detect_signals(
         "tenant_id",
         ["*.py", "*.ts", "*.java", "*.go"],
         excluded_paths=excluded,
+        candidate_paths=files,
     ):
         signals["has_multi_tenancy"] = True
 
@@ -1160,16 +1429,16 @@ def _grep_recursive(
     globs: list[str],
     *,
     excluded_paths: set[str] | None = None,
+    candidate_paths: list[Path] | None = None,
 ) -> bool:
     """Check if pattern appears in any file matching globs (capped at 200 files)."""
+    paths = candidate_paths if candidate_paths is not None else list(
+        _iter_detection_paths(project_path, excluded_paths=excluded_paths)
+    )
     checked = 0
     for glob in globs:
-        for f in _iter_detection_paths(
-            project_path,
-            glob,
-            excluded_paths=excluded_paths,
-        ):
-            if ".git" in str(f) or "venv" in str(f) or "node_modules" in str(f):
+        for f in paths:
+            if not f.match(glob):
                 continue
             try:
                 if pattern in f.read_text(errors="replace"):
@@ -1177,7 +1446,7 @@ def _grep_recursive(
             except Exception:
                 pass
             checked += 1
-            if checked > 200:
+            if checked >= 200:
                 return False
     return False
 
@@ -1214,7 +1483,15 @@ def _directory_has_unmanaged_files(
     project_path: Path,
     directory: Path,
     excluded_paths: set[str],
+    observer: OverlayInputObserver | None = None,
 ) -> bool:
+    if observer is not None:
+        relative = directory.relative_to(project_path).as_posix()
+        state = observer.directory_state(directory)
+        if state != "directory":
+            observer.decision("namespace/" + relative, {"state": state})
+            return False
+        return observer.unmanaged_witness(directory, excluded_paths)
     if not directory.is_dir() or directory.is_symlink():
         return False
     try:
@@ -1285,6 +1562,7 @@ def _apply_memory_choice_to_preview(
     preview_dir: Path,
     generated: list[str],
     memory_choice: str | None,
+    source_origins: SourceOrigins | None = None,
 ) -> None:
     """Record onboarding intent without installing or configuring a provider."""
 
@@ -1298,7 +1576,10 @@ def _apply_memory_choice_to_preview(
         if not source.is_file():
             raise FileNotFoundError(f"memory configuration seed is missing: {source}")
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
+        if source_origins is None:
+            shutil.copy2(source, destination)
+        else:
+            source_origins.copy2(source, destination)
         if relative.as_posix() not in generated:
             generated.append(relative.as_posix())
 
@@ -1314,7 +1595,7 @@ def _apply_memory_choice_to_preview(
         )
         if replacements != 1:
             raise ValueError(f"memory configuration seed is missing memory.{key}")
-    destination.write_text(content, encoding="utf-8")
+    destination.write_text(content, encoding="utf-8", newline="\n")
 
 
 def _apply_planning_baseline_profile(preview_dir: Path, tier: str) -> None:
@@ -1337,7 +1618,7 @@ def _apply_planning_baseline_profile(preview_dir: Path, tier: str) -> None:
             raise ValueError("planning-baseline seed is missing source_bindings.architecture")
         architecture["applicability"] = applicability
         architecture["sha256"] = None
-    destination.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    destination.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8", newline="\n")
 
 
 def _apply_ai_component_inventory_profile(preview_dir: Path, tier: str) -> None:
@@ -1365,7 +1646,748 @@ def _apply_ai_component_inventory_profile(preview_dir: Path, tier: str) -> None:
     entry["enabled"] = required
     entry["current_maturity"] = "L1" if required else "L0"
     entry["target_maturity"] = "L1" if required else "L0"
-    destination.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    destination.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8", newline="\n")
+
+
+def _copy_new_generated_seed(
+    source: Path, destination: Path, *, source_origins: SourceOrigins | None = None,
+) -> None:
+    """Copy a seed into a new private preview path with generation-time age.
+
+    The caller owns the preview directory. Refuse existing destinations, keep
+    copy2 metadata, and change only mtime: archive/source age is not the age of
+    the newly generated adopter configuration. Never use this on adopter files.
+    """
+    with destination.open("xb"):
+        pass
+    if source_origins is None:
+        shutil.copy2(source, destination)
+    else:
+        source_origins.copy2(source, destination)
+    copied = destination.stat()
+    os.utime(destination, ns=(copied.st_atime_ns, time.time_ns()))
+
+
+def _project_generated_gate_inputs(preview_dir: Path, generated: list[str]) -> None:
+    """Project only installed gate inputs; missing inputs remain obligations."""
+    inventory = {_safe_generated_relpath(value).as_posix() for value in generated}
+    aliases = (("task_battery/", ".github/autoresearch/task_battery/"),
+               ("capabilities/", "naos/capabilities/"))
+
+    def project_input(value: str) -> str:
+        for old, new in aliases:
+            if not value.startswith(old):
+                continue
+            relative = _safe_generated_relpath(value).as_posix()
+            candidate = new + relative.removeprefix(old.rstrip("/")).lstrip("/")
+            if value.endswith("/"):
+                candidate = candidate.rstrip("/") + "/"
+                descendants = [path for path in inventory if path.startswith(candidate)]
+                if not descendants:
+                    return value
+                if not all((preview_dir / path).is_file() for path in descendants):
+                    raise ValueError(f"Generated gate dependency is missing: {candidate}")
+            elif candidate not in inventory:
+                return value
+            elif not (preview_dir / candidate).is_file():
+                raise ValueError(f"Generated gate dependency is missing: {candidate}")
+            return candidate
+        return value
+
+    for relative in ("naos/gatekeepers.yaml", "scripts/workflows/gatekeepers.baseline.yaml"):
+        if relative not in inventory:
+            continue
+        path = preview_dir / relative
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for gate in document["gates"]:
+            if "required_inputs" in gate:
+                gate["required_inputs"] = [project_input(value) for value in gate["required_inputs"]]
+        path.write_text(yaml.safe_dump(document, sort_keys=False, allow_unicode=True),
+                        encoding="utf-8", newline="\n")
+
+
+def _project_generated_capability_references(preview_dir: Path, generated: list[str]) -> None:
+    """Project kit references using the exact generated inventory, not host files."""
+    inventory = {_safe_generated_relpath(value).as_posix() for value in generated}
+    aliases = (
+        ("templates/structural-seeds/", ""),
+        ("templates/agents/", ".github/agents/"),
+        ("templates/skills/", ".github/skills/"),
+        ("templates/instructions/", ".github/instructions/"),
+        ("templates/prompts/", ".github/prompts/"),
+        ("templates/host-guidance/", ".github/naos-guidance/"),
+        ("templates/workflows/", ".github/workflows/"),
+        ("autoresearch/", ".github/autoresearch/"),
+        ("task_battery/", ".github/autoresearch/task_battery/"),
+        ("capabilities/", "naos/capabilities/"),
+    )
+    future_prefixes = ("naos/reports/", ".naos/", "naos/context_index/", "naos/context_queries/",
+                       "naos/evidence/", "naos/test_evidence/", "naos/active/")
+
+    def project_reference(value: str, *, evidence: bool = False) -> str:
+        parts = value.split(maxsplit=1)
+        if not parts or value.startswith(("https://", "http://", "kit://")):
+            return value
+        reference = parts[0]
+        # Evidence prose is an obligation, not a claim that an input exists.
+        if evidence and "/" not in reference:
+            return value
+        relative = _safe_generated_relpath(reference).as_posix()
+        if evidence and (reference.startswith(future_prefixes) or " when approved" in value):
+            return value
+        candidates = [relative]
+        candidates.extend(new + relative.removeprefix(old) for old, new in aliases if relative.startswith(old))
+        if relative in {"templates/agents/AGENTS.md", ".github/agents/AGENTS.md"}:
+            candidates.insert(0, ".github/NAOS_AGENTS.md")
+        if relative == "templates/Makefile.naos":
+            candidates.append("Makefile.naos")
+        if relative == "policies/default_policy.yaml":
+            candidates.append("naos/policy/default_policy.yaml")
+        for candidate in candidates:
+            if candidate in inventory:
+                if not (preview_dir / candidate).is_file():
+                    raise ValueError(f"Generated capability dependency is missing: {candidate}")
+                return candidate + (" " + parts[1] if len(parts) > 1 else "")
+        if evidence and relative.startswith(("naos/", "specs/")):
+            # An optional project's missing configuration is still required
+            # project evidence; its kit seed cannot satisfy that obligation.
+            return value
+        sources = [relative]
+        # Reverse installed aliases only to actual kit sources. Missing optional
+        # examples remain upstream references, never claims of installed files.
+        sources.extend(old + relative.removeprefix(new) for old, new in aliases
+                       if new and relative.startswith(new))
+        if relative.startswith("naos/workflows/examples/"):
+            sources.append("templates/workflows/" + relative.removeprefix("naos/workflows/examples/"))
+        if relative in {".github/NAOS_AGENTS.md", ".github/agents/AGENTS.md"}:
+            sources.append("templates/agents/AGENTS.md")
+        if relative.startswith("naos/"):
+            sources.append("templates/structural-seeds/" + relative)
+        for source in sources:
+            path = KIT_DIR / source
+            if path.is_file() and path.resolve().is_relative_to(KIT_DIR.resolve()):
+                return "kit://" + source + (" " + parts[1] if len(parts) > 1 else "")
+        raise ValueError(f"Capability dependency is neither generated nor present in the kit: {reference}")
+
+    for relative in sorted(inventory):
+        if not relative.startswith("naos/capabilities/") or not relative.endswith(".yaml") or Path(relative).name.startswith("_"):
+            continue
+        path = preview_dir / relative
+        card = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for field in ("related_docs", "related_scripts", "related_schemas", "required_evidence"):
+            if field in card:
+                card[field] = [project_reference(value, evidence=field == "required_evidence") for value in card[field]]
+        for validator in card.get("validators", []):
+            if validator.get("script"):
+                validator["script"] = project_reference(validator["script"])
+                if validator["script"].startswith("kit://") and validator.get("status") == "available":
+                    validator["status"] = "external"
+                    validator["notes"] = (validator.get("notes", "") + " Kit dependency; not installed or verified runnable in this generated project.").strip()
+        card.setdefault("known_limitations", []).append(
+            "kit:// references require the separately acquired NAOS kit; they are not local files, runnable commands or satisfied evidence. Required evidence remains an obligation, not proof of availability."
+        )
+        path.write_text(yaml.safe_dump(card, sort_keys=False, allow_unicode=True), encoding="utf-8", newline="\n")
+
+
+    catalog_relative = "naos/setup_module_catalog.yaml"
+    if catalog_relative in inventory:
+        catalog_path = preview_dir / catalog_relative
+        catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+        for module in catalog["modules"]:
+            declarations = [module, *(module.get("profile_overrides") or {}).values()]
+            for declaration in declarations:
+                if "related_docs" in declaration:
+                    declaration["related_docs"] = [project_reference(value)
+                                                   for value in declaration["related_docs"]]
+        catalog["semantics"]["related_docs_scope"] = (
+            "Local related_docs identify files in this generated inventory. kit:// references "
+            "identify separately acquired NAOS kit material; they are not installed files, "
+            "runnable commands, or verified evidence. Catalogue bodies are on-demand configuration, "
+            "not a claim about host startup context."
+        )
+        catalog_path.write_text(yaml.safe_dump(catalog, sort_keys=False, allow_unicode=True),
+                                encoding="utf-8", newline="\n")
+
+
+
+def _manual_instruction_inputs(body: str) -> str:
+    """Project authoring variables into explicit human-supplied input templates.
+
+    No host-specific expansion or implicit value/default is asserted. Unknown
+    names become declared manual inputs; malformed authoring tokens fail before
+    any derived adapter is published.
+    """
+    pattern = re.compile(r"\{\{input:([A-Za-z_][A-Za-z0-9_-]{0,63})\}\}|\$\{input:([A-Za-z_][A-Za-z0-9_-]{0,63})\}")
+    names = sorted({match.group(1) or match.group(2) for match in pattern.finditer(body)})
+    remainder = pattern.sub("", body)
+    if "{{input:" in remainder or "${input:" in remainder:
+        raise ValueError("Malformed host authoring input token")
+    if not names:
+        return body
+    body = pattern.sub(lambda match: "[MANUAL_INPUT:" + (match.group(1) or match.group(2)) + "]", body)
+    lines = []
+    fence: str | None = None
+    for line in body.splitlines(keepends=True):
+        stripped = line.lstrip()
+        if stripped.startswith(("```", "~~~")):
+            fence = None if fence else stripped[:3]
+        elif fence and "[MANUAL_INPUT:" in line and re.match(r"\s*(?:python\d*|conda run|bash|sh|grep|naos|make)\s", line):
+            line = "# Manual input template; fill and review before execution: " + line.lstrip()
+        lines.append(line)
+    contract = ["", "## Manual input contract", "",
+        "Obtain these values from the human/request before following the template.",
+        "MANUAL_INPUT markers are not host-expanded variables, defaults, validated values or execution approval.",
+        "Missing required task context stops the dependent step; do not invent a value.", "",
+        "| Input | Source |", "| --- | --- |"]
+    contract += ["| " + name + " | Human/request; confirm value and applicability before use |" for name in names]
+    return "".join(lines) + "\n" + "\n".join(contract) + "\n"
+
+
+def _project_instruction_links(
+    body: str, *, document_path: str, output_document_path: str,
+    inventory: set[str], tier: str, kit_reference_paths: frozenset[str] = frozenset(),
+) -> str:
+    """Resolve named NAOS Markdown resources from the source document location.
+
+    Relative links in a portable body must address the output document location;
+    source/kit absence becomes a manual obligation, never an invented local link.
+    This is pure inventory projection, with no filesystem/network access.
+    """
+    import posixpath
+    source_parent = posixpath.dirname(document_path)
+    output_parent = posixpath.dirname(output_document_path)
+    def project(match: re.Match[str]) -> str:
+        label, operand = match.group(1), match.group(2)
+        if operand.startswith("#") or re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", operand):
+            return match.group(0)
+        target, separator, fragment = operand.partition("#")
+        canonical = posixpath.normpath(posixpath.join(source_parent, target))
+        output_canonical = posixpath.normpath(posixpath.join(output_parent, target))
+        if canonical not in inventory and output_canonical in inventory:
+            canonical = output_canonical
+        elif canonical not in inventory and target in inventory:
+            canonical = target
+        # Only explicitly selected copied-doc references become upstream kit
+        # URIs; arbitrary missing local links retain their original obligation.
+        if canonical in kit_reference_paths and canonical not in inventory:
+            return "[" + label + "](kit://" + canonical + (separator + fragment if separator else "") + ")"
+        named_instruction = (target.endswith((".instructions.md", ".prompt.md"))
+            or canonical.startswith((".github/instructions/", ".github/prompts/", ".github/skills/", ".github/naos-guidance/")))
+        if not named_instruction:
+            return match.group(0)
+        if canonical.startswith("../") or canonical == ".." or canonical.startswith("/"):
+            raise ValueError("Instruction link escapes generated project")
+        if canonical not in inventory:
+            return (label + f" (not installed in {tier}; obtain required guidance or perform the applicable "
+                    "review manually with project source, tests and human review; no local file loaded)")
+        # Skill support trees are copied intact beside both SKILL.md routes.
+        if (document_path.startswith(".github/skills/")
+                and canonical.startswith(source_parent + "/")):
+            canonical = posixpath.join(output_parent, canonical[len(source_parent) + 1:])
+        relative = posixpath.relpath(canonical, output_parent or ".")
+        return "[" + label + "](" + relative + (separator + fragment if separator else "") + ")"
+    return re.sub(r"(?<!!)\[([^]\n]+)\]\(([^)\s]+)\)", project, body)
+
+
+def _project_host_route_body(body: str, *, portable: bool, inventory: set[str],
+                             skill_names: set[str], tier: str,
+                             portable_routes: set[str] | None = None,
+                             unavailable_make_targets: set[str] | None = None,
+                             document_path: str | None = None,
+                             output_document_path: str | None = None) -> str:
+    """Pure projection; no filesystem writes or agent permission translation."""
+    body = _manual_instruction_inputs(body)
+    body = body.replace("$naos_checkpoint_protocol", (
+        "Quickstart is research-only and does not enforce cognitive checkpoints or Rule 26. "
+        "Preserve source evidence and a manual research/handoff record; request a reviewed profile transition before lifecycle implementation. "
+        "For context pressure, absent caller/host telemetry remains UNKNOWN; keep a local compact or task-card record when useful."
+        if tier == "quickstart" else
+        "At phase transitions, non-obvious discoveries, five consecutive tool calls and handoff, "
+        "record the selected profile's cognitive checkpoint under Rule 26. For context pressure use only "
+        "caller/host-supplied telemetry; absent telemetry is UNKNOWN, not FRESH."
+    ))
+    if tier == "quickstart":
+        body = body.replace("Anything outside this matrix defaults to **Standard / MODERATE** and triggers a Rule 26 checkpoint.",
+            "Anything outside this matrix requires a manual research record; Quickstart does not enforce Rule 26 or activate Standard controls.")
+        body = body.replace("Unlisted tasks default to **Standard / MODERATE / no specialised skill** and trigger Rule 26.",
+            "Unlisted tasks require manual research review; Quickstart does not enforce Rule 26 or activate Standard controls.")
+        body = body.replace("Anything outside this matrix requires a Rule 26 checkpoint and human review of the current profile.",
+            "Anything outside this matrix requires manual source/evidence review; Quickstart does not enforce Rule 26.")
+        body = body.replace("**Override rule.** Disagreement with the matched row REQUIRES a Rule 26 T2 checkpoint justifying the divergence.",
+            "**Quickstart recommendation review.** Explain any divergence in the manual research record; no Rule 26 enforcement or profile activation is implied.")
+    def available_reference(path: str) -> bool:
+        if path in inventory:
+            return True
+        if document_path and not path.startswith((".github/", ".agents/", "naos/")):
+            return (Path(document_path).parent / path).as_posix() in inventory
+        return False
+    installed_skills = {Path(p).parent.name for p in inventory
+                        if p.startswith(".github/skills/") and p.endswith("/SKILL.md")}
+    # Kit authoring paths must refer to their generated project locations
+    # before selection checks decide whether a manual fallback is needed.
+    body = re.sub(
+        r"(?<![A-Za-z0-9_./-])templates/skills/([a-z0-9-]+)/SKILL\.md",
+        r".github/skills/\1/SKILL.md", body,
+    )
+    body = body.replace(".github/agents/AGENTS.md", ".github/NAOS_AGENTS.md")
+    aliases = {
+        "templates/instruction-triple/copilot-instructions.md": ".github/copilot-instructions.md",
+        "templates/instruction-triple/project-context.md": ".github/project-context.md",
+        "templates/instruction-triple/CLAUDE.md": "CLAUDE.md",
+        "templates/agents/": ".github/agents/",
+        "templates/prompts/": ".github/prompts/",
+        "templates/instructions/": ".github/instructions/",
+        "templates/profiles/": ".github/profiles/",
+        "templates/spec-kit/specs/": "naos/spec_templates/spec-kit/specs/",
+        "templates/structural-seeds/": "",
+        "task_battery/portable_scenarios.yaml": ".github/autoresearch/task_battery/portable_scenarios.yaml",
+    }
+    # Unknown authoring resources stay explicit kit dependencies; do not pretend
+    # optional integration templates or documentation are installed or runnable.
+    authoring_path = r"(?<![A-Za-z0-9_./:-])(?:templates/[A-Za-z0-9_./*-]+|kit/[A-Za-z0-9_./*-]+|task_battery/portable_scenarios\.yaml)"
+    def authoring_reference(match: re.Match[str]) -> str:
+        path = match.group(0).rstrip(".")
+        suffix = match.group(0)[len(path):]
+        for source, destination in aliases.items():
+            if path == source or source.endswith("/") and path.startswith(source):
+                candidate = destination + path[len(source):]
+                if candidate in inventory or candidate.endswith("/") and any(p.startswith(candidate) for p in inventory):
+                    return candidate + suffix
+        return "kit://" + path.removeprefix("kit/") + suffix
+    body = re.sub(authoring_path, authoring_reference, body)
+    if document_path is not None:
+        body = _project_instruction_links(
+            body, document_path=document_path,
+            output_document_path=output_document_path or document_path,
+            inventory=inventory, tier=tier,
+        )
+    # Unavailable profile dependencies become explicit manual obligations.
+    # Native @agent syntax is never promised by a portable adapter.
+    def agent(match: re.Match[str]) -> str:
+        name = match.group(0).lstrip("@")
+        path = f".github/agents/{name}.agent.md"
+        if path in inventory:
+            return f"manual {name} role (read {path}; human-authorized handoff)" if portable else match.group(0)
+        return f"human {name.removeprefix('naos-')} review (agent not installed in {tier}; no dispatch)"
+    body = re.sub(r"@naos-[a-z0-9-]+", agent, body)
+    # Exact references to named skills, including extension-skill names,
+    # are checked against selection rather than assumed installed.
+    for name in sorted(skill_names, key=len, reverse=True):
+        token = f"`{name}`"
+        if token not in body:
+            continue
+        if name in installed_skills:
+            route = f".agents/skills/naos-portable-{name}/SKILL.md"
+            if portable and portable_routes is not None and route not in portable_routes:
+                replacement = f"read `.github/skills/{name}/SKILL.md` manually (portable adapter absent; human review, no dispatch)"
+            else:
+                replacement = f"`naos-portable-{name}`" if portable else token
+        else:
+            fallback = (
+                "read `.github/skills/systemic-wiring/SKILL.md` and perform the affected-surface review"
+                if name == "systemic-capability-wiring" and "systemic-wiring" in installed_skills
+                else "perform the described check manually with source, tests and human review"
+            )
+            replacement = f"{name} guidance (not installed in {tier}; {fallback})"
+        body = body.replace(token, replacement)
+    reference_pattern = (
+        r"(?<![A-Za-z0-9_./:-])(?:scripts/[A-Za-z0-9_./-]+\.py|"
+        r"\.github/(?:NAOS_AGENTS\.md|skills/[a-z0-9-]+/SKILL\.md|agents/[a-z0-9-]+\.agent\.md|"
+        r"instructions/[a-z0-9-]+\.instructions\.md|prompts/[A-Za-z0-9_-]+(?:\.prompt)?\.md|"
+        r"autoresearch/[A-Za-z0-9_./-]+\.py))"
+    )
+    def inline_command(match: re.Match[str]) -> str:
+        command = match.group(1)
+        missing = [path for path in re.findall(reference_pattern, command) if not available_reference(path)]
+        make_match = re.match(r"make -f Makefile\.naos ([a-zA-Z0-9_.-]+)", command)
+        if make_match and make_match.group(1) in (unavailable_make_targets or set()):
+            missing.append("Makefile.naos target " + make_match.group(1))
+        if missing and re.match(r"(?:python\d*|conda run|bash|sh|make -f Makefile\.naos)\s", command):
+            return "manual check (" + ", ".join(
+                path + f" [not installed in {tier}; source/tests and human review]"
+                for path in missing) + ")"
+        return match.group(0)
+    body = re.sub(r"`([^`\n]+)`", inline_command, body)
+    lines = []
+    for line in body.splitlines(keepends=True):
+        missing = [path for path in re.findall(reference_pattern, line) if not available_reference(path)]
+        make_match = re.match(r"\s*make -f Makefile\.naos ([a-zA-Z0-9_.-]+)", line)
+        if make_match and make_match.group(1) in (unavailable_make_targets or set()):
+            missing.append("Makefile.naos target " + make_match.group(1))
+        if missing and re.match(r"\s*(?:python\d*|conda run|bash|sh|make -f Makefile\.naos)\s", line):
+            # Never publish a runnable-looking command to an absent script.
+            line = "# Profile fallback: " + ", ".join(missing) + f" not installed in {tier}; perform the described check manually and request human review.\n"
+        lines.append(line)
+    body = "".join(lines)
+    def path_reference(match: re.Match[str]) -> str:
+        path = match.group(0)
+        if available_reference(path) or match.string[match.end():].startswith(f" [not installed in {tier};"):
+            return path
+        return f"{path} [not installed in {tier}; use the protocol in this file and human review]"
+    body = re.sub(reference_pattern, path_reference, body)
+    def workflow(match: re.Match[str]) -> str:
+        command = match.group(1)
+        candidates = [f".github/prompts/{command}.prompt.md", f".github/prompts/{command}.md"]
+        found = next((path for path in candidates if path in inventory), None)
+        if found is None:
+            return f"{command} workflow (not installed in {tier}; use manual goal/context review)"
+        if not portable:
+            return match.group(0)
+        base = command.removeprefix("naos-")
+        base = re.sub(r"[^a-z0-9-]+", "-", base.lower()).strip("-")
+        route = f".agents/skills/naos-workflow-{base}/SKILL.md"
+        if portable_routes is not None and route not in portable_routes:
+            return f"read `{found}` manually (portable adapter absent; human review, no dispatch)"
+        return f"naos-workflow-{base}"
+    body = re.sub(r"(?<![A-Za-z0-9_.-])/(naos-[A-Za-z0-9_-]+)(?![A-Za-z0-9_-])", workflow, body)
+    return body
+
+
+def _render_selected_host_route(
+    relative: str, original_bytes: bytes, adapter_templates: dict[str, bytes],
+    *, inventory: set[str], skill_names: set[str], tier: str,
+    portable_routes: set[str] | None = None,
+    unavailable_make_targets: set[str] | None = None,
+) -> tuple[str, dict[str, bytes]]:
+    """Render only one selected skill/prompt; callers own custody and publication."""
+    is_skill = relative.startswith(".github/skills/") and relative.endswith("/SKILL.md")
+    is_prompt = relative.startswith(".github/prompts/") and relative.endswith(".md")
+    if not (is_skill or is_prompt):
+        raise ValueError("Selected host route requires a skill or prompt")
+    base = Path(relative).parent.name if is_skill else Path(relative).name.removesuffix(".prompt.md").removesuffix(".md").removeprefix("naos-")
+    base = re.sub(r"[^a-z0-9-]+", "-", base.lower()).strip("-")
+    name = ("naos-portable-" if is_skill else "naos-workflow-") + base
+    if len(name) > 64:
+        raise ValueError("Portable adapter name exceeds host name contract")
+    destination = f".agents/skills/{name}/SKILL.md"
+    # Normalize only the parsing view; provenance/copy inputs retain raw bytes.
+    original = original_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    metadata: dict[str, Any] = {}
+    body = original
+    if original.startswith("---\n"):
+        frontmatter, body = original[4:].split("\n---", 1)
+        metadata = yaml.safe_load(frontmatter) or {}
+    description = str(metadata.get("description") or f"Manually follow the NAOS {base} workflow for the selected profile.")
+    if len(description) > 1024:
+        raise ValueError("Portable adapter description exceeds host description contract")
+    if is_skill:
+        parameters, authoring_base = skill_authoring_metadata(metadata)
+    else:
+        parameters, authoring_base = metadata.get("parameters", []), metadata.get("extends")
+    if not isinstance(parameters, list) or any(not isinstance(row, dict)
+            or not isinstance(row.get("name"), str) or not row["name"].strip()
+            or not isinstance(row.get("description"), str) or not row["description"].strip()
+            for row in parameters):
+        raise ValueError("Portable adapter requires well-formed authoring inputs")
+    if len({row["name"] for row in parameters}) != len(parameters):
+        raise ValueError("Portable adapter requires unique authoring input names")
+    if parameters:
+        def cell(value: Any) -> str:
+            return str(value).replace("|", "\\|").replace("\n", " ").replace("\r", " ")
+        lines = ["", "## Authoring inputs (manual)", "",
+                 "Review these inputs with the human before following this workflow. This table",
+                 "is procedural guidance, not a host-enforced schema or execution authorization.", "",
+                 "| Input | Description | Required | Default |", "| --- | --- | --- | --- |"]
+        for row in parameters:
+            lines.append("| " + " | ".join([cell(row["name"]), cell(row["description"]),
+                cell(json.dumps(row["required"]) if "required" in row else "not specified"),
+                cell(json.dumps(row["default"], ensure_ascii=False) if "default" in row else "not specified")]) + " |")
+        body += "\n".join(lines) + "\n"
+    if authoring_base:
+        body += ("\n## Authoring base (manual)\n\nRead the declared base guidance "
+                 + json.dumps(authoring_base, ensure_ascii=False)
+                 + ". If that base is unavailable, stop and ask for it. Do not infer inheritance, "
+                   "agent permissions or execution approval from this reference.\n")
+    body = _project_host_route_body(body, portable=True, inventory=inventory, skill_names=skill_names, tier=tier,
+                                    portable_routes=portable_routes,
+                                    unavailable_make_targets=unavailable_make_targets,
+                                    document_path=relative, output_document_path=destination)
+    outputs = {}
+    for kind, dest, target, adapter_body in (
+        ("portable-skill", destination, relative, body),
+        ("claude-command", f".claude/commands/{name}.md", destination, ""),
+    ):
+        text = adapter_templates[kind].decode("utf-8")
+        for token, value in {
+            "$adapter_name": name, "$adapter_description": json.dumps(description, ensure_ascii=False),
+            "$adapter_profile": tier, "$adapter_source": target, "$adapter_body": adapter_body,
+        }.items():
+            text = text.replace(token, value)
+        outputs[dest] = text.encode("utf-8")
+    return name, outputs
+
+
+def _unavailable_project_make_targets(text: str, inventory: set[str]) -> set[str]:
+    """Find declared targets whose unconditional local script inputs are absent.
+
+    This is availability projection, not Make evaluation or proof that a target
+    passes. File-guarded optional scripts retain their existing skip behavior.
+    """
+    targets: dict[str, tuple[set[str], list[str]]] = {}
+    current: str | None = None
+    for line in text.splitlines():
+        match = re.match(r"^([A-Za-z0-9_.-]+):([^=].*)?$", line)
+        if match:
+            current = match.group(1)
+            dependencies = set((match.group(2) or "").split("#", 1)[0].split())
+            targets[current] = (dependencies, [])
+        elif current is not None and line.startswith("\t"):
+            if not line.lstrip().startswith("#"):
+                targets[current][1].append(line)
+        elif line and not line.startswith(("#", " ")):
+            current = None
+    unavailable: set[str] = set()
+    for name, (_, lines) in targets.items():
+        required: set[str] = set()
+        guards: list[set[str]] = []
+        # Recognize only the shipped positive file-test guard shape. Unknown
+        # conditions confer no availability guarantee. Guard scope applies to
+        # occurrences in that true branch, never to the whole Make target.
+        controls = re.compile(
+            r"\bif\s+\[\s+-f\s+scripts/[A-Za-z0-9_./-]+\.py\s+\]"
+            r"(?:\s*&&\s*\[[^\]\n]+\])*\s*;\s*then\b|\bif\b|\belse\b|\bfi\b"
+        )
+        def inspect(chunk: str) -> None:
+            protected = set().union(*guards) if guards else set()
+            required.update(path for path in re.findall(r"scripts/[A-Za-z0-9_./-]+\.py", chunk)
+                            if path not in protected)
+        for line in lines:
+            start = 0
+            for match in controls.finditer(line):
+                inspect(line[start:match.start()])
+                token = match.group(0)
+                if token.startswith("if"):
+                    guards.append(set(re.findall(r"-f\s+(scripts/[A-Za-z0-9_./-]+\.py)", token))
+                                  if token != "if" else set())
+                elif token == "else" and guards:
+                    guards[-1] = set()
+                elif token == "fi" and guards:
+                    guards.pop()
+                start = match.end()
+            inspect(line[start:])
+        if required - inventory:
+            unavailable.add(name)
+    previous: set[str] = set()
+    while previous != unavailable:
+        previous = set(unavailable)
+        unavailable.update(name for name, (dependencies, _) in targets.items()
+                           if dependencies & unavailable)
+    return unavailable
+
+
+def _generate_host_routes(
+    preview_dir: Path, generated: list[str], tier: str,
+    *, source_origins: SourceOrigins | None = None,
+) -> None:
+    """Project manual portable routes from the actual selected inventory.
+
+    Original host files remain available. Distinct names avoid same-name skill
+    discovery overlap; agent permissions are never translated between hosts.
+    All mutations here are to private generated previews, before activation.
+    """
+    inventory = set(generated)
+    skill_names = {p.name for p in (TEMPLATES_DIR / "skills").iterdir() if p.is_dir()}
+    skill_catalogue_input = json.dumps(sorted(skill_names), separators=(",", ":")).encode("utf-8")
+    installed_skills = {
+        Path(relative).parent.name for relative in inventory
+        if relative.startswith(".github/skills/") and relative.endswith("/SKILL.md")
+    }
+
+    makefile = preview_dir / "Makefile.naos"
+    unavailable_make_targets = _unavailable_project_make_targets(
+        makefile.read_text(encoding="utf-8") if makefile.is_file() else "", inventory,
+    )
+
+    def project_body(body: str, *, portable: bool, document_path: str | None = None) -> str:
+        projected = _project_host_route_body(body, portable=portable, inventory=inventory,
+                                            skill_names=skill_names, tier=tier,
+                                            unavailable_make_targets=unavailable_make_targets,
+                                            document_path=document_path)
+        # These exact renderer-owned summaries retain their canonical KIT
+        # attribution/coverage. Profile fallbacks apply to operational guidance
+        # outside them, as in the brownfield layout adapter below.
+        section_id = {
+            ".github/naos-guidance/security-reference.md": "secure-coding-controls",
+            ".github/naos-guidance/cursor-security.md": "secure-coding-controls",
+            ".github/instructions/ai-pipeline.instructions.md": "agentic-coding-controls",
+        }.get(document_path)
+        if section_id is not None:
+            begin = f"<!-- BEGIN NAOS GENERATED: {section_id} -->"
+            end = f"<!-- END NAOS GENERATED: {section_id} -->"
+            if any(text.count(marker) != 1 for text in (body, projected) for marker in (begin, end)):
+                raise ValueError(f"Canonical control summary markers invalid: {document_path}")
+            start, finish = body.index(begin), body.index(end) + len(end)
+            projected_start, projected_finish = projected.index(begin), projected.index(end) + len(end)
+            if finish <= start or projected_finish <= projected_start:
+                raise ValueError(f"Canonical control summary marker order invalid: {document_path}")
+            upstream_notice = (
+                "> Upstream KIT provenance only: source/register/renderer paths in the "
+                "canonical summary are upstream references, not claims that those files "
+                "are installed or runnable in this project. This attribution does not "
+                "authorize a command; use only the selected inventory and approved workflow.\n\n"
+            )
+            prefix = projected[:projected_start]
+            if not prefix.endswith(upstream_notice):
+                prefix += upstream_notice
+            projected = prefix + body[start:finish] + projected[projected_finish:]
+        return projected
+
+    # Repair legacy skill/prompt profile references too, without altering their native
+    # metadata or tool contracts. Header/body split prevents frontmatter edits.
+    for relative in sorted(inventory):
+        if not (
+            relative.startswith(".github/skills/") and relative.endswith("/SKILL.md")
+            or relative.startswith(".github/prompts/")
+            or relative in {"CLAUDE.md", "AGENTS.md", ".github/copilot-instructions.md", ".github/project-context.md", ".github/NAOS_AGENTS.md"}
+            or relative.startswith(".github/agents/") and relative.endswith(".agent.md")
+            or relative.startswith(".github/instructions/") and relative.endswith(".md")
+            or relative.startswith(".cursor/rules/") and relative.endswith(".mdc")
+            or relative.startswith(".github/naos-guidance/") and relative.endswith(".md")
+        ):
+            continue
+        path = preview_dir / relative
+        text = path.read_text(encoding="utf-8")
+        if text.startswith("---\n"):
+            head, body = text[4:].split("\n---", 1)
+            path.write_text("---\n" + head + "\n---" + project_body(body, portable=False, document_path=relative), encoding="utf-8", newline="\n")
+        else:
+            path.write_text(project_body(text, portable=False, document_path=relative), encoding="utf-8", newline="\n")
+
+    routes: list[tuple[str, str]] = []
+    selected = [p for p in sorted(inventory) if (
+        p.startswith(".github/skills/") and p.endswith("/SKILL.md")
+    ) or p.startswith(".github/prompts/")]
+    for relative in selected:
+        is_skill = relative.startswith(".github/skills/")
+        base = Path(relative).parent.name if is_skill else Path(relative).name.removesuffix(".prompt.md").removesuffix(".md").removeprefix("naos-")
+        base = re.sub(r"[^a-z0-9-]+", "-", base.lower()).strip("-")
+        name = ("naos-portable-" if is_skill else "naos-workflow-") + base
+        if len(name) > 64:
+            raise ValueError("Portable adapter name exceeds host name contract")
+        destination = f".agents/skills/{name}/SKILL.md"
+        if destination in set(generated):
+            raise ValueError("Portable adapter destination collision")
+        source = TEMPLATES_DIR / ("skills" if is_skill else "prompts")
+        source = source / (Path(relative).parent.name + "/SKILL.md" if is_skill else Path(relative).name)
+        if is_skill and (source.parent / "agents" / "openai.yaml").exists():
+            raise ValueError(
+                "Portable adapter Codex policy collides with skill support: "
+                + source.relative_to(TEMPLATES_DIR).as_posix()
+            )
+        original_bytes = source.read_bytes()
+        # Parsed text uses universal newlines; original_bytes remains the recipe input.
+        original = original_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+        metadata: dict[str, Any] = {}
+        body = original
+        if original.startswith("---\n"):
+            frontmatter, body = original[4:].split("\n---", 1)
+            metadata = yaml.safe_load(frontmatter) or {}
+        description = str(metadata.get("description") or f"Manually follow the NAOS {base} workflow for the selected profile.")
+        if len(description) > 1024:
+            raise ValueError("Portable adapter description exceeds host description contract")
+        body = project_body(body, portable=True, document_path=relative)
+        # Capture once: the exact rendered wrappers are validated and recorded.
+        adapter_templates = {kind: (TEMPLATES_DIR / "host-adapters" / f"{kind}.md").read_bytes()
+                             for kind in ("portable-skill", "claude-command")}
+        if source_origins is not None:
+            for kind, template_bytes in adapter_templates.items():
+                dest = destination if kind == "portable-skill" else f".claude/commands/{name}.md"
+                for kit_source, data in ((TEMPLATES_DIR / "host-adapters" / f"{kind}.md", template_bytes),
+                                         (source, original_bytes)):
+                    mode_row(source_origins.declaration, source=kit_source.relative_to(KIT_DIR).as_posix(),
+                             source_bytes=data, destination=dest, output_bytes=data)
+        _route_name, rendered_routes = _render_selected_host_route(
+            relative, original_bytes, adapter_templates,
+            inventory=inventory, skill_names=skill_names, tier=tier,
+            unavailable_make_targets=unavailable_make_targets,
+        )
+        assert _route_name == name
+        # Inputs originate in reviewed source, not rendered mutable preview.
+        # Include the inventory: dependency projection is an explicit input.
+        inventory_input = json.dumps(sorted(inventory), separators=(",", ":")).encode("utf-8")
+        for kind, dest, target, adapter_body in (
+            ("portable-skill", destination, relative, body),
+            ("claude-command", f".claude/commands/{name}.md", destination, ""),
+        ):
+            template = TEMPLATES_DIR / "host-adapters" / f"{kind}.md"
+            template_bytes = adapter_templates[kind]
+            if source_origins is not None:
+                # Named kit templates/guidance are reviewed sources, not arbitrary
+                # observed host inputs. Validate the same bytes we render/capture.
+                for kit_source, data in ((template, template_bytes), (source, original_bytes)):
+                    mode_row(
+                        source_origins.declaration,
+                        source=kit_source.relative_to(KIT_DIR).as_posix(),
+                        source_bytes=data, destination=dest, output_bytes=data,
+                    )
+                source_origins.record_recipe(
+                    "host_adapter", dest,
+                    sorted([
+                        ("kit/" + template.relative_to(KIT_DIR).as_posix(), template_bytes),
+                        ("kit/" + source.relative_to(KIT_DIR).as_posix(), original_bytes),
+                        ("generated/selected_inventory.json", inventory_input),
+                        ("generated/known_skill_names.json", skill_catalogue_input),
+                        ("generated/project_makefile.txt", makefile.read_bytes()),
+                    ]),
+                    {"profile": tier, "name": name, "kind": kind},
+                )
+            text = rendered_routes[dest].decode("utf-8")
+            path = preview_dir / dest
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8", newline="\n")
+            generated.append(dest)
+        policy_source = TEMPLATES_DIR / "host-adapters" / "openai.yaml"
+        policy_destination = Path(destination).parent / "agents" / "openai.yaml"
+        policy_target = preview_dir / policy_destination
+        policy_target.parent.mkdir(parents=True, exist_ok=True)
+        if source_origins is not None:
+            source_origins.copy2(policy_source, policy_target)
+        else:
+            shutil.copy2(policy_source, policy_target)
+        generated.append(policy_destination.as_posix())
+        if is_skill:
+            # Preserve the complete relative support tree and inventory every
+            # leaf. Skills can reference scripts/resources beside SKILL.md.
+            for support in sorted(source.parent.rglob("*")):
+                if (not support.is_file() or support == source or support.name == ".DS_Store"
+                        or support.suffix in {".pyc", ".pyo"} or "__pycache__" in support.parts):
+                    continue
+                dest = Path(destination).parent / support.relative_to(source.parent)
+                target = preview_dir / dest
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if source_origins is not None:
+                    source_origins.copy2(support, target)
+                else:
+                    shutil.copy2(support, target)
+                generated.append(dest.as_posix())
+        routes.append((name, destination))
+
+    lines = ["## Selected profile availability", ""]
+    if tier == "quickstart":
+        lines += ["Quickstart installs research guidance at `.github/agents/naos-research.agent.md`.",
+                  "Design/task-start/task-complete workflows, skills and lifecycle scripts are not",
+                  "installed. Use a manual goal, source inspection and human review; use `naos doctor`",
+                  "for diagnostics. Move to Lite or higher through a reviewed profile transition", "before using lifecycle automation."]
+    else:
+        lines += ["Design -> task-start -> authorized implementation -> task-complete -> human review.",
+                  "Use these generated routes or read their files explicitly; no route grants execution approval.", ""]
+        lines += [f"- `{name}`: `{path}`" for name, path in routes]
+        lines += ["", "Use `Makefile.naos` targets only when their scripts are installed. Missing skill/agent",
+                  "references are marked with a manual fallback in generated guidance."]
+    availability = ("Selected profile: " + tier + ". Read root AGENTS.md for the exact generated routes. "
+        "A missing tool never waives a selected-profile rule: perform the source/test review manually "
+        "or stop the dependent work and obtain the required tool/evidence. "
+        "kit:// references identify separately acquired kit resources, not local files or runnable commands. "
+        "Profile presets describe other possible installations; they do not activate components.\n\n")
+    for relative in ("CLAUDE.md", ".github/copilot-instructions.md"):
+        path = preview_dir / relative
+        path.write_text(availability + path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+    lines += ["", "A missing tool does not waive governance duties. Review source/tests manually or stop dependent work until required evidence is available.",
+              "kit:// references are separately acquired kit resources, not project-local files or runnable commands.",
+              "Reference profile presets and context_phases are manual planning guidance; no runtime context injection is implemented."]
+    router = preview_dir / "AGENTS.md"
+    text = router.read_text(encoding="utf-8").replace("$naos_profile", tier).replace("$naos_routes", "\n".join(lines))
+    router.write_text(text, encoding="utf-8", newline="\n")
 
 
 def scaffold_files(
@@ -1377,15 +2399,21 @@ def scaffold_files(
     signals: dict | None = None,
     memory_choice: str | None = None,
     emit_progress: bool = True,
+    source_origins: SourceOrigins | None = None,
+    copied_tool_outputs: set[Path] | None = None,
+    _defer_traceability_content: bool = False,
 ) -> list[str]:
     """
     Generate governance files into preview_dir.
-    Returns list of files generated.
+    Returns forward-slash relative paths of files generated on every OS.
 
     Security: writes ONLY to preview_dir — never modifies project_path directly.
     Activation (copy to project_path) requires separate --activate call.
     """
     generated: list[str] = []
+    if copied_tool_outputs is None:
+        copied_tool_outputs = set()
+    copy_source = source_origins.copy2 if source_origins is not None else shutil.copy2
     surface_contract = load_profile_surface_contract(tier)
     required_surfaces = set(surface_contract.get("required_surfaces") or [])
     preview_dir.mkdir(parents=True, exist_ok=True)
@@ -1400,18 +2428,36 @@ def scaffold_files(
                 else:
                     dest = preview_dir / tpl.name
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(tpl, dest)
-                generated.append(str(dest.relative_to(preview_dir)))
+                copy_source(tpl, dest)
+                generated.append(dest.relative_to(preview_dir).as_posix())
 
     # 1b. Auto-populate instruction-triple templates from detected signals.
-    if signals:
-        template_ctx = _make_template_context(
-            project_path=project_path,
-            signals=signals,
-            tier=tier,
-            archetype=archetype,
-        )
-        _populate_templates(preview_dir, template_ctx)
+    template_ctx = _make_template_context(
+        project_path=project_path,
+        signals=signals or _empty_signals(),
+        tier=tier,
+        archetype=archetype,
+    )
+    _populate_templates(preview_dir, template_ctx)
+
+    # Detailed protocols are required on demand, not unconditional host imports.
+    # Keep the complete reviewed text available rather than deleting governance
+    # duties to reduce always-loaded host entrypoints.
+    guidance_src = TEMPLATES_DIR / "host-guidance"
+    if guidance_src.is_dir():
+        for guidance in sorted(guidance_src.glob("*.md")):
+            if tier == "quickstart" and guidance.name.startswith("cursor-"):
+                continue
+            destination = preview_dir / ".github" / "naos-guidance" / guidance.name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            copy_source(guidance, destination)
+            generated.append(destination.relative_to(preview_dir).as_posix())
+            # CLAUDE reference retains the same project fact substitutions as the
+            # compact entrypoint; other $tokens remain literal authoring guidance.
+            if guidance.name == "claude-reference.md":
+                from string import Template
+                destination.write_text(Template(destination.read_text(encoding="utf-8")).safe_substitute(template_ctx),
+                                       encoding="utf-8", newline="\n")
 
     # 2. Rules Chain
     rules_src = TEMPLATES_DIR / "rules-chain"
@@ -1421,14 +2467,14 @@ def scaffold_files(
                 rel = tpl.relative_to(rules_src)
                 dest = preview_dir / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(tpl, dest)
-                generated.append(str(rel))
+                copy_source(tpl, dest)
+                generated.append(rel.as_posix())
 
     # 3. RULES.md from selected profile
     profile_rules = validated_profile_rules_path(tier)
     dest = preview_dir / ".ai" / "RULES.md"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(profile_rules, dest)
+    copy_source(profile_rules, dest)
     generated.append(".ai/RULES.md")
 
     # 4. Cursor rules (lite+ only — skip for quickstart)
@@ -1438,20 +2484,20 @@ def scaffold_files(
         cursor_dest.mkdir(parents=True, exist_ok=True)
         for mdc in cursor_src.iterdir():
             if mdc.is_file():
-                shutil.copy2(mdc, cursor_dest / mdc.name)
+                copy_source(mdc, cursor_dest / mdc.name)
                 generated.append(f".cursor/rules/{mdc.name}")
 
     # 5. Makefile.naos
     makefile_src = TEMPLATES_DIR / "Makefile.naos"
     if makefile_src.exists():
-        shutil.copy2(makefile_src, preview_dir / "Makefile.naos")
+        copy_source(makefile_src, preview_dir / "Makefile.naos")
         generated.append("Makefile.naos")
 
     # 5a. Profile generated-surface contract (all profiles, including quickstart).
     if PROFILE_SURFACE_CONTRACT_PATH.is_file():
         contract_dest = preview_dir / "naos" / "profile_generated_surface_contract.json"
         contract_dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(PROFILE_SURFACE_CONTRACT_PATH, contract_dest)
+        copy_source(PROFILE_SURFACE_CONTRACT_PATH, contract_dest)
         generated.append("naos/profile_generated_surface_contract.json")
     if tier == "quickstart":
         for contract_schema_src in [
@@ -1463,7 +2509,7 @@ def scaffold_files(
             if contract_schema_src.is_file():
                 contract_schema_dest = preview_dir / "schemas" / "naos" / contract_schema_src.name
                 contract_schema_dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(contract_schema_src, contract_schema_dest)
+                copy_source(contract_schema_src, contract_schema_dest)
                 generated.append(f"schemas/naos/{contract_schema_src.name}")
 
     # 6. Structural seeds (quickstart: selected seeds; lite+: all except the
@@ -1552,10 +2598,12 @@ def scaffold_files(
                     continue
                 dest = preview_dir / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(seed, dest)
-                generated.append(str(rel))
+                _copy_new_generated_seed(seed, dest, source_origins=source_origins)
+                generated.append(rel.as_posix())
 
-    _apply_memory_choice_to_preview(preview_dir, generated, memory_choice)
+    _apply_memory_choice_to_preview(
+        preview_dir, generated, memory_choice, source_origins=source_origins,
+    )
     _apply_planning_baseline_profile(preview_dir, tier)
     _apply_ai_component_inventory_profile(preview_dir, tier)
 
@@ -1567,7 +2615,7 @@ def scaffold_files(
         if policy_src.is_file():
             dest = preview_dir / "naos" / "policy" / "default_policy.yaml"
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(policy_src, dest)
+            copy_source(policy_src, dest)
             _persist_generated_policy_profile(dest, tier)
             generated.append("naos/policy/default_policy.yaml")
 
@@ -1575,7 +2623,7 @@ def scaffold_files(
         if register_src.is_file():
             dest = preview_dir / "naos" / "secure_coding_control_register.yaml"
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(register_src, dest)
+            _copy_new_generated_seed(register_src, dest, source_origins=source_origins)
             generated.append("naos/secure_coding_control_register.yaml")
 
         if CAPABILITIES_DIR.is_dir():
@@ -1584,11 +2632,19 @@ def scaffold_files(
             for cap_file in sorted(CAPABILITIES_DIR.glob("*.yaml")):
                 if tier == "lite" and cap_file.name == "ai_component_inventory.yaml":
                     continue
-                shutil.copy2(cap_file, cap_dest / cap_file.name)
+                copy_source(cap_file, cap_dest / cap_file.name)
                 generated.append(f"naos/capabilities/{cap_file.name}")
 
         schema_src = KIT_DIR / "schemas" / "naos"
         adopter_schema_names = {
+            "task_claims.schema.json",
+            "task_claim_report.schema.json",
+            "conformance_latest.schema.json",
+            "capability.schema.json",
+            "capability_maturity.schema.json",
+            "static_grader_report.schema.json",
+            "grader_assessment.schema.json",
+            "llm_grader_readiness.schema.json",
             "calibration_shadow.schema.json",
             "calibration_shadow_report.schema.json",
             "evidence_classification_policy.schema.json",
@@ -1598,12 +2654,48 @@ def scaffold_files(
             "gatekeeper.schema.json",
             "gate_input_error.schema.json",
             "agent_trace_event.schema.json",
+            "agent_trace_validation.schema.json",
+            "external_evidence_ingest.schema.json",
+            "external_evidence_source.schema.json",
             "evidence_attestation.schema.json",
             "evidence_envelope.schema.json",
             "evidence_verification.schema.json",
             "claims_validation.schema.json",
+            "control_plane_review.schema.json",
+            "setup_module_catalog.schema.json",
+            "setup_recommendations.schema.json",
+            "function_index_health.schema.json",
+            "graph_context_query.schema.json",
+            "graph_context_readiness.schema.json",
+            "learning_loop_review.schema.json",
+            "local_context_index.schema.json",
+            "local_context_query.schema.json",
+            "memory_context_readiness.schema.json",
+            "memory_provider_access.schema.json",
+            "memory_use_policy.schema.json",
+            "module_header_traceability.schema.json",
+            "roadmap_crosswalk_validation.schema.json",
+            "self_check.schema.json",
+            "self_check_dependency_resolution.schema.json",
+            "semantic_candidate_layer.schema.json",
+            "session_lifecycle.schema.json",
+            "spec_cascade_coherence.schema.json",
+            "systemic_impact_review.schema.json",
+            "systemic_impact_rules.schema.json",
+            "systemic_impact_changed_path_review.schema.json",
+            "systemic_impact_family_review.schema.json",
+            "configuration_posture_review.schema.json",
+            "pr_governance_summary.schema.json",
+            "policy_override.schema.json",
+            "policy_override_merge.schema.json",
+            "adapter_coherence_report.schema.json",
+            "task_context_pack.schema.json",
+            "test_evidence_health.schema.json",
+            "task_registry.schema.json",
             "capability_maturity_report.schema.json",
             "evidence_pack.schema.json",
+            "report_source_reference.schema.json",
+            "capability_maturity_collection_witness.schema.json",
             "dashboard_summary.schema.json",
             "ai_surface_context_budget.schema.json",
             "ai_surface_profile_footprint_baseline.schema.json",
@@ -1611,6 +2703,7 @@ def scaffold_files(
             "cross_harness_review_readiness_report.schema.json",
             "duplicate_function_hygiene.schema.json",
             "secret_hygiene.schema.json",
+            "secret_public_literals.schema.json",
             "test_quality_hygiene.schema.json",
             "dependency_integrity.schema.json",
             "package_reality.schema.json",
@@ -1679,12 +2772,23 @@ def scaffold_files(
                     continue
                 if tier == "lite" and schema_file.name.startswith("ai_component_inventory"):
                     continue
-                shutil.copy2(schema_file, schema_dest / schema_file.name)
+                copy_source(schema_file, schema_dest / schema_file.name)
                 generated.append(f"schemas/naos/{schema_file.name}")
+        team_schema_src = KIT_DIR / "schemas" / "team_config.schema.yaml"
+        if team_schema_src.is_file():
+            team_schema_dest = preview_dir / "schemas" / team_schema_src.name
+            team_schema_dest.parent.mkdir(parents=True, exist_ok=True)
+            copy_source(team_schema_src, team_schema_dest)
+            generated.append(f"schemas/{team_schema_src.name}")
 
     # 6b. Public evidence docs used by admissibility-pack (all tiers)
     evidence_docs = {
         "ADMISSIBILITY.md",
+        "TOOL_NEUTRAL_USAGE.md",
+        "HOST_CONTEXT_BUDGET.md",
+        "CLAIMS_AND_LIMITATIONS.md",
+        "CONFIGURATION_POSTURE_REVIEW.md",
+        "decisions/ADR-0010-control-plane-advisory-boundaries.md",
         "COMPLIANCE_MAPPING.md",
         "DORA_MAPPING.md",
         "ENGRAM_SETUP.md",
@@ -1698,8 +2802,41 @@ def scaffold_files(
                 continue
             dest = preview_dir / "docs" / doc_name
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(doc_src, dest)
+            copy_source(doc_src, dest)
             generated.append(f"docs/{doc_name}")
+
+    # Copied public evidence docs retain their kit-only references explicitly;
+    # do not ship broken local links or imply the canonical kit register exists
+    # in an adopter. All other local links remain unchanged and validated.
+    evidence_doc_kit_references = {
+        "docs/COMPLIANCE_MAPPING.md": frozenset({
+            "KNOWN_LIMITATIONS.md",
+            "configs/secure_coding_control_register.yaml",
+            "configs/secure_coding_control_register.sample.yaml",
+            "configs/secure_coding_control_render_manifest.yaml",
+            "docs/decisions/ADR-0012-secure-and-agentic-coding-control-register.md",
+            "docs/SECURE_CODING_CONTROL_MODEL.md",
+        }),
+        "docs/decisions/ADR-0010-control-plane-advisory-boundaries.md": frozenset({
+            "docs/CONTROL_PLANE.md", "docs/BEHAVIORAL_AUDIT_ENABLEMENT.md",
+        }),
+    }
+    for relative, upstream in evidence_doc_kit_references.items():
+        if relative not in generated:
+            continue
+        for resource in upstream:
+            if not (KIT_DIR / resource).is_file():
+                raise ValueError(f"Declared upstream evidence-doc source is missing: {resource}")
+        path = preview_dir / relative
+        original = path.read_text(encoding="utf-8")
+        projected = _project_instruction_links(original, document_path=relative,
+            output_document_path=relative, inventory=set(generated), tier=tier,
+            kit_reference_paths=upstream)
+        if projected != original:
+            projected += ("\n> Upstream kit resources: `kit://` links identify separately acquired NAOS kit "
+                "sources, not installed project files, runnable commands or satisfied evidence. "
+                "Obtain the named source for the applicable review; project-local obligations remain in force.\n")
+            path.write_text(projected, encoding="utf-8", newline="\n")
 
     # 7. Archetype-specific project-context.md (override generic template — lite+ only)
     if archetype and archetype != "custom" and tier != "quickstart":
@@ -1707,7 +2844,11 @@ def scaffold_files(
         if archetype_ctx.exists():
             dest = preview_dir / ".github" / "project-context.md"
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(archetype_ctx, dest)
+            copy_source(archetype_ctx, dest)
+            dest.write_text(
+                _provisional_archetype_context(dest.read_text(encoding="utf-8"), archetype, tier),
+                encoding="utf-8", newline="\n",
+            )
             # generated[] entries must be real preview-relative paths (activate() resolves
             # and copies them); the archetype annotation is logged, not embedded in the path.
             generated.append(".github/project-context.md")
@@ -1735,14 +2876,14 @@ def scaffold_files(
                 continue
             if tier == "lite" and spec_file.name not in lite_specs:
                 continue
-            shutil.copy2(spec_file, specs_dest / spec_file.name)
+            copy_source(spec_file, specs_dest / spec_file.name)
             generated.append(f"specs/{spec_file.name}")
         template_specs_dest = preview_dir / "naos" / "spec_templates" / "spec-kit" / "specs"
         template_specs_dest.mkdir(parents=True, exist_ok=True)
         for spec_file in sorted(spec_src.iterdir()):
             if not spec_file.is_file():
                 continue
-            shutil.copy2(spec_file, template_specs_dest / spec_file.name)
+            copy_source(spec_file, template_specs_dest / spec_file.name)
             generated.append(f"naos/spec_templates/spec-kit/specs/{spec_file.name}")
 
     # 8b. Agent surface templates (profile contract):
@@ -1769,8 +2910,12 @@ def scaffold_files(
                 continue
             if tier == "lite" and agent_file.name not in (lite_agents | contract_agents):
                 continue
-            shutil.copy2(agent_file, agents_dest / agent_file.name)
-            generated.append(f".github/agents/{agent_file.name}")
+            # A Markdown index in .github/agents is parsed as a custom agent by
+            # supported hosts. Keep role documentation outside that discovery root.
+            destination = (preview_dir / ".github" / "NAOS_AGENTS.md"
+                           if agent_file.name == "AGENTS.md" else agents_dest / agent_file.name)
+            copy_source(agent_file, destination)
+            generated.append(destination.relative_to(preview_dir).as_posix())
 
     # 8c. Agent surface prompts (profile contract):
     #     quickstart → none | lite → bounded lifecycle set | standard/assured → all
@@ -1796,7 +2941,7 @@ def scaffold_files(
                 continue
             if tier == "lite" and prompt_file.name not in (lite_prompts | contract_prompts):
                 continue
-            shutil.copy2(prompt_file, prompts_dest / prompt_file.name)
+            copy_source(prompt_file, prompts_dest / prompt_file.name)
             generated.append(f".github/prompts/{prompt_file.name}")
 
     # 8d. Agent surface skills (tier-conditional):
@@ -1835,12 +2980,25 @@ def scaffold_files(
             dest_skill = skills_dest / skill_dir.name
             if dest_skill.exists():
                 shutil.rmtree(dest_skill)
+            if source_origins is not None:
+                for skill_file in skill_dir.rglob("*"):
+                    if (not skill_file.is_file() or ".DS_Store" == skill_file.name
+                            or skill_file.suffix in {".pyc", ".pyo"}
+                            or "__pycache__" in skill_file.parts):
+                        continue
+                    destination = dest_skill / skill_file.relative_to(skill_dir)
+                    source_origins.record(
+                        skill_file, destination.relative_to(preview_dir).as_posix(),
+                    )
             shutil.copytree(
                 skill_dir,
                 dest_skill,
                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo", ".DS_Store"),
             )
-            generated.append(f".github/skills/{skill_dir.name}/SKILL.md")
+            generated.extend(
+                leaf.relative_to(preview_dir).as_posix()
+                for leaf in sorted(dest_skill.rglob("*")) if leaf.is_file()
+            )
 
     # 8e. Agent surface instructions (tier + signal conditional):
     #     quickstart → function-discovery only (hero anti-duplication instruction)
@@ -1893,7 +3051,7 @@ def scaffold_files(
                     and instr_file.name not in signal_additions
                 ):
                     continue
-            shutil.copy2(instr_file, instructions_dest / instr_file.name)
+            copy_source(instr_file, instructions_dest / instr_file.name)
             generated.append(f".github/instructions/{instr_file.name}")
 
     # 8f. CI workflow templates (tier-conditional):
@@ -1912,7 +3070,7 @@ def scaffold_files(
             if wf_file.name not in default_workflows:
                 continue
             dest = workflows_dest / wf_file.name
-            shutil.copy2(wf_file, dest)
+            copy_source(wf_file, dest)
             if wf_file.name == "naos-control-plane-ci.yml":
                 content = dest.read_text(encoding="utf-8")
                 content = re.sub(
@@ -1920,8 +3078,18 @@ def scaffold_files(
                     f"NAOS_PROFILE: {tier}",
                     content,
                 )
-                dest.write_text(content, encoding="utf-8")
+                dest.write_text(content, encoding="utf-8", newline="\n")
             generated.append(f".github/workflows/{wf_file.name}")
+
+    # Distribute the reviewed PR example as inert guidance, never as active CI.
+    if workflows_src.is_dir() and tier != "quickstart":
+        pr_example = workflows_src / "naos-pr-governance.yml.example"
+        if pr_example.is_file():
+            example_rel = "naos/workflows/examples/naos-pr-governance.yml.example"
+            example_dest = preview_dir / example_rel
+            example_dest.parent.mkdir(parents=True, exist_ok=True)
+            copy_source(pr_example, example_dest)
+            generated.append(example_rel)
 
     # 8g. Autoresearch runner (Standard/Assured only — not Lite)
     #     Copies kit/autoresearch/ → .github/autoresearch/
@@ -1939,15 +3107,15 @@ def scaffold_files(
                     continue
                 dest = autores_dest / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(ar_file, dest)
-                generated.append(f".github/autoresearch/{rel}")
+                copy_source(ar_file, dest)
+                generated.append(f".github/autoresearch/{rel.as_posix()}")
         battery_src = KIT_DIR / "task_battery"
         battery_dest = autores_dest / "task_battery"
         if battery_src.is_dir():
             battery_dest.mkdir(parents=True, exist_ok=True)
             for bat_file in battery_src.iterdir():
                 if bat_file.is_file() and bat_file.name != "d4_grader_scenarios.yaml":
-                    shutil.copy2(bat_file, battery_dest / bat_file.name)
+                    copy_source(bat_file, battery_dest / bat_file.name)
                     generated.append(
                         f".github/autoresearch/task_battery/{bat_file.name}"
                     )
@@ -1958,7 +3126,7 @@ def scaffold_files(
         init_dest = preview_dir / ".github" / "autoresearch" / "__init__.py"
         if graders_src.is_dir() and init_src.is_file():
             init_dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(init_src, init_dest)
+            copy_source(init_src, init_dest)
             generated.append(".github/autoresearch/__init__.py")
             graders_dest.mkdir(parents=True, exist_ok=True)
             for grader_file in graders_src.rglob("*"):
@@ -1969,8 +3137,8 @@ def scaffold_files(
                     continue
                 dest = graders_dest / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(grader_file, dest)
-                generated.append(f".github/autoresearch/graders/{rel}")
+                copy_source(grader_file, dest)
+                generated.append(f".github/autoresearch/graders/{rel.as_posix()}")
 
     # 8h. Instincts + profiles (tier-conditional):
     #     quickstart → no reference profiles  |  lite+ → every reference profile preset + schema
@@ -1981,7 +3149,7 @@ def scaffold_files(
         profiles_dest.mkdir(parents=True, exist_ok=True)
         for pf_file in sorted(profiles_src.iterdir()):
             if pf_file.is_file():
-                shutil.copy2(pf_file, profiles_dest / pf_file.name)
+                copy_source(pf_file, profiles_dest / pf_file.name)
                 generated.append(f".github/profiles/{pf_file.name}")
     if instincts_src.is_dir() and tier in ("standard", "assured"):
         instincts_dest = preview_dir / ".github" / "instincts"
@@ -1992,13 +3160,13 @@ def scaffold_files(
             # Standard tier: schema only (no INS-*.yaml seed files)
             if tier == "standard" and ins_file.name.startswith("INS-"):
                 continue
-            shutil.copy2(ins_file, instincts_dest / ins_file.name)
+            copy_source(ins_file, instincts_dest / ins_file.name)
             generated.append(f".github/instincts/{ins_file.name}")
 
     # 9a. Patch AI policy in naos_ai_precommit.yaml
     precommit_yaml = preview_dir / "configs" / "naos_ai_precommit.yaml"
     if precommit_yaml.exists():
-        content = precommit_yaml.read_text()
+        content = precommit_yaml.read_text(encoding="utf-8")
         content = re.sub(
             r"enabled:.*# NAOS_INIT_PATCH",
             f"enabled: {str(backend != 'disabled').lower()}  # NAOS_INIT_PATCH",
@@ -2014,23 +3182,30 @@ def scaffold_files(
             f"preferred_backend: {backend}",
             content,
         )
-        precommit_yaml.write_text(content)
+        precommit_yaml.write_text(content, encoding="utf-8", newline="\n")
 
     # 9b. Patch NAOS_TIER default in pre-commit hook to match selected tier
     precommit_hook = preview_dir / ".githooks" / "pre-commit"
     if precommit_hook.exists():
-        content = precommit_hook.read_text()
+        content = precommit_hook.read_text(encoding="utf-8")
         content = re.sub(
             r'NAOS_TIER="\$\{NAOS_TIER:-lite\}"',
             f'NAOS_TIER="${{NAOS_TIER:-{tier}}}"',
             content,
         )
-        precommit_hook.write_text(content)
+        precommit_hook.write_text(content, encoding="utf-8", newline="\n")
+
+    # The standalone P3 wrapper has its own default, independent of Makefile.naos.
+    reporting_makefile = preview_dir / "Makefile.naos.secure-coding-reporting"
+    if reporting_makefile.is_file():
+        content = reporting_makefile.read_text(encoding="utf-8")
+        content = re.sub(r"(?m)^NAOS_PROFILE \?= lite$", f"NAOS_PROFILE ?= {tier}", content)
+        reporting_makefile.write_text(content, encoding="utf-8", newline="\n")
 
     # 9c. Patch Makefile.naos default profile to match selected tier
     makefile = preview_dir / "Makefile.naos"
     if makefile.exists():
-        content = makefile.read_text()
+        content = makefile.read_text(encoding="utf-8")
         content = re.sub(
             r"NAOS_PROFILE \?= quickstart",
             f"NAOS_PROFILE ?= {tier}",
@@ -2043,6 +3218,26 @@ def scaffold_files(
         )
         if tier == "quickstart":
             command_contract = surface_contract.get("commands") or {}
+            unavailable_targets = []
+            for command in ("design", "task-start"):
+                alternative = command_contract[command]["alternative"]
+                unavailable_targets.append(
+                    f"{command}: ## Not applicable in quickstart; use the supported alternative\n"
+                    f"\t@echo \"NAOS command applicability: not_applicable (profile=quickstart command={command})\"\n"
+                    f"\t@echo \"Supported alternative: {alternative}\"\n\n"
+                )
+            content = re.sub(
+                r"(?m)^\.PHONY: ",
+                ".PHONY: design task-start ",
+                content,
+                count=1,
+            )
+            content = re.sub(
+                r"(?m)(?=^gov-refresh:)",
+                "".join(unavailable_targets),
+                content,
+                count=1,
+            )
             refresh_alternative = command_contract["gov-refresh"]["alternative"]
             readiness_alternative = command_contract["naos-readiness"]["alternative"]
             content = re.sub(
@@ -2061,7 +3256,7 @@ def scaffold_files(
                 content,
                 flags=re.DOTALL,
             )
-        makefile.write_text(content)
+        makefile.write_text(content, encoding="utf-8", newline="\n")
 
     # 10. Automation scripts (tier-conditional)
     #     quickstart → none  |  lite → 5 core scripts  |  standard/assured → all
@@ -2069,16 +3264,27 @@ def scaffold_files(
     if scripts_src.is_dir() and tier != "quickstart":
         # Core scripts always go to scripts/ (non-workflow)
         lite_scripts = {
+            "naos_governance_audit.py",
+            "naos_code_quality_audit.py",
+            "architecture_boundaries.py",
+            "naos_adapter_coherence.py",
             "naos_validate_truth.py",
             "naos_validate_task_registry.py",
             "naos_readiness.py",
             "naos_ai_precommit.py",
             "naos_policy.py",
             "source_roots.py",
+            "naos_console.py",
             "spec_header.py",
             "naos_schema_validation.py",
             "naos_adoption_common.py",
+            "naos_ai_surfaces.py",
+            "naos_windows_report.py",
             "naos_hygiene_common.py",
+            "naos_secret_public_literals.py",
+            "naos_secret_managed_operands.py",
+            "naos_secret_ri_windows_operands.py",
+            "naos_secret_public_literals.json",
             "naos_adopt.py",
             "naos_preflight.py",
             "naos_intake.py",
@@ -2103,6 +3309,9 @@ def scaffold_files(
             "naos_validate_claims.py",
             "naos_capability_maturity.py",
             "naos_systemic_impact.py",
+            "naos_systemic_applicability.py",
+            "naos_systemic_family_review.py",
+            "naos_configuration_posture_review.py",
             "naos_module_header_traceability.py",
             "naos_spec_pack_contract.py",
             "naos_spec_pack_materialize.py",
@@ -2120,6 +3329,7 @@ def scaffold_files(
             "naos_research_record.py",
             "naos_composed_traceability.py",
             "naos_task_claims.py",
+            "naos_secret_patterns.py",
             "naos_local_context_index.py",
             "naos_local_context_query.py",
             "naos_semantic_candidate_readiness.py",
@@ -2180,6 +3390,21 @@ def scaffold_files(
         }
         # Shared source-bound report checks are required by copied Lite consumers.
         lite_scripts.add("naos_report_contracts.py")
+        lite_scripts.add("naos_evidence_contracts.py")
+        lite_scripts.add("naos_report_composition.py")
+        lite_scripts.add("naos_self_check_dependency_resolution.py")
+        lite_scripts.add("naos_self_check_inspection.py")
+        # Canonical full self-check producers must be present before inspection
+        # derives their owned report sinks from their installed source.
+        lite_scripts.update({
+            "naos_governance_bypass_posture.py",
+            "naos_external_evidence_ingest.py",
+            "naos_learning_loop_review.py",
+            "naos_detect_spec_drift.py",
+        })
+        # configuration_posture_review -> systemic_family_review imports this
+        # shared boundary helper in generated Lite projects as well.
+        lite_scripts.add("naos_resource_boundary.py")
 
         for script_file in scripts_src.iterdir():
             if not script_file.is_file():
@@ -2189,18 +3414,34 @@ def scaffold_files(
             # copied into every adopter repository by default.
             if script_file.name in {
                 "naos_repository_intelligence.py",
+                "naos_repository_intelligence_windows.py",
                 "naos_agent_orchestration_plan.py",
                 "naos_agent_sponsor_registry.py",
                 "naos_aivss_arithmetic_verification.py",
                 "naos_public_export.py",
+                "generate_naos_secret_public_literals.py",
+                "naos_ci_readiness.py",
             }:
                 continue
             if tier == "lite" and script_file.name not in lite_scripts:
                 continue
             dest = preview_dir / "scripts" / script_file.name
             dest.parent.mkdir(parents=True, exist_ok=True)
-            _copy_generated_script(script_file, dest)
+            _copy_generated_script(script_file, dest, source_origins=source_origins, copied_tool_outputs=copied_tool_outputs)
             generated.append(f"scripts/{script_file.name}")
+
+        native_report_source = KIT_DIR / "upgrade_contract" / "windows_handles.py"
+        native_report_dest = preview_dir / "scripts" / "naos_windows_handles.py"
+        _copy_generated_script(native_report_source, native_report_dest, source_origins=source_origins, copied_tool_outputs=copied_tool_outputs)
+        generated.append("scripts/naos_windows_handles.py")
+
+        # Trace atomic publication needs the exact supported POSIX observations.
+        for metadata_name in ("security.py", "linux_primitives.py"):
+            metadata_source = KIT_DIR / "upgrade_contract" / metadata_name
+            metadata_dest = preview_dir / "scripts" / "naos_posix_metadata" / metadata_name
+            metadata_dest.parent.mkdir(parents=True, exist_ok=True)
+            _copy_generated_script(metadata_source, metadata_dest, source_origins=source_origins, copied_tool_outputs=copied_tool_outputs)
+            generated.append(f"scripts/naos_posix_metadata/{metadata_name}")
 
         workflows_src = scripts_src / "workflows"
         if workflows_src.is_dir():
@@ -2211,13 +3452,36 @@ def scaffold_files(
                     continue
                 dest = preview_dir / "scripts" / "workflows" / wf_file.name
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                _copy_generated_script(wf_file, dest)
+                _copy_generated_script(wf_file, dest, source_origins=source_origins, copied_tool_outputs=copied_tool_outputs)
                 generated.append(f"scripts/workflows/{wf_file.name}")
+                if wf_file.name == "generate_naos_dashboard.py":
+                    # The copied dashboard must retain the shipped gate floor
+                    # without depending on the kit's templates directory.
+                    baseline = dest.with_name("gatekeepers.baseline.yaml")
+                    copy_source(
+                        TEMPLATES_DIR / "structural-seeds/naos/gatekeepers.yaml",
+                        baseline,
+                    )
+                    generated.append("scripts/workflows/gatekeepers.baseline.yaml")
+                    # Keep inert declaration comparisons available when the
+                    # adopter's dashboard is moved without the kit templates.
+                    for declaration in ("ai_code_provenance", "compliance_posture"):
+                        baseline_name = f"{declaration}.baseline.yaml"
+                        copy_source(
+                            TEMPLATES_DIR / f"structural-seeds/naos/{declaration}.yaml",
+                            dest.with_name(baseline_name),
+                        )
+                        generated.append(f"scripts/workflows/{baseline_name}")
 
-        # Validators (standard/assured only).
+        # Lite's adapter reviewer needs only the shared context helper/package;
+        # executable maintainer validators remain Standard/Assured only.
         validators_src = scripts_src / "validators"
-        if validators_src.is_dir() and tier in ("standard", "assured"):
-            for val_file in validators_src.rglob("*"):
+        if validators_src.is_dir() and tier in ("lite", "standard", "assured"):
+            validator_files = (
+                [validators_src / "__init__.py", validators_src / "validator_context.py"]
+                if tier == "lite" else validators_src.rglob("*")
+            )
+            for val_file in validator_files:
                 if not val_file.is_file():
                     continue
                 rel = val_file.relative_to(validators_src)
@@ -2230,11 +3494,26 @@ def scaffold_files(
                     continue
                 dest = preview_dir / "scripts" / "validators" / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                _copy_generated_script(val_file, dest)
-                generated.append(f"scripts/validators/{rel}")
+                _copy_generated_script(val_file, dest, source_origins=source_origins, copied_tool_outputs=copied_tool_outputs)
+                generated.append(f"scripts/validators/{rel.as_posix()}")
+
+    _generate_host_routes(preview_dir, generated, tier, source_origins=source_origins)
 
     capability_emitter = preview_dir / "scripts" / "naos_emit_capabilities.py"
-    if tier in ("standard", "assured") and capability_emitter.is_file():
+    if tier == "lite" or (tier in ("standard", "assured") and capability_emitter.is_file()):
+        if source_origins is not None:
+            catalogue_sources = sorted({
+                *default_agent_files(preview_dir),
+                *default_skill_files(preview_dir),
+                *default_instruction_files(preview_dir),
+            })
+            source_origins.record_recipe(
+                "catalogue", "configs/naos_ai_surface_catalogue.yaml",
+                SourceOrigins.capture_file_inputs(
+                    catalogue_sources, preview_dir, namespace="generated",
+                ),
+                {"profile": tier},
+            )
         catalogue = emit_catalogue(preview_dir)
         write_catalogue(
             preview_dir / "configs" / "naos_ai_surface_catalogue.yaml",
@@ -2242,6 +3521,12 @@ def scaffold_files(
         )
         generated.append("configs/naos_ai_surface_catalogue.yaml")
 
+    _project_generated_capability_references(preview_dir, generated)
+    _project_generated_gate_inputs(preview_dir, generated)
+    if not _defer_traceability_content:
+        _finalize_copied_tool_content(
+            preview_dir, copied_tool_outputs, source_origins=source_origins,
+        )
     return generated
 
 
@@ -2250,10 +3535,13 @@ def _guard_activation_destination(
     rel: Path,
     *,
     reject_multiply_linked_file: bool,
-) -> tuple[Path, tuple[int, int, int, int] | None]:
+) -> tuple[Path, tuple[int, int, int, int] | dict[str, str] | None]:
     """Validate one target path without following project descendants."""
 
     destination = project_root / rel
+    windows = _windows_cli()
+    if windows is not None:
+        return destination, windows.activation_destination_identity(project_root, rel)
     current = project_root
     for part in rel.parts[:-1]:
         current /= part
@@ -2356,6 +3644,63 @@ def _require_greenfield_intent_plan_binding(
         )
 
 
+def _emit_unmanaged_collision_review(
+    *, plan_sha256: str, blocked_rows: list[dict[str, Any]],
+) -> None:
+    """Describe manual decisions; this diagnostic never grants apply authority."""
+    def review_kind(row: dict[str, Any]) -> str:
+        ordinary_collision = (
+            row["action"] == "UNMANAGED_COLLISION_PRESERVE"
+            and row.get("current") == "file"
+        ) or (
+            row["action"] == "REFUSE_UNENROLLED_COLLISION"
+            and (row.get("before") or {}).get("presence") == "present"
+        )
+        return "external_content_comparison" if ordinary_collision else "blocking_control_review"
+
+    review = {
+        "schema": "naos.init.manual_collision_review.v1",
+        "plan_sha256": plan_sha256,
+        "apply_authorized": False,
+        "activation_status": "refused_project_preserved",
+        "blocked_paths": [
+            {
+                "path": row["path"].replace("\\", "/"),
+                "plan_path": row["path"],
+                "plan_action": row["action"],
+                "generated_source": row["source"],
+                "disposition": "unresolved_manual_review",
+                "review_kind": review_kind(row),
+                "manual_merge_authorized": False,
+                "required_action": (
+                    "Preserve the existing destination. Compare content only in "
+                    "an external review workspace; record a decision to keep, "
+                    "draft a merge externally, or defer. Check path type, links "
+                    "and permissions before any separately authorized integration. "
+                    "This diagnostic grants no destination write or ownership."
+                    if review_kind(row) == "external_content_comparison" else
+                    "Preserve the destination and resolve the reported blocking "
+                    "control through its existing refusal/recovery procedure. "
+                    "This row is not a content-merge candidate and grants no "
+                    "destination write or ownership."
+                ),
+            }
+            for row in sorted(blocked_rows, key=lambda item: item["path"])
+        ],
+        "next_action": (
+            "Generate an external review preview with the same profile/options "
+            "and without --activate. Resolve each listed path through the "
+            "adopter's reviewed manual integration process. Direct init remains "
+            "create-only: existing destinations still block init after a manual "
+            "merge. This diagnostic does not clear collisions, authorize an "
+            "init retry, or constitute an upgrade apply plan."
+        ),
+    }
+    print("  BEGIN NAOS MANUAL COLLISION REVIEW")
+    print(json.dumps(review, indent=2, sort_keys=True, ensure_ascii=True))
+    print("  END NAOS MANUAL COLLISION REVIEW")
+
+
 def _activate_managed_content(
     project_root: Path,
     sources: list[tuple[Path, Path]],
@@ -2364,7 +3709,23 @@ def _activate_managed_content(
     dry_run: bool,
     greenfield: bool,
     preapply_revalidator: Callable[[], None] | None = None,
+    fixed_checks: list[dict[str, Any]] | None = None,
+    private_preview_address: PrivatePreviewAddress | None = None,
 ) -> list[str]:
+    windows = _windows_cli()
+    if windows is not None:
+        if private_preview_address is not None:
+            return windows.activate(
+                project_root, sources, request_inputs=request_inputs, dry_run=dry_run,
+                greenfield=greenfield, checks=fixed_checks,
+                preapply_revalidator=preapply_revalidator,
+                private_preview_address=private_preview_address,
+            )
+        return windows.activate(
+            project_root, sources, request_inputs=request_inputs, dry_run=dry_run,
+            greenfield=greenfield, checks=fixed_checks,
+            preapply_revalidator=preapply_revalidator,
+        )
     intent = (
         _greenfield_root_intent(
             project_root,
@@ -2520,6 +3881,16 @@ def _activate_managed_content(
             _require_greenfield_intent_plan_binding(intent, plan)
         print(f"  Managed-content plan SHA-256: {plan['plan_sha256']}")
         if plan.get("status") != "ready_create_only":
+            if not greenfield and scope.status in {
+                "owner_enrollment_required", "enrollment_required",
+            }:
+                _emit_unmanaged_collision_review(
+                    plan_sha256=plan["plan_sha256"],
+                    blocked_rows=[
+                        item for item in plan["paths"]
+                        if not item["action"].startswith("CREATE_")
+                    ],
+                )
             collisions = [
                 str(item["path"])
                 for item in plan["paths"]
@@ -2567,6 +3938,10 @@ def _activate_managed_content(
                 project_root,
                 authorization_digest=str(plan["plan_sha256"]),
                 source_policy_sha256=str(plan["source_policy_sha256"]),
+                creator_identity=(
+                    managed_content_creator_identity(KIT_DIR)
+                    if scope.status == "owner_enrollment_required" else None
+                ),
             )
         if scope.status != "valid":
             raise ActivationPreflightRefusal(
@@ -2654,19 +4029,25 @@ def activate(
     managed_inputs: dict[str, Any] | None = None,
     greenfield: bool = False,
     preapply_revalidator: Callable[[], None] | None = None,
+    fixed_checks: list[dict[str, Any]] | None = None,
+    private_preview_address: PrivatePreviewAddress | None = None,
 ) -> list[str]:
     """Activate generated files only through the managed create-only path."""
+    if private_preview_address is not None:
+        private_preview_address.require_root(preview_dir, io=True)
     if generated_files is None:
         rels = [src.relative_to(preview_dir) for src in preview_dir.rglob("*") if src.is_file() and not src.is_symlink()]
     else:
         rels = [_safe_generated_relpath(item) for item in generated_files]
-    if greenfield:
+    if _windows_cli() is not None:
+        project_root = Path(os.path.abspath(os.fspath(project_path.expanduser())))
+    elif greenfield:
         lexical_root = Path(os.path.abspath(os.fspath(project_path)))
         project_root = lexical_root.parent.resolve(strict=True) / lexical_root.name
     else:
         project_root = project_path.resolve(strict=False)
     activation_plan: list[
-        tuple[Path, Path, Path, tuple[int, int, int, int] | None]
+        tuple[Path, Path, Path, tuple[int, int, int, int] | dict[str, str] | None]
     ] = []
     for rel in sorted(set(rels), key=lambda item: str(item)):
         if _is_generated_cache_artifact(rel):
@@ -2702,6 +4083,9 @@ def activate(
         dry_run=dry_run,
         greenfield=greenfield,
         preapply_revalidator=preapply_revalidator,
+        fixed_checks=fixed_checks,
+        **({"private_preview_address": private_preview_address}
+           if private_preview_address is not None else {}),
     )
 
 
@@ -2717,6 +4101,7 @@ def _generated_python_collection_root(relative: str) -> str:
 def _ruff_root_scan_consumers(
     project_path: Path,
     excluded_paths: set[str],
+    observer: OverlayInputObserver | None = None,
 ) -> list[dict[str, Any]]:
     """Find observable recursive Ruff commands in bounded host automation files."""
 
@@ -2728,27 +4113,51 @@ def _ruff_root_scan_consumers(
         project_path / "noxfile.py",
     ]
     workflow_root = project_path / ".github" / "workflows"
-    if workflow_root.is_dir():
-        candidates.extend(sorted(workflow_root.glob("*.yml")))
-        candidates.extend(sorted(workflow_root.glob("*.yaml")))
+    workflow_state = (observer.directory_state(workflow_root)
+                      if observer is not None else None)
+    if workflow_state == "directory" or (observer is None and workflow_root.is_dir()):
+        if observer is None:
+            candidates.extend(sorted(workflow_root.glob("*.yml")))
+            candidates.extend(sorted(workflow_root.glob("*.yaml")))
+        else:
+            candidates.extend(observer.matching_paths("workflow_yml", workflow_root,
+                                                      suffix=".yml"))
+            candidates.extend(observer.matching_paths("workflow_yaml", workflow_root,
+                                                      suffix=".yaml"))
+    elif observer is not None:
+        observer.decision("workflow_namespace", {"state": workflow_state})
 
     consumers: list[dict[str, Any]] = []
     seen: set[tuple[int, int]] = set()
-    for path in candidates:
-        if not path.is_file() or path.is_symlink():
-            continue
-        path_stat = path.stat()
-        identity = (path_stat.st_dev, path_stat.st_ino)
-        if identity in seen:
-            continue
-        seen.add(identity)
-        relative = path.relative_to(project_path).as_posix()
-        if relative in excluded_paths or path_stat.st_size > 2_000_000:
-            continue
-        try:
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        except OSError:
-            continue
+    for candidate_index, path in enumerate(candidates):
+        if observer is not None:
+            relative = path.relative_to(project_path).as_posix()
+            data = observer.file(path, purpose=f"ruff_scan/{candidate_index}",
+                                 excluded=relative in excluded_paths)
+            if data is None:
+                continue
+            path_stat = path.stat()
+            identity = (path_stat.st_dev, path_stat.st_ino)
+            if identity in seen:
+                observer.decision("ruff_dedup/" + relative, {"state": "duplicate"})
+                continue
+            seen.add(identity)
+            lines = data.decode("utf-8", errors="replace").splitlines()
+        else:
+            if not path.is_file() or path.is_symlink():
+                continue
+            path_stat = path.stat()
+            identity = (path_stat.st_dev, path_stat.st_ino)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            relative = path.relative_to(project_path).as_posix()
+            if relative in excluded_paths or path_stat.st_size > 2_000_000:
+                continue
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                continue
         for line_number, line in enumerate(lines, start=1):
             command = line.strip()
             ruff_match = re.search(r"(?<![\w.-])ruff\b(?P<tail>.*)", command)
@@ -2772,6 +4181,8 @@ def _ruff_root_scan_consumers(
                     "bypasses_nested_config": bypasses_nested_config,
                 }
             )
+            if observer is not None and len(consumers) > MAX_INPUTS:
+                raise SourceModeError("Overlay Ruff consumer count exceeds bound")
     return consumers
 
 
@@ -2783,6 +4194,7 @@ def build_overlay_compatibility_report(
     excluded_paths: set[str] | None = None,
     layout_adapter: dict[str, Any] | None = None,
     host_lint_boundary: dict[str, Any] | None = None,
+    observer: OverlayInputObserver | None = None,
 ) -> dict[str, Any]:
     """Detect deterministic host collection overlap before activation.
 
@@ -2792,6 +4204,9 @@ def build_overlay_compatibility_report(
 
     project_path = project_path.resolve(strict=False)
     excluded = excluded_paths or set()
+    if observer is not None and (len(generated_files) > MAX_INPUTS
+                                 or len(excluded) > MAX_INPUTS):
+        raise SourceModeError("Overlay selected path count exceeds bound")
     generated_python = sorted(
         str(_safe_generated_relpath(item))
         for item in generated_files
@@ -2799,16 +4214,30 @@ def build_overlay_compatibility_report(
     )
     prospective_setup_python: list[str] = []
     setup_catalog = preview_dir / "naos/setup_module_catalog.yaml"
-    if setup_catalog.is_file() and not setup_catalog.is_symlink():
-        catalog = yaml.safe_load(setup_catalog.read_text(encoding="utf-8")) or {}
+    setup_bytes = (observer.file(setup_catalog, root="preview", purpose="setup_catalog")
+                   if observer is not None else None)
+    if (setup_bytes is not None if observer is not None
+            else setup_catalog.is_file() and not setup_catalog.is_symlink()):
+        catalog = yaml.safe_load(setup_bytes.decode("utf-8") if observer is not None
+                                 else setup_catalog.read_text(encoding="utf-8")) or {}
+        if observer is not None and (type(catalog) is not dict
+                                     or type(catalog.get("modules")) not in {list, type(None)}
+                                     or len(catalog.get("modules") or []) > MAX_INPUTS):
+            raise SourceModeError("Overlay setup catalogue exceeds observation bound")
         for module in catalog.get("modules") or []:
             if not isinstance(module, dict):
                 continue
+            if observer is not None and (type(module.get("install_actions"))
+                                         not in {list, type(None)}
+                                         or len(module.get("install_actions") or []) > MAX_INPUTS):
+                raise SourceModeError("Overlay setup actions exceed observation bound")
             for action in module.get("install_actions") or []:
                 if not isinstance(action, dict):
                     continue
                 destination = str(action.get("destination") or "")
                 if destination.endswith(".py"):
+                    if observer is not None and len(prospective_setup_python) >= MAX_INPUTS:
+                        raise SourceModeError("Overlay setup Python paths exceed bound")
                     prospective_setup_python.append(
                         str(_safe_generated_relpath(destination))
                     )
@@ -2822,7 +4251,7 @@ def build_overlay_compatibility_report(
     )
     findings: list[dict[str, Any]] = []
 
-    ruff_consumers = _ruff_root_scan_consumers(project_path, excluded)
+    ruff_consumers = _ruff_root_scan_consumers(project_path, excluded, observer)
     ruff_boundary_roots = {
         root
         for consumer in ruff_consumers
@@ -2852,9 +4281,15 @@ def build_overlay_compatibility_report(
     config_text = ""
     for name in ("pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini", ".coveragerc"):
         if name in excluded:
+            if observer is not None:
+                observer.decision("config/" + name, {"state": "excluded"})
             continue
         path = project_path / name
-        if path.is_file() and path.stat().st_size <= 2_000_000:
+        if observer is not None:
+            data = observer.file(path, purpose="config")
+            if data is not None:
+                config_text += f"\n# {name}\n{data.decode('utf-8', errors='replace')}"
+        elif path.is_file() and path.stat().st_size <= 2_000_000:
             config_text += f"\n# {name}\n{path.read_text(encoding='utf-8', errors='replace')}"
 
     testpaths: set[str] = set()
@@ -2878,20 +4313,36 @@ def build_overlay_compatibility_report(
             )
 
     tests_dir = project_path / "tests"
+    test_state = observer.directory_state(tests_dir) if observer is not None else None
     test_files = (
         sorted(
             path
             for path in tests_dir.rglob("*.py")
             if path.relative_to(project_path).as_posix() not in excluded
         )
-        if tests_dir.is_dir()
+        if tests_dir.is_dir() and observer is None
         else []
     )
-    for test_file in test_files:
+    if observer is not None:
+        test_files = (observer.matching_paths("test_python_namespace", tests_dir,
+                                              suffix=".py", recursive=True)
+                      if test_state == "directory" else [])
+        if test_state != "directory":
+            observer.decision("test_python_namespace",
+                              {"state": test_state})
+    for test_index, test_file in enumerate(test_files):
         try:
-            if test_file.stat().st_size > 2_000_000:
-                continue
-            text = test_file.read_text(encoding="utf-8", errors="replace")
+            if observer is not None:
+                relative = test_file.relative_to(project_path).as_posix()
+                data = observer.file(test_file, purpose=f"test_scan/{test_index}",
+                                     excluded=relative in excluded)
+                if data is None:
+                    continue
+                text = data.decode("utf-8", errors="replace")
+            else:
+                if test_file.stat().st_size > 2_000_000:
+                    continue
+                text = test_file.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
         recursively_scans_python = bool(
@@ -2919,6 +4370,7 @@ def build_overlay_compatibility_report(
             project_path,
             project_path / root,
             excluded,
+            observer,
         ):
             prospective_setup_overlap = root == "scripts" and any(
                 Path(item).parts and Path(item).parts[0] == root
@@ -3026,8 +4478,9 @@ def _apply_brownfield_script_layout_adapter(
     namespace must be absent in the preview. In the adopter it may either be
     absent or contain only paths from the validated managed-content manifest;
     this permits later profile transitions to reproduce the same adapter
-    without inferring ownership. Every exact generated path reference is
-    rewritten before the managed-content plan is built.
+    without inferring ownership. Adopter command references are rewritten
+    before the managed-content plan is built; canonical kit provenance keeps
+    its own source namespace.
     """
 
     blocking = [
@@ -3090,8 +4543,23 @@ def _apply_brownfield_script_layout_adapter(
         key=lambda item: len(item[0]),
         reverse=True,
     )
+    # These declarations resolve canonical plugin provenance against kit_root(),
+    # independently of the adopter's generated tool destinations.
+    kit_relative_adapter_declarations = {
+        "naos/adapter_coherence_rules.yaml",
+        "naos/adapter_propagation_state.yaml",
+    }
+    # These renderer-owned blocks describe canonical kit controls. Operational
+    # references outside the blocks still follow the adopter's tool layout.
+    kit_generated_sections = {
+        ".github/naos-guidance/security-reference.md": "secure-coding-controls",
+        ".github/instructions/ai-pipeline.instructions.md": "agentic-coding-controls",
+        ".github/naos-guidance/cursor-security.md": "secure-coding-controls",
+    }
     reference_rewrite_count = 0
     for relative in rewritten:
+        if relative in kit_relative_adapter_declarations:
+            continue
         path = preview_dir / _safe_generated_relpath(relative)
         if not path.is_file() or path.is_symlink():
             continue
@@ -3102,6 +4570,22 @@ def _apply_brownfield_script_layout_adapter(
         updated = original
         for old, new in ordered_mappings:
             updated = updated.replace(old, new)
+        section_id = kit_generated_sections.get(relative)
+        if section_id is not None:
+            begin = f"<!-- BEGIN NAOS GENERATED: {section_id} -->"
+            end = f"<!-- END NAOS GENERATED: {section_id} -->"
+            if original.count(begin) == original.count(end) == 1:
+                start = original.index(begin)
+                finish = original.index(end)
+                if finish > start and updated.count(begin) == updated.count(end) == 1:
+                    updated_start = updated.index(begin)
+                    updated_finish = updated.index(end)
+                    if updated_finish > updated_start:
+                        updated = (
+                            updated[:updated_start]
+                            + original[start:finish + len(end)]
+                            + updated[updated_finish + len(end):]
+                        )
         if relative in {
             "Makefile.naos",
             ".githooks/pre-commit",
@@ -3110,7 +4594,7 @@ def _apply_brownfield_script_layout_adapter(
         }:
             updated = updated.replace("scripts/", f"{BROWNFIELD_TOOL_ROOT}/")
         if updated != original:
-            path.write_text(updated, encoding="utf-8")
+            path.write_text(updated, encoding="utf-8", newline="\n")
             reference_rewrite_count += 1
 
     if not mappings and reference_rewrite_count == 0:
@@ -3131,6 +4615,7 @@ def _apply_brownfield_ruff_boundaries(
     preview_dir: Path,
     generated_files: list[str],
     report: dict[str, Any],
+    source_origins: SourceOrigins | None = None,
 ) -> tuple[list[str], dict[str, Any] | None]:
     """Fence generated Python from a detected conventional Ruff root scan."""
 
@@ -3168,7 +4653,17 @@ def _apply_brownfield_ruff_boundaries(
             raise ActivationPreflightRefusal(
                 f"generated Ruff boundary conflicts with preview content: {config_rel}"
             )
-        config_path.write_text(BROWNFIELD_RUFF_BOUNDARY, encoding="utf-8")
+        if source_origins is not None:
+            source_origins.record_recipe(
+                "ruff_boundary", config_rel,
+                [
+                    ("decision/generated_roots", bounded_canonical_input(generated_roots)),
+                    ("decision/lint_findings", bounded_canonical_input(lint_findings)),
+                    ("source/boundary_literal", BROWNFIELD_RUFF_BOUNDARY.encode("utf-8")),
+                ],
+                {"root": root},
+            )
+        config_path.write_text(BROWNFIELD_RUFF_BOUNDARY, encoding="utf-8", newline="\n")
         if config_rel not in rewritten:
             rewritten.append(config_rel)
         config_paths.append(config_rel)
@@ -3410,6 +4905,368 @@ def print_memory_onboarding(
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 
+_LF_TEXT_SUFFIXES = frozenset({
+    ".csv", ".json", ".md", ".mdc", ".mmd", ".naos", ".py",
+    ".sh", ".toml", ".txt", ".yaml", ".yml",
+})
+_LF_TEXT_NAMES = frozenset({
+    ".githooks/pre-commit", ".gitignore", "Makefile.naos.secure-coding-reporting",
+    "naos/workflows/examples/naos-pr-governance.yml.example",
+})
+
+
+def _git_attributes_exact_pattern(relative: str) -> str:
+    """Quote one root-relative literal path for Git attributes wildmatch."""
+    if any(ord(character) < 32 or ord(character) == 127 for character in relative):
+        raise ValueError(f"Generated Git attributes path has a control character: {relative!r}")
+    literal = "/" + "".join(
+        "\\" + character if character in "*?[]\\" else character
+        for character in relative
+    )
+    return json.dumps(literal, ensure_ascii=False)
+
+
+def _generated_lf_text_paths(
+    preview_dir: Path,
+    generated: list[str],
+    recipe_inputs: list[tuple[str, bytes]] | None = None,
+) -> tuple[list[str], list[dict[str, str]]]:
+    covered: list[str] = []
+    omitted: list[dict[str, str]] = []
+    if recipe_inputs is not None and len(generated) > MAX_INPUTS:
+        raise SourceModeError("LF recipe input count exceeds bound")
+    remaining = MAX_TOTAL_INPUT_BYTES
+    for relative in sorted(set(generated)):
+        rel = _safe_generated_relpath(relative)
+        source = preview_dir / rel
+        if source.is_symlink() or not source.is_file():
+            raise ValueError(f"Generated LF source is not a regular file: {relative}")
+        if recipe_inputs is None:
+            data = source.read_bytes()
+        else:
+            data = SourceOrigins._bounded_bytes(
+                source, remaining=min(MAX_INPUT_BYTES, remaining),
+            )
+            remaining -= len(data)
+            recipe_inputs.append((f"generated/{relative}", data))
+        if b"\x00" in data:
+            continue
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if b"\r" in data:
+            omitted.append({"path": relative, "reason": "source_contains_cr"})
+        elif rel.suffix.lower() in _LF_TEXT_SUFFIXES or relative in _LF_TEXT_NAMES:
+            covered.append(rel.as_posix())
+        else:
+            omitted.append({"path": relative, "reason": "text_type_not_allowlisted"})
+    return covered, omitted
+
+
+def _add_generated_gitignore(
+    project_path: Path,
+    preview_dir: Path,
+    generated: list[str],
+    *,
+    greenfield: bool,
+    current_managed_paths: set[str],
+    source_origins: SourceOrigins | None = None,
+) -> None:
+    """Preview a source-bound seed; never replace an unmanaged adopter ignore."""
+    if not greenfield and ".gitignore" not in current_managed_paths:
+        try:
+            os.lstat(project_path / ".gitignore")
+        except FileNotFoundError:
+            pass
+        else:
+            return
+    destination = preview_dir / ".gitignore"
+    if destination.exists() or destination.is_symlink():
+        raise ValueError("Generated Git ignore conflicts with preview content")
+    source = TEMPLATES_DIR / "git" / "gitignore"
+    copy_source = source_origins.copy2 if source_origins is not None else shutil.copy2
+    copy_source(source, destination)
+    generated.append(".gitignore")
+
+
+def _add_generated_lf_policy(
+    project_path: Path,
+    preview_dir: Path,
+    generated: list[str],
+    *,
+    greenfield: bool,
+    current_managed_paths: set[str],
+    source_origins: SourceOrigins | None = None,
+) -> dict[str, Any]:
+    """Create only a source-bound policy; never edit adopter attributes."""
+    recipe_inputs: list[tuple[str, bytes]] | None = [] if source_origins is not None else None
+    # Recipe identifiers are portable POSIX paths, even when the scaffold
+    # inventory was assembled from native Windows Path values.
+    canonical_generated = [_safe_generated_relpath(item).as_posix() for item in generated]
+    covered, omitted = _generated_lf_text_paths(preview_dir, canonical_generated, recipe_inputs)
+    destination = project_path / ".gitattributes"
+    attributes_state = "not_checked" if greenfield else "absent"
+    if greenfield:
+        # Exact --new retries must regenerate the first operation's inventory.
+        # The parent-bound greenfield intent/managed receipt authenticate it.
+        include = True
+    else:
+        try:
+            os.lstat(destination)
+        except FileNotFoundError:
+            include = True
+        else:
+            attributes_state = "present"
+            include = ".gitattributes" in current_managed_paths
+    if not include:
+        return {
+            "status": "preserved_unmanaged",
+            "text_paths": covered,
+            "omitted_text_paths": omitted,
+        }
+    lines = [
+        "# NAOS-generated policy for the exact generated text inventory.",
+        "# Review with the adopter's other Git attributes before committing.",
+    ]
+    # Completion history may predate canonical digests. Preserve future direct
+    # Markdown archives, including raw CRLF history, without overriding LF rules
+    # for the exact generated scaffold inventory (such as completed/_TEMPLATE).
+    completed_directories = sorted({
+        _safe_generated_relpath(relative).parent.as_posix()
+        for relative in canonical_generated
+        if _safe_generated_relpath(relative).name == "_TEMPLATE.md"
+        and _safe_generated_relpath(relative).parent.name == "completed"
+        and (_safe_generated_relpath(relative).parent.parent / "TASK_REGISTRY.yaml").as_posix()
+        in canonical_generated
+    })
+    lines.append("# Direct completed-card archives retain their recorded bytes.")
+    lines.extend(
+        json.dumps(json.loads(_git_attributes_exact_pattern(directory)) + "/*.md", ensure_ascii=False)
+        + " -text -filter -ident -working-tree-encoding"
+        for directory in completed_directories
+    )
+    lines.extend(
+        f"{_git_attributes_exact_pattern(relative)} text eol=lf"
+        for relative in sorted({*covered, ".gitattributes"})
+    )
+    lines.extend([
+        "# Portable provenance records and bases retain their exact recorded bytes.",
+        '"/.naos/managed-content/v3/**" -text -filter -ident -working-tree-encoding',
+    ])
+    policy_path = preview_dir / ".gitattributes"
+    if policy_path.exists() or policy_path.is_symlink():
+        raise ValueError("Generated LF policy conflicts with preview content")
+    if source_origins is not None:
+        assert recipe_inputs is not None
+        source_origins.record_recipe(
+            "lf_policy", ".gitattributes",
+            sorted([*recipe_inputs,
+                    ("decision/allowlist", bounded_canonical_input({
+                        "suffixes": sorted(_LF_TEXT_SUFFIXES),
+                        "names": sorted(_LF_TEXT_NAMES),
+                    })),
+                    ("decision/generated_paths", bounded_canonical_input(sorted(set(canonical_generated)))),
+                    ("decision/text_paths", bounded_canonical_input(covered)),
+                    ("decision/omitted", bounded_canonical_input(omitted)),
+                    ("decision/completed_archive_directories", bounded_canonical_input(completed_directories))]),
+            {"greenfield": greenfield, "attributes_state": attributes_state,
+             "attributes_managed": ".gitattributes" in current_managed_paths},
+        )
+    policy_path.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
+    generated.append(".gitattributes")
+    return {
+        "status": "generated",
+        "text_paths": covered,
+        "omitted_text_paths": omitted,
+    }
+
+
+def inspect_effective_lf_attributes(
+    project_path: Path,
+    text_paths: list[str],
+    *,
+    cached: bool = False,
+    portable_only: bool = False,
+) -> dict[str, Any]:
+    """Inspect LF rules; portable mode excludes machine-local attribute policy.
+
+    Portable inspection requires the index and conservatively refuses any
+    info/attributes entry. Only child flags/environment change, never policy.
+    """
+    if portable_only and not cached:
+        return {"status": "unverified_portable_git_attributes", "gaps": [], "tracked": None}
+    environment = {
+        key: value for key, value in os.environ.items()
+        if key.upper() not in {
+            "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+            "GIT_PAGER", "GIT_FLUSH",
+        }
+        and not key.upper().startswith(("GIT_TRACE", "GIT_REDIRECT_"))
+    }
+    command_prefix = ["git"]
+    if portable_only:
+        # --cached alone still consults global/system/info attributes. Empty
+        # core.attributesFile suppresses the global default; NOSYSTEM excludes
+        # system attributes. Neither changes adopter configuration.
+        command_prefix.extend(["-c", "core.attributesFile="])
+        environment["GIT_ATTR_NOSYSTEM"] = "1"
+    try:
+        top = subprocess.run(
+            [*command_prefix, "rev-parse", "--show-toplevel"], cwd=project_path,
+            env=environment, capture_output=True, check=False, timeout=5,
+        )
+        if top.returncode or Path(os.fsdecode(top.stdout.rstrip(b"\r\n"))).resolve() != project_path.resolve():
+            return {"status": "unverified_git_root", "gaps": [], "tracked": None}
+        paths = sorted(set(text_paths))
+        if not paths:
+            return {"status": "verified", "gaps": [], "tracked": None}
+        info_attributes = None
+        if portable_only:
+            # Ask Git for its actual path: linked worktrees can use the common
+            # directory's info/attributes, rather than <worktree>/.git/info.
+            local = subprocess.run(
+                [*command_prefix, "rev-parse", "--git-path", "info/attributes"],
+                cwd=project_path, env=environment, capture_output=True,
+                check=False, timeout=5,
+            )
+            raw_path = local.stdout.rstrip(b"\r\n")
+            if local.returncode or not raw_path or b"\n" in raw_path or b"\r" in raw_path or b"\x00" in raw_path:
+                return {"status": "unverified_local_git_attributes", "gaps": [], "tracked": None}
+            info_attributes = Path(os.fsdecode(raw_path))
+            if not info_attributes.is_absolute():
+                info_attributes = project_path / info_attributes
+            try:
+                # Conservative refusal includes empty files, directories and
+                # dangling links; a linked info parent also remains unknown.
+                if stat.S_ISLNK(info_attributes.parent.lstat().st_mode):
+                    return {"status": "unverified_local_git_attributes", "gaps": [], "tracked": None}
+                info_attributes.lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                return {"status": "unverified_local_git_attributes", "gaps": [], "tracked": None}
+        result = subprocess.run(
+            [*command_prefix, "check-attr", *(["--cached"] if cached else []),
+             "-z", "--stdin", "text", "eol"],
+            cwd=project_path, env=environment, capture_output=True,
+            input=b"\x00".join(os.fsencode(path) for path in paths) + b"\x00",
+            check=False, timeout=10,
+        )
+        if result.returncode:
+            return {"status": "unverified_git_attributes", "gaps": [], "tracked": None}
+        fields = result.stdout.split(b"\x00")
+        if not fields or fields[-1] != b"" or (len(fields) - 1) != 6 * len(paths):
+            return {"status": "unverified_git_attributes", "gaps": [], "tracked": None}
+        observed: dict[str, dict[str, str]] = {}
+        for index in range(0, len(fields) - 1, 3):
+            relative = os.fsdecode(fields[index])
+            attribute = os.fsdecode(fields[index + 1])
+            value = os.fsdecode(fields[index + 2])
+            if (
+                relative not in paths
+                or attribute not in {"text", "eol"}
+                or attribute in observed.get(relative, {})
+            ):
+                return {"status": "unverified_git_attributes", "gaps": [], "tracked": None}
+            observed.setdefault(relative, {})[attribute] = value
+        gaps = [
+            relative for relative in paths
+            if observed.get(relative) != {"text": "set", "eol": "lf"}
+        ]
+        if info_attributes is not None:
+            try:
+                info_attributes.lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                # A new local override cannot be accepted during inspection.
+                return {"status": "unverified_local_git_attributes", "gaps": [], "tracked": None}
+        tracked = subprocess.run(
+            [*command_prefix, "ls-files", "--error-unmatch", "--", ".gitattributes"],
+            cwd=project_path, env=environment, capture_output=True,
+            check=False, timeout=5,
+        ).returncode == 0
+        return {"status": "verified", "gaps": gaps, "tracked": tracked}
+    except (OSError, subprocess.SubprocessError, UnicodeError, ValueError):
+        return {"status": "unverified_git_attributes", "gaps": [], "tracked": None}
+
+
+def _require_unmanaged_lf_policy(project_path: Path, policy: dict[str, Any]) -> None:
+    """Refuse unsafe brownfield publication without editing adopter policy.
+
+    Preview bytes and managed provenance remain unchanged. A human must review
+    and stage/commit a compatible adopter policy before managed activation.
+    """
+    if policy.get("status") != "preserved_unmanaged":
+        return
+    paths = list(policy.get("text_paths") or [])
+    effective = inspect_effective_lf_attributes(project_path, paths)
+    staged = inspect_effective_lf_attributes(project_path, paths, cached=True)
+    portable = inspect_effective_lf_attributes(project_path, paths, cached=True, portable_only=True)
+    if any(
+        item.get("status") != "verified"
+        or item.get("gaps")
+        or item.get("tracked") is not True
+        for item in (effective, staged, portable)
+    ):
+        details = "working tree: " + "; ".join(lf_policy_diagnostic_lines(policy, effective))
+        details += "; index: " + "; ".join(lf_policy_diagnostic_lines(policy, staged))
+        details += "; portable index (" + str(portable.get("status")) + "): "
+        details += "; ".join(lf_policy_diagnostic_lines(policy, portable))
+        raise ActivationPreflightRefusal(
+            "LF_POLICY_UNMANAGED_REFUSED: adopter .gitattributes must be "
+            "tracked and Git must select text/eol=lf in the working tree "
+            "and portable index for every generated text "
+            "path before managed activation or profile transition. Review "
+            "the external preview and the effective Git attributes; amend "
+            "and stage the adopter policy explicitly, then rerun. Existing "
+            "repository-local info/attributes requires explicit review; "
+            "its presence cannot certify portable policy. " + details
+        )
+
+
+def lf_policy_diagnostic_lines(
+    policy: dict[str, Any],
+    effective: dict[str, Any] | None = None,
+) -> list[str]:
+    """Keep LF limitations visible without changing any plan/evidence schema."""
+    lines: list[str] = []
+    if policy.get("status") == "preserved_unmanaged":
+        lines.append(
+            "LF_POLICY_UNMANAGED_ATTRIBUTES: existing adopter .gitattributes "
+            "was preserved; NAOS LF policy was not installed."
+        )
+    omitted = policy.get("omitted_text_paths") or []
+    if omitted:
+        lines.append(
+            "LF_POLICY_SOURCE_GAPS: generated text paths were not pinned: "
+            + ", ".join(str(item.get("path")) for item in omitted[:10])
+            + (f" (and {len(omitted) - 10} more)" if len(omitted) > 10 else "")
+        )
+    if effective is None:
+        return lines
+    if effective.get("status") != "verified":
+        lines.append(
+            "LF_POLICY_GIT_UNVERIFIED: effective attributes could not be "
+            "verified at the adopter Git root."
+        )
+        return lines
+    gaps = effective.get("gaps") or []
+    if gaps:
+        lines.append(
+            "LF_POLICY_EFFECTIVE_GAPS: Git does not select text/eol=lf for: "
+            + ", ".join(str(path) for path in gaps[:10])
+            + (f" (and {len(gaps) - 10} more)" if len(gaps) > 10 else "")
+        )
+    if effective.get("tracked") is False:
+        lines.append(
+            "LF_POLICY_UNTRACKED: the root .gitattributes is not tracked; "
+            "a future clone is not protected until it is committed."
+        )
+    return lines
+
+
 def _generate_scaffold_preview(
     *,
     project_path: Path,
@@ -3424,10 +5281,24 @@ def _generate_scaffold_preview(
     apply_brownfield_layout_adapter: bool,
     ephemeral_preview: bool,
     emit_progress: bool,
+    collect_source_modes: bool = False,
+    private_preview_address: PrivatePreviewAddress | None = None,
 ) -> dict[str, Any]:
     """Generate one deterministic preview using the canonical init pipeline."""
 
-    prepare_preview_dir(preview_dir, project_path)
+    if private_preview_address is not None and not ephemeral_preview:
+        raise ValueError("Private preview addressing requires an owned ephemeral preview")
+    prepare_preview_dir(preview_dir, project_path, **(
+        {"private_preview_address": private_preview_address}
+        if private_preview_address is not None else {}
+    ))
+    if private_preview_address is not None:
+        preview_dir = Path(private_preview_address.io_root)
+    source_origins = (
+        SourceOrigins.from_kit(KIT_DIR, output_root=preview_dir)
+        if collect_source_modes else None
+    )
+    copied_tool_outputs: set[Path] = set()
     generated = scaffold_files(
         project_path=project_path,
         tier=tier,
@@ -3437,7 +5308,13 @@ def _generate_scaffold_preview(
         signals=signals,
         memory_choice=memory_choice,
         emit_progress=emit_progress,
+        source_origins=source_origins,
+        copied_tool_outputs=copied_tool_outputs,
+        _defer_traceability_content=True,
     )
+    # Native Path strings use backslashes on Windows. Overlay and adapter
+    # comparisons consume portable root-relative identifiers.
+    generated = [_safe_generated_relpath(item).as_posix() for item in generated]
     overlay_compatibility: dict[str, Any] | None = None
     layout_adapter: dict[str, Any] | None = None
     host_lint_boundary: dict[str, Any] | None = None
@@ -3456,6 +5333,13 @@ def _generate_scaffold_preview(
                 overlay_compatibility,
                 current_managed_paths=current_managed_paths,
             )
+            if layout_adapter is not None:
+                copied_tool_outputs = {
+                    preview_dir / BROWNFIELD_TOOL_ROOT / path.relative_to(preview_dir / "scripts")
+                    for path in copied_tool_outputs
+                }
+                if source_origins is not None:
+                    source_origins.rename_prefix("scripts", BROWNFIELD_TOOL_ROOT)
             overlay_compatibility = build_overlay_compatibility_report(
                 project_path,
                 preview_dir,
@@ -3467,7 +5351,10 @@ def _generate_scaffold_preview(
             preview_dir,
             generated,
             overlay_compatibility,
+            source_origins=source_origins,
         )
+        overlay_observer = (OverlayInputObserver(project_path.resolve(strict=False), preview_dir)
+                            if source_origins is not None else None)
         overlay_compatibility = build_overlay_compatibility_report(
             project_path,
             preview_dir,
@@ -3475,7 +5362,23 @@ def _generate_scaffold_preview(
             excluded_paths=current_managed_paths,
             layout_adapter=layout_adapter,
             host_lint_boundary=host_lint_boundary,
+            observer=overlay_observer,
         )
+        if overlay_observer is not None:
+            overlay_observer.decision("stage/generated_paths", sorted(generated))
+            overlay_observer.decision("stage/excluded_paths", sorted(current_managed_paths))
+            overlay_observer.decision("stage/layout_adapter", layout_adapter)
+            overlay_observer.decision("stage/lint_boundary", host_lint_boundary)
+            overlay_observer.decision("stage/ephemeral_preview", ephemeral_preview)
+            overlay_observer.decision("stage/render_context", {
+                "project_root": str(project_path.resolve(strict=False)),
+                "preview_root": ("external_ephemeral_preview" if ephemeral_preview
+                                 else str(preview_dir.resolve(strict=False))),
+            })
+            source_origins.record_recipe(
+                "overlay_report", "naos/overlay_compatibility.json",
+                sorted(overlay_observer.inputs), {"ephemeral_preview": ephemeral_preview},
+            )
         if ephemeral_preview:
             overlay_compatibility["preview_root"] = "external_ephemeral_preview"
         overlay_report_path = preview_dir / "naos" / "overlay_compatibility.json"
@@ -3483,10 +5386,29 @@ def _generate_scaffold_preview(
         overlay_report_path.write_text(
             json.dumps(overlay_compatibility, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
+            newline="\n",
         )
         overlay_report_rel = "naos/overlay_compatibility.json"
         if overlay_report_rel not in generated:
             generated.append(overlay_report_rel)
+
+    _finalize_copied_tool_content(
+        preview_dir, copied_tool_outputs, source_origins=source_origins,
+    )
+    _add_generated_gitignore(
+        project_path, preview_dir, generated,
+        greenfield=not existing_destination,
+        current_managed_paths=current_managed_paths,
+        source_origins=source_origins,
+    )
+    lf_policy = _add_generated_lf_policy(
+        project_path,
+        preview_dir,
+        generated,
+        greenfield=not existing_destination,
+        current_managed_paths=current_managed_paths,
+        source_origins=source_origins,
+    )
 
     generated_files = tuple(
         sorted(
@@ -3534,7 +5456,7 @@ def _generate_scaffold_preview(
             "generated profile contract is incomplete: "
             + ", ".join(missing_surfaces)
         )
-    return {
+    result = {
         "generated_files": generated_files,
         "sources": tuple(
             (Path(relative_text), preview_dir / relative_text)
@@ -3543,23 +5465,62 @@ def _generate_scaffold_preview(
         "overlay_compatibility": overlay_compatibility,
         "layout_adapter": layout_adapter,
         "host_lint_boundary": host_lint_boundary,
+        "lf_policy": lf_policy,
         "profile_contract_sha256": canonical_sha256(profile_contract),
     }
+    if source_origins is not None:
+        result["source_mode_inventory"] = source_origins.inventory(
+            [(relative, preview_dir / relative) for relative in generated_files]
+        )
+    return result
 
 
 def regenerate_managed_init_preview(
     project_root: Path,
     preview_root: Path,
     *,
-    manifest_snapshot: dict[str, Any],
+    manifest_snapshot: dict[str, Any] | ValidatedWindowsProvenance,
     requested_profile: str,
+    collect_source_modes: bool = False,
+    _profile_capture=None,
 ) -> dict[str, Any]:
     """Regenerate exact managed init sources without writing the adopter project."""
 
-    root = project_root.resolve(strict=True)
+    root = (_canonical_init_target(project_root, must_exist=True)
+            if _windows_cli() is not None else project_root.resolve(strict=True))
     if requested_profile not in PROFILES:
         raise ValueError(f"unsupported requested profile: {requested_profile}")
-    if (
+    try:
+        from .upgrade_contract.portable_provenance import ValidatedPortableSnapshot
+    except ImportError:
+        from upgrade_contract.portable_provenance import ValidatedPortableSnapshot
+    if _profile_capture is not None and type(manifest_snapshot) is not ValidatedPortableSnapshot:
+        raise ValueError('Owned profile capture requires portable v3 history')
+    if type(manifest_snapshot) is ValidatedPortableSnapshot:
+        previous_inputs = manifest_snapshot.inputs
+        # Shared setup/init reader validates actual current bytes and native
+        # metadata; replay ownership alone never excludes adopter changes.
+        try:
+            from .upgrade_contract.v3_public_profile import (
+                current_managed_paths as inspect_current_managed_paths, _ProfilePreviewCapture)
+        except ImportError:
+            from upgrade_contract.v3_public_profile import (
+                current_managed_paths as inspect_current_managed_paths, _ProfilePreviewCapture)
+        if _profile_capture is None:
+            current_managed_paths = inspect_current_managed_paths(
+                root, expected_portable=manifest_snapshot,
+            )
+        elif type(_profile_capture) is _ProfilePreviewCapture:
+            current_managed_paths = _profile_capture.current_paths(root, manifest_snapshot)
+        else:
+            raise ValueError('Exact internally owned profile capture required')
+    elif isinstance(manifest_snapshot, ValidatedWindowsProvenance):
+        preserved = manifest_snapshot.previous_inputs
+        if preserved is None:
+            raise ValueError("Windows enrollment has no committed initialization request")
+        previous_inputs = preserved
+        current_managed_paths = {path.replace('\\', '/') for path in manifest_snapshot.entries}
+    elif (
         not isinstance(manifest_snapshot, dict)
         or manifest_snapshot.get("schema")
         != "naos.upgrade.managed_content_manifest_snapshot.v2"
@@ -3567,7 +5528,15 @@ def regenerate_managed_init_preview(
         or not isinstance(manifest_snapshot.get("entries"), list)
     ):
         raise ValueError("managed preview requires a validated manifest snapshot")
-    previous_inputs = dict(manifest_snapshot["previous_inputs"])
+    else:
+        previous_inputs = dict(manifest_snapshot["previous_inputs"])
+        current_managed_paths = {
+            str(entry["path"])
+            for entry in manifest_snapshot["entries"]
+            if isinstance(entry, dict) and isinstance(entry.get("path"), str)
+        }
+        if len(current_managed_paths) != len(manifest_snapshot["entries"]):
+            raise ValueError("managed preview path inventory is invalid")
     mode = previous_inputs.get("mode")
     archetype = previous_inputs.get("archetype")
     backend = previous_inputs.get("backend")
@@ -3597,13 +5566,6 @@ def regenerate_managed_init_preview(
         raise ValueError(
             "brownfield managed preview has no repository-intelligence binding"
         )
-    current_managed_paths = {
-        str(entry["path"])
-        for entry in manifest_snapshot["entries"]
-        if isinstance(entry, dict) and isinstance(entry.get("path"), str)
-    }
-    if len(current_managed_paths) != len(manifest_snapshot["entries"]):
-        raise ValueError("managed preview path inventory is invalid")
     signals = detect_signals(root, excluded_paths=current_managed_paths)
     generated = _generate_scaffold_preview(
         project_path=root,
@@ -3618,7 +5580,11 @@ def regenerate_managed_init_preview(
         apply_brownfield_layout_adapter=mode == "brownfield",
         ephemeral_preview=True,
         emit_progress=False,
+        collect_source_modes=collect_source_modes,
     )
+    # Shared POSIX/Windows profile regeneration refuses before a ready plan;
+    # it does not change the generated inventory or approval/check schemas.
+    _require_unmanaged_lf_policy(root, generated["lf_policy"])
     effective_inputs = {**previous_inputs, "profile": requested_profile}
     overlay = generated["overlay_compatibility"]
     if not isinstance(overlay, dict):
@@ -3653,6 +5619,7 @@ def _run_scaffold_session(
     backend: str,
     preview_dir: Path,
     ephemeral_preview: bool = False,
+    private_preview_address: PrivatePreviewAddress | None = None,
 ) -> int:
     """Generate one preview and optionally activate it."""
 
@@ -3671,12 +5638,17 @@ def _run_scaffold_session(
         existing_destination=not args.new and project_path is not None,
         apply_brownfield_layout_adapter=not args.new and project_path is not None,
         ephemeral_preview=ephemeral_preview,
+        **({"private_preview_address": private_preview_address}
+           if private_preview_address is not None else {}),
         emit_progress=True,
     )
+    if private_preview_address is not None:
+        preview_dir = Path(private_preview_address.io_root)
     generated = list(preview["generated_files"])
     overlay_compatibility = preview["overlay_compatibility"]
     layout_adapter = preview["layout_adapter"]
     host_lint_boundary = preview["host_lint_boundary"]
+    lf_policy = preview["lf_policy"]
     if layout_adapter is not None:
         print(
             "  Applied brownfield tool-layout adapter: "
@@ -3687,6 +5659,8 @@ def _run_scaffold_session(
             "  Applied managed Ruff discovery markers to generated Python "
             "roots; no pre-existing adopter Ruff file was modified."
         )
+    for line in lf_policy_diagnostic_lines(lf_policy):
+        print("  " + line)
 
     print(f"\n  Generated {len(generated)} files:")
     for item in generated[:20]:
@@ -3740,6 +5714,8 @@ def _run_scaffold_session(
             None,
         )
         if not args.new:
+            if not args.dry_run:
+                _require_unmanaged_lf_policy(dest, lf_policy)
             _revalidate_brownfield_init_prestart(
                 args,
                 dest.resolve(strict=False),
@@ -3814,6 +5790,7 @@ def _run_scaffold_session(
             frozen_overlay_sha256 = canonical_sha256(overlay_compatibility)
 
             def revalidate_brownfield_activation_inputs() -> None:
+                _require_unmanaged_lf_policy(dest, lf_policy)
                 _revalidate_brownfield_init_prestart(
                     args,
                     dest.resolve(strict=False),
@@ -3847,6 +5824,15 @@ def _run_scaffold_session(
             )
         else:
             activation_preapply_revalidator = None
+        fixed_checks = [{
+            "check_id": "generated_profile_contract", "status": "passed",
+            "evidence_sha256": preview["profile_contract_sha256"],
+        }]
+        if not args.new:
+            fixed_checks.append({
+                "check_id": "overlay_compatibility", "status": "passed",
+                "evidence_sha256": canonical_sha256(overlay_compatibility),
+            })
         try:
             activated = activate(
                 preview_dir,
@@ -3858,6 +5844,9 @@ def _run_scaffold_session(
                 managed_inputs=managed_inputs,
                 greenfield=args.new,
                 preapply_revalidator=activation_preapply_revalidator,
+                fixed_checks=fixed_checks,
+                **({"private_preview_address": private_preview_address}
+                   if private_preview_address is not None else {}),
             )
             skipped = sorted(before_existing - set(activated))
             warn_generated_freshness_after_activation(
@@ -3870,6 +5859,13 @@ def _run_scaffold_session(
                 memory_config_outcome = "dry_run" if args.dry_run else "activated"
             elif memory_config_rel in before_existing:
                 memory_config_outcome = "preserved"
+            if not args.dry_run:
+                effective_paths = list(lf_policy["text_paths"])
+                if lf_policy["status"] == "generated":
+                    effective_paths.append(".gitattributes")
+                effective = inspect_effective_lf_attributes(dest, effective_paths)
+                for line in lf_policy_diagnostic_lines(lf_policy, effective):
+                    print("  " + line)
             print_memory_onboarding(tier, args.memory, memory_config_outcome)
         except ActivationPreflightRefusal:
             raise
@@ -3898,7 +5894,9 @@ def _run_scaffold_session(
         if args.memory is not None:
             activation_cmd.extend(["--memory", args.memory])
         activation_cmd.append("--activate")
-        print("    " + " ".join(shlex.quote(str(part)) for part in activation_cmd))
+        if os.name == "nt":
+            print("  PowerShell activation command:")
+        print("    " + _format_activation_command(activation_cmd))
         print()
         print("  Next steps after activation:")
         print("    1. Edit .github/project-context.md — fill ALL [ADAPT] sections")
@@ -3926,9 +5924,9 @@ def _run_scaffold_session(
                     f"       Before planning or coding, run {preferred_naos} spec-pack-contract --profile {tier} --mode filled."
                 )
                 print("       Specs drive technology choices — not the other way around.")
-            print(
-                "    3. chmod +x .githooks/pre-commit && git config core.hooksPath .githooks"
-            )
+            print("    3. Review Git hook integration:")
+            for guidance_line in hook_activation_guidance(project_path or Path.cwd()):
+                print("       " + guidance_line)
             print("    4. make -f Makefile.naos naos-readiness  # reports scaffolded or missing prerequisites")
             if backend not in ("disabled", "static_only"):
                 print("    5. python scripts/naos_ai_precommit.py --check-config")
@@ -3936,9 +5934,9 @@ def _run_scaffold_session(
             else:
                 print("    5. make -f Makefile.naos gov-refresh")
         else:
-            print(
-                "    2. chmod +x .githooks/pre-commit && git config core.hooksPath .githooks"
-            )
+            print("    2. Review Git hook integration:")
+            for guidance_line in hook_activation_guidance(project_path or Path.cwd()):
+                print("       " + guidance_line)
             print("    3. make -f Makefile.naos naos-readiness")
             if backend not in ("disabled", "static_only"):
                 print("    4. python scripts/naos_ai_precommit.py --check-config")
@@ -3956,6 +5954,53 @@ def _run_scaffold_session(
     return 0
 
 
+def hook_activation_guidance(root: Path) -> list[str]:
+    """Inspect target Git context without changing hook files or configuration."""
+    boundary = "Init generates/copies the hook only; it does not make it executable, configure Git, or execute it."
+    # Keep real effective Git config (including HOME/GIT_CONFIG_*), but do not
+    # let inherited trace/redirection selectors write outside the target.
+    environment = {key: value for key, value in os.environ.items()
+                   if key.upper() not in {"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR",
+                                          "GIT_INDEX_FILE", "GIT_PAGER", "GIT_FLUSH"}
+                   and not key.upper().startswith(("GIT_TRACE", "GIT_REDIRECT_"))}
+
+    def git(*arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["git", *arguments], cwd=root, env=environment,
+                              text=True, capture_output=True, check=False, timeout=5)
+
+    try:
+        top = git("rev-parse", "--show-toplevel")
+        if top.returncode:
+            return [boundary, "Target is not a confirmed Git worktree; review hook setup after establishing its Git repository."]
+        top_root = Path(top.stdout.strip()).resolve()
+        hooks = git("config", "--get", "core.hooksPath")
+        if hooks.returncode not in {0, 1}:
+            return [boundary, "Effective core.hooksPath could not be read; preserve existing hook integration and inspect Git configuration."]
+        description = "Effective core.hooksPath: " + (json.dumps(hooks.stdout.rstrip("\n")) if hooks.returncode == 0 else "unset")
+        if top_root != root.resolve():
+            return [boundary, "Nested target in Git worktree " + json.dumps(str(top_root)) + ". " + description,
+                    "The enclosing repository owns hook configuration; review integration there. No target-relative setup command is offered."]
+        if hooks.returncode == 0:
+            return [boundary, description + ". Preserve this configuration; review integration with its owner before making a change."]
+        worktrees = git("worktree", "list", "--porcelain")
+        if worktrees.returncode or sum(line.startswith("worktree ") for line in worktrees.stdout.splitlines()) != 1:
+            return [boundary, description + ". Worktree configuration is shared or could not be established; review repository/worktree scope before hook integration."]
+        hooks_dir = git("rev-parse", "--git-path", "hooks")
+        if hooks_dir.returncode:
+            return [boundary, "Default Git hook directory could not be established; preserve existing integration."]
+        directory = Path(hooks_dir.stdout.strip())
+        if not directory.is_absolute():
+            directory = root / directory
+        if directory.exists() and any(not item.name.endswith(".sample") for item in directory.iterdir()):
+            return [boundary, description + ". Existing default hook entries require reviewed integration; no replacement command is offered."]
+    except (OSError, subprocess.SubprocessError, UnicodeError, ValueError):
+        return [boundary, "Git hook context could not be inspected; preserve existing integration and review Git configuration manually."]
+    return [boundary, description + ". After activation, review .githooks/pre-commit and recheck Git context before explicitly opting in from this worktree root in a POSIX shell:",
+            "chmod +x .githooks/pre-commit && git config --local core.hooksPath .githooks",
+            "On Git for Windows, use its bundled Bash and set NAOS_PYTHON to the absolute path of the selected native Python executable (use forward slashes, including when the path contains spaces). This native workflow requires no WSL or global Git configuration change.",
+            "Configuration alone does not prove the hook has executed."]
+
+
 def _canonical_init_target(
     supplied: Path,
     *,
@@ -3964,6 +6009,11 @@ def _canonical_init_target(
 ) -> Path:
     """Bind an operator-selected target without following its final component."""
 
+    windows = _windows_cli()
+    if windows is not None:
+        return windows.canonical_target(
+            supplied, must_exist=must_exist, allow_existing_resume=allow_existing_resume,
+        )
     lexical = Path(os.path.abspath(os.fspath(supplied.expanduser())))
     try:
         parent = lexical.parent.resolve(strict=True)
@@ -4002,6 +6052,7 @@ def _canonical_init_target(
 
 
 def main() -> int:
+    configure_console_output()
     parser = argparse.ArgumentParser(
         description="NAOS init — Portable Governance Scaffolder",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -4134,6 +6185,29 @@ def main() -> int:
 
     print_banner()
 
+    # Managed v3 must route before legacy provenance, scan exclusions, or fresh
+    # scaffold generation, including an attempted --new resume.
+    classification_path = project_path if project_path is not None else Path.cwd()
+    if classification_path.is_dir():
+        try:
+            try:
+                from .upgrade_contract.v3_recovery import has_v3_control
+            except ImportError:
+                from upgrade_contract.v3_recovery import has_v3_control
+            if has_v3_control(classification_path):
+                if args.new:
+                    print("NOT_APPLIED: --new cannot enroll an existing managed v3 project; "
+                          "use managed init review without --new.", file=sys.stderr)
+                    return 2
+                return _route_managed_init_transition(
+                    args, classification_path, requested_profile=args.tier or wizard_tier(),
+                )
+        except (OSError, RuntimeError, ValueError) as exc:
+            print(f"NOT_APPLIED: managed v3 init review requires validated completed "
+                  f"same-root history; explicit rebind or recovery may be required: {exc}",
+                  file=sys.stderr)
+            return 3
+
     # Detection mode: analyse existing project
     signals: dict | None = None
     detected_archetype = None
@@ -4169,7 +6243,7 @@ def main() -> int:
             lang = ARCHETYPES.get(detected_archetype, {}).get(
                 "label", detected_archetype
             )
-            print(f"  Detected archetype: {lang}")
+            print(f"  Candidate archetype from repository signals: {lang}")
         else:
             print("  Could not auto-detect archetype — you'll be asked to select one")
 
@@ -4288,9 +6362,9 @@ def main() -> int:
         operation_error: OSError | RuntimeError | ValueError | None = None
         cleanup_error: OSError | RuntimeError | ValueError | None = None
         try:
-            temporary_preview = tempfile.TemporaryDirectory(
+            temporary_preview = create_temporary_preview(
                 prefix="naos-init-preview-",
-                dir=temp_root,
+                parent=temp_root,
             )
         except (OSError, RuntimeError, ValueError) as exc:
             operation_error = exc
@@ -4301,6 +6375,8 @@ def main() -> int:
                     **session_kwargs,
                     preview_dir=Path(temporary_preview.name) / "preview",
                     ephemeral_preview=True,
+                    **({"private_preview_address": temporary_preview.preview_address}
+                       if hasattr(temporary_preview, "preview_address") else {}),
                 )
             except (ActivationFailure, OSError, RuntimeError, ValueError) as exc:
                 operation_error = exc

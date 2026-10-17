@@ -29,12 +29,12 @@ When beginning a session (fresh or post-compaction):
 3. **Record operator attribution**: `naos operator-attribution` records local identity signals for who initiated the run/session; it is not authentication, authorization, task ownership, locking, separation-of-duties evidence, non-repudiation, or approval
 4. **Summarize audit history**: `naos audit-log` records/summarizes append-only event history; it is not approval, non-repudiation, cryptographic signing, tamper-proof storage, task locking, evidence conflict detection, compliance approval, or source of truth
 5. **Detect evidence conflicts**: `naos evidence-conflicts` flags deterministic evidence/review conflicts for human review; it does not resolve conflicts, adjudicate correctness, prove separation of duties, approve work, lock tasks, or prove compliance
-5. **Record task coordination when relevant**: `naos task-claim --task <TASK-ID>` or `make -f Makefile.naos naos-task-claim TASK=T-123` records local claim metadata; `naos task-release --task <TASK-ID>` releases it. Claims do not authorize work, approve tasks, prove ownership or separation of duties, mark completion, create exclusive access, resolve evidence conflicts, or prove compliance.
-5. **Generate/review lifecycle posture**: `naos session-start --task <TASK-ID>` is a report/checklist, not automatic context injection
-6. **Read compact file first** (fastest recovery): get last completed WI, next action, blockers
-7. **Verify git state**: `git status && git diff --name-only` — understand what changed since last session
-8. **Read active task card**: confirm scope and acceptance criteria haven't changed
-9. **Do NOT restart completed work** — continue from where the last session left off
+6. **Record task coordination when relevant**: `naos task-claim --task <TASK-ID>` or `make -f Makefile.naos naos-task-claim TASK=T-123` records local claim metadata; `naos task-release --task <TASK-ID>` releases it. Claims do not authorize work, approve tasks, prove ownership or separation of duties, mark completion, create exclusive access, resolve evidence conflicts, or prove compliance.
+7. **Generate/review lifecycle posture**: `naos session-start --task <TASK-ID>` is a report/checklist, not automatic context injection
+8. **Read compact file first** (fastest recovery): get last completed WI, next action, blockers
+9. **Verify git state**: `git status && git diff --name-only` — understand what changed since last session
+10. **Read active task card**: confirm scope and acceptance criteria haven't changed
+11. **Do NOT restart completed work** — continue from where the last session left off
 
 Session identity isolates report roots, operator attribution records local run/session identity signals, the audit log records event history over time, and evidence conflict detection flags deterministic review conflicts. M3 adds local SQLite write coordination for context-index file integrity, M4 adds audit event history, M5 adds evidence conflict detection, M6 adds task claim/release coordination metadata, M7 adds static team/operator policy overlay scopes, M8 adds team-scoped gatekeeper posture, M9 adds PR-time CI evidence templates, and P1 adds optional tool integration templates. NAOS still treats authorization-backed task locking, release approval, deployment authorization, and public-release re-audit as separate human-governed steps. Lifecycle reports never write memory, compact files, task cards, or `TASK_REGISTRY`. Memory candidates are proposal-only until explicitly approved under memory-use policy.
 

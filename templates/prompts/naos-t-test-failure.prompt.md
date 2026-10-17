@@ -18,6 +18,17 @@ Systematic debugging of test failures to identify and fix root causes.
 
 Analyze **test failures** and provide systematic debugging guidance to identify root causes.
 
+### Evidence before changing the test contract
+
+Treat the implementation under test as the initial hypothesis. Preserve the original failing output, test command, environment, and baseline test before repairs; do not replace that evidence with a later pass.
+
+Before weakening or removing an assertion, adding or widening skip/xfail, adding retries, or increasing timeouts:
+- Identify the exact specification or acceptance-criterion reference and evidence explaining why the existing test contract is wrong or why the proposed exception is needed.
+- Record the proposed diff, the coverage or failure signal it removes, alternatives considered, and residual risk. Temporary exceptions need an issue reference and an expiry or removal condition.
+- Obtain explicit human approval for that exact change before applying it. A passing rerun, existing skip reason, issue reference, or agent judgment is not approval.
+
+Specification-driven test repairs remain valid when evidence establishes the intended behavior. Strengthening assertions or correcting fixtures without reducing the contract does not require this weakening approval. Existing approved native/platform skips remain valid within their approved scope. Never suppress a failure through success exits, hidden skips, fabricated results, or discarded negative evidence. Use PR-risk changed-test review together with Python test-quality structural findings; neither proves absence of tampering.
+
 **Input Parameters**:
 - {{test_name}}: Name of failing test(s)
 - {{failure_output}}: Test failure output/stack trace
@@ -158,7 +169,7 @@ def/it test_{{scenario}}_edge_case():
 
 **CI/CD Improvements**:
 - [ ] Add test to critical path (block merge if fails)
-- [ ] Increase test timeout if timing issue
+- [ ] Propose a timeout increase only after measured timing evidence and the approval condition above
 - [ ] Configure test to run in parallel safely
 
 **Commit the Fix**:
@@ -176,19 +187,19 @@ Verified:
 ```
 
 **If Test is Flaky**:
-- [ ] Add retry logic if legitimate flake
-- [ ] Increase timeouts if timing sensitive
+- [ ] Propose retries only after retained reproducible flake evidence and the approval condition above
+- [ ] Propose timeout changes only after measured timing evidence and the approval condition above
 - [ ] Mock external dependencies properly
 - [ ] Add synchronization if race condition
-- [ ] Mark as xfail temporarily with issue reference
+- [ ] Propose temporary xfail only with evidence, issue reference, removal condition, and explicit human approval above
 
 **Common Patterns**:
 
-**Pattern 1: Assertion Error** — Wrong expected value or test logic error → Update assertion or fix test data
+**Pattern 1: Assertion Error** — Compare the failure with the specification; repair implementation by default. Correct test expectations only when evidence establishes the intended behavior; apply the approval condition above to weakening changes
 
 **Pattern 2: Import Error** — Missing dependency or circular import → Install package or restructure imports
 
-**Pattern 3: Timeout** — Infinite loop or slow operation → Optimize code or increase timeout
+**Pattern 3: Timeout** — Investigate infinite loops or measured slow operations; optimize the implementation. Apply the approval condition above before increasing timeouts
 
 **Pattern 4: Mock Error** — Mock not matching real interface → Update mock or use real object
 

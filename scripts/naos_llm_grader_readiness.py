@@ -20,6 +20,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    normalize_boolean_settings,
     default_naos_root,
     exit_code_for_summary,
     finding_counts,
@@ -110,10 +111,56 @@ def as_mapping(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+# Consumed input toggles only; derived report booleans are not configuration.
+BOOLEAN_SETTING_PATHS = (
+    "enabled",
+    "runtime_enabled",
+    "provider_allowed",
+    "external_api_allowed",
+    "model_dependency_allowed",
+    "api_keys_allowed",
+    "cost_incurred_by_default",
+    "cost_budget_required_if_enabled_later",
+    "human_approval_required_before_cost",
+    "data_exposure_review_required",
+    "prompt_rubric_version_required",
+    "model_version_required",
+    "bias_variance_limitations_required",
+    "residual_risk_required",
+    "advisory_only",
+    "can_promote_without_human",
+    "can_approve",
+    "can_certify",
+    "can_prove_compliance",
+    "deterministic_baseline_required",
+    "static_grader_remains_primary",
+    "future_enablement_requested",
+    "profile_posture.*.human_review_required",
+    "data_exposure_policy.review_required",
+    "model_policy.provider_required_if_enabled_later",
+    "model_policy.model_version_required_if_enabled_later",
+    "prompt_rubric_policy.prompt_version_required_if_enabled_later",
+    "prompt_rubric_policy.rubric_version_required_if_enabled_later",
+    "prompt_rubric_policy.prompt_and_rubric_review_required",
+    "bias_variance_policy.limitations_required",
+    "residual_risk_policy.required",
+    "deterministic_baseline.required",
+    "deterministic_baseline.static_grader_remains_primary",
+    "advisory_boundary.advisory_only",
+    "advisory_boundary.can_promote_without_human",
+    "advisory_boundary.can_approve",
+    "advisory_boundary.can_certify",
+    "advisory_boundary.can_prove_compliance",
+    "advisory_boundary.can_replace_deterministic_controls",
+    "advisory_boundary.can_replace_human_review",
+    "advisory_boundary.may_challenge_deterministic_controls",
+)
+
+
 def bool_value(value: Any, default: bool = False) -> bool:
     if value is None:
         return default
-    return bool(value)
+    return value if isinstance(value, bool) else False
 
 
 def has_model_role(value: Any) -> bool:
@@ -268,9 +315,11 @@ def report_status(rules: dict[str, Any], profile: str, posture: dict[str, Any], 
 
 
 def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any], rules_path: Path) -> dict[str, Any]:
-    rules = load_yaml_mapping(rules_path)
+    rules, invalid_booleans = normalize_boolean_settings(load_yaml_mapping(rules_path), BOOLEAN_SETTING_PATHS)
     posture = profile_posture(rules, profile)
     findings = build_findings(rules, profile)
+    if invalid_booleans:
+        findings.append(finding("boolean_setting_invalid", severity_for(profile, future_requested(rules)), "review_required", "Expected YAML booleans; invalid values evaluated as false: " + ", ".join(invalid_booleans)))
     status = report_status(rules, profile, posture, findings)
 
     cost_policy = as_mapping(rules.get("cost_policy"))
@@ -396,7 +445,7 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
         "residual_risks": RESIDUAL_RISKS,
         "limitations": LIMITATIONS,
         "not_claimed": NOT_CLAIMED,
-        "human_review_required": bool(requested or posture.get("human_review_required") or findings),
+        "human_review_required": bool(requested or bool_value(posture.get("human_review_required")) or findings),
         "summary": summary,
     }
 
@@ -404,7 +453,7 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate LLMGrader readiness posture without running an LLM.")
     parser.add_argument("--profile", default=None, choices=["quickstart", "lite", "standard", "assured"])
-    parser.add_argument("--naos-root", default=None)
+    parser.add_argument("--naos-root", default=None, help="Governance root; overrides NAOS_ROOT.")
     parser.add_argument("--policy", default=None)
     parser.add_argument("--project-root", default=".")
     parser.add_argument("--rules", default=None)
@@ -414,9 +463,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = Path(args.project_root).resolve()
-    policy = load_policy(explicit_policy=args.policy, root=root)
+    requested_naos_root = args.naos_root or os.environ.get("NAOS_ROOT")
+    policy = load_policy(explicit_policy=args.policy, naos_root=requested_naos_root, root=root)
     profile = normalize_profile(args.profile, policy)
-    naos_root = args.naos_root or default_naos_root(policy)
+    naos_root = requested_naos_root or default_naos_root(policy)
     rules_path, _source = resolve_rules_path(root, naos_root, policy, args.rules)
     try:
         report = build_report(root, naos_root, profile, policy, rules_path)

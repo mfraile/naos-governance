@@ -30,7 +30,7 @@ from naos_policy import (  # noqa: E402
     load_policy,
     normalize_profile,
     report_output_path,
-    severity_for_profile,
+    resolve_report_rule_severity,
     status_from_counts,
     write_report,
 )
@@ -81,20 +81,29 @@ def as_list(value: Any) -> list[str]:
 
 def relative_text(root: Path, path: Path) -> str:
     try:
-        return str(path.relative_to(root))
+        return path.relative_to(root).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix()
 
 
 def normalize_path_text(value: str) -> str:
-    return value.strip().strip("`'\"").replace("\\", "/").lstrip("./")
+    normalized = value.strip().strip("`'\"").replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def rule_severity_resolution(root: Path, naos_root: str, profile: str, policy: dict[str, Any], rules: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+    return resolve_report_rule_severity(
+        profile, policy, (rules.get("profile_severity_behavior") or {}).get(profile) if isinstance(rules.get("profile_severity_behavior"), dict) else None,
+        advisory=is_kit_repository(root, naos_root),
+        preserve_lower_request=True,
+        allow_none=True,
+    )
 
 
 def rule_severity(root: Path, naos_root: str, profile: str, policy: dict[str, Any], rules: dict[str, Any]) -> str:
-    if is_kit_repository(root, naos_root):
-        return "advisory"
-    mapping = rules.get("profile_severity_behavior") if isinstance(rules.get("profile_severity_behavior"), dict) else {}
-    return str(mapping.get(profile) or severity_for_profile(profile, policy) or "advisory")
+    return rule_severity_resolution(root, naos_root, profile, policy, rules)[0]
 
 
 def compile_patterns(patterns: list[str]) -> list[re.Pattern[str]]:
@@ -155,8 +164,8 @@ def collect_source_files(
         include_patterns, _ = effective_include_patterns(root, rules)
     for pattern in include_patterns:
         try:
-            matches = root.glob(pattern)
-        except (OSError, ValueError):
+            matches = list(root.glob(pattern))
+        except (OSError, ValueError, NotImplementedError):
             continue
         for match in matches:
             if not match.is_file():
@@ -424,7 +433,7 @@ def build_report(
     rules_source: str,
 ) -> dict[str, Any]:
     rules = load_yaml(rules_path)
-    severity = rule_severity(root, naos_root, profile, policy, rules)
+    severity, severity_downgrade = rule_severity_resolution(root, naos_root, profile, policy, rules)
     policy_meta = policy.get("_meta", {})
     if rules.get("enabled") is False:
         return {
@@ -449,7 +458,49 @@ def build_report(
         }
 
     include_patterns, source_roots = effective_include_patterns(root, rules)
-    source_files, excluded_files = collect_source_files(root, rules, policy, include_patterns)
+    configuration_errors = []
+    configured_patterns = rules.get("include_patterns")
+    if (not isinstance(configured_patterns, list) or not configured_patterns
+            or any(not isinstance(pattern, str) or not pattern.strip() for pattern in configured_patterns)):
+        configuration_errors.append("include_patterns must be a non-empty list of strings")
+    else:
+        for pattern in configured_patterns:
+            try:
+                if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
+                    raise ValueError("patterns must be project-relative")
+                if any("**" in part and part != "**"
+                       for part in pattern.replace("\\", "/").split("/")):
+                    raise ValueError("recursive wildcard ** must be a complete path component")
+                next(root.glob(pattern), None)
+            except (ValueError, NotImplementedError) as exc:
+                configuration_errors.append(f"Invalid include pattern {pattern!r}: {exc}")
+    file_types = rules.get("file_types", ["python"])
+    if not isinstance(file_types, list) or not file_types or any(value != "python" for value in file_types):
+        configuration_errors.append("Only file_types: [python] is supported")
+    if "enabled" in rules and not isinstance(rules["enabled"], bool):
+        configuration_errors.append("enabled must be a boolean")
+    source_files, excluded_files = (
+        ([], []) if configuration_errors
+        else collect_source_files(root, rules, policy, include_patterns)
+    )
+    # Applicability is scoped to declared source roots and configured selections.
+    # An unmatched Python source remains a configuration gap, not an exemption.
+    python_present = bool(source_files or excluded_files)
+    if not python_present:
+        for source_root in resolve_source_roots(root, absolute=True):
+            if not source_root.is_dir():
+                continue
+            if any(path.is_file() and is_excluded(path, root, rules, policy) is None
+                   for path in source_root.rglob("*.py")):
+                python_present = True
+                break
+    coverage = {
+        "supported_file_types": ["python"],
+        "source_roots": source_roots,
+        "status": ("configuration_error" if configuration_errors else "evaluated" if source_files
+                   else "selection_gap" if python_present else "not_assessed"),
+        "reason": "Only configured Python module headers are evaluated; other languages are not assessed.",
+    }
     req_patterns = compile_patterns(as_list(rules.get("allowed_requirement_id_patterns")) or [r"^(FR|NFR)-[A-Z0-9-]+$"])
     task_patterns = compile_patterns(
         as_list(rules.get("allowed_task_id_patterns"))
@@ -460,14 +511,18 @@ def build_report(
     task_ids = load_task_ids(root, rules)
 
     scanned_files: list[dict[str, Any]] = []
-    findings: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = [{**severity_downgrade, "path": str(rules_path)}] if severity_downgrade else []
+    for error in configuration_errors:
+        findings.append(finding(path=".", severity=severity, status="unknown", message=error,
+                                required_next_actions=["Repair the module-header configuration."]))
     if not source_files:
         findings.append(
             finding(
                 path=".",
-                severity=severity,
+                severity=severity if python_present or configuration_errors else "advisory",
                 status="not_configured",
-                message="No Python source files matched configured module-header include patterns.",
+                message=("No Python source files matched configured module-header include patterns."
+                         if python_present else "No applicable Python source modules found; module headers are not assessed."),
                 required_next_actions=["Configure include patterns, add source files, disable the capability, or record why it is not applicable."],
             )
         )
@@ -501,7 +556,8 @@ def build_report(
             "stale_headers": len(status_paths["stale"]),
             "duplicate_headers": len(status_paths["duplicate"]),
             "not_configured": sum(1 for item in findings if item.get("status") == "not_configured"),
-            "human_review_required": sum(1 for item in scanned_files if item.get("human_review_required")),
+            "human_review_required": sum(1 for item in scanned_files if item.get("human_review_required")) + int(not source_files),
+            "not_assessed": int(coverage["status"] == "not_assessed"),
         }
     )
     paths_by_status = {
@@ -518,7 +574,7 @@ def build_report(
     ]
     stale_headers = [item for item in scanned_files if item.get("path") in paths_by_status["stale"]]
     duplicate_headers = [item for item in scanned_files if item.get("path") in paths_by_status["duplicate"]]
-    human_review_required = bool(summary["human_review_required"] or duplicate_headers or stale_headers)
+    human_review_required = bool(not source_files or severity_downgrade or summary["human_review_required"] or duplicate_headers or stale_headers)
     return {
         "schema": "naos.module_header_traceability.v1",
         "generated_at": utc_now_text(),
@@ -542,6 +598,7 @@ def build_report(
             "not_claimed": "This report does not prove complete source traceability, source correctness, or design correctness.",
         },
         "summary": summary,
+        "coverage": coverage,
         "scanned_files": scanned_files,
         "excluded_files": excluded_files,
         "findings": findings,

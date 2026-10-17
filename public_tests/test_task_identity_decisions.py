@@ -44,7 +44,7 @@ def protected(root):
     for folder in ("active", "completed"):
         paths.extend((root / "naos" / folder).glob("*.md"))
     return {
-        str(path.relative_to(root)): path.read_bytes()
+        path.relative_to(root).as_posix(): path.read_bytes()
         for path in paths
         if path.is_file()
     }

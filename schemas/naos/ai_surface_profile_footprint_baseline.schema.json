@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:naos-governance:schemas:naos:ai-surface-profile-footprint-baseline:v1",
   "title": "NAOS Fresh Profile Footprint Baseline",
-  "description": "Complete deterministic measurements for isolated fresh Quickstart, Lite, Standard, and Assured scaffolds. This report is measurement and intake-gate evidence; it is not candidate approval, pilot closure, runtime proof, or publication authority.",
-  "$comment": "Every accepted report is content-addressed and includes complete generated-input provenance. JSON Schema cannot recompute declared digests; all report accounting also requires scripts/naos_ai_surface_budget.py::validate_fresh_profiles_report.",
+  "description": "Historical v1 complete-payload digests and v2 complete repeatable measurement projections for isolated fresh Quickstart, Lite, Standard, and Assured scaffolds. V2 full reports retain per-run raw-hash declarations and need not be equal. This report is measurement and intake-gate evidence; it is not candidate approval, pilot closure, runtime proof, or publication authority.",
+  "$comment": "Every accepted report is content-addressed and includes complete generated-input provenance. V1 stable_payload_sha256 retains its original full-payload-minus-generated_at scope. V2 deterministic=true refers only to determinism_scope, and report_integrity_sha256 makes no cross-run equality claim. JSON Schema cannot recompute declared digests; all report accounting also requires scripts/naos_ai_surface_budget.py::validate_fresh_profiles_report.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -23,11 +23,170 @@
     "threshold_findings",
     "summary",
     "limitations",
-    "not_claimed",
-    "stable_payload_sha256"
+    "not_claimed"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema": {
+            "const": "naos.ai_surface_profile_footprint_baseline.v1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "stable_payload_sha256"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "determinism_scope"
+              ]
+            },
+            {
+              "required": [
+                "measurement_projection_version"
+              ]
+            },
+            {
+              "required": [
+                "measurement_payload_sha256"
+              ]
+            },
+            {
+              "required": [
+                "report_integrity_sha256"
+              ]
+            },
+            {
+              "required": [
+                "raw_hash_provenance"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema": {
+            "const": "naos.ai_surface_profile_footprint_baseline.v2"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "determinism_scope",
+          "measurement_projection_version",
+          "measurement_payload_sha256",
+          "report_integrity_sha256",
+          "raw_hash_provenance"
+        ],
+        "not": {
+          "required": [
+            "stable_payload_sha256"
+          ]
+        }
+      }
+    }
   ],
   "properties": {
-    "schema": {"const": "naos.ai_surface_profile_footprint_baseline.v1"},
+    "determinism_scope": {
+      "const": "complete_measurement_projection"
+    },
+    "measurement_projection_version": {
+      "const": "classifier_scan_hash_links.v1"
+    },
+    "measurement_payload_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "report_integrity_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "raw_hash_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "original_report_bytes_archived",
+        "original_report_bytes_verified",
+        "current_source_state_verified",
+        "authenticity_verified",
+        "declarations"
+      ],
+      "properties": {
+        "authority": {
+          "const": "classifier_emitted_historical_scan_time_hash_declaration"
+        },
+        "original_report_bytes_archived": {
+          "const": false
+        },
+        "original_report_bytes_verified": {
+          "const": false
+        },
+        "current_source_state_verified": {
+          "const": false
+        },
+        "authenticity_verified": {
+          "const": false
+        },
+        "declarations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "link_id",
+              "occurrence_identity",
+              "source_report",
+              "source_bucket",
+              "source_index",
+              "source_item_sha256",
+              "source_report_sha256"
+            ],
+            "properties": {
+              "link_id": {
+                "type": "string",
+                "pattern": "^/profiles/[0-3]/self_check/finding_occurrences/[0-9]+/finding/source_report_sha256$"
+              },
+              "occurrence_identity": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_report": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_bucket": {
+                "enum": [
+                  "findings",
+                  "known_gaps",
+                  "residual_risks"
+                ]
+              },
+              "source_index": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "source_item_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "source_report_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      }
+    },
+    "schema": {"enum": ["naos.ai_surface_profile_footprint_baseline.v1", "naos.ai_surface_profile_footprint_baseline.v2"]},
     "generated_at": {"type": "string", "format": "date-time"},
     "status": {"enum": ["pass", "warning", "unapproved", "stop"]},
     "deterministic": {"const": true},
@@ -155,6 +314,404 @@
     "stable_payload_sha256": {"$ref": "#/$defs/sha256"}
   },
   "$defs": {
+    "host_context_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "lines",
+        "chars",
+        "estimated_tokens",
+        "sha256",
+        "relationship"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "relationship": {
+          "enum": [
+            "project_entry",
+            "explicit_import",
+            "unconditional_project_rule",
+            "paths_conditioned_rule",
+            "skill_body_on_demand",
+            "command_body_on_demand",
+            "guidance_reference_on_demand",
+            "source_input",
+            "project_instruction_candidate",
+            "conditional_instruction_candidate"
+          ]
+        },
+        "paths": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "host_union_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "lines",
+        "chars",
+        "estimated_tokens",
+        "sha256",
+        "relationship"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "relationship": {
+          "enum": [
+            "project_entry",
+            "explicit_import",
+            "unconditional_project_rule",
+            "paths_conditioned_rule",
+            "skill_body_on_demand",
+            "command_body_on_demand",
+            "guidance_reference_on_demand",
+            "source_input",
+            "project_instruction_candidate",
+            "conditional_instruction_candidate"
+          ]
+        },
+        "paths": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "condition": {
+          "type": "string"
+        }
+      }
+    },
+    "host_base_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "lines",
+        "chars",
+        "estimated_tokens",
+        "sha256",
+        "relationship"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "relationship": {
+          "const": "project_instruction_candidate"
+        },
+        "paths": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "host_conditional_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "lines",
+        "chars",
+        "estimated_tokens",
+        "sha256",
+        "relationship",
+        "condition"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "relationship": {
+          "const": "conditional_instruction_candidate"
+        },
+        "paths": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "host_candidate_union": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "deduplication",
+        "token_basis",
+        "threshold_basis",
+        "host",
+        "basis",
+        "observed_loading",
+        "settings_verified",
+        "status",
+        "limits",
+        "base_candidates",
+        "conditional_candidates",
+        "all_candidates",
+        "input_files",
+        "base_candidate_estimated_tokens",
+        "all_candidate_estimated_tokens",
+        "unresolved",
+        "excluded",
+        "source_refs",
+        "known_limitations"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string"
+        },
+        "deduplication": {
+          "type": "string"
+        },
+        "token_basis": {
+          "type": "string"
+        },
+        "threshold_basis": {
+          "type": "string"
+        },
+        "host": {
+          "enum": [
+            "cursor",
+            "copilot_harness",
+            "vscode_local"
+          ]
+        },
+        "basis": {
+          "const": "project_local_conservative_candidate_union"
+        },
+        "observed_loading": {
+          "const": false
+        },
+        "settings_verified": {
+          "const": false
+        },
+        "status": {
+          "enum": [
+            "partial",
+            "project_local_subset",
+            "not_present"
+          ]
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_files",
+            "max_import_depth",
+            "max_file_bytes",
+            "max_discovery_entries",
+            "max_directory_depth"
+          ],
+          "properties": {
+            "max_files": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_import_depth": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_file_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_discovery_entries": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_directory_depth": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "base_candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_base_candidate"
+          }
+        },
+        "conditional_candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_conditional_candidate"
+          }
+        },
+        "all_candidates": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/host_base_candidate"
+              },
+              {
+                "$ref": "#/$defs/host_conditional_candidate"
+              }
+            ]
+          }
+        },
+        "input_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_union_file"
+          }
+        },
+        "base_candidate_estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "all_candidate_estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "reason"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "known_limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
@@ -327,7 +884,8 @@
             },
             "naos_fixed_time": {"type": "string", "format": "date-time"},
             "python_hash_seed": {"const": "0"},
-            "temporary_provider_and_git_metadata_roots": {"const": true}
+            "temporary_provider_and_git_metadata_roots": {"const": true},
+            "temporary_home_and_user_profile": {"const": true}
           }
         },
         "normalizations": {
@@ -348,6 +906,16 @@
                 "user-home paths",
                 "generated session UUIDs",
                 "generated audit event IDs",
+                "generated input mtimes to the fixed replay instant"
+              ]
+            },
+            {
+              "const": [
+                "temporary roots",
+                "Python executable",
+                "user-home paths",
+                "generated session UUIDs",
+                "generated audit event IDs (new IDs only in exact verified audit-finding reference slots)",
                 "generated input mtimes to the fixed replay instant"
               ]
             }
@@ -506,6 +1074,7 @@
     "profile": {
       "type": "object",
       "additionalProperties": false,
+      "dependentRequired": {"host_contexts": ["host_union_content_manifest"], "host_union_content_manifest": ["host_contexts"]},
       "required": [
         "profile",
         "scaffold_contract",
@@ -517,6 +1086,252 @@
         "threshold_evaluations"
       ],
       "properties": {
+        "host_contexts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "claude_code",
+            "cursor",
+            "copilot_harness",
+            "vscode_local"
+          ],
+          "properties": {
+            "claude_code": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "host",
+                "basis",
+                "observed_loading",
+                "status",
+                "scope",
+                "supported_import_grammar",
+                "limits",
+                "input_files",
+                "startup_files",
+                "startup_estimated_tokens",
+                "conditional_rules",
+                "on_demand_bodies",
+                "import_edges",
+                "unresolved",
+                "github_instructions_basis",
+                "token_basis",
+                "known_limitations",
+                "vendor_guidance",
+                "local_thresholds_are_vendor_limits"
+              ],
+              "properties": {
+                "host": {
+                  "const": "claude_code"
+                },
+                "basis": {
+                  "const": "project_local_static_loading_estimate"
+                },
+                "observed_loading": {
+                  "const": false
+                },
+                "status": {
+                  "enum": [
+                    "partial",
+                    "project_local_subset",
+                    "not_present"
+                  ]
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "supported_import_grammar": {
+                  "type": "string"
+                },
+                "limits": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "max_files",
+                    "max_import_depth",
+                    "max_file_bytes",
+                    "max_discovery_entries",
+                    "max_directory_depth"
+                  ],
+                  "properties": {
+                    "max_files": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "max_import_depth": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "max_file_bytes": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "max_discovery_entries": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "max_directory_depth": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "input_files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/host_context_file"
+                  }
+                },
+                "startup_files": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/host_context_file"
+                  }
+                },
+                "startup_estimated_tokens": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "conditional_rules": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/host_context_file"
+                  }
+                },
+                "on_demand_bodies": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/host_context_file"
+                  }
+                },
+                "import_edges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "from",
+                      "to",
+                      "syntax"
+                    ],
+                    "properties": {
+                      "from": {
+                        "type": "string"
+                      },
+                      "to": {
+                        "type": "string"
+                      },
+                      "syntax": {
+                        "const": "standalone_relative_import"
+                      }
+                    }
+                  }
+                },
+                "unresolved": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "path",
+                      "reason"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "github_instructions_basis": {
+                  "type": "string"
+                },
+                "token_basis": {
+                  "const": "configured_character_estimate_not_provider_tokenizer"
+                },
+                "known_limitations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "vendor_guidance": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "claude_file_target_lines",
+                    "hard_token_limit",
+                    "source_refs",
+                    "verified_on",
+                    "authority"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "advisory"
+                    },
+                    "claude_file_target_lines": {
+                      "const": 200
+                    },
+                    "hard_token_limit": {
+                      "type": "null"
+                    },
+                    "source_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "verified_on": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "authority": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "local_thresholds_are_vendor_limits": {
+                  "const": false
+                }
+              }
+            },
+            "cursor": {
+              "$ref": "#/$defs/host_candidate_union"
+            },
+            "copilot_harness": {
+              "$ref": "#/$defs/host_candidate_union"
+            },
+            "vscode_local": {
+              "$ref": "#/$defs/host_candidate_union"
+            }
+          }
+        },
+        "host_union_content_manifest": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
         "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
         "scaffold_contract": {
           "type": "object",

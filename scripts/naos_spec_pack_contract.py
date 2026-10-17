@@ -186,6 +186,7 @@ def collect_traceability_definitions(
     code_rule: dict[str, Any],
     required_set: set[str],
     policy: dict[str, Any],
+    ambiguous_definitions: set[str] | None = None,
 ) -> tuple[set[str], str | None]:
     source = str(code_rule.get("definition_source") or "patterns")
     if source == "task_registry":
@@ -201,6 +202,11 @@ def collect_traceability_definitions(
         text = path.read_text(encoding="utf-8", errors="ignore")
         if source == "requirement_headers":
             definitions.update(spec_header.canonical_frs(text))
+        elif source == "architecture_components":
+            components = spec_header.architecture_component_sections(text)
+            definitions.update(key for key, sections in components.items() if len(sections) == 1)
+            if ambiguous_definitions is not None:
+                ambiguous_definitions.update(key for key, sections in components.items() if len(sections) > 1)
         else:
             definitions.update(extract_pattern_tokens(text, code_rule.get("definition_patterns") or []))
     return definitions, None
@@ -541,13 +547,22 @@ def validate_contract(
                 traceability_codes.append(code_entry)
                 continue
 
+            ambiguous_definitions: set[str] = set()
             definitions, definition_source_path = collect_traceability_definitions(
                 root=root,
                 specs_root=specs_root,
                 code_rule=code_rule,
                 required_set=required_set,
                 policy=policy,
+                ambiguous_definitions=ambiguous_definitions,
             )
+            for identifier in sorted(ambiguous_definitions):
+                findings.append(finding(
+                    profile=profile, policy=policy, status="ambiguous_definition",
+                    category="traceability_reference", rule_id=f"{code_id}:{identifier}",
+                    message=f"Multiple component definitions make {identifier} ambiguous.",
+                    expected="one component definition", actual=identifier,
+                ))
             references = collect_traceability_references(
                 specs_root=specs_root,
                 code_rule=code_rule,

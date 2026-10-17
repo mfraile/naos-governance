@@ -1,0 +1,15 @@
+# Local v2 checkpoint proof reuse
+
+A v2 apply validates and detaches the incoming plan before publication. Its invocation-local proof verifies one canonical snapshot and stores an immutable tree containing exact container and scalar types and values. Checkpoints compare their plan with that immutable tree. Dictionary insertion order does not affect equality; int/float/bool and list/tuple changes refuse reuse. Existing equality for signed floating zero is preserved. Mutable constructor input and the detached compatibility view cannot modify the proof's immutable authority.
+
+This proof skips only repeated pure plan serialization and the full semantic validator that the previous proof already skipped. Journal integrity still checks the live RFC 8785 backend's exact distribution version and imported module path. Filesystem identity, metadata, custody, topology, staging, lock, and durability observations remain live. Imported or recovered historical journals have no local proof and retain full validation. For historical v1/v2 journals, schemas and compatibility remain unchanged.
+
+The bounded native Mac/Python 3.13 profile-transition probe used 8 and 24 created files plus one replacement. Full-plan canonical calls fell from 23/55 to 2/2; serialized plan bytes fell from 380,512/2,218,370 to 33,088/80,668. Journal calls (24/56), journal bytes (477,470/2,669,342), and selected native observation counts were unchanged. Single cProfile timings were 0.449/1.717 seconds before and 0.379/1.435 seconds after. These timings include profiler overhead and do not establish an SLA or explain the separate 13,796-second v3 full-profile receipt.
+
+Full journal serialization and durable writes still include the entire immutable plan at every checkpoint. That amplification and the separate v3 full-profile performance requirement remain unresolved by this correction.
+
+## New-only compact content-aware checkpoints
+
+New POSIX content-aware transactions use `naos.upgrade.content_transaction.compact.v1`. A canonical `plan.json` sidecar is written once, with its exact byte digest and size bound by each complete journal. Every per-leaf durable intent/completion checkpoint and cumulative action/directory inventory remains; total bytes are not claimed to scale linearly. A fresh invocation-local typed plan proof avoids serializing the full plan or inventing legacy journal integrity at compact checkpoints. Compact physical integrity and all current native guards remain live. Old v1/v2 archives and unfinished recovery keep their original format and writer; there is no automatic migration.
+
+The measurements above describe the older v2 proof correction, not the compact format. Compact support requires a reader that recognizes the new schema; an older binary can refuse it even if its version string is 1.1.0. Source-bound compact payload/CPU measurements and native recovery qualification must be reported separately; reduced payload alone does not establish latency or whole-profile usability.

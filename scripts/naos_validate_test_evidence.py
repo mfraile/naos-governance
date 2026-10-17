@@ -15,6 +15,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    controlled_utc_now_text,
     exit_code_for_summary,
     finding_counts,
     is_kit_repository,
@@ -25,7 +26,7 @@ from naos_policy import (  # noqa: E402
     status_from_counts,
     write_report,
 )
-from naos_test_evidence_map import build_map  # noqa: E402
+from naos_test_evidence_map import COVERAGE_INPUT_FAILURES, build_map  # noqa: E402
 from source_roots import resolve_source_roots  # noqa: E402
 
 
@@ -51,6 +52,7 @@ def validate_map(
     naos_root: str = "naos",
 ) -> dict[str, Any]:
     base_severity = severity_for_profile(profile, policy, advisory)
+    input_severity = base_severity
     if is_kit_repository(root, naos_root) and evidence_map.get("status") == "not_configured":
         base_severity = "advisory"
 
@@ -77,17 +79,60 @@ def validate_map(
                     }
                 )
 
-    summary = finding_counts(findings)
+    coverage_inputs = evidence_map.get("coverage_inputs") or []
+    for item in coverage_inputs:
+        if item.get("selected") and item.get("status") in COVERAGE_INPUT_FAILURES:
+            findings.append({
+                "id": f"TEST-EVIDENCE-INPUT.{item['status']}.{item['path']}",
+                "severity": input_severity,
+                "status": f"coverage_input_{item['status']}",
+                "path": item["path"],
+                "message": item.get("message") or "Selected coverage input could not be analyzed.",
+                "human_review_required": True,
+            })
+    test_inputs = evidence_map.get("test_inputs") or []
+    for item in test_inputs:
+        if item.get("status") in {"unreadable", "parse_error"}:
+            input_status = item["status"]
+            findings.append({
+                "id": f"TEST-EVIDENCE-TEST-INPUT.{input_status}.{item['path']}",
+                "severity": input_severity,
+                "status": f"test_input_{input_status}",
+                "path": item["path"],
+                "message": item.get("message") or (
+                    "Discovered test file could not be read."
+                    if input_status == "unreadable"
+                    else "Discovered test file has invalid Python syntax."
+                ),
+                "human_review_required": True,
+            })
+    map_summary = evidence_map.get("summary") or {}
+    test_summary = {key: value for key, value in map_summary.items() if key.startswith("test_input")}
+    test_summary.setdefault("test_input_status", "unknown")
+    coverage_summary = {key: value for key, value in map_summary.items() if key.startswith("coverage_input")}
+    coverage_summary.setdefault("coverage_input_status", "unknown")
+    known_gaps = list(evidence_map.get("known_gaps") or [])
+    if coverage_summary["coverage_input_status"] == "unknown":
+        known_gaps.append("Coverage input completeness was not recorded by this map; regenerate it to verify selected inputs.")
+    if test_summary["test_input_status"] == "unknown":
+        known_gaps.append("Test input completeness was not recorded by this map; regenerate it to verify discovered files.")
+    summary = {**finding_counts(findings), **coverage_summary, **test_summary}
     status = status_from_counts(summary)
 
     return {
         "schema": "naos.test_evidence_health.v1",
+        "generated_at": controlled_utc_now_text(),
         "profile": profile,
+        "project_root": str(root.resolve()),
+        "naos_root": naos_root,
         "status": status,
         "advisory_mode": advisory,
         "map_summary": evidence_map.get("summary", {}),
         "summary": summary,
         "findings": findings,
+        "coverage_inputs": coverage_inputs,
+        "test_inputs": test_inputs,
+        "known_gaps": known_gaps,
         "limitations": [
             "This validator reports mapped evidence and gaps; it does not prove tests are sufficient.",
             "Complete test coverage must not be claimed unless coverage evidence exists and supports the claim.",
@@ -126,7 +171,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(report, indent=2))
     else:
-        print(f"NAOS test evidence validation: {report['status']} ({report['summary']['total_findings']} findings)")
+        print(
+            f"NAOS test evidence validation: {report['status']} "
+            f"({report['summary']['total_findings']} findings; "
+            f"coverage inputs: {report['summary']['coverage_input_status']}; "
+            f"test inputs: {report['summary']['test_input_status']})"
+        )
     return exit_code_for_summary(profile, report["summary"], policy, args.strict)
 
 

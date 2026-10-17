@@ -28,13 +28,14 @@ The kit also pins `requirements.txt` to `PyYAML==6.0.1` and
 `jsonschema==4.19.2` for reproducible local validation while leaving
 `pyproject.toml` package metadata ranges broader.
 
-This delta is not a publication event, package approval, security assurance,
-API behavior proof, vulnerability scan, supply-chain assurance,
-registry-trust proof, certification, compliance proof, or release authorization.
+This change description does not, by itself, establish package approval,
+security assurance, API behavior proof, vulnerability-scan results,
+supply-chain assurance, registry-trust proof, certification, compliance proof,
+or authority for a later release.
 
-The 1.1.0 claims are supported by current candidate files and executed
-validation; historical development milestones are not reused as release proof.
-Publication remains a separate maintainer action.
+The 1.1.0 release was published on 2026-09-16 with the sanitized export archive,
+export manifest, and SHA-256 checksums. Later local source changes are not in
+those published assets unless a separate release is authorized and completed.
 
 ## Summary
 

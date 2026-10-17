@@ -6,6 +6,10 @@ point to an exported or installed kit; all mutations use disposable projects.
 from __future__ import annotations
 
 import copy
+import ast
+import contextlib
+import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -13,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import yaml
 
@@ -259,9 +264,34 @@ class GeneratedHookSnapshotTests(unittest.TestCase):
                 workflow = yaml.safe_load((seed / ".github/workflows/naos-control-plane-ci.yml").read_text())
                 self.assertEqual(workflow["env"]["NAOS_PROFILE"], profile)
                 scripts = "\n".join(str(s.get("run", "")) for s in workflow["jobs"]["naos-readiness"]["steps"])
-                self.assertIn("validate_test_ac_references.py", scripts)
-                self.assertLess(scripts.index("naos model-policy"), scripts.index("naos control-plane-review"))
-                self.assertLess(scripts.index("naos model-telemetry"), scripts.index("naos control-plane-review"))
+                self.assertIn("-m naos_governance.scripts.naos_ci_readiness", scripts)
+                # CI delegates AC validation to the installed runner. Probe its
+                # first dispatch without running the producer/consumer chain.
+                runner_spec = importlib.util.spec_from_file_location(
+                    "generated_hook_readiness_probe", KIT / "scripts/naos_ci_readiness.py")
+                runner = importlib.util.module_from_spec(runner_spec)
+                runner_spec.loader.exec_module(runner)
+
+                class DispatchObserved(Exception):
+                    pass
+
+                with patch.object(runner.subprocess, "run", side_effect=DispatchObserved) as dispatch, \
+                        contextlib.redirect_stdout(io.StringIO()), self.assertRaises(DispatchObserved):
+                    runner.run_chain(seed, profile, "naos")
+                dispatch.assert_called_once()
+                self.assertEqual(dispatch.call_args.args[0], [sys.executable, str(VALIDATOR.resolve())])
+                self.assertEqual(dispatch.call_args.kwargs["cwd"], seed)
+                receipt = json.loads((seed / "naos/reports/ci_readiness.json").read_text())
+                self.assertEqual(receipt["ac_validator"]["authority"], "runner_adjacent")
+                self.assertTrue(receipt["ac_validator"]["applicable"])
+                runner_tree = ast.parse((KIT / "scripts/naos_ci_readiness.py").read_text())
+                producers = next(ast.literal_eval(node.value) for node in runner_tree.body
+                                 if isinstance(node, ast.Assign)
+                                 and any(isinstance(target, ast.Name) and target.id == "PRODUCERS"
+                                         for target in node.targets))
+                producer_names = [command[0] for command in producers]
+                self.assertLess(producer_names.index("model-policy"), producer_names.index("control-plane-review"))
+                self.assertLess(producer_names.index("model-telemetry"), producer_names.index("control-plane-review"))
                 self.assertEqual(workflow["jobs"]["naos-readiness"]["steps"][0]["with"]["fetch-depth"], 0)
 
 

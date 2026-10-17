@@ -1,15 +1,8 @@
 ---
-name: "systemic-wiring"
-description: "Check systemic wiring consistency for any project change. Use when modules, APIs, schemas, config, docs, commands, tests, hooks, dependencies, events, migrations, infrastructure, AI-assisted changes, or observability surfaces change. Tool-neutral: usable from Claude Code, Codex, Gemini CLI, Cursor, Copilot, or by human reviewers."
-parameters:
-  - name: target
-    description: "Changed surface: module, api, schema, event, migration, config, cli, docs, test, hook, dependency, access, infra, observability, network, ai-change, or all."
-    required: false
-    default: "all"
-  - name: depth
-    description: "Check depth: quick (triage only) or standard (full wiring check)."
-    required: false
-    default: "standard"
+name: systemic-wiring
+description: 'Check systemic wiring consistency for any project change. Use when modules, APIs, schemas, config, docs, commands, tests, hooks, dependencies, events, migrations, infrastructure, AI-assisted changes, or observability surfaces change. Tool-neutral: usable from Claude Code, Codex, Gemini CLI, Cursor, Copilot, or by human reviewers.'
+metadata:
+  naos-parameters: '[{"name":"target","description":"Changed surface: module, api, schema, event, migration, config, cli, docs, test, hook, dependency, access, infra, observability, network, ai-change, or all.","required":false,"default":"all"},{"name":"depth","description":"Check depth: quick (triage only) or standard (full wiring check).","required":false,"default":"standard"}]'
 ---
 
 # Systemic Wiring
@@ -78,6 +71,13 @@ Keep canonical kit/development sources separate from files generated or
 installed into adopter projects. A kit-only audit, plugin source, or maintainer
 history file is not adopter output. A generated `.github/`, `naos/`, or Make
 surface is not proof that its canonical source was reviewed.
+
+Adopter-authored product files are a third scope: optional `adopter_patterns`
+in the project routing rules declare their review route. Common source roots,
+tests and package manifests have a shipped product route; declare another layout
+explicitly. Keep these matches separate from generated-file propagation.
+Unknown paths, unknown targets and malformed declarations remain unresolved.
+Changed-path closure does not remove missing applicable governance evidence.
 
 ### Step 2: Check for Orphan Artifacts and Contradictions
 

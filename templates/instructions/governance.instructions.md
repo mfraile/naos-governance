@@ -55,7 +55,9 @@ make -f Makefile.naos naos-pre-implementation-alignment-review                # 
 make -f Makefile.naos naos-setup-recommendations                              # Orient module choices and next actions
 make -f Makefile.naos naos-governance-bypass-posture                          # Report local hook/CI bypass posture
 make -f Makefile.naos naos-external-evidence-ingest                           # Summarize local SARIF when configured
-make -f Makefile.naos naos-memory-readiness, make -f Makefile.naos naos-memory-use-policy, make -f Makefile.naos naos-learning-loop-review  # Review memory/MCP access, fallback, and governed learning posture
+make -f Makefile.naos naos-memory-readiness
+make -f Makefile.naos naos-memory-use-policy
+make -f Makefile.naos naos-learning-loop-review  # Review memory/MCP access, fallback, and governed learning posture
 make -f Makefile.naos naos-task-context TASK=<id>                            # Generate bounded task context for an active task
 make -f Makefile.naos naos-context-index                                     # Build generated local context index candidates
 make -f Makefile.naos naos-context-query QUERY="..."                         # Query bounded candidate references from the index

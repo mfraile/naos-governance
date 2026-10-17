@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:test_evidence_health:v1",
+  "title": "NAOS Test Evidence Health Report",
+  "description": "Source-to-test mapping and selected input health; mapping does not establish test execution or sufficiency.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "generated_at", "profile", "project_root", "naos_root", "status", "advisory_mode", "map_summary", "summary", "findings", "coverage_inputs", "test_inputs", "known_gaps", "limitations"],
+  "properties": {
+    "schema": {"const": "naos.test_evidence_health.v1"},
+    "generated_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "project_root": {"type": "string", "minLength": 1},
+    "naos_root": {"type": "string", "minLength": 1},
+    "status": {"enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "advisory_mode": {"type": "boolean"},
+    "map_summary": {"$ref": "#/$defs/map_summary"},
+    "summary": {
+      "allOf": [
+        {"$ref": "#/$defs/map_summary"},
+        {"type": "object", "required": ["blocking", "required", "warnings", "advisory", "total_findings", "coverage_input_status", "test_input_status"],
+         "properties": {
+           "blocking": {"type": "integer", "minimum": 0},
+           "required": {"type": "integer", "minimum": 0},
+           "warnings": {"type": "integer", "minimum": 0},
+           "advisory": {"type": "integer", "minimum": 0},
+           "total_findings": {"type": "integer", "minimum": 0}
+         }}
+      ]
+    },
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "coverage_inputs": {"type": "array", "items": {"$ref": "#/$defs/coverage_input"}},
+    "test_inputs": {"type": "array", "items": {"$ref": "#/$defs/test_input"}},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "map_summary": {
+      "type": "object",
+      "properties": {
+        "coverage_input_status": {"enum": ["complete", "incomplete", "not_configured", "unknown"]},
+        "test_input_status": {"enum": ["complete", "incomplete", "not_configured", "unknown"]},
+        "coverage_inputs_selected": {"type": "integer", "minimum": 0},
+        "coverage_inputs_parsed": {"type": "integer", "minimum": 0},
+        "coverage_inputs_failed": {"type": "integer", "minimum": 0},
+        "coverage_inputs_unsupported": {"type": "integer", "minimum": 0},
+        "test_inputs_selected": {"type": "integer", "minimum": 0},
+        "test_inputs_read": {"type": "integer", "minimum": 0},
+        "test_inputs_failed": {"type": "integer", "minimum": 0},
+        "sources": {"type": "integer", "minimum": 0},
+        "tests": {"type": "integer", "minimum": 0},
+        "mapped_sources": {"type": "integer", "minimum": 0},
+        "unmapped_sources": {"type": "integer", "minimum": 0},
+        "evidence_type_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
+      }
+    },
+    "coverage_input": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "origin", "selected", "status"],
+      "properties": {
+        "path": {"type": "string"},
+        "origin": {"enum": ["explicit", "discovered"]},
+        "selected": {"type": "boolean"},
+        "status": {"enum": ["parsed", "parsed_empty", "missing", "unreadable", "parse_error", "invalid_structure", "unsupported_format"]},
+        "source_references": {"type": "integer", "minimum": 0},
+        "message": {"type": "string"}
+      }
+    },
+    "test_input": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "status"],
+      "properties": {
+        "path": {"type": "string"},
+        "status": {"enum": ["read", "unreadable", "parse_error"]},
+        "failure_kind": {"enum": ["syntax_error", "decode_error"]},
+        "message": {"type": "string"}
+      }
+    },
+    "finding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"enum": ["advisory", "warning", "required", "blocking"]},
+        "status": {"type": "string", "minLength": 1},
+        "message": {"type": "string"},
+        "path": {"type": "string"},
+        "human_review_required": {"type": "boolean"}
+      }
+    }
+  }
+}

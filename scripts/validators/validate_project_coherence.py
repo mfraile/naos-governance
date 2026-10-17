@@ -29,6 +29,12 @@ import tokenize
 from pathlib import Path
 from typing import Callable, List, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from naos_console import configure_console_output, decode_child_output  # noqa: E402
+from naos_secret_patterns import is_secret_scan_file, secret_content_reason  # noqa: E402
+from naos_mcp_config_registry import _strip_jsonc  # noqa: E402
+from validators.validator_context import has_canonical_kit_sources, is_generated_adopter_repository as generated_context  # noqa: E402
+
 # ── Path configuration ────────────────────────────────────────────────────────
 NAOS_ROOT = Path(os.getenv("NAOS_ROOT", "naos"))
 LARGE_FILE_MB = float(os.getenv("LARGE_FILE_MB", "10"))
@@ -69,10 +75,6 @@ GENERATED_PROJECT_VALIDATORS = {
 }
 
 GENERATED_ADOPTER_BASELINE_SKIP_VALIDATORS = {
-    "validate_docs_consistency.py": (
-        "validates canonical kit public documentation and generated-document "
-        "templates, not one initialized adopter"
-    ),
     "validate_governed_debug_escalation.py": (
         "validates a separately installed and owner-approved opt-in control with "
         "an explicit profile, not baseline project coherence"
@@ -115,7 +117,7 @@ def print_header(text: str, color: str = Colors.CYAN) -> None:
 def is_kit_repository(root: Path | None = None) -> bool:
     """Return True when running from the NAOS kit source repo, not an initialized adopter project."""
     root = root or Path.cwd()
-    return (
+    return has_canonical_kit_sources(root) or (
         (root / "pyproject.toml").is_file()
         and (root / "naos_init.py").is_file()
         and (root / "templates" / "structural-seeds" / "naos" / "TASK_REGISTRY.yaml").is_file()
@@ -135,10 +137,7 @@ def should_skip_for_kit_repo(validator_path: Path, root: Path | None = None) -> 
 def is_generated_adopter_repository(root: Path | None = None) -> bool:
     """Return True for an initialized adopter carrying the generated profile contract."""
     root = root or Path.cwd()
-    return (
-        (root / NAOS_ROOT / "TASK_REGISTRY.yaml").is_file()
-        and (root / NAOS_ROOT / "profile_generated_surface_contract.json").is_file()
-    )
+    return generated_context(root, NAOS_ROOT)
 
 
 def should_skip_for_generated_adopter(
@@ -184,15 +183,11 @@ def validator_timeout_seconds(
 def run_validator(validator_path: Path) -> Tuple[bool, str, str]:
     name = validator_path.stem.replace("validate_", "").replace("_", " ").title()
 
-    # Determine project root: go up until we leave kit/scripts/validators/
-    # In the portable kit the validator lives at <project_root>/kit/scripts/validators/
-    # or at <project_root>/scripts/validators/ — walk up to find pyproject.toml / .git
+    # The caller selects the inspected repository; a packaged/copied validator's
+    # installation directory does not replace that project authority.
     project_root = Path.cwd()
-    for ancestor in [validator_path.resolve(), *validator_path.resolve().parents]:
-        if (ancestor / ".git").exists() or (ancestor / "pyproject.toml").exists():
-            project_root = ancestor
-            break
     timeout_seconds = validator_timeout_seconds(validator_path, project_root)
+    child_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
 
     try:
         result = subprocess.run(
@@ -200,11 +195,15 @@ def run_validator(validator_path: Path) -> Tuple[bool, str, str]:
             cwd=project_root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="surrogateescape",
+            env=child_env,
             timeout=timeout_seconds,
         )
         return result.returncode == 0, name, result.stdout + result.stderr
-    except subprocess.TimeoutExpired:
-        return False, name, f"⏱ Timeout (>{timeout_seconds}s)"
+    except subprocess.TimeoutExpired as exc:
+        partial = decode_child_output(exc.stdout) + decode_child_output(exc.stderr)
+        return False, name, f"⏱ Timeout (>{timeout_seconds}s)" + ("\n" + partial if partial else "")
     except Exception as e:
         return False, name, f"❌ Error: {e}"
 
@@ -235,55 +234,192 @@ def check_python_syntax() -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
+# Finite symbolic CloudFormation short forms; no tag resolution or execution.
+CLOUDFORMATION_TAGS = {
+    "Ref", "Condition", "Base64", "Cidr", "FindInMap", "GetAtt", "GetAZs",
+    "ImportValue", "Join", "Select", "Split", "Sub", "Transform", "If",
+    "Equals", "And", "Not", "Or", "Length", "ToJsonString",
+}
+
+
+def _format_issue(path: Path, root: Path, kind: str, error: Exception) -> str:
+    """Report only type/location, never parser messages or source snippets."""
+    location = ""
+    mark = getattr(error, "problem_mark", None)
+    if mark is not None:
+        location = f" at line {mark.line + 1}, column {mark.column + 1}"
+    elif isinstance(error, json.JSONDecodeError):
+        location = f" at line {error.lineno}, column {error.colno}"
+    return f"{path.relative_to(root)}: {kind} error ({type(error).__name__}){location}"
+
+
+def _format_paths(root: Path, suffixes: set[str]):
+    for path in sorted(root.rglob("*")):
+        if path.suffix not in suffixes:
+            continue
+        relative = path.relative_to(root)
+        if not any(part in EXCLUDE_DIRS for part in relative.parts):
+            yield path
+
+
+def _format_symlink(path: Path, root: Path) -> bool:
+    return path.is_symlink() or any(
+        parent.is_symlink() for parent in path.parents
+        if parent != root and root in parent.parents
+    )
+
+
+def _helm_template_chart(path: Path, root: Path, cache: dict[Path, bool]) -> Path | None:
+    """Classify selected templates only beneath a contained ordinary Helm chart."""
+    for parent in path.parents:
+        if parent != root and root not in parent.parents:
+            break
+        if parent.name != "templates":
+            continue
+        chart_root = parent.parent
+        if chart_root != root and root not in chart_root.parents:
+            continue
+        chart = chart_root / "Chart.yaml"
+        if chart not in cache:
+            cache[chart] = False
+            if chart.is_symlink() or not chart.is_file() or _format_symlink(chart, root):
+                continue
+            try:
+                import yaml
+                metadata = yaml.safe_load(chart.read_text(encoding="utf-8-sig"))
+                cache[chart] = (
+                    isinstance(metadata, dict) and metadata.get("apiVersion") in {"v1", "v2"}
+                    and isinstance(metadata.get("name"), str) and bool(metadata["name"].strip())
+                    and isinstance(metadata.get("version"), str) and bool(metadata["version"].strip())
+                )
+            except (ImportError, OSError, UnicodeError, ValueError, TypeError):
+                pass
+            except Exception:
+                # A malformed chart marker cannot authorize a template exclusion.
+                pass
+        if cache[chart]:
+            return chart.parent
+    return None
+
+
 def check_yaml_validity() -> Tuple[bool, List[str]]:
+    """Syntax-only safe YAML streams and finite symbolic CloudFormation tags."""
     issues: List[str] = []
     try:
         import yaml  # type: ignore[import-untyped]
     except ImportError:
-        return True, []
+        return False, ["YAML validation unavailable: PyYAML is required"]
 
+    class CloudFormationSafeLoader(yaml.SafeLoader):
+        pass
+
+    def intrinsic(loader, node):
+        if isinstance(node, yaml.ScalarNode):
+            return loader.construct_scalar(node)
+        if isinstance(node, yaml.SequenceNode):
+            return loader.construct_sequence(node)
+        if isinstance(node, yaml.MappingNode):
+            return loader.construct_mapping(node)
+        raise yaml.constructor.ConstructorError(None, None, "unsupported node", node.start_mark)
+
+    for tag in CLOUDFORMATION_TAGS:
+        CloudFormationSafeLoader.add_constructor("!" + tag, intrinsic)
     root = Path.cwd()
-    for yf in list(root.rglob("*.yaml")) + list(root.rglob("*.yml")):
-        if any(excl in yf.parts for excl in EXCLUDE_DIRS):
+    notes: List[str] = []
+    chart_cache: dict[Path, bool] = {}
+    for path in _format_paths(root, {".yaml", ".yml"}):
+        if _format_symlink(path, root):
+            issues.append(f"{path.relative_to(root)}: YAML symlink input refused; not analyzed")
+            continue
+        chart = _helm_template_chart(path, root, chart_cache)
+        if chart is not None:
+            notes.append(f"NOT_VALIDATED: {path.relative_to(root)}: unrendered Helm template; render/tool check needed")
             continue
         try:
-            yaml.safe_load(yf.read_text(encoding="utf-8"))
-        except Exception as e:
-            try:
-                rel = yf.relative_to(root)
-            except ValueError:
-                rel = yf
-            issues.append(f"{rel}: {e}")
-    return len(issues) == 0, issues
+            # Exhaust every document, including malformed later documents.
+            for _ in yaml.load_all(path.read_text(encoding="utf-8-sig"), Loader=CloudFormationSafeLoader):
+                pass
+        except (OSError, UnicodeError, yaml.YAMLError, ValueError, TypeError, RecursionError) as error:
+            issues.append(_format_issue(path, root, "YAML", error))
+    return len(issues) == 0, issues + notes
+
+
+def _is_jsonc_path(path: Path) -> bool:
+    return (
+        path.suffix in {".jsonc", ".code-workspace"}
+        or path.name in {"devcontainer.json", ".devcontainer.json"}
+        or (path.name.startswith("tsconfig") and path.suffix == ".json")
+        or (path.parent.name == ".vscode" and path.name in {"settings.json", "launch.json", "tasks.json"})
+    )
+
+
+def _checked_jsonc(text: str) -> str:
+    """Guard malformed comments/commas before the shared string-safe stripper."""
+    index = 0
+    in_string = False
+    escaped = False
+    previous = ""
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+        elif text.startswith("//", index):
+            while index < len(text) and text[index] not in "\r\n":
+                index += 1
+            continue
+        elif text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            if end < 0:
+                raise ValueError("unterminated JSONC comment")
+            index = end + 2
+            continue
+        elif char == "," and (not previous or previous in "[{,:"):
+            raise ValueError("invalid JSONC comma")
+        if not char.isspace():
+            previous = char
+        index += 1
+    return _strip_jsonc(text)
+
+
+def _reject_json_constant(_value: str):
+    raise ValueError("non-standard JSON constant")
 
 
 def check_json_validity() -> Tuple[bool, List[str]]:
+    """Strict BOM-tolerant JSON; comments/trailing commas only in named families."""
     issues: List[str] = []
     root = Path.cwd()
-    for jf in root.rglob("*.json"):
-        if any(excl in jf.parts for excl in EXCLUDE_DIRS):
+    notes: List[str] = []
+    chart_cache: dict[Path, bool] = {}
+    for path in _format_paths(root, {".json", ".jsonc", ".code-workspace"}):
+        if _format_symlink(path, root):
+            issues.append(f"{path.relative_to(root)}: JSON symlink input refused; not analyzed")
+            continue
+        chart = _helm_template_chart(path, root, chart_cache)
+        if chart is not None:
+            notes.append(f"NOT_VALIDATED: {path.relative_to(root)}: unrendered Helm template; render/tool check needed")
             continue
         try:
-            json.loads(jf.read_text(encoding="utf-8"))
-        except Exception as e:
-            try:
-                rel = jf.relative_to(root)
-            except ValueError:
-                rel = jf
-            issues.append(f"{rel}: {e}")
-    return len(issues) == 0, issues
+            text = path.read_text(encoding="utf-8-sig")
+            json.loads(_checked_jsonc(text) if _is_jsonc_path(path) else text,
+                       parse_constant=_reject_json_constant)
+        except (OSError, UnicodeError, ValueError, TypeError, RecursionError) as error:
+            issues.append(_format_issue(path, root, "JSON", error))
+    return len(issues) == 0, issues + notes
 
 
 def check_no_secrets(root: Path | None = None) -> Tuple[bool, List[str]]:
-    """Heuristic check for accidentally committed secrets."""
+    """Selected-pattern check using the shared credential contract, without inline waivers."""
     issues: List[str] = []
-    secret_patterns = [
-        (r'password\s*=\s*["\'][^"\']{8,}["\']', "Possible hardcoded password"),
-        (r'api[_-]?key\s*=\s*["\'][^"\']{20,}["\']', "Possible API key"),
-        (r'secret[_-]?key\s*=\s*["\'][^"\']{20,}["\']', "Possible secret key"),
-        (r"-----BEGIN (?:RSA |)PRIVATE KEY-----", "Private key detected"),
-    ]
-    exts = [".py", ".sh", ".yml", ".yaml", ".json", ".toml", ".env", ".conf"]
     root = (root or Path.cwd()).resolve()
     fixture_paths: set[Path] = set()
     fixture_prefixes: tuple[Path, ...] = ()
@@ -292,24 +428,27 @@ def check_no_secrets(root: Path | None = None) -> Tuple[bool, List[str]]:
         issues.extend(override_issues)
         fixture_paths = set(overrides["intentional_secret_fixture_paths"])
         fixture_prefixes = tuple(overrides["intentional_secret_fixture_prefixes"])
-    for ext in exts:
-        for fp in root.rglob(f"*{ext}"):
-            if any(excl in fp.parts for excl in EXCLUDE_DIRS):
-                continue
-            try:
-                rel_path = fp.relative_to(root)
-            except ValueError:
-                rel_path = fp
-            if is_intentional_secret_fixture(
-                rel_path,
-                fixture_paths=fixture_paths,
-                fixture_prefixes=fixture_prefixes,
-            ):
-                continue
-            text = fp.read_text(encoding="utf-8", errors="ignore")
-            for pattern, desc in secret_patterns:
-                if re.search(pattern, text, re.IGNORECASE):
-                    issues.append(f"{rel_path}: {desc}")
+    for fp in sorted(root.rglob("*")):
+        rel_path = fp.relative_to(root)
+        # data/ is application input for this check; other built-ins retain their exclusions.
+        if any(part in EXCLUDE_DIRS - {"data"} for part in rel_path.parts):
+            continue
+        if not is_secret_scan_file(fp) or (not fp.is_file() and not fp.is_symlink()):
+            continue
+        if is_intentional_secret_fixture(rel_path, fixture_paths=fixture_paths,
+                                         fixture_prefixes=fixture_prefixes):
+            continue
+        if fp.is_symlink() or any(parent.is_symlink() for parent in fp.parents if parent != root and root in parent.parents):
+            issues.append(f"{rel_path}: selected secret input is a symlink; not analyzed")
+            continue
+        try:
+            text = fp.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            issues.append(f"{rel_path}: selected secret input could not be read as UTF-8")
+            continue
+        reason = secret_content_reason(text)
+        if reason is not None:
+            issues.append(f"{rel_path}: Secret-like pattern ({reason})")
     return len(issues) == 0, issues
 
 
@@ -473,6 +612,7 @@ def check_no_draft_files() -> Tuple[bool, List[str]]:
 
 
 def main() -> int:
+    configure_console_output()
     print_header("🔍 MASTER PROJECT COHERENCE VALIDATOR (NAOS)", Colors.MAGENTA)
 
     kit_repo = is_kit_repository()
@@ -544,17 +684,22 @@ def main() -> int:
         ("Python Syntax", check_python_syntax),
         ("YAML Validity", check_yaml_validity),
         ("JSON Validity", check_json_validity),
-        ("No Secrets", check_no_secrets),
+        ("Selected Secret Patterns (heuristic)", check_no_secrets),
         ("No Large Files", check_large_files),
         ("No Draft Files in Root", check_no_draft_files),
     ]
 
+    coverage_notes: List[str] = []
     for check_name, fn in builtin_checks:
         ok, issues = fn()
         total += 1
         if ok:
             passed_count += 1
             print(f"{Colors.GREEN}✓ PASS{Colors.END} — {check_name}")
+            for issue in issues:
+                print(f"  {Colors.YELLOW}→ {issue}{Colors.END}")
+                if issue.startswith("NOT_VALIDATED:"):
+                    coverage_notes.append(issue)
         else:
             failed.append(check_name)
             print(f"{Colors.RED}✗ FAIL{Colors.END} — {check_name}")
@@ -599,8 +744,10 @@ def main() -> int:
         )
         return 1
 
+    if coverage_notes:
+        print(f"{Colors.YELLOW}NOT_VALIDATED coverage remains; complete the listed tool checks.{Colors.END}")
     print(
-        f"{Colors.GREEN}{Colors.BOLD}✅ ALL CHECKS PASSED — PROJECT IS COHERENT!{Colors.END}\n"
+        f"{Colors.GREEN}{Colors.BOLD}✅ ALL SELECTED CHECKS PASSED{Colors.END}\n"
     )
     return 0
 

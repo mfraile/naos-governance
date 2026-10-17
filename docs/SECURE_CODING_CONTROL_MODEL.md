@@ -37,7 +37,8 @@ replace policy, gatekeeper, evidence, exception, and human decision authority.
   — deterministic route, evidence-availability, freshness, mapping-state, and
   human-review report.
 - [`capabilities/secure_coding_reporting.yaml`](../capabilities/secure_coding_reporting.yaml)
-  — separately bounded P3 presentation capability with no gate authority.
+  — bounded P3 presentation with normal G4/G6 capability maturity linkage;
+  the report and producer have no gate decision authority.
 - [`schemas/naos/secure_coding_reporting.schema.json`](../schemas/naos/secure_coding_reporting.schema.json)
   — exact five-dimension P3 report contract.
 - [`scripts/naos_secure_coding_reporting.py`](../scripts/naos_secure_coding_reporting.py)
@@ -96,9 +97,12 @@ satisfaction, security, conformance, compliance, approval, or release verdict.
 
 P3 is derived presentation. It consumes the authoritative P1/P2 reports and may
 write only its report plus bounded regions or objects in existing generated
-dashboard and evidence artifacts. `CAP-SECURE-CODING-REPORTING` has no gatekeeper
-assignment. G4/G6 continue to consume underlying evidence rather than the P3
-presentation.
+dashboard and evidence artifacts. `CAP-SECURE-CODING-REPORTING` links
+to G4/G6 through the normal capability maturity contract. Its declared current
+and target maturity and profile enforcement contribute to the ordinary gate
+severity ceiling, which cannot exceed the declared gate severity. G4/G6 continue
+to consume underlying evidence rather than the P3 presentation. The report and
+producer cannot set gate severity or make gate decisions.
 
 ## 3. Register and render contracts
 
@@ -158,6 +162,19 @@ retain their narrow contracts. Dependency hallucination, context leakage, and
 claim integrity remain `indirect`; external SARIF remains `partial` for
 applicable controls.
 
+Package reality parses configured Python declarations and retains offline-only
+review by default. Its separate, bounded filename inventory identifies unsupported
+manifests such as `package.json` and `go.mod` as `not_assessed`; it does not review
+their dependencies. Inventory coverage is limited to selected roots and exclusions:
+unsupported manifests make it partial, and unsafe paths, discovery errors or bounds
+make it incomplete. Symlink/reparse paths are not followed by this inventory,
+exclusions are case-insensitive, and concurrent filesystem changes are not an
+authenticated snapshot. Name similarity includes adjacent transpositions at the
+configured distance threshold; it is heuristic review evidence, with known-name
+and adopter allowlist exclusions, rather than registry existence or package safety
+proof. Existing profile severity, strict exits and explicit online consent remain
+authoritative.
+
 P2 reports each detector route independently. Required, conditional, optional,
 not-applicable, missing, available, malformed, and stale states remain evidence
 routing states, not control outcomes.
@@ -169,6 +186,21 @@ P3 exposes exactly five independent dimensions:
 3. detector evidence availability and freshness;
 4. mapping verification;
 5. human review.
+
+Detector routes inspect the finite canonical producer schemas before treating a
+report as available. Empty objects, malformed reports, mismatched declared
+scope, and adverse or unexecuted producer outcomes remain unresolved findings.
+The route retains validation, producer outcome, source finding references and
+reason codes separately; a clean status cannot hide adverse subordinate content.
+External SARIF retains its unverified review-evidence ceiling.
+
+A present `generated_at` must include a timezone and may be at most five minutes
+in the future. Invalid, naive or later timestamps remain unresolved and never
+fall back to modification time. Schema-valid producers that omit `generated_at`
+(such as the claims validator) retain an explicit `file_mtime` age basis.
+That measures bounded file age, not producer execution age or current-source
+freshness. The central policy still supplies the staleness window and severity;
+a zero window disables age-based staleness, not timestamp validity checks.
 
 No dimension is converted into a control verdict. The dimensions are not summed,
 weighted, averaged, or collapsed into a blended/composite security score.
@@ -215,7 +247,7 @@ security, or operating effectiveness.
 | P2 capability | `capabilities/secure_coding_controls.yaml` | Detector/evidence-routing authority, resources, limits, and evidence |
 | Evidence routes | `templates/structural-seeds/naos/secure_coding_control_evidence_routes.yaml` | Detector-to-report and G4/G6 routing contract |
 | P2 control report | `scripts/naos_secure_coding_controls.py` | Register/route validity plus separate evidence, freshness, mapping, human-review dimensions, and a framework-version snapshot from the canonical register |
-| P3 capability | `capabilities/secure_coding_reporting.yaml` | Derived presentation authority and explicit absence of gate authority |
+| P3 capability | `capabilities/secure_coding_reporting.yaml` | Derived report/producer authority boundary and normal G4/G6 capability maturity linkage |
 | P3 report schema | `schemas/naos/secure_coding_reporting.schema.json` | Exact five-dimension structural contract plus a derived standards snapshot for future framework-version review |
 | P3 command | `scripts/naos_secure_coding_reporting.py` | Consume P1/P2 reports, generate P3 report, and project bounded output |
 | Portable P1 adapter | `scripts/secure_coding_reporting/portable_reference.py` | Map adopter paths through an isolated canonical P1 validation view |
@@ -224,6 +256,71 @@ security, or operating effectiveness.
 | Dashboard/evidence projection | `scripts/secure_coding_reporting/projection.py` | Preflight, reject symlinks, and update only existing generated artifacts |
 | Systemic-impact rules | `templates/structural-seeds/naos/systemic_impact_rules.yaml` | Review propagation for register, detector, mapping, evidence, and AI-surface changes |
 | Control-plane review rules | `templates/structural-seeds/naos/control_plane_review_rules.yaml` | Human disposition routing without automatic remediation or approval |
+
+The local secret-hygiene detector excludes safe relative `docs/` or `specs/`
+document paths from entropy findings only when they appear in YAML reference
+fields or their lists. Sensitive assignments and provider signatures remain
+checked, including path-shaped values. This reduces false positives in shipped
+cookbook references; it does not prove that referenced files exist or are safe.
+An unknown credential deliberately shaped as such a document reference can
+evade entropy-only detection.
+
+
+The default text suffixes include JSONL, so audit records receive the same
+provider, assignment and quoted-literal checks as JSON. Explicit adopter suffix
+overrides remain authoritative; coverage continues to mean selected inputs.
+
+Entropy-only public noise reduction uses the shipped
+`scripts/naos_secret_public_literals.json` catalog, whose exact bytes are SHA-256
+bound in `scripts/naos_secret_public_literals.py`. The offline
+`generate_naos_secret_public_literals.py` generator selects reviewed product
+member identities, actual installer destination declarations, schema public
+identifiers/enum/property/parser declarations, central public report operands,
+and finite reviewed public grammar/source-format selectors. It never reads
+adopter findings or admits every Python literal. Each group records its source,
+selector and selected-component digest. Catalog generation and selector changes
+require source review; `--check` detects stale data/digest pairs. Missing,
+unreadable, malformed, duplicate, oversized, linked or Windows reparse-point
+catalog inputs produce a blocking source-bound finding and no public exceptions.
+
+Recognition requires complete exact quoted-literal equality, including exact
+JSON/Python emitted escape representations. Only independently declared complete
+operands expand under the observed project root and executing module location;
+The exact live absolute `sys.executable` string is also a public runtime
+operand; stored interpreter fields, path searches and aliases supply no
+exception. Unknown paths, suffix additions, mixed strings, JSON keys and metadata values
+receive the ordinary checks. The existing installer copy marker, and coincident
+project/module roots, conservatively prevent installed-only kit members from
+being invented as adopter destinations. No filename-existence, directory-role,
+root-prefix or arbitrary source-literal permission is introduced. The exact
+public macOS attribute name `Y29tLmFwcGxlLnByb3ZlbmFuY2U=` is recognized; attribute
+payloads receive no exception.
+
+The designated `.naos/upgrade-v1/OWNER.json` may contribute only its exact public
+enrollment label, recomputed as UUIDv5 from the native resolved project root and
+a strict lowercase SHA-256 plan string. Duplicate, malformed, unsafe, missing or
+mismatched inputs contribute no exception. This is entropy classification, not
+proof of enrollment, ownership, authorization or producer authenticity.
+
+New marked audit IDs are independently recomputed by the audit producer's pure
+exact-body API. A bounded collector can also derive the complete audit filename
+operand from a verified event, exact actual root/NAOS-root agreement, the shipped
+default audit location and a valid timezone-aware timestamp. It reads only
+independently selected regular JSON/JSONL inputs, at most 8 MiB each and 32 MiB
+per corpus, with finite structure/result limits and strict duplicate/nonfinite
+JSON refusal. Body fields, neighboring strings, providers and sensitive
+assignments still receive the ordinary scan. Legacy random IDs, unknown event
+types, arbitrary source-report/artifact paths, custom audit locations and partial
+basename/prefix matches receive no such exception. Invalid intake grants no
+coverage or authenticity claim. The `public_literal_matches` report count is
+exact literal recognition before the entropy predicate, not a count of secrets
+or independently suppressed findings.
+
+These finite public values could deliberately be used as credentials, just as
+an existing explicitly allowed public identifier could. Entropy alone would
+then miss the exact value; assignment/provider controls remain active. The
+scanner still makes no secret-free, complete scanning or security assurance
+claim, and retains its existing paired, whitespace-free quoted-literal scope.
 
 ## 8. Phased status
 
@@ -264,7 +361,8 @@ activate project security enforcement.
 ### P3 — bounded reporting: complete
 
 - `CAP-SECURE-CODING-REPORTING` separates derived presentation from P2 gate
-  evidence and has no gatekeeper assignment;
+  evidence; its normal G4/G6 capability linkage contributes to the maturity
+  severity ceiling without adding the P3 report as gate evidence;
 - an exact schema enforces five dimensions, mandatory human review, limitations,
   and explicit non-claims;
 - P1/P2 source results are invoked and persisted rather than reimplemented;
@@ -308,3 +406,75 @@ referentially coherent. It does not mean application code is secure, mappings
 are verified, detector evidence is valid or complete, any control is satisfied,
 or any gate, release, approval, certification, or compliance obligation is
 satisfied.
+
+
+The exact public entropy vocabulary includes its digest-bound catalog selector
+names. Default task card and compact operands are recomputed only from the
+selected canonical task registry validated against shipped schema bytes, with
+the finite default ordinal task IDs (T-[0-9]{3}, 1,000 labels). Namespaced/custom task IDs,
+session IDs of any shape, authored paths, arbitrary filenames and neighboring
+values do not establish membership. Duplicate/aliased/malformed, unreadable,
+oversized or linked/reparse inputs provide no recognition. All raw source IDs
+and bodies, assignment checks and provider checks remain scanned. These public
+naming classifications assert no identity, ownership or permission.
+
+Exact local index artifact IDs and their graph node aliases, plus external SARIF
+result IDs and their control-plane route aliases, are recomputed by shared pure
+producer functions. Recognition requires the selected default local index or
+external ingest report operand, exact project and NAOS root context, strict JSON,
+shipped schema bytes, bounded ordinary files, and complete valid defining fields.
+Duplicate identities, unsafe defining paths, malformed values and copied IDs in
+custom or unselected reports provide no recognition. The collector reads at most
+two reports of 1 MiB each, with the existing depth/node/entry bounds. It excludes
+only exact recomputed label strings from entropy checks; defining fields, other
+body values and mixed strings remain scanned. Hash-derived naming asserts no
+authenticity, source truth, external finding verification or permission.
+
+Authored planning, decision and spec references, plus custom and random/default
+session references, require existing explicit adopter-reviewed exact entropy
+declarations when they trigger the detector. UUID shape or a session-index record
+alone does not prove publicness. Default random session path noise remains a
+known usability limitation; this correction does not claim universal default
+session recognition or a fully clean workflow.
+
+SQLite coordination reports retain the stable target, action, result and status.
+They no longer publish a successful write's random operational temporary filename;
+`temp_db_path` is null and temporary cleanup/replace references identify their role.
+This changes report presentation only, not filename generation or write/lock
+coordination. Legacy reports containing operational names remain ordinary inputs.
+
+
+Secret-hygiene reports label the final findings array `SH-1`, `SH-2`, and so
+on, with `id_scheme: report_ordinal_v1`. Evidence-classification reports label their missing-classification diagnostics
+`EC-<array position>` with the same scheme marker; unrelated policy/parse
+diagnostic IDs remain unchanged. These deterministic ordinals are unique within one
+report and follow its array order; they are not content addresses, credentials,
+producer authentication or stable cross-run identities. Every physical finding
+record retains its own label, including identical bodies. Paths, line/column,
+detector status, severity and redacted messages remain separate actionable
+fields. No detected credential value is copied into a generated label.
+
+Classification retains the original source finding ID alongside source-report
+path/hash, bucket/index and source-item hash. A report-local ordinal must never
+be used without its report context. Existing readers still accept legacy
+string IDs, including path-based and content-addressed IDs; retained evidence
+is not rewritten. Bounded exact recognition of old content-addressed IDs stays
+available and fails closed at the existing limits. New report labels require
+no entropy exemption or proof collection. Raw report bodies, unknown IDs,
+assignment/provider detection and scan coverage remain unchanged.
+
+SARIF emits document-local `NAOS-D1`, `NAOS-D2`, and so on only for marked
+ordinal records from secret hygiene and evidence classification, including their
+existing self-check copies. Distinct original rule identities retain distinct
+labels in first-seen order. All other and unmarked legacy SARIF rule IDs remain
+unchanged; an explicit rule_id override retains the existing rule identity.
+Result `ruleId` and rule `id` use the same selected label. The existing structured
+source/ID identity pair, duplicate-routing semantics, raw source finding IDs and
+complete SHA-256 content fingerprints remain unchanged: short labels are assigned
+only after the original result and fingerprint computation. The new labels are
+not stable across different exports; fingerprints and provenance retain separate
+roles. The scheme marker selects a producer format, not authenticated authority.
+This avoids regenerating long derived identifier literals for these records
+without changing detectors, hash values, resource limits or unknown-value
+handling. Legacy generated identifiers and arbitrary raw report content can
+still yield findings. No universal clean-workflow or readiness claim is made.

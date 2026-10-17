@@ -1,164 +1,2639 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:naos-governance:schemas:naos:dashboard_summary:v1",
-  "title": "NAOS Dashboard Summary Report",
-  "description": "Schema for the machine-readable summary emitted by scripts/workflows/generate_naos_dashboard.py. The dashboard summarizes advisory control-plane evidence; it is not approval, certification, compliance proof, or release authorization.",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schema",
-    "generated_at",
-    "profile",
-    "status",
-    "naos_root",
-    "policy",
-    "inputs",
-    "findings",
-    "limitations",
-    "summary",
-    "ac_completion_evidence",
-    "adapter_coherence",
-    "advanced_capability_readiness",
-    "agent_trace_validation",
-    "agentic_workflow",
-    "ai_code_provenance",
-    "ai_surface_health",
-    "audit_log",
-    "behavioral_governance_readiness",
-    "calibration_shadow",
-    "capability_maturity",
-    "capability_maturity_readiness",
-    "claims_validation",
-    "compliance_posture",
-    "composed_traceability",
-    "control_plane_review",
-    "cross_harness_review_readiness",
-    "deterministic_hygiene",
-    "evidence_attestation",
-    "evidence_classification",
-    "evidence_conflicts",
-    "evidence_pack",
-    "evidence_verification",
-    "exceptions_waivers",
-    "external_evidence_ingest",
-    "failure_mode_observations",
-    "function_index_health",
-    "gatekeeper_readiness",
-    "governance_bypass_posture",
-    "grader_assessment",
-    "graph_context_query",
-    "graph_context_readiness",
-    "harness_trace_import",
-    "learning_loop_review",
-    "llm_grader_readiness",
-    "local_context_index",
-    "local_context_query",
-    "memory_context_readiness",
-    "memory_provider_access",
-    "memory_use_policy",
-    "module_header_traceability",
-    "operator_attribution",
-    "plan_coherence",
-    "policy_overrides",
-    "pr_governance",
-    "pr_risk_classification",
-    "pre_implementation_alignment",
-    "professional_adoption",
-    "research_record",
-    "roadmap_crosswalk",
-    "self_conformance",
-    "semantic_candidate_layer",
-    "session_identity",
-    "session_lifecycle",
-    "setup_recommendations",
-    "spec_assembly_worksheet",
-    "spec_cascade_coherence",
-    "spec_pack_contract",
-    "spec_pack_materialization",
-    "sqlite_write_coordination",
-    "static_grader",
-    "systemic_impact_review",
-    "task_claims",
-    "task_context_pack",
-    "task_lifecycle",
-    "test_evidence_health"
-  ],
-  "properties": {
-    "schema": {"const": "naos.dashboard_summary.v1"},
-    "generated_at": {"type": "string"},
-    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"type": "string"},
-    "naos_root": {"type": "string"},
-    "policy": {"type": "object"},
-    "inputs": {"type": "object"},
-    "findings": {"type": "array", "items": {"type": "object"}},
-    "limitations": {"type": "array", "items": {"type": "string"}},
-    "summary": {"type": "object"},
-    "ac_completion_evidence": {"type": "object"},
-    "adapter_coherence": {"type": "object"},
-    "advanced_capability_readiness": {"type": "object"},
-    "agent_trace_validation": {"type": "object"},
-    "agentic_workflow": {"type": "object"},
-    "ai_code_provenance": {"type": "object"},
-    "ai_surface_health": {"type": "object"},
-    "audit_log": {"type": "object"},
-    "behavioral_governance_readiness": {"type": "object"},
-    "calibration_shadow": {"type": "object"},
-    "capability_maturity": {"type": "object"},
-    "capability_maturity_readiness": {"type": "object"},
-    "claims_validation": {"type": "object"},
-    "compliance_posture": {"type": "object"},
-    "composed_traceability": {"type": "object"},
-    "control_plane_review": {"type": "object"},
-    "cross_harness_review_readiness": {"type": "object"},
-    "deterministic_hygiene": {"type": "object"},
-    "evidence_attestation": {"type": "object"},
-    "evidence_classification": {"type": "object"},
-    "evidence_conflicts": {"type": "object"},
-    "evidence_pack": {"type": "object"},
-    "evidence_verification": {"type": "object"},
-    "exceptions_waivers": {"type": "object"},
-    "external_evidence_ingest": {"type": "object"},
-    "failure_mode_observations": {"type": "object"},
-    "function_index_health": {"type": "object"},
-    "gatekeeper_readiness": {"type": "object"},
-    "governance_bypass_posture": {"type": "object"},
-    "grader_assessment": {"type": "object"},
-    "graph_context_query": {"type": "object"},
-    "graph_context_readiness": {"type": "object"},
-    "harness_trace_import": {"type": "object"},
-    "learning_loop_review": {"type": "object"},
-    "llm_grader_readiness": {"type": "object"},
-    "local_context_index": {"type": "object"},
-    "local_context_query": {"type": "object"},
-    "memory_context_readiness": {"type": "object"},
-    "memory_provider_access": {"type": "object"},
-    "memory_use_policy": {"type": "object"},
-    "module_header_traceability": {"type": "object"},
-    "operator_attribution": {"type": "object"},
-    "plan_coherence": {"type": "object"},
-    "policy_overrides": {"type": "object"},
-    "pr_governance": {"type": "object"},
-    "pr_risk_classification": {"type": "object"},
-    "pre_implementation_alignment": {"type": "object"},
-    "professional_adoption": {"type": "object"},
-    "research_record": {"type": "object"},
-    "roadmap_crosswalk": {"type": "object"},
-    "self_conformance": {"type": "object"},
-    "semantic_candidate_layer": {"type": "object"},
-    "session_identity": {"type": "object"},
-    "session_lifecycle": {"type": "object"},
-    "setup_recommendations": {"type": "object"},
-    "spec_assembly_worksheet": {"type": "object"},
-    "spec_cascade_coherence": {"type": "object"},
-    "spec_pack_contract": {"type": "object"},
-    "spec_pack_materialization": {"type": "object"},
-    "sqlite_write_coordination": {"type": "object"},
-    "static_grader": {"type": "object"},
-    "systemic_impact_review": {"type": "object"},
-    "task_claims": {"type": "object"},
-    "task_context_pack": {"type": "object"},
-    "task_lifecycle": {"type": "object"},
-    "test_evidence_health": {"type": "object"}
-  }
+  "$id": "urn:naos-governance:schemas:naos:dashboard_summary:supported",
+  "oneOf": [
+    {
+      "title": "NAOS Dashboard Summary Report",
+      "description": "Schema for the machine-readable summary emitted by scripts/workflows/generate_naos_dashboard.py. The dashboard summarizes advisory control-plane evidence; it is not approval, certification, compliance proof, or release authorization.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "generated_at",
+        "project_root",
+        "profile",
+        "status",
+        "naos_root",
+        "policy",
+        "inputs",
+        "findings",
+        "limitations",
+        "summary",
+        "ac_completion_evidence",
+        "adapter_coherence",
+        "advanced_capability_readiness",
+        "agent_trace_validation",
+        "agentic_workflow",
+        "ai_code_provenance",
+        "ai_surface_health",
+        "audit_log",
+        "behavioral_governance_readiness",
+        "calibration_shadow",
+        "capability_maturity",
+        "capability_maturity_readiness",
+        "claims_validation",
+        "compliance_posture",
+        "composed_traceability",
+        "control_plane_review",
+        "cross_harness_review_readiness",
+        "deterministic_hygiene",
+        "evidence_attestation",
+        "evidence_classification",
+        "evidence_conflicts",
+        "evidence_pack",
+        "evidence_verification",
+        "exceptions_waivers",
+        "external_evidence_ingest",
+        "failure_mode_observations",
+        "function_index_health",
+        "gatekeeper_readiness",
+        "governance_bypass_posture",
+        "grader_assessment",
+        "graph_context_query",
+        "graph_context_readiness",
+        "harness_trace_import",
+        "learning_loop_review",
+        "llm_grader_readiness",
+        "local_context_index",
+        "local_context_query",
+        "memory_context_readiness",
+        "memory_provider_access",
+        "memory_use_policy",
+        "module_header_traceability",
+        "operator_attribution",
+        "plan_coherence",
+        "policy_overrides",
+        "pr_governance",
+        "pr_risk_classification",
+        "pre_implementation_alignment",
+        "professional_adoption",
+        "research_record",
+        "roadmap_crosswalk",
+        "self_conformance",
+        "semantic_candidate_layer",
+        "session_identity",
+        "session_lifecycle",
+        "setup_recommendations",
+        "spec_assembly_worksheet",
+        "spec_cascade_coherence",
+        "spec_pack_contract",
+        "spec_pack_materialization",
+        "sqlite_write_coordination",
+        "static_grader",
+        "systemic_impact_review",
+        "task_claims",
+        "task_context_pack",
+        "task_lifecycle",
+        "test_evidence_health"
+      ],
+      "properties": {
+        "schema": {
+          "const": "naos.dashboard_summary.v1"
+        },
+        "generated_at": {
+          "type": "string"
+        },
+        "project_root": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "quickstart",
+            "lite",
+            "standard",
+            "assured"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "naos_root": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "object"
+        },
+        "inputs": {
+          "type": "object"
+        },
+        "input_applicability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "selected_workflows",
+            "inputs",
+            "errors"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "selected_workflows",
+                "selected_obligations"
+              ]
+            },
+            "selected_workflows": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "advisory_missing_inputs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "inputs": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "workflow",
+                  "decision",
+                  "reason",
+                  "path",
+                  "input_status"
+                ],
+                "properties": {
+                  "workflow": {
+                    "type": "string"
+                  },
+                  "decision": {
+                    "enum": [
+                      "required_by_gate",
+                      "selected",
+                      "exempt_missing",
+                      "present_or_invalid",
+                      "selected_required",
+                      "unselected_missing_advisory"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "input_status": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "object"
+        },
+        "ac_completion_evidence": {
+          "type": "object"
+        },
+        "adapter_coherence": {
+          "type": "object"
+        },
+        "advanced_capability_readiness": {
+          "type": "object"
+        },
+        "agent_trace_validation": {
+          "type": "object"
+        },
+        "agentic_workflow": {
+          "type": "object"
+        },
+        "ai_code_provenance": {
+          "type": "object"
+        },
+        "ai_surface_health": {
+          "type": "object"
+        },
+        "audit_log": {
+          "type": "object"
+        },
+        "behavioral_governance_readiness": {
+          "type": "object"
+        },
+        "calibration_shadow": {
+          "type": "object"
+        },
+        "capability_maturity": {
+          "type": "object"
+        },
+        "capability_maturity_readiness": {
+          "type": "object"
+        },
+        "claims_validation": {
+          "type": "object"
+        },
+        "compliance_posture": {
+          "type": "object"
+        },
+        "composed_traceability": {
+          "type": "object"
+        },
+        "control_plane_review": {
+          "type": "object"
+        },
+        "cross_harness_review_readiness": {
+          "type": "object"
+        },
+        "deterministic_hygiene": {
+          "type": "object"
+        },
+        "evidence_attestation": {
+          "type": "object"
+        },
+        "evidence_classification": {
+          "type": "object"
+        },
+        "evidence_conflicts": {
+          "type": "object"
+        },
+        "evidence_pack": {
+          "type": "object",
+          "properties": {
+            "status_scope": {
+              "const": "collection_findings"
+            },
+            "assembly_status": {
+              "enum": [
+                "complete",
+                "incomplete",
+                "invalid",
+                "not_evaluated"
+              ]
+            },
+            "readiness": {
+              "type": "object"
+            },
+            "producer_outcome_summary": {
+              "type": "object"
+            },
+            "projection_scope": {
+              "const": "stored_pack_fields"
+            }
+          }
+        },
+        "evidence_verification": {
+          "type": "object"
+        },
+        "exceptions_waivers": {
+          "type": "object"
+        },
+        "external_evidence_ingest": {
+          "type": "object"
+        },
+        "failure_mode_observations": {
+          "type": "object"
+        },
+        "function_index_health": {
+          "type": "object"
+        },
+        "gatekeeper_readiness": {
+          "type": "object"
+        },
+        "governance_bypass_posture": {
+          "type": "object"
+        },
+        "grader_assessment": {
+          "type": "object"
+        },
+        "graph_context_query": {
+          "type": "object"
+        },
+        "graph_context_readiness": {
+          "type": "object"
+        },
+        "harness_trace_import": {
+          "type": "object"
+        },
+        "learning_loop_review": {
+          "type": "object"
+        },
+        "llm_grader_readiness": {
+          "type": "object"
+        },
+        "local_context_index": {
+          "type": "object"
+        },
+        "local_context_query": {
+          "type": "object"
+        },
+        "memory_context_readiness": {
+          "type": "object"
+        },
+        "memory_provider_access": {
+          "type": "object"
+        },
+        "memory_use_policy": {
+          "type": "object"
+        },
+        "module_header_traceability": {
+          "type": "object"
+        },
+        "operator_attribution": {
+          "type": "object"
+        },
+        "plan_coherence": {
+          "type": "object"
+        },
+        "policy_overrides": {
+          "type": "object"
+        },
+        "pr_governance": {
+          "type": "object"
+        },
+        "pr_risk_classification": {
+          "type": "object"
+        },
+        "pre_implementation_alignment": {
+          "type": "object"
+        },
+        "professional_adoption": {
+          "type": "object"
+        },
+        "research_record": {
+          "type": "object"
+        },
+        "roadmap_crosswalk": {
+          "type": "object"
+        },
+        "self_conformance": {
+          "type": "object"
+        },
+        "semantic_candidate_layer": {
+          "type": "object"
+        },
+        "session_identity": {
+          "type": "object"
+        },
+        "session_lifecycle": {
+          "type": "object"
+        },
+        "setup_recommendations": {
+          "type": "object"
+        },
+        "spec_assembly_worksheet": {
+          "type": "object"
+        },
+        "spec_cascade_coherence": {
+          "type": "object"
+        },
+        "spec_pack_contract": {
+          "type": "object"
+        },
+        "spec_pack_materialization": {
+          "type": "object"
+        },
+        "sqlite_write_coordination": {
+          "type": "object"
+        },
+        "static_grader": {
+          "type": "object"
+        },
+        "systemic_impact_review": {
+          "type": "object"
+        },
+        "task_claims": {
+          "type": "object"
+        },
+        "task_context_pack": {
+          "type": "object"
+        },
+        "task_lifecycle": {
+          "type": "object"
+        },
+        "test_evidence_health": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "title": "NAOS Dashboard Summary Report",
+      "description": "Schema for the machine-readable summary emitted by scripts/workflows/generate_naos_dashboard.py. The dashboard summarizes advisory control-plane evidence; it is not approval, certification, compliance proof, or release authorization.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "generated_at",
+        "project_root",
+        "profile",
+        "status",
+        "naos_root",
+        "policy",
+        "inputs",
+        "findings",
+        "limitations",
+        "summary",
+        "ac_completion_evidence",
+        "adapter_coherence",
+        "advanced_capability_readiness",
+        "agent_trace_validation",
+        "agentic_workflow",
+        "ai_code_provenance",
+        "ai_surface_health",
+        "audit_log",
+        "behavioral_governance_readiness",
+        "calibration_shadow",
+        "capability_maturity",
+        "capability_maturity_readiness",
+        "claims_validation",
+        "compliance_posture",
+        "composed_traceability",
+        "control_plane_review",
+        "cross_harness_review_readiness",
+        "deterministic_hygiene",
+        "evidence_attestation",
+        "evidence_classification",
+        "evidence_conflicts",
+        "evidence_pack",
+        "evidence_verification",
+        "exceptions_waivers",
+        "external_evidence_ingest",
+        "failure_mode_observations",
+        "function_index_health",
+        "gatekeeper_readiness",
+        "governance_bypass_posture",
+        "grader_assessment",
+        "graph_context_query",
+        "graph_context_readiness",
+        "harness_trace_import",
+        "learning_loop_review",
+        "llm_grader_readiness",
+        "local_context_index",
+        "local_context_query",
+        "memory_context_readiness",
+        "memory_provider_access",
+        "memory_use_policy",
+        "module_header_traceability",
+        "operator_attribution",
+        "plan_coherence",
+        "policy_overrides",
+        "pr_governance",
+        "pr_risk_classification",
+        "pre_implementation_alignment",
+        "professional_adoption",
+        "research_record",
+        "roadmap_crosswalk",
+        "self_conformance",
+        "semantic_candidate_layer",
+        "session_identity",
+        "session_lifecycle",
+        "setup_recommendations",
+        "spec_assembly_worksheet",
+        "spec_cascade_coherence",
+        "spec_pack_contract",
+        "spec_pack_materialization",
+        "sqlite_write_coordination",
+        "static_grader",
+        "systemic_impact_review",
+        "task_claims",
+        "task_context_pack",
+        "task_lifecycle",
+        "test_evidence_health"
+      ],
+      "properties": {
+        "schema": {
+          "const": "naos.dashboard_summary.v2"
+        },
+        "generated_at": {
+          "type": "string"
+        },
+        "project_root": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "quickstart",
+            "lite",
+            "standard",
+            "assured"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "naos_root": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "object"
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "schema",
+              "composition_kind",
+              "source_schema",
+              "source_generated_at",
+              "source_reference",
+              "source_sha256",
+              "source_size_bytes",
+              "detail_availability",
+              "detail_reason"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source": {
+                "type": "string"
+              },
+              "required_for_pack": {
+                "type": "boolean"
+              },
+              "exists": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string"
+              },
+              "format": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "report_status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "freshness": {
+                "type": "object"
+              },
+              "external_references": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "evidence_result": {
+                "type": "object"
+              },
+              "projection_error": {
+                "type": "object"
+              },
+              "collection_witness": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$id": "urn:naos-governance:schemas:naos:capability_maturity_collection_witness:v1",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "state",
+                  "source_schema",
+                  "source_generated_at",
+                  "status",
+                  "profile",
+                  "naos_root",
+                  "project_root",
+                  "schema",
+                  "source_sha256",
+                  "source_size_bytes",
+                  "capabilities"
+                ],
+                "properties": {
+                  "state": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "source_schema": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source_generated_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "profile": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "naos_root": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "project_root": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "schema": {
+                    "const": "naos.capability_maturity_collection_witness.v1"
+                  },
+                  "source_sha256": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "source_size_bytes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "capabilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "capability_id",
+                        "enabled",
+                        "current_maturity",
+                        "target_maturity",
+                        "evaluated_status",
+                        "ready_for_promotion",
+                        "human_approval_required",
+                        "promotion_recorded",
+                        "missing_evidence",
+                        "stale_evidence",
+                        "waivers",
+                        "required_next_actions",
+                        "evidence_results"
+                      ],
+                      "properties": {
+                        "capability_id": {
+                          "type": "string"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "current_maturity": {
+                          "type": "string"
+                        },
+                        "target_maturity": {
+                          "type": "string"
+                        },
+                        "evaluated_status": {
+                          "type": "string"
+                        },
+                        "ready_for_promotion": {
+                          "type": "boolean"
+                        },
+                        "human_approval_required": {
+                          "type": "boolean"
+                        },
+                        "promotion_recorded": {
+                          "type": "boolean"
+                        },
+                        "missing_evidence": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "stale_evidence": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "waivers": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "required_next_actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "evidence_results": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "reference",
+                              "availability",
+                              "applicability",
+                              "applicability_reason",
+                              "applicability_source",
+                              "validation",
+                              "scope",
+                              "producer_outcome",
+                              "requirement_outcome",
+                              "content_sha256",
+                              "generation_age",
+                              "requirement_contract",
+                              "stage",
+                              "candidates"
+                            ],
+                            "properties": {
+                              "reference": {},
+                              "availability": {},
+                              "applicability": {},
+                              "applicability_reason": {},
+                              "applicability_source": {},
+                              "validation": {},
+                              "scope": {},
+                              "producer_outcome": {},
+                              "requirement_outcome": {},
+                              "content_sha256": {},
+                              "generation_age": {},
+                              "requirement_contract": {},
+                              "stage": {
+                                "const": "L2"
+                              },
+                              "candidates": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "reference",
+                                    "content_sha256",
+                                    "availability",
+                                    "requirement_outcome"
+                                  ],
+                                  "properties": {
+                                    "reference": {},
+                                    "content_sha256": {},
+                                    "availability": {},
+                                    "requirement_outcome": {}
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "schema": {
+                "const": "naos.report_source_reference.v1"
+              },
+              "composition_kind": {
+                "const": "source_reference"
+              },
+              "source_schema": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_generated_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_reference": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "source_size_bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "detail_availability": {
+                "enum": [
+                  "source_bound",
+                  "unavailable"
+                ]
+              },
+              "detail_reason": {
+                "enum": [
+                  "collected_bytes_required",
+                  "source_missing",
+                  "unsafe_source_reference"
+                ]
+              }
+            }
+          }
+        },
+        "input_applicability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "selected_workflows",
+            "inputs",
+            "errors"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "selected_workflows",
+                "selected_obligations"
+              ]
+            },
+            "selected_workflows": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "advisory_missing_inputs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "inputs": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "workflow",
+                  "decision",
+                  "reason",
+                  "path",
+                  "input_status"
+                ],
+                "properties": {
+                  "workflow": {
+                    "type": "string"
+                  },
+                  "decision": {
+                    "enum": [
+                      "required_by_gate",
+                      "selected",
+                      "exempt_missing",
+                      "present_or_invalid",
+                      "selected_required",
+                      "unselected_missing_advisory"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "input_status": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "object"
+        },
+        "ac_completion_evidence": {
+          "type": "object"
+        },
+        "adapter_coherence": {
+          "type": "object"
+        },
+        "advanced_capability_readiness": {
+          "type": "object"
+        },
+        "agent_trace_validation": {
+          "type": "object"
+        },
+        "agentic_workflow": {
+          "type": "object"
+        },
+        "ai_code_provenance": {
+          "type": "object"
+        },
+        "ai_surface_health": {
+          "type": "object"
+        },
+        "audit_log": {
+          "type": "object"
+        },
+        "behavioral_governance_readiness": {
+          "type": "object"
+        },
+        "calibration_shadow": {
+          "type": "object"
+        },
+        "capability_maturity": {
+          "type": "object"
+        },
+        "capability_maturity_readiness": {
+          "type": "object"
+        },
+        "claims_validation": {
+          "type": "object"
+        },
+        "compliance_posture": {
+          "type": "object"
+        },
+        "composed_traceability": {
+          "type": "object"
+        },
+        "control_plane_review": {
+          "type": "object"
+        },
+        "cross_harness_review_readiness": {
+          "type": "object"
+        },
+        "deterministic_hygiene": {
+          "type": "object"
+        },
+        "evidence_attestation": {
+          "type": "object"
+        },
+        "evidence_classification": {
+          "type": "object",
+          "properties": {
+            "collection_references": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "unclassified_context": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "source",
+                    "json_pointer",
+                    "item_count",
+                    "canonical_sha256",
+                    "canonicalization"
+                  ],
+                  "properties": {
+                    "source": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "schema",
+                        "composition_kind",
+                        "source_schema",
+                        "source_generated_at",
+                        "source_reference",
+                        "source_sha256",
+                        "source_size_bytes",
+                        "detail_availability",
+                        "detail_reason"
+                      ],
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "required_for_pack": {
+                          "type": "boolean"
+                        },
+                        "exists": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        },
+                        "report_status": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "freshness": {
+                          "type": "object"
+                        },
+                        "external_references": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "evidence_result": {
+                          "type": "object"
+                        },
+                        "projection_error": {
+                          "type": "object"
+                        },
+                        "collection_witness": {
+                          "$schema": "https://json-schema.org/draft/2020-12/schema",
+                          "$id": "urn:naos-governance:schemas:naos:capability_maturity_collection_witness:v1",
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "state",
+                            "source_schema",
+                            "source_generated_at",
+                            "status",
+                            "profile",
+                            "naos_root",
+                            "project_root",
+                            "schema",
+                            "source_sha256",
+                            "source_size_bytes",
+                            "capabilities"
+                          ],
+                          "properties": {
+                            "state": {
+                              "type": [
+                                "object",
+                                "null"
+                              ]
+                            },
+                            "source_schema": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "source_generated_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "status": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "profile": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "naos_root": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "project_root": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "schema": {
+                              "const": "naos.capability_maturity_collection_witness.v1"
+                            },
+                            "source_sha256": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^[0-9a-f]{64}$"
+                            },
+                            "source_size_bytes": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 0
+                            },
+                            "capabilities": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "capability_id",
+                                  "enabled",
+                                  "current_maturity",
+                                  "target_maturity",
+                                  "evaluated_status",
+                                  "ready_for_promotion",
+                                  "human_approval_required",
+                                  "promotion_recorded",
+                                  "missing_evidence",
+                                  "stale_evidence",
+                                  "waivers",
+                                  "required_next_actions",
+                                  "evidence_results"
+                                ],
+                                "properties": {
+                                  "capability_id": {
+                                    "type": "string"
+                                  },
+                                  "enabled": {
+                                    "type": "boolean"
+                                  },
+                                  "current_maturity": {
+                                    "type": "string"
+                                  },
+                                  "target_maturity": {
+                                    "type": "string"
+                                  },
+                                  "evaluated_status": {
+                                    "type": "string"
+                                  },
+                                  "ready_for_promotion": {
+                                    "type": "boolean"
+                                  },
+                                  "human_approval_required": {
+                                    "type": "boolean"
+                                  },
+                                  "promotion_recorded": {
+                                    "type": "boolean"
+                                  },
+                                  "missing_evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "stale_evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "waivers": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required_next_actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "evidence_results": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "reference",
+                                        "availability",
+                                        "applicability",
+                                        "applicability_reason",
+                                        "applicability_source",
+                                        "validation",
+                                        "scope",
+                                        "producer_outcome",
+                                        "requirement_outcome",
+                                        "content_sha256",
+                                        "generation_age",
+                                        "requirement_contract",
+                                        "stage",
+                                        "candidates"
+                                      ],
+                                      "properties": {
+                                        "reference": {},
+                                        "availability": {},
+                                        "applicability": {},
+                                        "applicability_reason": {},
+                                        "applicability_source": {},
+                                        "validation": {},
+                                        "scope": {},
+                                        "producer_outcome": {},
+                                        "requirement_outcome": {},
+                                        "content_sha256": {},
+                                        "generation_age": {},
+                                        "requirement_contract": {},
+                                        "stage": {
+                                          "const": "L2"
+                                        },
+                                        "candidates": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                              "reference",
+                                              "content_sha256",
+                                              "availability",
+                                              "requirement_outcome"
+                                            ],
+                                            "properties": {
+                                              "reference": {},
+                                              "content_sha256": {},
+                                              "availability": {},
+                                              "requirement_outcome": {}
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "schema": {
+                          "const": "naos.report_source_reference.v1"
+                        },
+                        "composition_kind": {
+                          "const": "source_reference"
+                        },
+                        "source_schema": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_generated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_reference": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_sha256": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "source_size_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 0
+                        },
+                        "detail_availability": {
+                          "enum": [
+                            "source_bound",
+                            "unavailable"
+                          ]
+                        },
+                        "detail_reason": {
+                          "enum": [
+                            "collected_bytes_required",
+                            "source_missing",
+                            "unsafe_source_reference"
+                          ]
+                        }
+                      }
+                    },
+                    "json_pointer": {
+                      "enum": [
+                        "/unclassified_context",
+                        "/missing_classification",
+                        "/unknown_findings",
+                        "/findings"
+                      ]
+                    },
+                    "item_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "canonical_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "canonicalization": {
+                      "const": "json_sort_keys_ascii_compact_v1"
+                    }
+                  }
+                },
+                "missing_classification": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "source",
+                    "json_pointer",
+                    "item_count",
+                    "canonical_sha256",
+                    "canonicalization"
+                  ],
+                  "properties": {
+                    "source": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "schema",
+                        "composition_kind",
+                        "source_schema",
+                        "source_generated_at",
+                        "source_reference",
+                        "source_sha256",
+                        "source_size_bytes",
+                        "detail_availability",
+                        "detail_reason"
+                      ],
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "required_for_pack": {
+                          "type": "boolean"
+                        },
+                        "exists": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        },
+                        "report_status": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "freshness": {
+                          "type": "object"
+                        },
+                        "external_references": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "evidence_result": {
+                          "type": "object"
+                        },
+                        "projection_error": {
+                          "type": "object"
+                        },
+                        "collection_witness": {
+                          "$schema": "https://json-schema.org/draft/2020-12/schema",
+                          "$id": "urn:naos-governance:schemas:naos:capability_maturity_collection_witness:v1",
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "state",
+                            "source_schema",
+                            "source_generated_at",
+                            "status",
+                            "profile",
+                            "naos_root",
+                            "project_root",
+                            "schema",
+                            "source_sha256",
+                            "source_size_bytes",
+                            "capabilities"
+                          ],
+                          "properties": {
+                            "state": {
+                              "type": [
+                                "object",
+                                "null"
+                              ]
+                            },
+                            "source_schema": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "source_generated_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "status": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "profile": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "naos_root": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "project_root": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "schema": {
+                              "const": "naos.capability_maturity_collection_witness.v1"
+                            },
+                            "source_sha256": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^[0-9a-f]{64}$"
+                            },
+                            "source_size_bytes": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 0
+                            },
+                            "capabilities": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "capability_id",
+                                  "enabled",
+                                  "current_maturity",
+                                  "target_maturity",
+                                  "evaluated_status",
+                                  "ready_for_promotion",
+                                  "human_approval_required",
+                                  "promotion_recorded",
+                                  "missing_evidence",
+                                  "stale_evidence",
+                                  "waivers",
+                                  "required_next_actions",
+                                  "evidence_results"
+                                ],
+                                "properties": {
+                                  "capability_id": {
+                                    "type": "string"
+                                  },
+                                  "enabled": {
+                                    "type": "boolean"
+                                  },
+                                  "current_maturity": {
+                                    "type": "string"
+                                  },
+                                  "target_maturity": {
+                                    "type": "string"
+                                  },
+                                  "evaluated_status": {
+                                    "type": "string"
+                                  },
+                                  "ready_for_promotion": {
+                                    "type": "boolean"
+                                  },
+                                  "human_approval_required": {
+                                    "type": "boolean"
+                                  },
+                                  "promotion_recorded": {
+                                    "type": "boolean"
+                                  },
+                                  "missing_evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "stale_evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "waivers": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required_next_actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "evidence_results": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "reference",
+                                        "availability",
+                                        "applicability",
+                                        "applicability_reason",
+                                        "applicability_source",
+                                        "validation",
+                                        "scope",
+                                        "producer_outcome",
+                                        "requirement_outcome",
+                                        "content_sha256",
+                                        "generation_age",
+                                        "requirement_contract",
+                                        "stage",
+                                        "candidates"
+                                      ],
+                                      "properties": {
+                                        "reference": {},
+                                        "availability": {},
+                                        "applicability": {},
+                                        "applicability_reason": {},
+                                        "applicability_source": {},
+                                        "validation": {},
+                                        "scope": {},
+                                        "producer_outcome": {},
+                                        "requirement_outcome": {},
+                                        "content_sha256": {},
+                                        "generation_age": {},
+                                        "requirement_contract": {},
+                                        "stage": {
+                                          "const": "L2"
+                                        },
+                                        "candidates": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                              "reference",
+                                              "content_sha256",
+                                              "availability",
+                                              "requirement_outcome"
+                                            ],
+                                            "properties": {
+                                              "reference": {},
+                                              "content_sha256": {},
+                                              "availability": {},
+                                              "requirement_outcome": {}
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "schema": {
+                          "const": "naos.report_source_reference.v1"
+                        },
+                        "composition_kind": {
+                          "const": "source_reference"
+                        },
+                        "source_schema": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_generated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_reference": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_sha256": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "source_size_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 0
+                        },
+                        "detail_availability": {
+                          "enum": [
+                            "source_bound",
+                            "unavailable"
+                          ]
+                        },
+                        "detail_reason": {
+                          "enum": [
+                            "collected_bytes_required",
+                            "source_missing",
+                            "unsafe_source_reference"
+                          ]
+                        }
+                      }
+                    },
+                    "json_pointer": {
+                      "enum": [
+                        "/unclassified_context",
+                        "/missing_classification",
+                        "/unknown_findings",
+                        "/findings"
+                      ]
+                    },
+                    "item_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "canonical_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "canonicalization": {
+                      "const": "json_sort_keys_ascii_compact_v1"
+                    }
+                  }
+                },
+                "unknown_findings": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "source",
+                    "json_pointer",
+                    "item_count",
+                    "canonical_sha256",
+                    "canonicalization"
+                  ],
+                  "properties": {
+                    "source": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "schema",
+                        "composition_kind",
+                        "source_schema",
+                        "source_generated_at",
+                        "source_reference",
+                        "source_sha256",
+                        "source_size_bytes",
+                        "detail_availability",
+                        "detail_reason"
+                      ],
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "required_for_pack": {
+                          "type": "boolean"
+                        },
+                        "exists": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        },
+                        "report_status": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "freshness": {
+                          "type": "object"
+                        },
+                        "external_references": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "evidence_result": {
+                          "type": "object"
+                        },
+                        "projection_error": {
+                          "type": "object"
+                        },
+                        "collection_witness": {
+                          "$schema": "https://json-schema.org/draft/2020-12/schema",
+                          "$id": "urn:naos-governance:schemas:naos:capability_maturity_collection_witness:v1",
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "state",
+                            "source_schema",
+                            "source_generated_at",
+                            "status",
+                            "profile",
+                            "naos_root",
+                            "project_root",
+                            "schema",
+                            "source_sha256",
+                            "source_size_bytes",
+                            "capabilities"
+                          ],
+                          "properties": {
+                            "state": {
+                              "type": [
+                                "object",
+                                "null"
+                              ]
+                            },
+                            "source_schema": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "source_generated_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "status": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "profile": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "naos_root": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "project_root": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "schema": {
+                              "const": "naos.capability_maturity_collection_witness.v1"
+                            },
+                            "source_sha256": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^[0-9a-f]{64}$"
+                            },
+                            "source_size_bytes": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 0
+                            },
+                            "capabilities": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "capability_id",
+                                  "enabled",
+                                  "current_maturity",
+                                  "target_maturity",
+                                  "evaluated_status",
+                                  "ready_for_promotion",
+                                  "human_approval_required",
+                                  "promotion_recorded",
+                                  "missing_evidence",
+                                  "stale_evidence",
+                                  "waivers",
+                                  "required_next_actions",
+                                  "evidence_results"
+                                ],
+                                "properties": {
+                                  "capability_id": {
+                                    "type": "string"
+                                  },
+                                  "enabled": {
+                                    "type": "boolean"
+                                  },
+                                  "current_maturity": {
+                                    "type": "string"
+                                  },
+                                  "target_maturity": {
+                                    "type": "string"
+                                  },
+                                  "evaluated_status": {
+                                    "type": "string"
+                                  },
+                                  "ready_for_promotion": {
+                                    "type": "boolean"
+                                  },
+                                  "human_approval_required": {
+                                    "type": "boolean"
+                                  },
+                                  "promotion_recorded": {
+                                    "type": "boolean"
+                                  },
+                                  "missing_evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "stale_evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "waivers": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required_next_actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "evidence_results": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "reference",
+                                        "availability",
+                                        "applicability",
+                                        "applicability_reason",
+                                        "applicability_source",
+                                        "validation",
+                                        "scope",
+                                        "producer_outcome",
+                                        "requirement_outcome",
+                                        "content_sha256",
+                                        "generation_age",
+                                        "requirement_contract",
+                                        "stage",
+                                        "candidates"
+                                      ],
+                                      "properties": {
+                                        "reference": {},
+                                        "availability": {},
+                                        "applicability": {},
+                                        "applicability_reason": {},
+                                        "applicability_source": {},
+                                        "validation": {},
+                                        "scope": {},
+                                        "producer_outcome": {},
+                                        "requirement_outcome": {},
+                                        "content_sha256": {},
+                                        "generation_age": {},
+                                        "requirement_contract": {},
+                                        "stage": {
+                                          "const": "L2"
+                                        },
+                                        "candidates": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                              "reference",
+                                              "content_sha256",
+                                              "availability",
+                                              "requirement_outcome"
+                                            ],
+                                            "properties": {
+                                              "reference": {},
+                                              "content_sha256": {},
+                                              "availability": {},
+                                              "requirement_outcome": {}
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "schema": {
+                          "const": "naos.report_source_reference.v1"
+                        },
+                        "composition_kind": {
+                          "const": "source_reference"
+                        },
+                        "source_schema": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_generated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_reference": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_sha256": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "source_size_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 0
+                        },
+                        "detail_availability": {
+                          "enum": [
+                            "source_bound",
+                            "unavailable"
+                          ]
+                        },
+                        "detail_reason": {
+                          "enum": [
+                            "collected_bytes_required",
+                            "source_missing",
+                            "unsafe_source_reference"
+                          ]
+                        }
+                      }
+                    },
+                    "json_pointer": {
+                      "enum": [
+                        "/unclassified_context",
+                        "/missing_classification",
+                        "/unknown_findings",
+                        "/findings"
+                      ]
+                    },
+                    "item_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "canonical_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "canonicalization": {
+                      "const": "json_sort_keys_ascii_compact_v1"
+                    }
+                  }
+                },
+                "findings": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "source",
+                    "json_pointer",
+                    "item_count",
+                    "canonical_sha256",
+                    "canonicalization"
+                  ],
+                  "properties": {
+                    "source": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "schema",
+                        "composition_kind",
+                        "source_schema",
+                        "source_generated_at",
+                        "source_reference",
+                        "source_sha256",
+                        "source_size_bytes",
+                        "detail_availability",
+                        "detail_reason"
+                      ],
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "required_for_pack": {
+                          "type": "boolean"
+                        },
+                        "exists": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        },
+                        "report_status": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "freshness": {
+                          "type": "object"
+                        },
+                        "external_references": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "evidence_result": {
+                          "type": "object"
+                        },
+                        "projection_error": {
+                          "type": "object"
+                        },
+                        "collection_witness": {
+                          "$schema": "https://json-schema.org/draft/2020-12/schema",
+                          "$id": "urn:naos-governance:schemas:naos:capability_maturity_collection_witness:v1",
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "state",
+                            "source_schema",
+                            "source_generated_at",
+                            "status",
+                            "profile",
+                            "naos_root",
+                            "project_root",
+                            "schema",
+                            "source_sha256",
+                            "source_size_bytes",
+                            "capabilities"
+                          ],
+                          "properties": {
+                            "state": {
+                              "type": [
+                                "object",
+                                "null"
+                              ]
+                            },
+                            "source_schema": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "source_generated_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "status": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "profile": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "naos_root": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "project_root": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "schema": {
+                              "const": "naos.capability_maturity_collection_witness.v1"
+                            },
+                            "source_sha256": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^[0-9a-f]{64}$"
+                            },
+                            "source_size_bytes": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 0
+                            },
+                            "capabilities": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "capability_id",
+                                  "enabled",
+                                  "current_maturity",
+                                  "target_maturity",
+                                  "evaluated_status",
+                                  "ready_for_promotion",
+                                  "human_approval_required",
+                                  "promotion_recorded",
+                                  "missing_evidence",
+                                  "stale_evidence",
+                                  "waivers",
+                                  "required_next_actions",
+                                  "evidence_results"
+                                ],
+                                "properties": {
+                                  "capability_id": {
+                                    "type": "string"
+                                  },
+                                  "enabled": {
+                                    "type": "boolean"
+                                  },
+                                  "current_maturity": {
+                                    "type": "string"
+                                  },
+                                  "target_maturity": {
+                                    "type": "string"
+                                  },
+                                  "evaluated_status": {
+                                    "type": "string"
+                                  },
+                                  "ready_for_promotion": {
+                                    "type": "boolean"
+                                  },
+                                  "human_approval_required": {
+                                    "type": "boolean"
+                                  },
+                                  "promotion_recorded": {
+                                    "type": "boolean"
+                                  },
+                                  "missing_evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "stale_evidence": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "waivers": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required_next_actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "evidence_results": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "reference",
+                                        "availability",
+                                        "applicability",
+                                        "applicability_reason",
+                                        "applicability_source",
+                                        "validation",
+                                        "scope",
+                                        "producer_outcome",
+                                        "requirement_outcome",
+                                        "content_sha256",
+                                        "generation_age",
+                                        "requirement_contract",
+                                        "stage",
+                                        "candidates"
+                                      ],
+                                      "properties": {
+                                        "reference": {},
+                                        "availability": {},
+                                        "applicability": {},
+                                        "applicability_reason": {},
+                                        "applicability_source": {},
+                                        "validation": {},
+                                        "scope": {},
+                                        "producer_outcome": {},
+                                        "requirement_outcome": {},
+                                        "content_sha256": {},
+                                        "generation_age": {},
+                                        "requirement_contract": {},
+                                        "stage": {
+                                          "const": "L2"
+                                        },
+                                        "candidates": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                              "reference",
+                                              "content_sha256",
+                                              "availability",
+                                              "requirement_outcome"
+                                            ],
+                                            "properties": {
+                                              "reference": {},
+                                              "content_sha256": {},
+                                              "availability": {},
+                                              "requirement_outcome": {}
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "schema": {
+                          "const": "naos.report_source_reference.v1"
+                        },
+                        "composition_kind": {
+                          "const": "source_reference"
+                        },
+                        "source_schema": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_generated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_reference": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_sha256": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "source_size_bytes": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 0
+                        },
+                        "detail_availability": {
+                          "enum": [
+                            "source_bound",
+                            "unavailable"
+                          ]
+                        },
+                        "detail_reason": {
+                          "enum": [
+                            "collected_bytes_required",
+                            "source_missing",
+                            "unsafe_source_reference"
+                          ]
+                        }
+                      }
+                    },
+                    "json_pointer": {
+                      "enum": [
+                        "/unclassified_context",
+                        "/missing_classification",
+                        "/unknown_findings",
+                        "/findings"
+                      ]
+                    },
+                    "item_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "canonical_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "canonicalization": {
+                      "const": "json_sort_keys_ascii_compact_v1"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "evidence_conflicts": {
+          "type": "object"
+        },
+        "evidence_pack": {
+          "type": "object",
+          "properties": {
+            "status_scope": {
+              "const": "collection_findings"
+            },
+            "assembly_status": {
+              "enum": [
+                "complete",
+                "incomplete",
+                "invalid",
+                "not_evaluated"
+              ]
+            },
+            "readiness": {
+              "type": "object"
+            },
+            "producer_outcome_summary": {
+              "type": "object"
+            },
+            "projection_scope": {
+              "const": "stored_pack_fields"
+            }
+          }
+        },
+        "evidence_verification": {
+          "type": "object"
+        },
+        "exceptions_waivers": {
+          "type": "object"
+        },
+        "external_evidence_ingest": {
+          "type": "object"
+        },
+        "failure_mode_observations": {
+          "type": "object"
+        },
+        "function_index_health": {
+          "type": "object"
+        },
+        "gatekeeper_readiness": {
+          "type": "object"
+        },
+        "governance_bypass_posture": {
+          "type": "object"
+        },
+        "grader_assessment": {
+          "type": "object"
+        },
+        "graph_context_query": {
+          "type": "object"
+        },
+        "graph_context_readiness": {
+          "type": "object"
+        },
+        "harness_trace_import": {
+          "type": "object"
+        },
+        "learning_loop_review": {
+          "type": "object"
+        },
+        "llm_grader_readiness": {
+          "type": "object"
+        },
+        "local_context_index": {
+          "type": "object"
+        },
+        "local_context_query": {
+          "type": "object"
+        },
+        "memory_context_readiness": {
+          "type": "object"
+        },
+        "memory_provider_access": {
+          "type": "object"
+        },
+        "memory_use_policy": {
+          "type": "object"
+        },
+        "module_header_traceability": {
+          "type": "object"
+        },
+        "operator_attribution": {
+          "type": "object"
+        },
+        "plan_coherence": {
+          "type": "object"
+        },
+        "policy_overrides": {
+          "type": "object"
+        },
+        "pr_governance": {
+          "type": "object"
+        },
+        "pr_risk_classification": {
+          "type": "object"
+        },
+        "pre_implementation_alignment": {
+          "type": "object"
+        },
+        "professional_adoption": {
+          "type": "object"
+        },
+        "research_record": {
+          "type": "object"
+        },
+        "roadmap_crosswalk": {
+          "type": "object"
+        },
+        "self_conformance": {
+          "type": "object"
+        },
+        "semantic_candidate_layer": {
+          "type": "object"
+        },
+        "session_identity": {
+          "type": "object"
+        },
+        "session_lifecycle": {
+          "type": "object"
+        },
+        "setup_recommendations": {
+          "type": "object"
+        },
+        "spec_assembly_worksheet": {
+          "type": "object"
+        },
+        "spec_cascade_coherence": {
+          "type": "object"
+        },
+        "spec_pack_contract": {
+          "type": "object"
+        },
+        "spec_pack_materialization": {
+          "type": "object"
+        },
+        "sqlite_write_coordination": {
+          "type": "object"
+        },
+        "static_grader": {
+          "type": "object"
+        },
+        "systemic_impact_review": {
+          "type": "object"
+        },
+        "task_claims": {
+          "type": "object"
+        },
+        "task_context_pack": {
+          "type": "object"
+        },
+        "task_lifecycle": {
+          "type": "object"
+        },
+        "test_evidence_health": {
+          "type": "object"
+        }
+      }
+    }
+  ]
 }

@@ -1,23 +1,22 @@
 ---
 name: "naos-systemic-wiring"
 description: "NAOS-aware extension of systemic-wiring. Adds NAOS capability, policy, validator, evidence, dashboard, spec-pack, and AI surface families plus naos CLI commands and control-coherence invariants. Requires NAOS kit installed in the project."
-extends: "systemic-wiring"
-parameters:
-  - name: target
-    description: "All targets from systemic-wiring plus NAOS-specific: capability, policy, validator, gate, evidence, dashboard, spec-pack, ai-surface, hook-template, optional-integration, or all."
-    required: false
-    default: "all"
-  - name: depth
-    description: "Check depth: quick (triage only) or standard (full wiring check)."
-    required: false
-    default: "standard"
-  - name: profile
-    description: "NAOS profile: quickstart, lite, standard, or assured."
-    required: false
-    default: "standard"
 ---
 
 # NAOS Systemic Wiring
+
+## Invocation inputs
+
+These are procedural inputs, not host-enforced typed arguments or inheritance.
+Use these defaults when the user has not supplied a value. Resolve and read the
+`systemic-wiring` base skill before applying this extension; if it is unavailable,
+stop this route and report the missing prerequisite. Do not claim its checks ran.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `target` | `all` | All targets from systemic-wiring plus NAOS-specific: capability, policy, validator, gate, evidence, dashboard, spec-pack, ai-surface, hook-template, optional-integration, or all. |
+| `depth` | `standard` | Check depth: quick (triage only) or standard (full wiring check). |
+| `profile` | `standard` | NAOS profile: quickstart, lite, standard, or assured. |
 
 NAOS-aware extension of the generic `systemic-wiring` skill. Run the base
 `systemic-wiring` skill first, then apply the NAOS-specific additions below.

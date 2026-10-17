@@ -14,9 +14,10 @@ import argparse
 import json
 import os
 import re
+import stat
 import sys
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 import yaml
@@ -66,22 +67,72 @@ def find_claims_file(root: Path, naos_root: str, explicit: str | None) -> Path |
     return candidate if candidate.exists() else None
 
 
-def evidence_status(root: Path, evidence: Any, policy: dict[str, Any]) -> str:
-    if not evidence:
+def _local_evidence_status(root: Path, reference: str) -> str:
+    """Check a project-relative, forward-slash path without following links."""
+    raw = reference.strip()
+    parts = PurePosixPath(raw).parts
+    if (
+        not raw
+        or "\x00" in raw
+        or "\\" in raw
+        or raw.startswith("/")
+        or PureWindowsPath(raw).drive
+        or not parts
+        or ".." in parts
+        or ":" in raw
+    ):
+        return "invalid_local_reference"
+
+    try:
+        project_root = root.resolve(strict=True)
+        candidate = root
+        file_mode = None
+        for part in parts:
+            candidate = candidate / part
+            info = candidate.lstat()
+            file_mode = info.st_mode
+            if stat.S_ISLNK(file_mode) or (
+                getattr(info, "st_file_attributes", 0)
+                & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+            ):
+                return "invalid_local_reference"
+        resolved = candidate.resolve(strict=True)
+        if not resolved.is_relative_to(project_root):
+            return "invalid_local_reference"
+        return "verified" if file_mode is not None and stat.S_ISREG(file_mode) else "invalid_local_reference"
+    except FileNotFoundError:
         return "missing"
+    except (OSError, RuntimeError, ValueError):
+        return "invalid_local_reference"
+
+
+def _external_reference_status(policy: dict[str, Any]) -> str:
+    configured = str(
+        policy.get("evidence", {}).get("external_reference_default_status") or "external_reference_unverified"
+    )
+    # Configuration may name a review state, but cannot verify an external source.
+    return "external_reference_unverified" if configured == "verified" else configured
+
+
+def evidence_status(root: Path, evidence: Any, policy: dict[str, Any]) -> str:
+    external_status = _external_reference_status(policy)
     if isinstance(evidence, str):
         if evidence.startswith(("http://", "https://")):
-            return str(policy.get("evidence", {}).get("external_reference_default_status") or "external_reference_unverified")
-        return "verified" if (root / evidence).exists() or Path(evidence).exists() else "missing"
+            return external_status
+        return _local_evidence_status(root, evidence)
     if isinstance(evidence, dict):
-        ref = evidence.get("path") or evidence.get("file") or evidence.get("url")
-        if not ref:
-            return "missing"
-        if str(ref).startswith(("http://", "https://")):
-            return "verified" if evidence.get("verified") is True else str(
-                policy.get("evidence", {}).get("external_reference_default_status") or "external_reference_unverified"
-            )
-        return evidence_status(root, str(ref), policy)
+        kind = str(evidence.get("type") or "").strip().lower()
+        local_keys = [key for key in ("path", "file") if key in evidence]
+        external_keys = [key for key in ("url", "identifier", "uri") if key in evidence]
+        if local_keys and (external_keys or kind in {"external", "url", "uri", "identifier", "external_identifier"}):
+            return "invalid_local_reference"
+        if kind in {"external", "url", "uri", "identifier", "external_identifier"} or external_keys:
+            reference = next((evidence.get(key) for key in ("url", "identifier", "uri", "reference", "value") if key in evidence), None)
+            return external_status if isinstance(reference, str) and reference.strip() else "missing"
+        if len(local_keys) != 1:
+            return "missing" if not evidence else "invalid_local_reference"
+        reference = evidence[local_keys[0]]
+        return _local_evidence_status(root, reference) if isinstance(reference, str) else "invalid_local_reference"
     return "missing"
 
 
@@ -90,13 +141,18 @@ def evidence_verified(root: Path, evidence: Any, policy: dict[str, Any]) -> bool
 
 
 def expired(valid_until: Any) -> bool:
-    if not valid_until:
-        return False
+    valid_until_date = _valid_until_date(valid_until)
+    return valid_until_date is not None and valid_until_date < controlled_now_utc().date()
+
+
+def _valid_until_date(value: Any) -> date | None:
+    text = str(value)
+    if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", text):
+        return None
     try:
-        valid_until_date = date.fromisoformat(str(valid_until))
+        return date.fromisoformat(text)
     except ValueError:
-        return False
-    return valid_until_date < controlled_now_utc().date()
+        return None
 
 
 def safe_context_for_match(text: str, start: int, end: int, policy: dict[str, Any]) -> str | None:
@@ -185,18 +241,29 @@ def validate_claims(
             )
 
         evidence_statuses = [evidence_status(root, item, policy) for item in evidence_items]
-        external_unverified = any(status == "external_reference_unverified" for status in evidence_statuses)
+        external_status = _external_reference_status(policy)
+        external_unverified = external_status in evidence_statuses
         if external_unverified:
             findings.append(
                 {
                     "id": claim_id,
                     "severity": "advisory",
-                    "message": "External URL evidence is a reference only unless explicitly marked verified.",
+                    "message": "External evidence is an unverified reference; a verification flag does not establish support.",
                     "status": "external_reference_unverified",
                 }
             )
 
-        if status == "supported" and not any(evidence_verified(root, item, policy) for item in evidence_items):
+        if "invalid_local_reference" in evidence_statuses:
+            findings.append(
+                {
+                    "id": claim_id,
+                    "severity": severity,
+                    "message": "Local evidence reference must name a regular file within the project, without traversal or symlinks.",
+                    "status": "invalid_evidence_reference",
+                }
+            )
+
+        if status == "supported" and "verified" not in evidence_statuses:
             findings.append(
                 {
                     "id": claim_id,
@@ -216,7 +283,17 @@ def validate_claims(
                 }
             )
 
-        if expired(claim.get("valid_until")):
+        valid_until = claim.get("valid_until")
+        if "valid_until" in claim and _valid_until_date(valid_until) is None:
+            findings.append(
+                {
+                    "id": claim_id,
+                    "severity": severity,
+                    "message": "Claim valid_until must be a calendar date in YYYY-MM-DD format.",
+                    "status": "invalid_valid_until",
+                }
+            )
+        elif expired(valid_until):
             findings.append(
                 {
                     "id": claim_id,
@@ -281,6 +358,7 @@ def validate_claims(
 
     return {
         "schema": "naos.claims_validation.v1",
+        "generated_at": controlled_now_utc().isoformat(),
         "profile": profile,
         "status": status,
         "claims_file": claims_file,

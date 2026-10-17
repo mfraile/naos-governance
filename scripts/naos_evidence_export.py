@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -24,7 +25,6 @@ from naos_policy import (  # noqa: E402
     evidence_pack_output_path,
     evidence_staleness_days,
     exit_code_for_summary,
-    external_reference_status,
     finding_counts,
     is_kit_repository,
     load_policy,
@@ -35,6 +35,12 @@ from naos_policy import (  # noqa: E402
     test_map_output_path,
     write_report,
 )
+from naos_evidence_contracts import (  # noqa: E402
+    MATURITY_REPORT_REGISTRY, REPORT_REGISTRY, classify_evidence,
+)
+
+
+from naos_report_composition import compose_publication, CompositionError
 
 
 URL_RE = re.compile(r"https?://[^\s)'\"<>]+")
@@ -127,6 +133,19 @@ VALIDATOR_ARTIFACTS = {
     "ac_completion_evidence_report",
 }
 
+# Preserve legacy collection requirements while also classifying optional
+# producer reports which were never part of that requirements list.
+PRODUCER_ARTIFACTS = VALIDATOR_ARTIFACTS | {
+    "package_reality_report", "spec_pack_materialization_report", "spec_assembly_worksheet_report",
+}
+
+PACK_OUTPUT_KEYS = {
+    "claims_validation_report": "claims_report",
+    "roadmap_crosswalk_report": "roadmap_report",
+    "test_evidence_health_report": "test_evidence_report",
+    "validator_results": "validator_results_report",
+}
+
 
 def utc_timestamp() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -149,28 +168,41 @@ def timestamp_text(value: datetime) -> str:
     return value.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def load_structured_file(path: Path) -> tuple[Any, str]:
+def load_structured_file(path: Path, raw: bytes | None = None) -> tuple[Any, str]:
     suffix = path.suffix.lower()
-    text = path.read_text(encoding="utf-8")
+    text = (path.read_bytes() if raw is None else raw).decode("utf-8", errors="strict")
     if suffix == ".json":
-        return json.loads(text), "json"
+        def unique_pairs(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("duplicate_json_key")
+                result[key] = value
+            return result
+
+        def reject_constant(_value):
+            raise ValueError("nonfinite_json_number")
+
+        return json.loads(text, object_pairs_hook=unique_pairs, parse_constant=reject_constant), "json"
     if suffix in {".yaml", ".yml"}:
         return yaml.safe_load(text) or {}, "yaml"
     return text, "text"
 
 
 def classify_reference(reference: Any, policy: dict[str, Any]) -> dict[str, Any]:
-    default_status = external_reference_status(policy)
+    # A flag is a declaration, not supporting evidence or a content check.
+    default_status = "external_reference_unverified"
     if isinstance(reference, dict):
         url = reference.get("url") or reference.get("href") or reference.get("link")
         if url and str(url).startswith(("http://", "https://")):
             return {
                 "url": str(url),
-                "status": "verified" if reference.get("verified") is True else default_status,
-                "verified": reference.get("verified") is True,
+                "status": default_status,
+                "verified": False,
+                "declared_verified": reference.get("verified") is True,
             }
     if isinstance(reference, str) and reference.startswith(("http://", "https://")):
-        return {"url": reference, "status": default_status, "verified": False}
+        return {"url": reference, "status": default_status, "verified": False, "declared_verified": False}
     return {"url": None, "status": "not_external_reference", "verified": False}
 
 
@@ -208,6 +240,8 @@ def artifact_freshness(path: Path, generated_at: datetime, policy: dict[str, Any
     age_days = max(0, (generated_at.date() - modified.date()).days)
     stale_after_days = evidence_staleness_days(policy)
     return {
+        "basis": "file_mtime",
+        "source_freshness": "not_established",
         "modified_at": timestamp_text(modified),
         "age_days": age_days,
         "stale_after_days": stale_after_days,
@@ -250,8 +284,15 @@ def read_artifact(
             "freshness": {"status": "not_available"},
             "external_references": [],
         }
+    content_sha256 = None
+    collection_size_bytes = None
     try:
-        data, file_format = load_structured_file(path)
+        raw = path.read_bytes()
+        collection_size_bytes = len(raw)
+        content_sha256 = hashlib.sha256(raw).hexdigest()
+        data, file_format = load_structured_file(path, raw)
+        if key in PRODUCER_ARTIFACTS and not isinstance(data, dict):
+            raise ValueError("validator_report_must_be_object")
     except Exception as exc:
         return {
             "label": label,
@@ -262,6 +303,8 @@ def read_artifact(
             "status": "parse_error",
             "format": "unknown",
             "error": str(exc),
+            "collection_sha256": content_sha256,
+            "collection_size_bytes": collection_size_bytes,
             "data": None,
             "freshness": artifact_freshness(path, generated_at, policy),
             "external_references": [],
@@ -276,10 +319,107 @@ def read_artifact(
         "status": "present",
         "format": file_format,
         "report_status": report_status,
+        "collection_sha256": content_sha256,
+            "collection_size_bytes": collection_size_bytes,
         "data": data,
         "freshness": artifact_freshness(path, generated_at, policy),
         "external_references": dedupe_references(collect_external_references(data, policy)),
     }
+
+
+def project_evidence_outcomes(
+    root: Path, naos_root: str, profile: str, policy: dict[str, Any],
+    artifacts: dict[str, dict[str, Any]],
+) -> tuple[str, dict[str, int], dict[str, Any]]:
+    """Keep byte collection, bounded producer outcomes and review readiness apart."""
+    counts = {key: 0 for key in (
+        "evaluated", "passed", "adverse", "review_required", "not_run", "not_applicable", "unknown",
+        "invalid", "unsupported", "unresolved",
+    )}
+    evaluated: list[str] = []
+    unresolved: list[dict[str, Any]] = []
+    applicable_satisfied = 0
+    human_review = False
+    for key, artifact in artifacts.items():
+        if key not in PRODUCER_ARTIFACTS or not (artifact.get("exists") or artifact.get("required_for_pack")):
+            continue
+        path_text = artifact.get("path")
+        if path_text is None:
+            continue
+        path = Path(path_text)
+        if not path.is_absolute():
+            path = root / path
+        try:
+            reference = path.relative_to(root).as_posix()
+        except ValueError:
+            reference = path.as_posix()
+        result = classify_evidence(root, reference, profile=profile, naos_root=naos_root,
+                                   policy=policy, requirement={"type": "report"}, consumer="pack")
+        output_key = PACK_OUTPUT_KEYS.get(key, key)
+        expected = [descriptor.key for descriptor in (*REPORT_REGISTRY.values(), *MATURITY_REPORT_REGISTRY.values())
+                    if descriptor.output_key == output_key]
+        result["pack_expected_report_key"] = expected[0] if len(expected) == 1 else None
+        if len(expected) != 1 or result["report_key"] != expected[0]:
+            # A safe file and matching byte digest cannot change which producer
+            # is required by this named artifact slot.
+            result.update(producer_outcome="unknown", requirement_outcome="unresolved", human_review_required=True)
+            result["reason_codes"].append("unregistered_pack_source" if not expected else "pack_source_type_mismatch")
+        if artifact.get("projection_error"):
+            result.update(requirement_outcome="unresolved", human_review_required=True)
+            result["reason_codes"].append("invalid_summary_projection")
+        collected = artifact.get("collection_sha256")
+        if collected is not None and result.get("content_sha256") is not None and collected != result["content_sha256"]:
+            result.update(producer_outcome="unknown", requirement_outcome="unresolved", human_review_required=True)
+            result["reason_codes"].append("changed_during_collection")
+        artifact["evidence_result"] = result
+        evaluated.append(key)
+        counts["evaluated"] += 1
+        outcome = result["producer_outcome"]
+        counts[outcome if outcome in {"passed", "adverse", "review_required", "not_run", "not_applicable", "unknown"} else "unknown"] += 1
+        if result["validation"] in {"invalid", "unsupported"}:
+            counts[result["validation"]] += 1
+        reasons = list(result["reason_codes"])
+        stale = (artifact.get("freshness") or {}).get("status") == "stale"
+        if stale:
+            reasons.append("collection_file_age_exceeded")
+        if result["requirement_outcome"] == "unresolved" or stale:
+            counts["unresolved"] += 1
+            unresolved.append({"source": key, "reference": reference, "reason_codes": sorted(set(reasons)),
+                               "source_findings": result["source_findings"]})
+        elif result["requirement_outcome"] == "satisfied":
+            applicable_satisfied += 1
+        human_review = human_review or result["human_review_required"]
+
+    assembly = "complete"
+    if any(artifact.get("status") == "parse_error" for artifact in artifacts.values()):
+        assembly = "invalid"
+    elif any(artifact.get("required_for_pack") and artifact.get("status") != "present" for artifact in artifacts.values()):
+        assembly = "incomplete"
+    readiness = {
+        "status": "unresolved" if unresolved or assembly != "complete" else "ready" if applicable_satisfied else "not_evaluated",
+        "scope": "stored_report_review",
+        "evaluated_sources": evaluated,
+        "unresolved_sources": unresolved,
+        "source_freshness": "not_established",
+        "human_review_required": bool(human_review or unresolved or assembly != "complete"),
+    }
+    return assembly, counts, readiness
+
+
+def summarize_artifact(function, artifact: dict[str, Any], *args) -> dict[str, Any]:
+    """A malformed summary field must not discard the original report bytes."""
+    try:
+        return function(artifact, *args)
+    except (TypeError, ValueError, KeyError, AttributeError, OverflowError) as exc:
+        sources = [artifact] if "path" in artifact else [value for value in artifact.values() if isinstance(value, dict) and "path" in value]
+        for source in sources:
+            source["projection_error"] = {"kind": type(exc).__name__, "summary": function.__name__}
+        return {
+            "status": "invalid_report", "projection_status": "invalid_input",
+            "source_paths": [source.get("path") for source in sources],
+            "human_review_required": True,
+            "rule": "The original report is retained in artifacts; malformed summary fields are unresolved review evidence.",
+        }
 
 
 def parse_inline_entries(values: list[str], kind: str) -> list[dict[str, Any]]:
@@ -1408,6 +1548,13 @@ def summarize_evidence_classification(artifact: dict[str, Any]) -> dict[str, Any
         "policy_valid": bool(data.get("policy_valid")),
         "findings_scanned": int(data.get("findings_scanned") or 0),
         "classification_counts": data.get("classification_counts") or {},
+        **{key: data[key] for key in ("declared_classification_counts", "inferred_classification_counts")
+           if key in data},
+        "classification_count_semantics": data.get("classification_count_semantics")
+        or "legacy_unspecified_labels_not_verified_evidence",
+        **({"unclassified_context": data["unclassified_context"],
+            "unclassified_context_counts": data.get("unclassified_context_counts") or {}}
+           if "unclassified_context" in data else {}),
         "missing_classification": data.get("missing_classification") or [],
         "unknown_findings": data.get("unknown_findings") or [],
         "human_review_required": bool(data.get("human_review_required")),
@@ -1554,7 +1701,7 @@ def build_findings(
                 }
             )
     for reference in references:
-        if reference.get("status") == external_reference_status(policy):
+        if reference.get("status") == "external_reference_unverified":
             findings.append(
                 {
                     "id": "external_reference",
@@ -1778,6 +1925,8 @@ def build_evidence_pack(
     artifacts: dict[str, dict[str, Any]] = {}
     for key, label, explicit, required in artifact_specs:
         path, source = selected_path(explicit, defaults[key])
+        if path is not None and not path.is_absolute():
+            path = root / path
         missing_status = "missing" if key in VALIDATOR_ARTIFACTS else "not_configured"
         artifacts[key] = read_artifact(
             key=key,
@@ -1800,65 +1949,69 @@ def build_evidence_pack(
         + collect_external_references(list_sections, policy)
     )
     findings = build_findings(root, naos_root, profile, policy, artifacts, external_references)
-    ac_completion_evidence = summarize_ac_completion_evidence(
+    ac_completion_evidence = summarize_artifact(summarize_ac_completion_evidence,
         artifacts.get("ac_completion_evidence_report", {})
     )
-    evidence_attestation = summarize_evidence_attestation(artifacts.get("evidence_attestation_report", {}))
-    evidence_verification = summarize_evidence_verification(artifacts.get("evidence_verification_report", {}))
-    evidence_conflicts = summarize_evidence_conflicts(artifacts.get("evidence_conflict_detection_report", {}))
-    memory_context_readiness = summarize_memory_context_readiness(artifacts.get("memory_context_readiness_report", {}))
-    memory_provider_access = summarize_memory_provider_access(artifacts.get("memory_provider_access_report", {}))
-    memory_use_policy = summarize_memory_use_policy(artifacts.get("memory_use_policy_report", {}))
-    learning_loop_review = summarize_learning_loop_review(artifacts.get("learning_loop_review_report", {}))
-    failure_mode_observations = summarize_failure_mode_observations(artifacts.get("failure_mode_observations_report", {}))
-    adapter_coherence = summarize_adapter_coherence(artifacts.get("adapter_coherence_report", {}))
-    task_context_pack = summarize_task_context_pack(artifacts.get("task_context_pack_report", {}))
-    task_lifecycle = summarize_native_lifecycle_report(
+    evidence_attestation = summarize_artifact(summarize_evidence_attestation, artifacts.get("evidence_attestation_report", {}))
+    evidence_verification = summarize_artifact(summarize_evidence_verification, artifacts.get("evidence_verification_report", {}))
+    evidence_conflicts = summarize_artifact(summarize_evidence_conflicts, artifacts.get("evidence_conflict_detection_report", {}))
+    memory_context_readiness = summarize_artifact(summarize_memory_context_readiness, artifacts.get("memory_context_readiness_report", {}))
+    memory_provider_access = summarize_artifact(summarize_memory_provider_access, artifacts.get("memory_provider_access_report", {}))
+    memory_use_policy = summarize_artifact(summarize_memory_use_policy, artifacts.get("memory_use_policy_report", {}))
+    learning_loop_review = summarize_artifact(summarize_learning_loop_review, artifacts.get("learning_loop_review_report", {}))
+    failure_mode_observations = summarize_artifact(summarize_failure_mode_observations, artifacts.get("failure_mode_observations_report", {}))
+    adapter_coherence = summarize_artifact(summarize_adapter_coherence, artifacts.get("adapter_coherence_report", {}))
+    task_context_pack = summarize_artifact(summarize_task_context_pack, artifacts.get("task_context_pack_report", {}))
+    task_lifecycle = summarize_artifact(summarize_native_lifecycle_report,
         artifacts.get("task_lifecycle_report", {}),
         "Native completion records repository state; it does not approve merge/release or admit evidence.",
     )
-    research_record = summarize_native_lifecycle_report(
+    research_record = summarize_artifact(summarize_native_lifecycle_report,
         artifacts.get("research_record_report", {}),
         "Validated research remains candidate-only until a separate attributable transition.",
     )
-    composed_traceability = summarize_native_lifecycle_report(
+    composed_traceability = summarize_artifact(summarize_native_lifecycle_report,
         artifacts.get("composed_traceability_report", {}),
         "Relationship presence is structural evidence and does not prove semantic correctness.",
     )
-    task_claims = summarize_task_claims(artifacts.get("task_claim_report", {}))
-    spec_pack_contract = summarize_spec_pack_contract(artifacts.get("spec_pack_contract_report", {}))
-    spec_pack_materialization = summarize_spec_pack_materialization(artifacts.get("spec_pack_materialization_report", {}))
-    spec_assembly_worksheet = summarize_spec_assembly_worksheet(artifacts.get("spec_assembly_worksheet_report", {}))
-    spec_cascade_coherence = summarize_spec_cascade_coherence(artifacts.get("spec_cascade_report", {}))
-    local_context_index = summarize_local_context_index(artifacts.get("local_context_index_report", {}))
-    sqlite_write_coordination = summarize_sqlite_write_coordination(artifacts.get("sqlite_write_coordination_report", {}))
-    local_context_query = summarize_local_context_query(artifacts.get("local_context_query_report", {}))
-    semantic_candidate_layer = summarize_semantic_candidate_layer(artifacts.get("semantic_candidate_layer_report", {}))
-    graph_context_readiness = summarize_graph_context_readiness(artifacts.get("graph_context_readiness_report", {}))
-    graph_context_query = summarize_graph_context_query(artifacts.get("graph_context_query_report", {}))
-    session_identity = summarize_session_identity(artifacts.get("session_identity_report", {}))
-    operator_attribution = summarize_operator_attribution(artifacts.get("operator_attribution_report", {}))
-    session_lifecycle = summarize_session_lifecycle(artifacts.get("session_lifecycle_report", {}))
-    audit_log = summarize_audit_log(artifacts.get("audit_log_summary_report", {}))
-    agent_trace_validation = summarize_agent_trace_validation(artifacts.get("agent_trace_validation_report", {}))
-    harness_trace_import = summarize_harness_trace_import(artifacts.get("harness_trace_import_report", {}))
-    static_grader = summarize_static_grader(artifacts.get("static_grader_report", {}))
-    grader_assessment = summarize_grader_assessment(artifacts.get("grader_assessment_report", {}))
-    llm_grader_readiness = summarize_llm_grader_readiness(artifacts.get("llm_grader_readiness_report", {}))
-    behavioral_readiness = summarize_behavioral_governance_readiness(artifacts.get("behavioral_governance_readiness_report", {}))
-    policy_overrides = summarize_policy_overrides(artifacts.get("policy_override_merge_report", {}))
-    plan_coherence = summarize_plan_coherence(artifacts.get("plan_coherence_report", {}))
-    pr_risk_classification = summarize_pr_risk_classification(artifacts.get("pr_risk_classification_report", {}))
-    pr_governance = summarize_pr_governance(artifacts.get("pr_governance_summary_report", {}))
-    agentic_workflow = summarize_agentic_workflow(artifacts.get("agentic_workflow_review_report", {}))
-    pre_implementation_alignment = summarize_pre_implementation_alignment(artifacts.get("pre_implementation_alignment_review_report", {}))
-    calibration_shadow = summarize_calibration_shadow(artifacts.get("calibration_shadow_report", {}))
-    evidence_classification = summarize_evidence_classification(artifacts.get("evidence_classification_report", {}))
-    cross_harness_review_readiness = summarize_cross_harness_review_readiness(artifacts.get("cross_harness_review_readiness_report", {}))
-    ai_code_provenance = summarize_ai_code_provenance(artifacts.get("ai_code_provenance_report", {}))
-    compliance_posture = summarize_compliance_posture(artifacts.get("compliance_posture_report", {}))
-    professional_adoption = summarize_professional_adoption(artifacts)
-    deterministic_hygiene = summarize_deterministic_hygiene(artifacts)
+    task_claims = summarize_artifact(summarize_task_claims, artifacts.get("task_claim_report", {}))
+    spec_pack_contract = summarize_artifact(summarize_spec_pack_contract, artifacts.get("spec_pack_contract_report", {}))
+    spec_pack_materialization = summarize_artifact(summarize_spec_pack_materialization, artifacts.get("spec_pack_materialization_report", {}))
+    spec_assembly_worksheet = summarize_artifact(summarize_spec_assembly_worksheet, artifacts.get("spec_assembly_worksheet_report", {}))
+    spec_cascade_coherence = summarize_artifact(summarize_spec_cascade_coherence, artifacts.get("spec_cascade_report", {}))
+    local_context_index = summarize_artifact(summarize_local_context_index, artifacts.get("local_context_index_report", {}))
+    sqlite_write_coordination = summarize_artifact(summarize_sqlite_write_coordination, artifacts.get("sqlite_write_coordination_report", {}))
+    local_context_query = summarize_artifact(summarize_local_context_query, artifacts.get("local_context_query_report", {}))
+    semantic_candidate_layer = summarize_artifact(summarize_semantic_candidate_layer, artifacts.get("semantic_candidate_layer_report", {}))
+    graph_context_readiness = summarize_artifact(summarize_graph_context_readiness, artifacts.get("graph_context_readiness_report", {}))
+    graph_context_query = summarize_artifact(summarize_graph_context_query, artifacts.get("graph_context_query_report", {}))
+    session_identity = summarize_artifact(summarize_session_identity, artifacts.get("session_identity_report", {}))
+    operator_attribution = summarize_artifact(summarize_operator_attribution, artifacts.get("operator_attribution_report", {}))
+    session_lifecycle = summarize_artifact(summarize_session_lifecycle, artifacts.get("session_lifecycle_report", {}))
+    audit_log = summarize_artifact(summarize_audit_log, artifacts.get("audit_log_summary_report", {}))
+    agent_trace_validation = summarize_artifact(summarize_agent_trace_validation, artifacts.get("agent_trace_validation_report", {}))
+    harness_trace_import = summarize_artifact(summarize_harness_trace_import, artifacts.get("harness_trace_import_report", {}))
+    static_grader = summarize_artifact(summarize_static_grader, artifacts.get("static_grader_report", {}))
+    grader_assessment = summarize_artifact(summarize_grader_assessment, artifacts.get("grader_assessment_report", {}))
+    llm_grader_readiness = summarize_artifact(summarize_llm_grader_readiness, artifacts.get("llm_grader_readiness_report", {}))
+    behavioral_readiness = summarize_artifact(summarize_behavioral_governance_readiness, artifacts.get("behavioral_governance_readiness_report", {}))
+    policy_overrides = summarize_artifact(summarize_policy_overrides, artifacts.get("policy_override_merge_report", {}))
+    plan_coherence = summarize_artifact(summarize_plan_coherence, artifacts.get("plan_coherence_report", {}))
+    pr_risk_classification = summarize_artifact(summarize_pr_risk_classification, artifacts.get("pr_risk_classification_report", {}))
+    pr_governance = summarize_artifact(summarize_pr_governance, artifacts.get("pr_governance_summary_report", {}))
+    agentic_workflow = summarize_artifact(summarize_agentic_workflow, artifacts.get("agentic_workflow_review_report", {}))
+    pre_implementation_alignment = summarize_artifact(summarize_pre_implementation_alignment, artifacts.get("pre_implementation_alignment_review_report", {}))
+    calibration_shadow = summarize_artifact(summarize_calibration_shadow, artifacts.get("calibration_shadow_report", {}))
+    evidence_classification = summarize_artifact(summarize_evidence_classification, artifacts.get("evidence_classification_report", {}))
+    cross_harness_review_readiness = summarize_artifact(summarize_cross_harness_review_readiness, artifacts.get("cross_harness_review_readiness_report", {}))
+    ai_code_provenance = summarize_artifact(summarize_ai_code_provenance, artifacts.get("ai_code_provenance_report", {}))
+    compliance_posture = summarize_artifact(summarize_compliance_posture, artifacts.get("compliance_posture_report", {}))
+    professional_adoption = summarize_artifact(summarize_professional_adoption, artifacts)
+    deterministic_hygiene = summarize_artifact(summarize_deterministic_hygiene, artifacts)
+    assembly_status, producer_outcome_summary, readiness = project_evidence_outcomes(
+        root, naos_root, profile, policy, artifacts,
+    )
+
     summary = finding_counts(findings)
     summary.update(
         {
@@ -1869,7 +2022,7 @@ def build_evidence_pack(
             "stale_artifacts": sum(1 for artifact in artifacts.values() if (artifact.get("freshness") or {}).get("status") == "stale"),
             "external_references": len(external_references),
             "external_references_unverified": sum(
-                1 for reference in external_references if reference.get("status") == external_reference_status(policy)
+                1 for reference in external_references if reference.get("status") == "external_reference_unverified"
             ),
         }
     )
@@ -1880,6 +2033,9 @@ def build_evidence_pack(
         "generated_at": timestamp_text(generated_at),
         "profile": profile,
         "status": status_from_counts(summary),
+        "assembly_status": assembly_status,
+        "producer_outcome_summary": producer_outcome_summary,
+        "readiness": readiness,
         "naos_root": naos_root,
         "project_root": str(root),
         "policy": {
@@ -1898,7 +2054,9 @@ def build_evidence_pack(
                 "runtime safety",
                 "complete test coverage unless evidence supports it",
             ],
-            "external_reference_rule": "External URLs are references, not verified evidence, unless explicitly marked verified.",
+            "status_rule": "Legacy status summarizes collection findings; assembly_status describes collected files. Neither certifies the included reports.",
+            "readiness_rule": "Readiness reviews only registered stored report contracts. Unsupported, invalid and adverse required sources remain unresolved; source freshness and human approval are not established.",
+            "external_reference_rule": "External URLs remain unverified reference context. A verified flag is retained only as a declaration; supporting evidence is required.",
             "tier3_rule": "Experimental Tier 3 capabilities remain advisory and non-blocking unless project policy explicitly changes them.",
             "maturity_readiness_rule": (
                 "NAOS evaluates maturity readiness. It does not automatically promote, "
@@ -2370,6 +2528,11 @@ def main(argv: list[str] | None = None) -> int:
     profile = normalize_profile(args.profile, policy)
     report = build_evidence_pack(root=root, profile=profile, naos_root=naos_root, policy=policy, args=args)
     output = Path(args.output) if args.output else evidence_pack_output_path(root, naos_root, policy)
+    try:
+        report = compose_publication(report, root)
+    except CompositionError as exc:
+        print(f"NAOS evidence composition failed: {exc}", file=sys.stderr)
+        return 2
     write_report(output, report)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

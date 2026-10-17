@@ -14,7 +14,7 @@ from naos_hygiene_common import check_dependency_integrity, run_report_command
 
 
 FALLBACK_RULES = {
-    "scan_roots": ["src", "app", "tests"],
+    "scan_roots": "inferred",
     "exclude_dirs": ["dev", "dist", "build", "__pycache__"],
     "exclude_globs": [],
     "allowed_imports": [],

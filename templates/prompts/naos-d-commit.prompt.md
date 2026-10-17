@@ -9,7 +9,7 @@ Generate a properly formatted commit message following project governance standa
 
 **Before proceeding**, read: [Governance Bootstrap (Lean)](naos-GOVERNANCE_BOOTSTRAP-lean.prompt.md)
 
-Review commit references against `specs/03`, `naos/TASK_REGISTRY`, and Rule 8.
+Review commit references against `specs/03`, `naos/TASK_REGISTRY`, and the governance refresh protocol.
 
 ## Context Required
 
@@ -75,11 +75,11 @@ Run the commit only after reviewing the generated message and staged files. If h
 
 ```yaml
 next_action:
-	label: "Commit staged changes or investigate failed pre-commit checks."
-	preferred_command: "/naos-t-precommit"
-	preferred_agent: "@naos-debug"
-	reason: "Commit generation is complete; failed hooks require evidence-first debugging."
-	constraints:
-		- "Use the generated commit message only after confirming staged changes."
-		- "Do not use --no-verify to bypass governance checks."
+  label: "Commit staged changes or investigate failed pre-commit checks."
+  preferred_command: "/naos-t-precommit"
+  preferred_agent: "@naos-debug"
+  reason: "Commit generation is complete; failed hooks require evidence-first debugging."
+  constraints:
+    - "Use the generated commit message only after confirming staged changes."
+    - "Do not use --no-verify to bypass governance checks."
 ```

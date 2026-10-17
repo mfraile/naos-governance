@@ -12,6 +12,11 @@ PURPOSE:
 AUTHORITATIVE SOURCE:
     <NAOS_ROOT>/TASK_REGISTRY.yaml — THE SINGLE SOURCE OF TRUTH
 
+COMPATIBILITY:
+    Mapping registries and legacy task lists are accepted. Canonical lifecycle
+    fields determine delivery; absent legacy status is excluded from legacy
+    status counts and backlog comparisons rather than inferred as planned.
+
 FILES VALIDATED:
     - <NAOS_ROOT>/DASHBOARD.md
     - <NAOS_ROOT>/PROJECT_STATUS.md
@@ -23,12 +28,12 @@ ENV VARS:
     SPECS_ROOT  — path to specs/ directory (default: specs)
 
 USAGE:
-    python kit/scripts/validators/validate_task_coherence.py
+    python scripts/validators/validate_task_coherence.py
 
 EXIT CODES:
     0 — All files coherent with registry
     1 — Drift detected
-    2 — Registry file not found
+    2 — Registry file not found or invalid
 
 [ADAPT] section: adjust DASHBOARD_PATH, PROJECT_STATUS_PATH, BACKLOG_PATH,
                  EXECUTION_SPEC_PATH to match your project layout.
@@ -49,8 +54,14 @@ import yaml
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+from naos_console import configure_console_output  # noqa: E402
 
-from naos_task_lifecycle import is_task_delivered  # noqa: E402
+from naos_task_lifecycle import (  # noqa: E402
+    TASK_ID_TEXT_PATTERN,
+    extract_task_ids,
+    is_task_delivered,
+    normalize_task_id,
+)
 
 try:
     from validator_context import is_kit_repository, print_kit_skip
@@ -103,19 +114,39 @@ def load_registry() -> Dict[str, Any]:
         print(f"❌ FATAL: {REGISTRY_PATH} not found!")
         print("   Create TASK_REGISTRY.yaml in your NAOS_ROOT directory.")
         sys.exit(2)
-    with open(REGISTRY_PATH, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    try:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
+            registry = yaml.safe_load(f)
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        # Parser exceptions may contain registry contents; emit only fixed diagnostics.
+        raise ValueError("Cannot read or parse task registry YAML.") from exc
+    if isinstance(registry, list):
+        registry = {"tasks": registry}
+    if not isinstance(registry, dict) or not isinstance(registry.get("tasks"), list):
+        raise ValueError("Task registry must be a mapping with a tasks list.")
+    for index, task in enumerate(registry["tasks"]):
+        if not isinstance(task, dict):
+            raise ValueError(f"Task registry tasks[{index}] must be a mapping.")
+        try:
+            normalize_task_id(task.get("id"))
+        except ValueError as exc:
+            raise ValueError(f"Task registry tasks[{index}] has an invalid id.") from exc
+        if not isinstance(task.get("title"), str) or not task["title"].strip():
+            raise ValueError(f"Task registry tasks[{index}] requires a nonempty title.")
+        if "status" in task and not isinstance(task["status"], str):
+            raise ValueError(f"Task registry tasks[{index}] status must be a string.")
+    return registry
 
 
 def get_registry_tasks(registry: Dict) -> Dict[str, TaskInfo]:
     tasks = {}
     for task in registry.get("tasks", []):
-        task_id = task["id"]
+        task_id = normalize_task_id(task["id"])
         tasks[task_id] = TaskInfo(
             id=task_id,
             title=task["title"],
             requirement=task.get("requirement", ""),
-            status=task["status"],
+            status=task.get("status", ""),
             phase=task.get("phase", 0),
             priority=task.get("priority", "medium"),
             estimate_days=task.get("estimate_days", 0),
@@ -128,7 +159,7 @@ def get_registry_metrics(registry: Dict) -> Dict[str, Any]:
     tasks = registry.get("tasks", [])
     by_status: Dict[str, int] = defaultdict(int)
     for task in tasks:
-        status = task.get("status", "planned").lower()
+        status = task.get("status", "").lower()
         by_status[status] += 1
 
     tasks_done = sum(1 for task in tasks if is_task_delivered(task))
@@ -222,9 +253,7 @@ def validate_project_status(registry: Dict) -> List[ValidationResult]:
     text = PROJECT_STATUS_PATH.read_text(encoding="utf-8")
     tasks = get_registry_tasks(registry)
 
-    task_refs = re.findall(r"T-(\d{3})", text)
-    for task_num in set(task_refs):
-        task_id = f"T-{task_num}"
+    for task_id in extract_task_ids(text):
         if task_id not in tasks:
             results.append(
                 ValidationResult(
@@ -247,7 +276,11 @@ def validate_backlog(registry: Dict) -> List[ValidationResult]:
 
     text = BACKLOG_PATH.read_text(encoding="utf-8")
     tasks = get_registry_tasks(registry)
-    backlog_tasks = re.findall(r"\|\s*(T-\d{3})\s*\|[^|]+\|\s*([^|]+)\|", text)
+    backlog_tasks = re.findall(
+        rf"\|\s*({TASK_ID_TEXT_PATTERN.pattern})\s*\|[^|]+\|\s*([^|]+)\|",
+        text,
+        re.IGNORECASE,
+    )
 
     status_map = {
         "done": "implemented",
@@ -259,6 +292,7 @@ def validate_backlog(registry: Dict) -> List[ValidationResult]:
     }
 
     for task_id, status_raw in backlog_tasks:
+        task_id = normalize_task_id(task_id)
         status = (
             status_raw.strip()
             .lower()
@@ -283,7 +317,7 @@ def validate_backlog(registry: Dict) -> List[ValidationResult]:
             continue
 
         registry_status = tasks[task_id].status.lower()
-        if status not in {registry_status, "ready"}:
+        if registry_status and status not in {registry_status, "ready"}:
             results.append(
                 ValidationResult(
                     file=str(BACKLOG_PATH),
@@ -324,10 +358,12 @@ def validate_execution_spec(registry: Dict) -> List[ValidationResult]:
         return results
 
     matrix_tasks = re.findall(
-        r"\|\s*(T-\d{3})\s*\|[^|]+\|[^|]+\|[^|]+\|\s*([A-Z]{2,3}-[^\|]+)\|([^|]+)\|",
+        rf"\|\s*({TASK_ID_TEXT_PATTERN.pattern})\s*\|[^|]+\|[^|]+\|[^|]+\|\s*([A-Z]{{2,3}}-[^\|]+)\|([^|]+)\|",
         matrix_match.group(1),
+        re.IGNORECASE,
     )
     for task_id, requirement, _ in matrix_tasks:
+        task_id = normalize_task_id(task_id)
         if task_id not in tasks:
             results.append(
                 ValidationResult(
@@ -358,17 +394,17 @@ def validate_backlog_drift(registry: Dict) -> List[ValidationResult]:
         BACKLOG_PATH,
         EXECUTION_SPEC_PATH,
     ]
-    all_text = ""
+    referenced_ids: set[str] = set()
     for gf in governance_files:
         if gf.exists():
-            all_text += gf.read_text(encoding="utf-8")
+            referenced_ids.update(extract_task_ids(gf.read_text(encoding="utf-8")))
 
     for task_id, task in tasks.items():
         registry_entry = next(
-            (entry for entry in registry.get("tasks", []) if entry.get("id") == task_id),
+            (entry for entry in registry.get("tasks", []) if normalize_task_id(entry.get("id")) == task_id),
             {"status": task.status},
         )
-        if is_task_delivered(registry_entry) and task_id not in all_text:
+        if is_task_delivered(registry_entry) and task_id not in referenced_ids:
             results.append(
                 ValidationResult(
                     file="backlog_drift",
@@ -430,7 +466,7 @@ def print_results(all_results: List[ValidationResult]) -> bool:
 
         print("\n🔧 HOW TO FIX:")
         print(f"   1. Edit {REGISTRY_PATH}  (canonical source)")
-        print("   2. Run: python kit/scripts/workflows/sync_from_registry.py")
+        print("   2. Run: python scripts/workflows/sync_from_registry.py")
         print("   3. Re-run this validator to confirm coherence")
         return False
 
@@ -439,6 +475,7 @@ def print_results(all_results: List[ValidationResult]) -> bool:
 
 
 def main() -> int:
+    configure_console_output()
     if is_kit_repository():
         print_kit_skip(
             "Task Coherence",
@@ -447,7 +484,11 @@ def main() -> int:
         return 0
 
     print("🔍 Loading task registry …")
-    registry = load_registry()
+    try:
+        registry = load_registry()
+    except ValueError as exc:
+        print(f"❌ FATAL: {exc}")
+        return 2
 
     all_results: List[ValidationResult] = []
     print(f"📊 Validating {DASHBOARD_PATH} …")

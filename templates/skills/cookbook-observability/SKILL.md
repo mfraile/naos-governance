@@ -1,7 +1,8 @@
 ---
-name: "cookbook-observability"
-description: "If-then recipes for AI session observability — tracing agent behavior, diagnosing failures, and building a feedback loop. Invoke when an agent produces unexpected output, when governance violations are hard to trace, or when setting up observability for a new AI feature."
-parameters: []
+name: cookbook-observability
+description: If-then recipes for AI session observability — tracing agent behavior, diagnosing failures, and building a feedback loop. Invoke when an agent produces unexpected output, when governance violations are hard to trace, or when setting up observability for a new AI feature.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Cookbook: Observability
@@ -18,14 +19,20 @@ are hard to trace, or observability is needed for a new AI feature.
 
 ```bash
 # [ADAPT: Langfuse (open-source, self-hostable) or equivalent]
-pip install langfuse                 # or: npm install langfuse
+# [ADAPT] Select and review the backend and compatible SDK major/version first.
+# No universal install command or version is implied by the legacy examples.
 # Set env vars (never hardcode):
 # LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
 ```
 
-**Minimum trace metadata to capture per session**:
+**SDK compatibility — ADAPT before use**: The `client.trace(...)` and
+`span.event(...)` shapes below are legacy illustrative calls, not a current SDK
+contract. Select the installed SDK major and verify its actual API before
+copying a call. The official [Python v2→v3 migration guide](https://langfuse.com/docs/observability/sdk/upgrade-path/python-v2-to-v3) documents the trace/span API transition; later migrations also apply, including [v3→v4](https://langfuse.com/docs/observability/sdk/upgrade-path/python-v3-to-v4) (checked 2026-10-16). No SDK or tracing service is installed or invoked by this guidance.
+
+**Minimum trace metadata to capture per session (legacy API illustration)**:
 ```python
-# [ADAPT: your tracing SDK call]
+# [ADAPT: legacy illustrative API; verify the installed SDK major first]
 trace = client.trace(
     name="naos-session",
     metadata={
@@ -59,7 +66,7 @@ trace = client.trace(
 
 ```python
 # After a pre-commit block, log the context:
-# [ADAPT: your tracing call]
+# [ADAPT: legacy illustrative event API; verify the installed SDK major first]
 span.event(name="governance-block", metadata={"rule": "Rule-11", "file": "src/x.py"})
 ```
 

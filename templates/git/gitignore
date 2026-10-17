@@ -1,0 +1,4 @@
+# NAOS machine-local control stores; preserve these files on this machine.
+/.naos/upgrade-v1/
+/.naos/local/managed-content-v3/
+# Portable provenance at /.naos/managed-content/v3/ remains versionable.

@@ -46,7 +46,7 @@
         "unknown"
       ]
     },
-    "session_id": {"type": ["string", "null"]},
+    "session_id": {"anyOf": [{"$ref": "#/$defs/session_id"}, {"type": "null"}]},
     "session_root": {"type": ["string", "null"]},
     "session_report_root": {"type": ["string", "null"]},
     "sessions_index_path": {"type": ["string", "null"]},
@@ -62,5 +62,13 @@
     "not_claimed": {"type": "array", "items": {"type": "string"}},
     "human_review_required": {"type": "boolean"},
     "summary": {"type": "object"}
+  },
+  "$defs": {
+    "session_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|$))[a-z0-9][a-z0-9_-]*(?:\\.[a-z0-9_-]+)*(?![\\s\\S])"
+    }
   }
 }

@@ -1,9 +1,20 @@
+# INERT EXAMPLE: review artifact sensitivity, approved acquisition and Actions budget
+# before manually copying this file to an active .github/workflows/*.yml.
 name: NAOS PR Governance Evidence
 
 "on":
   pull_request:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: Full base commit SHA available in this repository
+        required: true
+        type: string
+      head_sha:
+        description: Full head commit SHA available in this repository
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,6 +22,10 @@ permissions:
 env:
   NAOS_PROFILE: standard
   NAOS_ROOT: naos
+  # Compare immutable commits independently of the merge checkout used to run code.
+  # Manual runs require explicit endpoints; empty PR fields never select a local diff.
+  NAOS_PR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.base_sha }}
+  NAOS_PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.head_sha }}
   # Optional governance metadata only. These values do not authenticate,
   # authorize, prove team membership, approve work, or satisfy separation of duties.
   TEAM_ID: ""
@@ -23,53 +38,73 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Retain the default PR merge checkout; acquire its comparison ancestry.
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.11"
 
-      - name: Install local package
+      # The selected artifact must include the reviewed readiness runner.
+      # URL/hash variables require adopter review; no package or hash is implied.
+      - name: Install approved NAOS artifact
+        shell: python
+        env:
+          NAOS_ARTIFACT_URL: ${{ vars.NAOS_ARTIFACT_URL }}
+          NAOS_ARTIFACT_SHA256: ${{ vars.NAOS_ARTIFACT_SHA256 }}
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .
+          import os
+          import re
+          import subprocess
+          import sys
+          from urllib.parse import urlsplit
 
-      - name: Run source validators
-        run: |
-          python scripts/validators/validate_capability_contracts.py
-          python scripts/validators/validate_docs_consistency.py
-          python scripts/validators/validate_tutorial_consistency.py
-          python scripts/validators/validate_implementation_reality.py
-          python -m unittest discover -s tests
+          url = os.environ.get("NAOS_ARTIFACT_URL", "")
+          digest = os.environ.get("NAOS_ARTIFACT_SHA256", "")
+          try:
+              selected = urlsplit(url)
+              selected.port  # Reject non-numeric and out-of-range ports before pip.
+          except ValueError:
+              sys.exit("NAOS acquisition error: malformed artifact URL.")
+          if (selected.scheme != "https" or not selected.hostname
+                  or selected.username is not None or selected.password is not None
+                  or selected.query or selected.fragment
+                  or any(character.isspace() for character in url)
+                  or not selected.path.endswith((".whl", ".tar.gz"))
+                  or not re.fullmatch(r"[0-9a-fA-F]{64}", digest)):
+              sys.exit("NAOS acquisition error: configure an approved HTTPS artifact URL "
+                       "and its independently reviewed SHA256 in repository variables.")
+          subprocess.run(
+              [sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
+               "--no-cache-dir", url + "#sha256=" + digest.lower()],
+              check=True,
+          )
 
-      - name: Generate NAOS PR governance reports
+      - name: Collect adopter PR governance evidence
+        shell: python
         run: |
-          python cli.py session-id --profile "$NAOS_PROFILE"
-          python cli.py operator-attribution --profile "$NAOS_PROFILE"
-          python cli.py policy-overrides --profile "$NAOS_PROFILE" --dry-run
-          python cli.py ai-surface-budget --profile "$NAOS_PROFILE"
-          python cli.py learning-loop-review --profile "$NAOS_PROFILE"
-          python cli.py self-check --profile "$NAOS_PROFILE"
-          python cli.py spec-pack-contract --profile "$NAOS_PROFILE"
-          python cli.py spec-pack-materialize . --profile "$NAOS_PROFILE" --dry-run
-          python cli.py spec-assembly-worksheet . --profile "$NAOS_PROFILE"
-          python cli.py spec-cascade --profile "$NAOS_PROFILE"
-          python cli.py gate-status --profile "$NAOS_PROFILE" ${TEAM_ID:+--team-id "$TEAM_ID"}
-          python cli.py gate-evaluate --profile "$NAOS_PROFILE" ${TEAM_ID:+--team-id "$TEAM_ID"}
-          python cli.py evidence-conflicts --profile "$NAOS_PROFILE"
-          python cli.py task-claims --profile "$NAOS_PROFILE"
-          python cli.py pr-risk-classify --profile "$NAOS_PROFILE"
-          python cli.py governance-bypass-posture --profile "$NAOS_PROFILE"
-          python cli.py external-evidence-ingest --profile "$NAOS_PROFILE"
-          python cli.py evidence-pack --profile "$NAOS_PROFILE"
-          python cli.py dashboard --profile "$NAOS_PROFILE" --json
-          python cli.py sarif-export --profile "$NAOS_PROFILE"
-          python cli.py pr-governance-summary --profile "$NAOS_PROFILE"
+          import importlib.util
+          import os
+          import subprocess
+          import sys
+          if not importlib.util.find_spec('naos_governance.scripts.naos_ci_readiness'):
+              sys.exit('NAOS acquisition error: select an artifact with the reviewed readiness runner.')
+          command = [sys.executable, '-m', 'naos_governance.scripts.naos_ci_readiness',
+                     '--profile', os.environ['NAOS_PROFILE'], '--naos-root', os.environ['NAOS_ROOT'],
+                     '--pr-base-ref', os.environ['NAOS_PR_BASE_SHA'],
+                     '--pr-head-ref', os.environ['NAOS_PR_HEAD_SHA']]
+          if os.environ.get('TEAM_ID'):
+              command += ['--team-id', os.environ['TEAM_ID']]
+          # The runner retains every failed producer and still collects consumers.
+          # Standard/Assured PR gate evaluation explicitly enforces required inputs.
+          subprocess.run(command, check=True)
 
       - name: Upload NAOS governance artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: naos-pr-governance
           if-no-files-found: ignore

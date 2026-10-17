@@ -1,6 +1,52 @@
 # Changelog
 
-All notable public changes to NAOS are summarized here.
+## Unreleased
+
+- Complete the selected native remediation acceptance on macOS ARM64/APFS,
+  Ubuntu x86_64/ext4 and Windows 11 x86_64/NTFS with CPython 3.11–3.13.
+  Retain the exact source/artifact scopes, failures and skips; final installation
+  smoke checks are separate from full workflow and interruption-recovery tests.
+- Correct setup confirmation, v3 saved-plan digest instructions, opt-in hooks,
+  Windows hook interpreter configuration and profile-specific conformance
+  guidance. Clarify platform diagrams and the limits of branch protection.
+- Preserve raw maintainer audit evidence locally with a hash catalog while
+  keeping generated snapshots out of new ordinary Git blobs. No raw evidence
+  is deleted or represented as backed up by that catalog.
+
+- Forward explicit task, local query and graph path through readiness and self-check; refresh context before building task packs. Unscoped query diagnostics preserve earlier scoped receipts while retaining the current unresolved outcome. Session inspection remains read-only.
+
+- Add explicit kit/adopter applicability and evidence-bound aggregate systemic review records. Preserve missing or stale artifacts and unresolved reviews; optional disabled receipts require a current disabling declaration. Windows witness paths use portable separators, and timestamp checks retain mutation detection across Python 3.11–3.13. Selected installed-workflow, package and recovery qualification is recorded separately; these bounded results do not imply every operation is qualified on every host.
+
+- Separate explicitly declared producer outputs from durable systemic-review inputs so report reruns do not recursively invalidate source review. Unknown files, authored baselines and immutable evidence remain byte-bound; current missing, stale and adverse reports still require resolution.
+
+- Include capability-referenced kit documentation and plugin metadata in wheel and source distributions, and resolve upgrade helpers relative to their installed package so profile activation and digest-bound upgrade work outside a source checkout. Explicitly include Claude Code’s hidden plugin manifest; installed adapter coherence requires it, and archive tests verify both plugin manifests byte-for-byte.
+
+- Preserve SARIF producer identity and distinct occurrences while consolidating duplicate self-check copies. Deliver actual SARIF on stdout when no output file is selected; JSON summaries include the payload in that case. Rule IDs and fingerprints change to prevent cross-producer collisions.
+
+- Prepare genuine repository-intelligence prerequisites for disposable overlay validation. Preserve pre-activation collision identity and target Git state; accept portable JSON verification argv and report unsafe or foreign managed archive refusals explicitly.
+
+- Separate architecture component IDs from section anchors; use exact bounded UTF-8 spec extraction with nonzero missing-ID exits on all supported OSs. Task context now selects requested anchors and consolidates identical capability-card copies while retaining their source paths.
+
+- Inspect supported GitHub and GitLab CI declarations structurally instead of
+  counting NAOS mentions. Report unsupported or unreadable configurations as
+  unknown; declaration presence does not establish execution or enforcement.
+- Limit failure-mode overclaim checks to declared prose fields so evidence and
+  control filenames containing `attestation` or `certification` do not create
+  false coverage claims. Actual prose claims remain subject to the same check.
+- Include deleted files and rename source paths in implementation-scope review,
+  preserving literal Git path names and the existing advisory policy.
+- Block advanced readiness when task requirement references are missing,
+  placeholders or absent from the specification, or no FR identifiers exist.
+  `--allow-adapt` continues to relax specification markers only.
+- Show scan input completeness in ordinary hygiene and test-evidence CLI output,
+  including unconfigured and legacy unknown states. Preserve valid companion
+  evidence when Python/JSON parsing or duplicate normalization reaches a recursion
+  limit, with distinct parse and analysis diagnostics.
+- Report malformed or unreadable selected Python inputs in duplicate-function and
+  test-quality hygiene, distinguishing selected, scanned and failed file counts.
+- Preserve unusable declared coverage inputs as findings even when other inputs
+  map every source. Dashboard metrics expose input completeness; severity and
+  exit codes continue to follow the configured profile and enforcement policy.
 
 ## [1.1.0] - 2026-09-16
 

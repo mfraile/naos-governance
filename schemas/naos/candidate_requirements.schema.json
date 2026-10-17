@@ -62,6 +62,293 @@
     "confidence_classes": {"type": "array", "items": {"type": "string"}},
     "promotion_rule": {"const": "human_review_required"},
     "non_claims": {"type": "array", "items": {"type": "string"}},
+    "reconstruction_coverage": {
+      "type": "object",
+      "required": [
+        "scope",
+        "discovery",
+        "categories",
+        "evidence_selection",
+        "local_path_selection_complete",
+        "requirements_complete",
+        "content_read_completeness_verified",
+        "repository_retrieval"
+      ],
+      "properties": {
+        "scope": {
+          "const": "bounded_local_path_selection_only"
+        },
+        "requirements_complete": {
+          "const": false
+        },
+        "content_read_completeness_verified": {
+          "const": false
+        },
+        "local_path_selection_complete": {
+          "type": "boolean"
+        },
+        "discovery": {
+          "type": "object",
+          "required": [
+            "file_count",
+            "complete",
+            "truncated",
+            "issues",
+            "max_files",
+            "max_entries"
+          ],
+          "properties": {
+            "file_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "max_files": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_entries": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "categories": {
+          "type": "object",
+          "required": [
+            "docs",
+            "source",
+            "tests",
+            "workflows"
+          ],
+          "properties": {
+            "docs": {
+              "type": "object",
+              "required": [
+                "matched",
+                "selected",
+                "limit",
+                "truncated"
+              ],
+              "properties": {
+                "matched": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "source": {
+              "type": "object",
+              "required": [
+                "matched",
+                "selected",
+                "limit",
+                "truncated"
+              ],
+              "properties": {
+                "matched": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "tests": {
+              "type": "object",
+              "required": [
+                "matched",
+                "selected",
+                "limit",
+                "truncated"
+              ],
+              "properties": {
+                "matched": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "workflows": {
+              "type": "object",
+              "required": [
+                "matched",
+                "selected",
+                "limit",
+                "truncated"
+              ],
+              "properties": {
+                "matched": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "evidence_selection": {
+          "type": "object",
+          "required": [
+            "docs",
+            "source",
+            "tests_and_workflows"
+          ],
+          "properties": {
+            "docs": {
+              "type": "object",
+              "required": [
+                "available",
+                "selected",
+                "limit",
+                "truncated"
+              ],
+              "properties": {
+                "available": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "source": {
+              "type": "object",
+              "required": [
+                "available",
+                "selected",
+                "limit",
+                "truncated"
+              ],
+              "properties": {
+                "available": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "tests_and_workflows": {
+              "type": "object",
+              "required": [
+                "available",
+                "selected",
+                "limit",
+                "truncated"
+              ],
+              "properties": {
+                "available": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "repository_retrieval": {
+          "type": "object",
+          "required": [
+            "input_records",
+            "may_add_paths_outside_local_prefix",
+            "completeness_claimed"
+          ],
+          "properties": {
+            "input_records": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "may_add_paths_outside_local_prefix": {
+              "const": true
+            },
+            "completeness_claimed": {
+              "const": false
+            }
+          }
+        }
+      }
+    },
     "repository_intelligence": {"type": ["object", "null"]}
   }
 }

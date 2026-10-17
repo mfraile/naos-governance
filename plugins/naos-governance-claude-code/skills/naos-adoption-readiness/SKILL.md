@@ -14,7 +14,9 @@ Use this skill to guide Claude Code through project-local NAOS adoption.
 2. If NAOS is missing, recommend the appropriate adoption dry-run:
    `naos adopt . --mode greenfield --profile standard --dry-run --no-prompt` or
    `naos adopt . --mode brownfield --profile standard --dry-run --no-prompt`.
-   Explain that `--dry-run` writes declared review reports, while
+   Explain that `--dry-run` may write declared review reports when prerequisites
+   permit persistence; blocked prerequisites show finding IDs and next actions.
+   Meanwhile,
    `--no-write-preview` writes neither reports nor activation files. Select a
    profile by purpose and review the generated install set. Before brownfield
    activation, run source-bound `repository-intelligence plan`; when applicable,
@@ -25,10 +27,13 @@ Use this skill to guide Claude Code through project-local NAOS adoption.
    `naos upgrade --plan-out` invocation followed by a separate
    `--apply-plan ... --expect-plan-digest ...` invocation. Legacy `--force`
    requests refuse.
-   Portable preview generation is exercised on Linux with Python 3.11, while
-   managed `init --activate` mutation is currently supported only on Darwin
-   ARM64 with CPython 3.11–3.13. Unsupported tuples refuse before target
-   mutation; use an absent external `--preview-dir` for review instead.
+   Managed activation targets native macOS, Ubuntu and Windows 11 with CPython
+   3.11–3.13. Implementation and qualification are separate. Use the exact
+   operation/candidate evidence in the platform manual; no blanket qualification
+   of subsequent source changes follows. Preview generation and package
+   installation do not qualify filesystem recovery. Use an absent external
+   `--preview-dir` for review. Consult `INSTALLATION_MANUAL.md` and
+   `docs/PLATFORM_ADAPTERS.md` for current platform limits.
 3. If NAOS is present, recommend orientation commands:
    `naos setup-recommendations`, `naos add setup-module MODULE_ID --dry-run`,
    `make -f Makefile.naos validate-all` only when `Makefile.naos` is installed,
@@ -80,3 +85,23 @@ Do not use these adoption commands to install Engram, configure clients,
 synchronize memory, call MCP, or claim live provider, project-identity, or tool
 access. Policy-valid use-grade memory remains access-unverified until the
 separate active-client verification boundary is satisfied.
+
+## Current evidence preconditions
+
+Diagnostic repository-intelligence plans retain findings but cannot authorize
+enrollment/apply; their bundle and generation fields are null. Keep an
+actionable plan's external `bundle.path` in a private evidence directory through
+operation/recovery, and use an absent explicit output path. Older diagnostic
+bundles do not authorize mutation. Follow `docs/ADOPTION_GUIDE.md` for details.
+
+Complete readiness needs actual task/query/indexed-path inputs. Its opt-in
+`--finalize-dependencies` mode supports Lite, Standard and Assured with current
+L0–L2 and targets through L3. Lite's enabled L0 behavioral capability permits
+inert inspection only; its missing-conformance warning and `not_ready` remain
+visible. Integrated/native and installed-artifact qualification remain pending,
+and finalization creates no evidence or review approvals;
+default behaviour is unchanged. Follow `INSTALLATION_MANUAL.md` and the project's
+`NAOS_QUICK_REFERENCE.md`. Supported configuration review uses the gate's emitted
+subject and actual reviewed snapshot/evidence under
+`docs/CONFIGURATION_POSTURE_REVIEW.md`; it does not waive stale sources,
+unrelated findings or runtime enablement.

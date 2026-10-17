@@ -181,7 +181,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["approved", "rejected", "needs_changes", "waived", "accepted_risk", "not_reviewed", "unknown"]
+            "enum": ["approved", "acknowledged", "rejected", "needs_changes", "waived", "accepted_risk", "not_reviewed", "unknown"]
           }
         },
         "reviewers": {

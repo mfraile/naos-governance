@@ -15,7 +15,7 @@ import os
 import re
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 import yaml
@@ -134,7 +134,9 @@ def safe_fragment(value: Any, fallback: str = "unscoped", max_length: int = 96) 
 def normalize_path(value: Any) -> str:
     text = str(value or "").strip()
     while text.startswith("./"):
-        text = text[2:]
+        text = text[2:] or "."
+    if text.startswith("/"):
+        return text
     return text.rstrip("/") if text not in {"", ".", "*"} else text
 
 
@@ -142,18 +144,36 @@ def normalize_paths(value: Any) -> list[str]:
     return dedupe_strings([normalize_path(item) for item in as_list(value) if normalize_path(item)])
 
 
+def path_issue(path: str, *, scope: bool = False) -> str | None:
+    """Validate logical repository paths without guessing a native path flavor."""
+    normalized = normalize_path(path)
+    if "\\" in normalized:
+        return "use_forward_slashes"
+    if normalized.startswith("/") or PureWindowsPath(normalized).drive:
+        return "repository_relative_path_required"
+    if scope and normalized in {"*", "."}:
+        return None
+    if any(part in {"", ".", ".."} for part in normalized.split("/")):
+        return "noncanonical_relative_path"
+    if not scope and any(char in normalized for char in "*?"):
+        return "changed_file_must_not_be_a_glob"
+    return None
+
+
 def path_matches(path: str, declarations: list[str]) -> bool:
     normalized = normalize_path(path)
+    if path_issue(normalized):
+        return False
     for declaration in declarations:
         item = normalize_path(declaration)
+        if path_issue(item, scope=True):
+            continue
         if item in {"*", "."}:
             return True
-        if not item:
-            continue
         prefix = item.rstrip("/")
         if normalized == prefix or normalized.startswith(f"{prefix}/"):
             return True
-        if fnmatch.fnmatch(normalized, item):
+        if fnmatch.fnmatchcase(normalized, item):
             return True
     return False
 
@@ -349,6 +369,13 @@ def build_report(
     paths = collect_changed_files(data)
     planned_change_paths = normalize_paths(data.get("planned_change_paths"))
     out_of_scope_paths = normalize_paths(data.get("out_of_scope_paths"))
+    path_groups = {**paths, "planned_change_paths": planned_change_paths, "out_of_scope_paths": out_of_scope_paths}
+    invalid_paths = [
+        {"field": field, "path": path, "reason": issue}
+        for field, values in path_groups.items()
+        for path in values
+        if (issue := path_issue(path, scope=field in {"planned_change_paths", "out_of_scope_paths"}))
+    ]
     generated_or_noise = set(paths["generated_evidence_files"] + paths["evidence_noise"])
     review_changed_files = [path for path in paths["changed_files"] if path not in generated_or_noise]
     out_of_scope_changed = [path for path in review_changed_files if path_matches(path, out_of_scope_paths)]
@@ -368,6 +395,17 @@ def build_report(
         known_gaps = ["parallel_lanes_not_declared"]
     else:
         known_gaps = []
+        if invalid_paths:
+            findings.append(
+                finding(
+                    "parallel_lane_handoff.invalid_path",
+                    severity,
+                    "invalid_path",
+                    "Handoff paths must be repository-relative, use / separators and omit dot segments; globs belong only in scope declarations.",
+                    "G3 Scope",
+                    invalid_paths=invalid_paths,
+                )
+            )
         if not lane_id and not handoff_path:
             findings.append(
                 finding(

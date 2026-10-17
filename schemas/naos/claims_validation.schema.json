@@ -21,6 +21,7 @@
   ],
   "properties": {
     "schema": {"const": "naos.claims_validation.v1"},
+    "generated_at": {"type": "string", "description": "Controlled producer generation time. Optional for historical schema compatibility; absent time does not establish report age."},
     "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
     "status": {"type": "string"},
     "claims_file": {"type": ["string", "null"]},

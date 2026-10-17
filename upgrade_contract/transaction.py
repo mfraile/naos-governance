@@ -13,14 +13,16 @@ import re
 import stat
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+from . import linux_primitives
 from .canonical import canonical_bytes, canonical_sha256, loads_strict_json
 from .planner import (
     CONTENT_AWARE_PLAN_SCHEMAS,
     ContentPlanningError,
+    content_aware_drift_paths,
     OWNERSHIP_CLASSES,
     regular_file_identity,
     regular_file_observation,
@@ -28,7 +30,10 @@ from .planner import (
     validate_create_only_plan,
 )
 from .security import (
+    supported_metadata_flags,
+    supported_source_xattrs,
     ContentPathError,
+    created_metadata_identity_matches,
     created_directory_metadata_matches,
     managed_creation_identity,
     observe_created_directory_metadata_fd,
@@ -261,9 +266,23 @@ def _rename_leaf_bytes(name: str) -> bytes:
 def rename_no_replace(source: Path, destination: Path) -> None:
     """Atomically publish a path only when the destination is absent on macOS."""
 
+    if platform.system() == "Linux":
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        source_fd = os.open(source.parent, directory_flags)
+        try:
+            destination_fd = os.open(destination.parent, directory_flags)
+            try:
+                linux_primitives.rename_at(
+                    source_fd, source.name, destination_fd, destination.name
+                )
+            finally:
+                os.close(destination_fd)
+        finally:
+            os.close(source_fd)
+        return
     if platform.system() != "Darwin":
         raise TransactionPrimitiveError(
-            "Atomic no-replace publication is supported only by the executed macOS adapter."
+            "Atomic no-replace publication requires a native POSIX adapter."
         )
     libc = ctypes.CDLL(None, use_errno=True)
     renamex_np = libc.renamex_np
@@ -286,6 +305,17 @@ def rename_no_replace_at(
 ) -> None:
     """Atomically publish a leaf relative to already-open directory handles."""
 
+    if platform.system() == "Linux":
+        _rename_leaf_bytes(source_name)
+        _rename_leaf_bytes(destination_name)
+        linux_primitives.rename_at(
+            source_directory_fd,
+            source_name,
+            destination_directory_fd,
+            destination_name,
+            exchange=False,
+        )
+        return
     if platform.system() != "Darwin":
         raise TransactionPrimitiveError(
             "Directory-handle no-replace publication requires the macOS adapter."
@@ -325,6 +355,17 @@ def rename_exchange_at(
 ) -> None:
     """Atomically exchange two Darwin leaves beneath held directory handles."""
 
+    if platform.system() == "Linux":
+        _rename_leaf_bytes(source_name)
+        _rename_leaf_bytes(destination_name)
+        linux_primitives.rename_at(
+            source_directory_fd,
+            source_name,
+            destination_directory_fd,
+            destination_name,
+            exchange=True,
+        )
+        return
     if platform.system() != "Darwin":
         raise TransactionPrimitiveError(
             "UNSUPPORTED_METADATA: atomic replacement is available only through "
@@ -418,7 +459,13 @@ class StableFileLock:
 
 
 def lock_observation(path: Path) -> dict[str, Any]:
-    """Report the kernel lock state without trusting persisted PID metadata."""
+    """Probe the kernel lock without changing persisted lock bytes.
+
+    The nonblocking exclusive probe can briefly contend with a writer, which
+    fails closed and may retry. The result is only a point-in-time observation;
+    even ``available`` never authorizes a writer or replaces its own acquisition.
+    Persisted PID metadata is diagnostic only.
+    """
 
     if fcntl is None:
         return {
@@ -752,7 +799,11 @@ def _copy_regular_file_new(
     expected_metadata: dict[str, object],
     creation_identity: dict[str, object],
 ) -> None:
-    """Copy data and the supported Darwin metadata tuple into private staging."""
+    """Copy data and supported POSIX metadata into exclusive private staging.
+
+    Failed staging is retained; unsealed preparation has no delete authority.
+    This helper has no authority to unlink a name after an open/copy failure.
+    """
 
     source_descriptor = os.open(
         source,
@@ -768,48 +819,54 @@ def _copy_regular_file_new(
                 f"Managed-content source changed before staging: {source}"
             )
         if (
-            source_metadata.get("flags") != 0
+            not supported_metadata_flags(source_metadata)
+            or not supported_source_xattrs(source_metadata)
             or source_metadata.get("acl_entries") != []
             or source_metadata.get("uid") != os.getuid()
             or int(source_metadata.get("mode") or 0) & ~0o777
         ):
             raise TransactionPrimitiveError(
-                "UNSUPPORTED_METADATA: source flags, ACL, owner, or special "
-                f"mode is outside the executed Darwin create-only adapter: {source}"
+                "UNSUPPORTED_METADATA: source flags, xattr namespace, ACL, owner, or special "
+                f"mode is outside the selected POSIX create-only adapter: {source}"
             )
         destination_descriptor = os.open(
             destination,
-            os.O_RDWR
-            | os.O_CREAT
-            | os.O_EXCL
-            | getattr(os, "O_NOFOLLOW", 0),
+            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
             0o600,
         )
-        libc = ctypes.CDLL(None, use_errno=True)
-        fcopyfile = libc.fcopyfile
-        fcopyfile.argtypes = [
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_void_p,
-            ctypes.c_uint32,
-        ]
-        fcopyfile.restype = ctypes.c_int
-        os.lseek(source_descriptor, 0, os.SEEK_SET)
-        if fcopyfile(
-            source_descriptor,
-            destination_descriptor,
-            None,
-            COPYFILE_DATA
-            | COPYFILE_XATTR
-            | COPYFILE_NOFOLLOW_SRC
-            | COPYFILE_NOFOLLOW_DST,
-        ) != 0:
-            error_number = ctypes.get_errno()
-            raise OSError(
-                error_number,
-                os.strerror(error_number),
-                str(destination),
+        if platform.system() == "Linux":
+            linux_primitives.copy_data_and_xattrs(
+                source_descriptor, destination_descriptor
             )
+        else:
+            libc = ctypes.CDLL(None, use_errno=True)
+            fcopyfile = libc.fcopyfile
+            fcopyfile.argtypes = [
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_void_p,
+                ctypes.c_uint32,
+            ]
+            fcopyfile.restype = ctypes.c_int
+            os.lseek(source_descriptor, 0, os.SEEK_SET)
+            if (
+                fcopyfile(
+                    source_descriptor,
+                    destination_descriptor,
+                    None,
+                    COPYFILE_DATA
+                    | COPYFILE_XATTR
+                    | COPYFILE_NOFOLLOW_SRC
+                    | COPYFILE_NOFOLLOW_DST,
+                )
+                != 0
+            ):
+                error_number = ctypes.get_errno()
+                raise OSError(
+                    error_number,
+                    os.strerror(error_number),
+                    str(destination),
+                )
         os.fchown(
             destination_descriptor,
             int(creation_identity["uid"]),
@@ -823,15 +880,12 @@ def _copy_regular_file_new(
                 observe_created_file_metadata_fd(source_descriptor)
             )
             != expected_metadata
-            or _descriptor_content_identity(destination_descriptor)
-            != expected_content
+            or _descriptor_content_identity(destination_descriptor) != expected_content
         ):
             raise TransactionPrimitiveError(
                 f"Managed-content staged content validation failed: {source}"
             )
-        destination_metadata = observe_created_file_metadata_fd(
-            destination_descriptor
-        )
+        destination_metadata = observe_created_file_metadata_fd(destination_descriptor)
         if not metadata_preservation_matches(
             expected_metadata,
             destination_metadata,
@@ -840,15 +894,6 @@ def _copy_regular_file_new(
             raise TransactionPrimitiveError(
                 f"Managed-content staged metadata validation failed: {source}"
             )
-    except BaseException:
-        if destination_descriptor is not None:
-            os.close(destination_descriptor)
-            destination_descriptor = None
-        try:
-            destination.unlink()
-        except FileNotFoundError:
-            pass
-        raise
     finally:
         if destination_descriptor is not None:
             os.close(destination_descriptor)
@@ -865,6 +910,7 @@ def _copy_regular_file_new_at(
     expected_metadata: dict[str, object],
     creation_identity: dict[str, object],
 ) -> None:
+    """Stage through a held parent; preserve all leaves if the copy fails."""
     source_descriptor = os.open(
         source,
         os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
@@ -880,49 +926,55 @@ def _copy_regular_file_new_at(
                 f"Managed-content source changed before staging: {source}"
             )
         if (
-            source_metadata.get("flags") != 0
+            not supported_metadata_flags(source_metadata)
+            or not supported_source_xattrs(source_metadata)
             or source_metadata.get("acl_entries") != []
             or source_metadata.get("uid") != os.getuid()
             or int(source_metadata.get("mode") or 0) & ~0o777
         ):
             raise TransactionPrimitiveError(
-                "UNSUPPORTED_METADATA: source flags, ACL, owner, or special "
-                f"mode is outside the executed Darwin create-only adapter: {source}"
+                "UNSUPPORTED_METADATA: source flags, xattr namespace, ACL, owner, or special "
+                f"mode is outside the selected POSIX create-only adapter: {source}"
             )
         destination_descriptor = os.open(
             destination_name,
-            os.O_RDWR
-            | os.O_CREAT
-            | os.O_EXCL
-            | getattr(os, "O_NOFOLLOW", 0),
+            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
             0o600,
             dir_fd=destination_parent_descriptor,
         )
-        libc = ctypes.CDLL(None, use_errno=True)
-        fcopyfile = libc.fcopyfile
-        fcopyfile.argtypes = [
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_void_p,
-            ctypes.c_uint32,
-        ]
-        fcopyfile.restype = ctypes.c_int
-        os.lseek(source_descriptor, 0, os.SEEK_SET)
-        if fcopyfile(
-            source_descriptor,
-            destination_descriptor,
-            None,
-            COPYFILE_DATA
-            | COPYFILE_XATTR
-            | COPYFILE_NOFOLLOW_SRC
-            | COPYFILE_NOFOLLOW_DST,
-        ) != 0:
-            error_number = ctypes.get_errno()
-            raise OSError(
-                error_number,
-                os.strerror(error_number),
-                destination_name,
+        if platform.system() == "Linux":
+            linux_primitives.copy_data_and_xattrs(
+                source_descriptor, destination_descriptor
             )
+        else:
+            libc = ctypes.CDLL(None, use_errno=True)
+            fcopyfile = libc.fcopyfile
+            fcopyfile.argtypes = [
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_void_p,
+                ctypes.c_uint32,
+            ]
+            fcopyfile.restype = ctypes.c_int
+            os.lseek(source_descriptor, 0, os.SEEK_SET)
+            if (
+                fcopyfile(
+                    source_descriptor,
+                    destination_descriptor,
+                    None,
+                    COPYFILE_DATA
+                    | COPYFILE_XATTR
+                    | COPYFILE_NOFOLLOW_SRC
+                    | COPYFILE_NOFOLLOW_DST,
+                )
+                != 0
+            ):
+                error_number = ctypes.get_errno()
+                raise OSError(
+                    error_number,
+                    os.strerror(error_number),
+                    destination_name,
+                )
         os.fchown(
             destination_descriptor,
             int(creation_identity["uid"]),
@@ -936,8 +988,7 @@ def _copy_regular_file_new_at(
                 observe_created_file_metadata_fd(source_descriptor)
             )
             != expected_metadata
-            or _descriptor_content_identity(destination_descriptor)
-            != expected_content
+            or _descriptor_content_identity(destination_descriptor) != expected_content
             or not metadata_preservation_matches(
                 expected_metadata,
                 observe_created_file_metadata_fd(destination_descriptor),
@@ -947,16 +998,6 @@ def _copy_regular_file_new_at(
             raise TransactionPrimitiveError(
                 f"Managed-content staged content or metadata validation failed: {source}"
             )
-    except BaseException:
-        if destination_descriptor is not None:
-            os.close(destination_descriptor)
-            destination_descriptor = None
-        try:
-            os.unlink(destination_name, dir_fd=destination_parent_descriptor)
-            os.fsync(destination_parent_descriptor)
-        except FileNotFoundError:
-            pass
-        raise
     finally:
         if destination_descriptor is not None:
             os.close(destination_descriptor)
@@ -1082,7 +1123,9 @@ def _managed_file_matches(
     current_ancestors = {str(item["path"]): item for item in ancestors}
     return (
         content == expected_content
-        and metadata == expected_metadata
+        and created_metadata_identity_matches(
+            metadata, expected_metadata, expected_type="regular_file"
+        )
         and (
             expected_ancestors is None
             or all(
@@ -1110,7 +1153,9 @@ def _managed_file_matches_at(
     current_ancestors = {str(item["path"]): item for item in ancestors}
     return (
         content == expected_content
-        and metadata == expected_metadata
+        and created_metadata_identity_matches(
+            metadata, expected_metadata, expected_type="regular_file"
+        )
         and (
             expected_ancestors is None
             or all(
@@ -1396,6 +1441,19 @@ def _content_mutation_items(plan: dict[str, Any]) -> list[dict[str, Any]]:
     return items
 
 
+def _publication_adapter(kind: str, installed_metadata: dict[str, Any]) -> str:
+    adapters = {
+        ("Darwin", "create"): "darwin_rename_excl",
+        ("Darwin", "replace"): "darwin_rename_swap",
+        ("Linux", "create"): "linux_renameat2_noreplace",
+        ("Linux", "replace"): "linux_renameat2_exchange",
+    }
+    try:
+        return adapters[(installed_metadata.get("platform"), kind)]
+    except (KeyError, TypeError) as exc:
+        raise TransactionPrimitiveError("Unsupported publication adapter binding") from exc
+
+
 def _validate_receipt_v2(
     value: dict[str, Any],
     *,
@@ -1479,7 +1537,7 @@ def _validate_receipt_v2(
             or action.get("base_blob")
             != {"path": after["sha256"], "sha256": after["sha256"]}
             or action.get("publication_adapter")
-            != ("darwin_rename_swap" if kind == "replace" else "darwin_rename_excl")
+            != _publication_adapter(kind, installed)
         ):
             raise TransactionPrimitiveError(
                 "Managed-content v2 receipt action binding is invalid: "
@@ -1547,7 +1605,23 @@ def _load_receipt_any(
     transaction_id: str,
     plan: dict[str, Any],
 ) -> tuple[dict[str, Any], str, str]:
-    value = _safe_json_object(path)
+    return _validate_receipt_any(
+        _safe_json_object(path), project_id=project_id,
+        scope_integrity_sha3_512=scope_integrity_sha3_512,
+        source_policy_sha256=source_policy_sha256,
+        transaction_id=transaction_id, plan=plan,
+    )
+
+
+def _validate_receipt_any(
+    value: dict[str, Any],
+    *,
+    project_id: str,
+    scope_integrity_sha3_512: str,
+    source_policy_sha256: str,
+    transaction_id: str,
+    plan: dict[str, Any],
+) -> tuple[dict[str, Any], str, str]:
     schema = value.get("schema")
     if schema == "naos.upgrade.managed_content_receipt.v1":
         digest = _validate_receipt(
@@ -1627,6 +1701,23 @@ def _validate_manifest(
     scope_integrity_sha3_512: str,
     source_policy_sha256: str,
 ) -> None:
+    _validate_manifest_record(
+        value,
+        validate_plan=lambda plan: validate_create_only_plan(plan, project_root=project_root),
+        project_id=project_id,
+        scope_integrity_sha3_512=scope_integrity_sha3_512,
+        source_policy_sha256=source_policy_sha256,
+    )
+
+
+def _validate_manifest_record(
+    value: dict[str, Any],
+    *,
+    validate_plan: Callable[[dict[str, Any]], Any],
+    project_id: str,
+    scope_integrity_sha3_512: str,
+    source_policy_sha256: str,
+) -> None:
     expected_keys = {
         "schema",
         "project_id",
@@ -1694,7 +1785,7 @@ def _validate_manifest(
             raise TransactionPrimitiveError(
                 "Managed-content manifest transaction binding is invalid."
             )
-        validate_create_only_plan(transaction_plan, project_root=project_root)
+        validate_plan(transaction_plan)
         transaction_by_id[transaction_id] = transaction
     last_transaction_id = value.get("last_transaction_id")
     if (
@@ -1858,6 +1949,23 @@ def _validate_manifest_v2(
     scope_integrity_sha3_512: str,
     source_policy_sha256: str,
 ) -> None:
+    _validate_manifest_v2_record(
+        value,
+        validate_plan=lambda plan: _validate_transaction_plan_any(plan, project_root=project_root),
+        project_id=project_id,
+        scope_integrity_sha3_512=scope_integrity_sha3_512,
+        source_policy_sha256=source_policy_sha256,
+    )
+
+
+def _validate_manifest_v2_record(
+    value: dict[str, Any],
+    *,
+    validate_plan: Callable[[dict[str, Any]], Any],
+    project_id: str,
+    scope_integrity_sha3_512: str,
+    source_policy_sha256: str,
+) -> None:
     expected_keys = {
         "schema",
         "minimum_recovery_naos_version",
@@ -1927,7 +2035,7 @@ def _validate_manifest_v2(
             raise TransactionPrimitiveError(
                 "Managed-content v2 manifest transaction binding is invalid."
             )
-        _validate_transaction_plan_any(plan, project_root=project_root)
+        validate_plan(plan)
         transaction_by_id[transaction_id] = transaction
     last_transaction = transactions[-1]
     if (
@@ -2206,6 +2314,30 @@ def load_managed_content_manifest_snapshot(
     )
     if manifest is None:
         return None
+    return _managed_content_snapshot_from_records(
+        manifest, manifest_version=manifest_version, project_id=project_id,
+        scope_integrity_sha3_512=scope_integrity_sha3_512,
+        source_policy_sha256=source_policy_sha256,
+        load_receipt=lambda transaction: _load_receipt_any(
+            receipts_root / f"{transaction['transaction_id']}.json",
+            project_id=project_id,
+            scope_integrity_sha3_512=scope_integrity_sha3_512,
+            source_policy_sha256=source_policy_sha256,
+            transaction_id=transaction["transaction_id"], plan=transaction["plan"],
+        ),
+        base_matches=lambda entry: _base_blob_matches(bases_root, entry),
+        historical_base_matches=lambda digest: _historical_base_matches(bases_root, digest),
+    )
+
+
+def _managed_content_snapshot_from_records(
+    manifest: dict[str, Any], *, manifest_version: str,
+    project_id: str, scope_integrity_sha3_512: str, source_policy_sha256: str,
+    load_receipt: Callable[[dict[str, Any]], tuple[dict[str, Any], str, str]],
+    base_matches: Callable[[dict[str, Any]], bool],
+    historical_base_matches: Callable[[str], bool],
+) -> dict[str, Any]:
+    """Shared projection after manifest validation; callbacks define the read boundary."""
     transactions = list(manifest["transactions"])
     creation_identities: dict[str, dict[str, Any]] = {}
     initialization_inputs: list[dict[str, Any]] = []
@@ -2264,14 +2396,7 @@ def load_managed_content_manifest_snapshot(
                     "Managed-content profile-transition inputs are incomplete."
                 )
             transitioned_inputs.append(copy.deepcopy(effective_inputs))
-        receipt, receipt_sha256, receipt_version = _load_receipt_any(
-            receipts_root / f"{transaction_id}.json",
-            project_id=project_id,
-            scope_integrity_sha3_512=scope_integrity_sha3_512,
-            source_policy_sha256=source_policy_sha256,
-            transaction_id=transaction_id,
-            plan=transaction["plan"],
-        )
+        receipt, receipt_sha256, receipt_version = load_receipt(transaction)
         expected_receipt_version = (
             "v2"
             if transaction_plan.get("schema") in CONTENT_AWARE_PLAN_SCHEMAS
@@ -2331,13 +2456,13 @@ def load_managed_content_manifest_snapshot(
         transitioned_inputs[-1] if transitioned_inputs else base_profile_inputs
     )
     for entry in manifest["entries"]:
-        if not _base_blob_matches(bases_root, entry):
+        if not base_matches(entry):
             raise TransactionPrimitiveError(
                 "Managed-content manifest recoverable base is invalid: "
                 + str(entry["path"])
             )
     for digest in sorted(historical_base_digests):
-        if not _historical_base_matches(bases_root, digest):
+        if not historical_base_matches(digest):
             raise TransactionPrimitiveError(
                 "Managed-content historical recoverable base is invalid: "
                 + digest
@@ -2390,6 +2515,16 @@ def _validate_journal(
     *,
     project_root: Path,
 ) -> dict[str, Any]:
+    return _validate_journal_record(
+        journal, validate_plan=lambda plan: validate_create_only_plan(plan, project_root=project_root)
+    )
+
+
+def _validate_journal_record(
+    journal: dict[str, Any],
+    *,
+    validate_plan: Callable[[dict[str, Any]], Any],
+) -> dict[str, Any]:
     expected_keys = {
         "schema",
         "transaction_id",
@@ -2432,7 +2567,7 @@ def _validate_journal(
     plan = journal.get("plan")
     if not isinstance(plan, dict):
         raise TransactionPrimitiveError("Managed-content journal plan is invalid.")
-    validate_create_only_plan(plan, project_root=project_root)
+    validate_plan(plan)
     planned_paths = [str(item["path"]) for item in plan["paths"]]
     applied_paths = journal.get("applied_paths")
     applied_identities = journal.get("applied_identities")
@@ -2672,10 +2807,80 @@ def _validate_v2_action_record(
         )
 
 
+def _immutable_typed_json(value: Any) -> tuple[type, Any]:
+    """Detach exact JSON types and values into an immutable local snapshot."""
+
+    if isinstance(value, dict):
+        return (type(value), tuple(
+            (key, _immutable_typed_json(item)) for key, item in value.items()
+        ))
+    if isinstance(value, (list, tuple)):
+        return (type(value), tuple(_immutable_typed_json(item) for item in value))
+    return (type(value), value)
+
+
+def _matches_typed_json_snapshot(value: Any, snapshot: tuple[type, Any]) -> bool:
+    expected_type, expected = snapshot
+    if type(value) is not expected_type:
+        return False
+    if isinstance(value, dict):
+        return len(value) == len(expected) and all(
+            key in value and _matches_typed_json_snapshot(value[key], item)
+            for key, item in expected
+        )
+    if isinstance(value, (list, tuple)):
+        return len(value) == len(expected) and all(
+            _matches_typed_json_snapshot(item, saved)
+            for item, saved in zip(value, expected, strict=True)
+        )
+    return value == expected
+
+
+@dataclass(frozen=True)
+class _ValidatedPlanProof:
+    """Invocation-local immutable authority for already validated v2 plans."""
+
+    root: str
+    canonical_plan: bytes
+    typed_plan: dict[str, Any]
+    _typed_snapshot: tuple[type, Any] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        detached = copy.deepcopy(self.typed_plan)
+        if (
+            type(self.canonical_plan) is not bytes
+            or canonical_bytes(detached) != self.canonical_plan
+        ):
+            raise TransactionPrimitiveError(
+                "Managed-content v2 validated proof canonical snapshot differs."
+            )
+        object.__setattr__(self, "typed_plan", detached)
+        object.__setattr__(self, "_typed_snapshot", _immutable_typed_json(detached))
+
+
 def _validate_journal_v2(
     journal: dict[str, Any],
     *,
     project_root: Path,
+    validated_plan_proof: _ValidatedPlanProof | None = None,
+) -> dict[str, Any]:
+    def validate_plan(plan):
+        if validated_plan_proof is None:
+            validate_content_aware_plan(plan, project_root=project_root)
+        elif (
+            str(project_root.resolve(strict=True)) != validated_plan_proof.root
+            or not _matches_typed_json_snapshot(
+                plan, validated_plan_proof._typed_snapshot
+            )
+        ):
+            raise TransactionPrimitiveError(
+                "Managed-content v2 checkpoint plan differs from its validated proof."
+            )
+    return _validate_journal_v2_record(journal, validate_plan=validate_plan)
+
+
+def _validate_journal_v2_record(
+    journal: dict[str, Any], *, validate_plan: Callable[[dict[str, Any]], Any],
 ) -> dict[str, Any]:
     expected_keys = {
         "schema",
@@ -2692,11 +2897,20 @@ def _validate_journal_v2(
     _validate_sha256_integrity(journal, label="managed-content v2 journal")
     if set(journal) != expected_keys:
         raise TransactionPrimitiveError("Managed-content v2 journal shape is invalid.")
+    if journal.get("schema") != "naos.upgrade.content_transaction.v2":
+        raise TransactionPrimitiveError("Managed-content v2 journal control fields are invalid.")
+    return _validate_content_checkpoint_fields(journal, journal.get("plan"), validate_plan=validate_plan)
+
+
+def _validate_content_checkpoint_fields(
+    journal: dict[str, Any], plan: dict[str, Any], *,
+    validate_plan: Callable[[dict[str, Any]], Any],
+) -> dict[str, Any]:
+    """Exact v2 semantic controls shared by two distinct physical formats."""
     transaction_id = journal.get("transaction_id")
     state = journal.get("state")
     if (
-        journal.get("schema") != "naos.upgrade.content_transaction.v2"
-        or journal.get("minimum_recovery_naos_version")
+        journal.get("minimum_recovery_naos_version")
         != CONTENT_AWARE_MINIMUM_RECOVERY_VERSION
         or not isinstance(transaction_id, str)
         or TRANSACTION_ID_RE.fullmatch(transaction_id) is None
@@ -2716,10 +2930,9 @@ def _validate_journal_v2(
         raise TransactionPrimitiveError(
             "Managed-content v2 journal control fields are invalid."
         )
-    plan = journal.get("plan")
     if not isinstance(plan, dict):
         raise TransactionPrimitiveError("Managed-content v2 journal plan is invalid.")
-    validate_content_aware_plan(plan, project_root=project_root)
+    validate_plan(plan)
     mutations = _content_mutation_items(plan)
     mutation_by_path = {str(item["path"]): item for item in mutations}
     mutation_paths = list(mutation_by_path)
@@ -2889,6 +3102,152 @@ def _journal_v2_value(
     )
 
 
+_COMPACT_JOURNAL_SCHEMA = "naos.upgrade.content_transaction.compact.v1"
+_COMPACT_PLAN_NAME = "plan.json"
+
+
+def _compact_plan_reference(plan_raw: bytes) -> dict[str, Any]:
+    return {"name": _COMPACT_PLAN_NAME, "sha256": hashlib.sha256(plan_raw).hexdigest(),
+            "size": len(plan_raw)}
+
+
+def _validate_compact_journal_record(
+    journal: dict[str, Any], plan_raw: bytes, *,
+    validate_plan: Callable[[dict[str, Any]], Any],
+    validated_plan_proof: _ValidatedPlanProof | None = None,
+) -> dict[str, Any]:
+    """Validate compact physical integrity once, then unchanged semantic controls."""
+    _validate_sha256_integrity(journal, label="compact transaction journal")
+    expected = {"schema", "minimum_recovery_naos_version", "transaction_id",
+                "plan_ref", "state", "applied_actions", "created_directories",
+                "pending_action", "detail", "integrity"}
+    reference = journal.get("plan_ref")
+    if (set(journal) != expected or journal.get("schema") != _COMPACT_JOURNAL_SCHEMA
+            or type(reference) is not dict or set(reference) != {"name", "sha256", "size"}
+            or reference.get("name") != _COMPACT_PLAN_NAME
+            or type(reference.get("size")) is not int or reference["size"] < 1
+            or type(reference.get("sha256")) is not str
+            or SHA256_RE.fullmatch(reference["sha256"]) is None
+            or type(plan_raw) is not bytes or len(plan_raw) != reference["size"]
+            or hashlib.sha256(plan_raw).hexdigest() != reference["sha256"]):
+        raise TransactionPrimitiveError("Compact checkpoint shape or plan binding is invalid.")
+    plan = loads_strict_json(plan_raw)
+    if type(plan) is not dict:
+        raise TransactionPrimitiveError("Compact plan sidecar is not an object.")
+    if validated_plan_proof is None:
+        canonical_plan = canonical_bytes(plan)
+    else:
+        canonical_plan = validated_plan_proof.canonical_plan
+        if not _matches_typed_json_snapshot(plan, validated_plan_proof._typed_snapshot):
+            raise TransactionPrimitiveError("Compact plan differs from its validated proof.")
+    if canonical_plan + b"\n" != plan_raw:
+        raise TransactionPrimitiveError("Compact plan sidecar is not canonical JSON.")
+    return _validate_content_checkpoint_fields(journal, plan, validate_plan=validate_plan)
+
+
+def _validate_checkpoint_plan_proof(plan, *, project_root, proof):
+    if (str(project_root.resolve(strict=True)) != proof.root
+            or not _matches_typed_json_snapshot(plan, proof._typed_snapshot)):
+        raise TransactionPrimitiveError("Compact checkpoint plan differs from its validated proof.")
+
+
+def _read_compact_plan_at(parent_descriptor: int) -> bytes:
+    descriptor = _open_safe_regular_at(
+        parent_descriptor, _COMPACT_PLAN_NAME, flags=os.O_RDONLY,
+        label="compact transaction plan sidecar")
+    try:
+        before = os.fstat(descriptor)
+        metadata = observe_created_file_metadata_fd(descriptor)
+        if not supported_metadata_flags(metadata) or metadata.get("acl_entries") != []:
+            raise TransactionPrimitiveError("UNSUPPORTED_METADATA: compact plan sidecar.")
+        chunks = []
+        while True:
+            block = os.read(descriptor, 65536)
+            if not block:
+                break
+            chunks.append(block)
+        after = os.fstat(descriptor)
+        live = os.stat(_COMPACT_PLAN_NAME, dir_fd=parent_descriptor, follow_symlinks=False)
+        if ((before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+                != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+                or (after.st_dev, after.st_ino) != (live.st_dev, live.st_ino)
+                or metadata != observe_created_file_metadata_fd(descriptor)):
+            raise TransactionPrimitiveError("Compact plan sidecar changed while read.")
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
+def _load_content_checkpoint_at(parent_descriptor: int, *, project_root: Path,
+                                label: str) -> tuple[dict[str, Any], dict[str, Any], str]:
+    journal = _safe_json_object_at(parent_descriptor, "journal.json", label=label)
+    if journal.get("schema") == _COMPACT_JOURNAL_SCHEMA:
+        plan = _validate_compact_journal_record(journal, _read_compact_plan_at(parent_descriptor),
+            validate_plan=lambda selected: validate_content_aware_plan(selected, project_root=project_root))
+        return journal, plan, "v2"  # Semantic recovery generation; raw schema stays explicit.
+    plan, version = _validate_journal_any(journal, project_root=project_root)
+    return journal, plan, version
+
+
+def _load_runtime_content_checkpoint(runtime, transaction_name):
+    with _open_runtime_transaction(runtime, transaction_name) as descriptor:
+        return _load_content_checkpoint_at(descriptor, project_root=runtime.root,
+                                           label=transaction_name)
+
+
+def _load_content_checkpoint_path(path: Path, *, project_root: Path):
+    descriptor = _open_project_root_handle(path.parent)
+    try:
+        result = _load_content_checkpoint_at(descriptor, project_root=project_root, label=str(path))
+        if not _root_handle_matches_path(path.parent, descriptor):
+            raise TransactionPrimitiveError("Transaction namespace changed while routed.")
+        return result
+    finally:
+        os.close(descriptor)
+
+
+def _compact_checkpoint_body(transaction_id, reference, state, applied_actions,
+                             created_directories, *, pending_action=None, detail=None):
+    return {"schema": _COMPACT_JOURNAL_SCHEMA,
+            "minimum_recovery_naos_version": CONTENT_AWARE_MINIMUM_RECOVERY_VERSION,
+            "transaction_id": transaction_id, "plan_ref": dict(reference), "state": state,
+            "applied_actions": applied_actions, "created_directories": created_directories,
+            "pending_action": pending_action, "detail": detail}
+
+
+def _persist_content_checkpoint(
+    runtime, transaction_id, plan, state, applied_actions, created_directories, *,
+    pending_action=None, detail=None, require_attached=True, validated_plan_proof=None,
+):
+    with _open_runtime_transaction(runtime, transaction_id) as descriptor:
+        current = _safe_json_object_at(descriptor, "journal.json", label=transaction_id)
+        compact = current.get("schema") == _COMPACT_JOURNAL_SCHEMA
+        plan_raw = _read_compact_plan_at(descriptor) if compact else None
+    arguments = dict(pending_action=pending_action, detail=detail,
+                     require_attached=require_attached, validated_plan_proof=validated_plan_proof)
+    if not compact:
+        return _persist_journal_v2(runtime, transaction_id, plan, state,
+                                   applied_actions, created_directories, **arguments)
+    if current.get("transaction_id") != transaction_id:
+        raise TransactionPrimitiveError("Compact checkpoint transaction-directory binding differs.")
+    if validated_plan_proof is None:
+        raise TransactionPrimitiveError("Compact checkpoint requires an invocation-local validated plan proof.")
+    validate = lambda selected: _validate_checkpoint_plan_proof(
+        selected, project_root=runtime.root, proof=validated_plan_proof)
+    _validate_compact_journal_record(current, plan_raw, validate_plan=validate,
+                                     validated_plan_proof=validated_plan_proof)
+    validate(plan)
+    body = _compact_checkpoint_body(transaction_id, current["plan_ref"], state,
+        applied_actions, created_directories, pending_action=pending_action, detail=detail)
+    _validate_content_checkpoint_fields(body, plan, validate_plan=validate)
+    value = _with_sha256_integrity(body)
+    _replace_runtime_journal(runtime, transaction_id, value, require_attached=require_attached)
+    with _open_runtime_transaction(runtime, transaction_id) as descriptor:
+        if _read_compact_plan_at(descriptor) != plan_raw:
+            raise TransactionPrimitiveError("Compact plan sidecar changed during checkpoint.")
+    return value
+
+
 def _validate_journal_any(
     journal: dict[str, Any],
     *,
@@ -3000,9 +3359,10 @@ def _open_destination_parent_handle(
                 if expected is not None:
                     valid = (metadata.st_dev, metadata.st_ino) == expected
                 elif created_identity is not None:
-                    valid = (
-                        observe_created_directory_metadata_fd(child)
-                        == created_identity
+                    valid = created_metadata_identity_matches(
+                        observe_created_directory_metadata_fd(child),
+                        created_identity,
+                        expected_type="directory",
                     )
                 else:
                     valid = False
@@ -3120,8 +3480,10 @@ def _created_directory_inventory_failures_at(
         try:
             relative = safe_relative_path(relative_text)
             descriptor = _open_existing_directory_handle(root_handle, relative)
-            if observe_created_directory_metadata_fd(descriptor) != record.get(
-                "identity"
+            if not created_metadata_identity_matches(
+                observe_created_directory_metadata_fd(descriptor),
+                record.get("identity"),
+                expected_type="directory",
             ):
                 failures.append(
                     f"created directory topology changed: {relative_text}"
@@ -3658,107 +4020,86 @@ def _require_manifest_journal_coverage(
         )
 
 
+def _unsealed_preparation_outcomes(
+    runtime: _ManagedRuntimeHandles,
+) -> list[CreateOnlyTransactionOutcome]:
+    """Report preserved unsealed residue before any automatic recovery mutation."""
+    runtime.assert_attached()
+    outcomes = []
+    for name in sorted(os.listdir(runtime.transactions_fd)):
+        if not name.startswith(".preparing-"):
+            continue
+        transaction_id = name.removeprefix(".preparing-")
+        detail = "Unsealed preparation has no durable object-identity inventory"
+        try:
+            with _open_runtime_transaction(runtime, name) as descriptor:
+                try:
+                    metadata = os.stat("journal.json", dir_fd=descriptor, follow_symlinks=False)
+                except FileNotFoundError:
+                    detail += "; preparation journal is missing"
+                else:
+                    # Unsealed bytes supply no delete authority. Do not parse an
+                    # unbounded record or open a FIFO/link merely to report residue.
+                    detail += (
+                        "; preparation journal is present but unsealed"
+                        if stat.S_ISREG(metadata.st_mode)
+                        else "; preparation journal is not a regular file"
+                    )
+        except (OSError, ValueError, TransactionPrimitiveError) as exc:
+            detail += f"; preparation directory cannot be validated: {exc}"
+        outcomes.append(CreateOnlyTransactionOutcome(
+            "recovery_required",
+            transaction_id if TRANSACTION_ID_RE.fullmatch(transaction_id) else None,
+            detail=(detail + "; all residue was preserved at "
+                    + str(runtime.root / ".naos/upgrade-v1/managed-content/transactions" / name)
+                    + ". Owner review must reconcile this preparation before retry; "
+                    "automatic recovery cannot delete or adopt unwitnessed objects."),
+        ))
+    runtime.assert_attached()
+    return outcomes
+
+
+def _require_supported_preparation_parents(runtime: _ManagedRuntimeHandles) -> None:
+    """Refuse known unsupported inheritance before creating private residue.
+
+    These held directories are the parents of staged and durable evidence files.
+    Later per-object checks remain necessary: this is an early refusal, not a
+    cached assertion about metadata on objects created after this observation.
+    """
+    runtime.assert_attached()
+    for label, descriptor in (
+        ("transactions", runtime.transactions_fd),
+        ("state", runtime.state_fd),
+        ("bases", runtime.bases_fd),
+        ("receipts", runtime.receipts_fd),
+    ):
+        metadata = observe_created_directory_metadata_fd(descriptor)
+        if not supported_metadata_flags(metadata) or metadata.get("acl_entries") != []:
+            raise TransactionPrimitiveError(
+                "UNSUPPORTED_METADATA: managed-content " + label
+                + " parent has unsupported inode flags or ACL inheritance; "
+                "no transaction preparation was created."
+            )
+    runtime.assert_attached()
+
+
 def _remove_runtime_preparation(
     runtime: _ManagedRuntimeHandles,
     preparation_name: str,
 ) -> None:
+    """Preserve an unsealed preparation: it has no durable delete authority.
+
+    A v1/v2 preparation journal binds planned content, but does not bind the
+    identities of every private object created before publication. Names, modes
+    and even expected content cannot prove that a leaf is still ours. Preserve
+    residue for explicit review instead of guessing during recovery. Even an
+    empty directory cannot be deleted by a non-atomic name/identity check.
+    """
     runtime.assert_attached()
-    with _open_runtime_transaction(runtime, preparation_name) as preparation_fd:
-        allowed_top_level = {"journal.json", "staging", "directories"}
-        for name in sorted(os.listdir(preparation_fd)):
-            if name not in allowed_top_level:
-                raise TransactionPrimitiveError(
-                    f"Unknown managed-content preparation residue: {preparation_name}/{name}"
-                )
-            metadata = os.stat(
-                name,
-                dir_fd=preparation_fd,
-                follow_symlinks=False,
-            )
-            if name in {"staging", "directories"}:
-                if (
-                    stat.S_ISLNK(metadata.st_mode)
-                    or not stat.S_ISDIR(metadata.st_mode)
-                    or stat.S_IMODE(metadata.st_mode) != 0o700
-                ):
-                    raise TransactionPrimitiveError(
-                        f"Unsafe managed-content preparation staging: {preparation_name}"
-                    )
-                collection_fd = _open_safe_directory_at(
-                    preparation_fd,
-                    name,
-                    label=f"{preparation_name}/{name}",
-                )
-                try:
-                    for staged_name in sorted(os.listdir(collection_fd)):
-                        staged_metadata = os.stat(
-                            staged_name,
-                            dir_fd=collection_fd,
-                            follow_symlinks=False,
-                        )
-                        if not re.fullmatch(r"[0-9]{6}", staged_name):
-                            raise TransactionPrimitiveError(
-                                "Unsafe managed-content preparation entry: "
-                                f"{preparation_name}/{name}/{staged_name}"
-                            )
-                        if name == "staging":
-                            if (
-                                stat.S_ISLNK(staged_metadata.st_mode)
-                                or not stat.S_ISREG(staged_metadata.st_mode)
-                                or staged_metadata.st_nlink != 1
-                            ):
-                                raise TransactionPrimitiveError(
-                                    "Unsafe managed-content preparation file: "
-                                    f"{preparation_name}/staging/{staged_name}"
-                                )
-                            os.unlink(staged_name, dir_fd=collection_fd)
-                        else:
-                            if (
-                                stat.S_ISLNK(staged_metadata.st_mode)
-                                or not stat.S_ISDIR(staged_metadata.st_mode)
-                                or stat.S_IMODE(staged_metadata.st_mode) != 0o755
-                            ):
-                                raise TransactionPrimitiveError(
-                                    "Unsafe managed-content preparation directory: "
-                                    f"{preparation_name}/directories/{staged_name}"
-                                )
-                            staged_fd = _open_safe_directory_at(
-                                collection_fd,
-                                staged_name,
-                                label=(
-                                    f"{preparation_name}/directories/{staged_name}"
-                                ),
-                                expected_mode=0o755,
-                            )
-                            try:
-                                if os.listdir(staged_fd):
-                                    raise TransactionPrimitiveError(
-                                        "Managed-content staged directory is not empty: "
-                                        f"{preparation_name}/directories/{staged_name}"
-                                    )
-                            finally:
-                                os.close(staged_fd)
-                            os.rmdir(staged_name, dir_fd=collection_fd)
-                        os.fsync(collection_fd)
-                finally:
-                    os.close(collection_fd)
-                os.rmdir(name, dir_fd=preparation_fd)
-                os.fsync(preparation_fd)
-            else:
-                if (
-                    stat.S_ISLNK(metadata.st_mode)
-                    or not stat.S_ISREG(metadata.st_mode)
-                    or metadata.st_nlink != 1
-                    or stat.S_IMODE(metadata.st_mode) != 0o600
-                ):
-                    raise TransactionPrimitiveError(
-                        f"Unsafe managed-content preparation journal: {preparation_name}"
-                    )
-                os.unlink("journal.json", dir_fd=preparation_fd)
-                os.fsync(preparation_fd)
-    os.rmdir(preparation_name, dir_fd=runtime.transactions_fd)
-    os.fsync(runtime.transactions_fd)
-    runtime.assert_attached()
+    raise TransactionPrimitiveError(
+        "Unsealed preparation has no durable object-identity inventory; "
+        "all residue was preserved for review: " + preparation_name
+    )
 
 
 def _remove_runtime_staging(
@@ -3895,7 +4236,20 @@ def _leaf_matches_exact_at(
         content, metadata = _leaf_observation_at(parent_descriptor, name)
     except (OSError, ContentPathError, TransactionPrimitiveError):
         return False
-    return content == expected_content and metadata == expected_metadata
+    return content == expected_content and created_metadata_identity_matches(
+        metadata, expected_metadata, expected_type="regular_file"
+    )
+
+
+def _leaf_observation_matches(
+    observed: tuple[dict[str, object], dict[str, object]] | None,
+    expected: tuple[dict[str, object], dict[str, object]],
+) -> bool:
+    return observed is not None and observed[0] == expected[0] and (
+        created_metadata_identity_matches(
+            observed[1], expected[1], expected_type="regular_file"
+        )
+    )
 
 
 def _entry_absent_at(parent_descriptor: int, name: str) -> bool:
@@ -4043,6 +4397,7 @@ def _persist_journal_v2(
     pending_action: dict[str, object] | None = None,
     detail: str | None = None,
     require_attached: bool = True,
+    validated_plan_proof: _ValidatedPlanProof | None = None,
 ) -> dict[str, Any]:
     journal = _journal_v2_value(
         transaction_id=transaction_id,
@@ -4053,7 +4408,11 @@ def _persist_journal_v2(
         pending_action=pending_action,
         detail=detail,
     )
-    _validate_journal_v2(journal, project_root=runtime.root)
+    _validate_journal_v2(
+        journal,
+        project_root=runtime.root,
+        validated_plan_proof=validated_plan_proof,
+    )
     _replace_runtime_journal(
         runtime,
         transaction_id,
@@ -4140,7 +4499,13 @@ def _v2_reconcile_forward_pending(
                 os.close(descriptor)
         if staged_present and target_identity is None:
             return True, None
-        if not staged_present and target_identity == pending["installed_identity"]:
+        if not staged_present and target_identity is not None and (
+            created_metadata_identity_matches(
+                target_identity,
+                pending["installed_identity"],
+                expected_type="directory",
+            )
+        ):
             if path not in {str(item["path"]) for item in created_directories}:
                 created_directories.append(
                     {"path": path, "identity": pending["installed_identity"]}
@@ -4170,9 +4535,9 @@ def _v2_reconcile_forward_pending(
         if key != "direction"
     }
     if kind == "create":
-        if target is None and staged == installed:
+        if target is None and _leaf_observation_matches(staged, installed):
             return True, None
-        if target == installed and staged is None:
+        if _leaf_observation_matches(target, installed) and staged is None:
             if path not in {str(action["path"]) for action in applied_actions}:
                 applied_actions.append(action_record)
             return True, None
@@ -4185,13 +4550,59 @@ def _v2_reconcile_forward_pending(
             )
         )
         backup = (before_content, pending["backup_identity"])
-        if target == backup and staged == installed:
+        if _leaf_observation_matches(target, backup) and _leaf_observation_matches(
+            staged, installed
+        ):
             return True, None
-        if target == installed and staged == backup:
+        if _leaf_observation_matches(target, installed) and _leaf_observation_matches(
+            staged, backup
+        ):
             if path not in {str(action["path"]) for action in applied_actions}:
                 applied_actions.append(action_record)
             return True, None
     return False, f"Leaf publication state is ambiguous and both sides were preserved: {path}"
+
+
+def _reverse_v2_created_leaf(
+    runtime: _ManagedRuntimeHandles,
+    transaction_id: str,
+    path: str,
+    expected_content: dict[str, Any],
+    action: dict[str, Any],
+) -> _ReconciliationOutcome:
+    """Reconcile the existing durable rollback intent through its private slot."""
+    runtime.assert_attached()
+    relative = safe_relative_path(path)
+    try:
+        with _open_runtime_staging(runtime, transaction_id) as staging_fd:
+            try:
+                parent_fd = _open_existing_parent_handle(runtime.root_fd, relative)
+            except FileNotFoundError:
+                # Never discard a private witness merely because public ancestry vanished.
+                if not _entry_absent_at(staging_fd, action["staged_name"]):
+                    return _content_conflict("Rollback public ancestry disappeared; private staging was preserved: " + path)
+                return _reconciled()
+            try:
+                if not _directory_handle_matches_topology(runtime.root, runtime.root_fd, relative, parent_fd):
+                    return _content_conflict("Rollback parent topology changed and was preserved: " + path)
+                if (not _entry_absent_at(staging_fd, action["staged_name"])
+                        and not _entry_absent_at(parent_fd, relative.name)):
+                    return _content_conflict("Both rollback public and private leaves exist and were preserved: " + path)
+                result = _quarantine_exact_regular_at(
+                    parent_fd, relative=relative,
+                    expected_content=expected_content,
+                    expected_identity=action["installed_identity"],
+                    quarantine_handle=staging_fd,
+                    quarantine_name=action["staged_name"],
+                )
+                runtime.assert_attached()
+                if result.reconciled and not _entry_absent_at(parent_fd, relative.name):
+                    return _content_conflict("Rollback public leaf reappeared and was preserved: " + path)
+                return result
+            finally:
+                os.close(parent_fd)
+    except (OSError, ValueError, TransactionPrimitiveError) as exc:
+        return _rollback_failure("Create rollback quarantine was preserved: " + path + ": " + str(exc))
 
 
 def _rollback_v2_transaction(
@@ -4204,6 +4615,7 @@ def _rollback_v2_transaction(
     scope_integrity_sha3_512: str,
     source_policy_sha256: str,
     reason: str,
+    validated_plan_proof: _ValidatedPlanProof | None = None,
 ) -> CreateOnlyTransactionOutcome:
     applied_actions = copy.deepcopy(journal.get("applied_actions") or [])
     cleanup_actions = copy.deepcopy(applied_actions)
@@ -4212,7 +4624,7 @@ def _rollback_v2_transaction(
 
     def fail(detail: str) -> CreateOnlyTransactionOutcome:
         try:
-            _persist_journal_v2(
+            _persist_content_checkpoint(
                 runtime,
                 transaction_id,
                 plan,
@@ -4222,6 +4634,7 @@ def _rollback_v2_transaction(
                 pending_action=pending,
                 detail=detail,
                 require_attached=False,
+                validated_plan_proof=validated_plan_proof,
             )
         except Exception as journal_exc:
             detail += f"; rollback journal finalization failed: {journal_exc}"
@@ -4232,7 +4645,7 @@ def _rollback_v2_transaction(
         )
 
     try:
-        _persist_journal_v2(
+        _persist_content_checkpoint(
             runtime,
             transaction_id,
             plan,
@@ -4242,6 +4655,7 @@ def _rollback_v2_transaction(
             pending_action=pending,
             detail=reason,
             require_attached=False,
+            validated_plan_proof=validated_plan_proof,
         )
     except Exception as exc:
         return CreateOnlyTransactionOutcome(
@@ -4279,7 +4693,6 @@ def _rollback_v2_transaction(
             else:
                 os.close(descriptor)
         else:
-            target = _v2_target_observation(runtime, path)
             installed_content = _plan_present_identity(
                 next(
                     item["after"]
@@ -4288,11 +4701,15 @@ def _rollback_v2_transaction(
                 )
             )
             installed = (installed_content, pending["installed_identity"])
-            if kind == "create" and target is None:
+            if kind == "create":
+                reconciliation = _reverse_v2_created_leaf(runtime, transaction_id, path, installed_content, pending)
+                if not reconciliation.reconciled:
+                    return fail(reconciliation.detail or "Create rollback topology was preserved: " + path)
                 applied_actions = [
                     action for action in applied_actions if action.get("path") != path
                 ]
             elif kind == "replace":
+                target = _v2_target_observation(runtime, path)
                 staged = _v2_staging_observation(
                     runtime,
                     transaction_id,
@@ -4306,14 +4723,16 @@ def _rollback_v2_transaction(
                     )
                 )
                 backup = (before_content, pending["backup_identity"])
-                if target == backup and staged == installed:
+                if _leaf_observation_matches(target, backup) and _leaf_observation_matches(
+                    staged, installed
+                ):
                     applied_actions = [
                         action
                         for action in applied_actions
                         if action.get("path") != path
                     ]
         pending = None
-        _persist_journal_v2(
+        _persist_content_checkpoint(
             runtime,
             transaction_id,
             plan,
@@ -4322,6 +4741,7 @@ def _rollback_v2_transaction(
             created_directories,
             detail="Durable pending action was reconciled before rollback.",
             require_attached=False,
+            validated_plan_proof=validated_plan_proof,
         )
 
     for action in reversed(list(applied_actions)):
@@ -4351,7 +4771,7 @@ def _rollback_v2_transaction(
                     f"preserved: {path}"
                 )
             pending = {"direction": "rollback", **copy.deepcopy(action)}
-            _persist_journal_v2(
+            _persist_content_checkpoint(
                 runtime,
                 transaction_id,
                 plan,
@@ -4361,11 +4781,13 @@ def _rollback_v2_transaction(
                 pending_action=pending,
                 detail=f"Reversing exact {kind} leaf: {path}",
                 require_attached=False,
+                validated_plan_proof=validated_plan_proof,
             )
             _transaction_checkpoint(f"rollback:{path}:intent")
             if kind == "create":
-                os.unlink(relative.name, dir_fd=parent_fd)
-                os.fsync(parent_fd)
+                reconciliation = _reverse_v2_created_leaf(runtime, transaction_id, path, installed_content, action)
+                if not reconciliation.reconciled:
+                    return fail(reconciliation.detail or "Create rollback topology was preserved: " + path)
             else:
                 transaction_fd = _open_safe_directory_at(
                     runtime.transactions_fd,
@@ -4434,7 +4856,7 @@ def _rollback_v2_transaction(
                     )
             applied_actions.remove(action)
             pending = None
-            _persist_journal_v2(
+            _persist_content_checkpoint(
                 runtime,
                 transaction_id,
                 plan,
@@ -4443,6 +4865,7 @@ def _rollback_v2_transaction(
                 created_directories,
                 detail=f"Exact {kind} leaf reversed: {path}",
                 require_attached=False,
+                validated_plan_proof=validated_plan_proof,
             )
             _transaction_checkpoint(f"rollback:{path}:complete")
         except BaseException:
@@ -4471,8 +4894,11 @@ def _rollback_v2_transaction(
             )
             try:
                 if (
-                    observe_created_directory_metadata_fd(descriptor)
-                    != directory_record["identity"]
+                    not created_metadata_identity_matches(
+                        observe_created_directory_metadata_fd(descriptor),
+                        directory_record["identity"],
+                        expected_type="directory",
+                    )
                     or os.listdir(descriptor)
                 ):
                     return fail(
@@ -4490,7 +4916,7 @@ def _rollback_v2_transaction(
                 "installed_identity": directory_record["identity"],
                 "backup_identity": None,
             }
-            _persist_journal_v2(
+            _persist_content_checkpoint(
                 runtime,
                 transaction_id,
                 plan,
@@ -4500,6 +4926,7 @@ def _rollback_v2_transaction(
                 pending_action=pending,
                 detail=f"Reversing exact created directory: {path}",
                 require_attached=False,
+                validated_plan_proof=validated_plan_proof,
             )
             _transaction_checkpoint(f"rollback-directory:{path}:intent")
             os.rmdir(relative.name, dir_fd=parent_fd)
@@ -4507,7 +4934,7 @@ def _rollback_v2_transaction(
             _transaction_checkpoint(f"rollback-directory:{path}:mutation")
             created_directories.remove(directory_record)
             pending = None
-            _persist_journal_v2(
+            _persist_content_checkpoint(
                 runtime,
                 transaction_id,
                 plan,
@@ -4516,6 +4943,7 @@ def _rollback_v2_transaction(
                 created_directories,
                 detail=f"Exact created directory reversed: {path}",
                 require_attached=False,
+                validated_plan_proof=validated_plan_proof,
             )
         finally:
             os.close(parent_fd)
@@ -4551,7 +4979,7 @@ def _rollback_v2_transaction(
         )
     except Exception as exc:
         return fail(f"Exact rollback cleanup failed and was preserved: {exc}")
-    _persist_journal_v2(
+    _persist_content_checkpoint(
         runtime,
         transaction_id,
         plan,
@@ -4560,6 +4988,7 @@ def _rollback_v2_transaction(
         [],
         detail=reason,
         require_attached=False,
+        validated_plan_proof=validated_plan_proof,
     )
     return CreateOnlyTransactionOutcome(
         "rolled_back",
@@ -4617,7 +5046,11 @@ def _regular_leaf_matches_at(
     try:
         return (
             _descriptor_content_identity(descriptor) == expected_content
-            and observe_created_file_metadata_fd(descriptor) == expected_identity
+            and created_metadata_identity_matches(
+                observe_created_file_metadata_fd(descriptor),
+                expected_identity,
+                expected_type="regular_file",
+            )
         )
     except (OSError, ContentPathError, TransactionPrimitiveError):
         return False
@@ -4642,8 +5075,11 @@ def _directory_matches_empty_at(
     try:
         return (
             not os.listdir(descriptor)
-            and observe_created_directory_metadata_fd(descriptor)
-            == expected_identity
+            and created_metadata_identity_matches(
+                observe_created_directory_metadata_fd(descriptor),
+                expected_identity,
+                expected_type="directory",
+            )
         )
     except (OSError, ContentPathError):
         return False
@@ -4663,7 +5099,11 @@ def _unlink_exact_private_regular_at(
         opened = os.fstat(descriptor)
         if (
             _descriptor_content_identity(descriptor) != expected_content
-            or observe_created_file_metadata_fd(descriptor) != expected_identity
+            or not created_metadata_identity_matches(
+                observe_created_file_metadata_fd(descriptor),
+                expected_identity,
+                expected_type="regular_file",
+            )
         ):
             return False
         current = os.stat(name, dir_fd=parent_handle, follow_symlinks=False)
@@ -4695,8 +5135,11 @@ def _rmdir_exact_private_directory_at(
         opened = os.fstat(descriptor)
         if (
             os.listdir(descriptor)
-            or observe_created_directory_metadata_fd(descriptor)
-            != expected_identity
+            or not created_metadata_identity_matches(
+                observe_created_directory_metadata_fd(descriptor),
+                expected_identity,
+                expected_type="directory",
+            )
         ):
             return False
         current = os.stat(name, dir_fd=parent_handle, follow_symlinks=False)
@@ -5219,9 +5662,14 @@ def _manifest_with_entries(
                 "receipt_sha256": receipt_sha256,
             }
         )
+    is_v2 = bool(existing and existing.get("schema") == "naos.upgrade.managed_content_manifest.v2")
+    if is_v2:
+        for entry in additions:
+            entry["last_mutated_by_transaction"] = transaction_id
     result = _with_sha256_integrity(
         {
-            "schema": "naos.upgrade.managed_content_manifest.v1",
+            "schema": "naos.upgrade.managed_content_manifest.v2" if is_v2 else "naos.upgrade.managed_content_manifest.v1",
+            **({"minimum_recovery_naos_version": CONTENT_AWARE_MINIMUM_RECOVERY_VERSION} if is_v2 else {}),
             "project_id": project_id,
             "scope_integrity_sha3_512": scope_integrity_sha3_512,
             "source_policy_sha256": source_policy_sha256,
@@ -5241,7 +5689,7 @@ def _manifest_with_entries(
             ],
         }
     )
-    _validate_manifest(
+    _validate_manifest_any(
         result,
         project_root=project_root,
         project_id=project_id,
@@ -5471,72 +5919,73 @@ def _manifest_entry_lineage_status(
     transaction_id: str,
     path: str,
 ) -> tuple[str, dict[str, Any]] | None:
-    """Resolve a current entry or an exact-authority later recreation."""
+    """Resolve ordered installed authority through exact recreations and updates.
 
-    transactions = [
-        item
-        for item in manifest.get("transactions") or []
-        if isinstance(item, dict)
-    ]
-    transaction_positions = {
-        str(item.get("transaction_id")): index
-        for index, item in enumerate(transactions)
-    }
-    current_entry = next(
-        (
-            item
-            for item in manifest.get("entries") or []
-            if isinstance(item, dict) and str(item.get("path")) == path
-        ),
-        None,
-    )
-    if current_entry is None:
+    Content-aware plans include non-mutating paths; only their eligible mutations
+    advance lineage. Missing live leaves do not remove their recorded authority.
+    """
+    entry = next((item for item in manifest["entries"] if item["path"] == path), None)
+    if entry is None:
         return None
-    current_transaction_id = str(
-        current_entry.get("introduced_by_transaction") or ""
-    )
-    if current_transaction_id == transaction_id:
-        return "current", current_entry
-    if (
-        transaction_id not in transaction_positions
-        or current_transaction_id not in transaction_positions
-        or transaction_positions[current_transaction_id]
-        <= transaction_positions[transaction_id]
-    ):
+    history: list[tuple[str, str, dict[str, Any]]] = []
+    for transaction in manifest["transactions"]:
+        plan = transaction["plan"]
+        content_aware = plan.get("schema") in CONTENT_AWARE_PLAN_SCHEMAS
+        items = _content_mutation_items(plan) if content_aware else plan["paths"]
+        for item in items:
+            if item["path"] == path:
+                history.append((transaction["transaction_id"],
+                                "content_aware" if content_aware else "create_only", item))
+    positions = {identifier: index for index, (identifier, _kind, _item) in enumerate(history)}
+    current_id = entry.get("last_mutated_by_transaction", entry["introduced_by_transaction"])
+    if transaction_id not in positions or not history or current_id != history[-1][0]:
         return None
 
-    def plan_item(bound_transaction_id: str) -> dict[str, Any] | None:
-        transaction = transactions[transaction_positions[bound_transaction_id]]
-        return next(
-            (
-                item
-                for item in (transaction.get("plan") or {}).get("paths") or []
-                if isinstance(item, dict) and str(item.get("path")) == path
-            ),
-            None,
-        )
-
-    original = plan_item(transaction_id)
-    successor = plan_item(current_transaction_id)
-    if original is None or successor is None:
+    previous: dict[str, Any] | None = None
+    previous_kind: str | None = None
+    previous_rule: Any = None
+    for _identifier, kind, item in history:
+        if kind == "create_only":
+            authority = {
+                "base": item["source"], "source_metadata": item["source_metadata"],
+                "ownership": item["ownership"], "creation_policy": item["creation_policy"],
+            }
+            # A create-only successor may recreate only the exact preceding
+            # authority, including an authority installed by a v2 replacement.
+            if previous is not None and (
+                authority != previous
+                or (previous_kind == "create_only" and previous_rule != item.get("source_policy_rule"))
+            ):
+                return None
+        else:
+            ownership = item["ownership"]
+            if previous is not None:
+                if (
+                    item["mutation"]["kind"] != "replace"
+                    or _plan_present_identity(item["before"]) != previous["base"]
+                    or ownership.get("before") != previous["ownership"]
+                    or ownership.get("after") != previous["ownership"]
+                    or ownership.get("creation_policy") != previous["creation_policy"]
+                ):
+                    return None
+            elif item["mutation"]["kind"] != "create":
+                return None
+            authority = {
+                "base": _content_aware_after_identity(item),
+                "source_metadata": item["after_metadata"],
+                "ownership": ownership["after"],
+                "creation_policy": ownership["creation_policy"],
+            }
+        previous = authority
+        previous_kind = kind
+        previous_rule = item.get("source_policy_rule")
+    if previous is None or any(entry.get(key) != value for key, value in previous.items()):
         return None
-    authority_fields = (
-        "source",
-        "source_metadata",
-        "ownership",
-        "creation_policy",
-        "source_policy_rule",
-    )
-    if any(original.get(field) != successor.get(field) for field in authority_fields):
-        return None
-    if (
-        current_entry.get("base") != successor.get("source")
-        or current_entry.get("source_metadata") != successor.get("source_metadata")
-        or current_entry.get("ownership") != successor.get("ownership")
-        or current_entry.get("creation_policy") != successor.get("creation_policy")
-    ):
-        return None
-    return "superseded_exact_recreation", current_entry
+    if current_id == transaction_id:
+        return "current", entry
+    if any(kind == "content_aware" for _identifier, kind, _item in history[positions[transaction_id] + 1:]):
+        return "superseded_content_update", entry
+    return "superseded_exact_recreation", entry
 
 
 def _base_blob_matches_at(
@@ -5654,7 +6103,7 @@ def _validated_transaction_receipt_at(
     )
     if transaction is None:
         return None
-    receipt, receipt_sha256 = _load_receipt_at(
+    receipt, receipt_sha256, receipt_version = _load_receipt_any_at(
         receipts_descriptor,
         f"{transaction_id}.json",
         project_id=project_id,
@@ -5667,7 +6116,10 @@ def _validated_transaction_receipt_at(
         raise TransactionPrimitiveError(
             f"Managed-content manifest receipt digest is invalid: {transaction_id}"
         )
-    for relative_text, identity in (receipt.get("created_metadata") or {}).items():
+    identities = (receipt.get("created_metadata") or {}) if receipt_version == "v1" else {
+        action["path"]: action["installed_metadata"] for action in receipt["actions"]
+    }
+    for relative_text, identity in identities.items():
         lineage = _manifest_entry_lineage_status(
             manifest,
             transaction_id=transaction_id,
@@ -5809,6 +6261,10 @@ def _committed_transaction_failures_at(
             path=relative_text,
         )
         entry = lineage[1] if lineage is not None else None
+        if lineage is not None and lineage[0] == "superseded_content_update":
+            if not _historical_base_matches_at(runtime.bases_fd, item["source"]["sha256"]):
+                failures.append(relative_text)
+            continue
         if (
             entry is None
             or entry.get("base") != item["source"]
@@ -5952,46 +6408,10 @@ def _require_manifest_topology_at(
     project_root: Path,
     source_policy_sha256: str,
 ) -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
-    journal_inventory = _validated_terminal_journal_inventory_at(
-        runtime,
-        project_root=project_root,
-        source_policy_sha256=source_policy_sha256,
+    inventory = _validate_terminal_transaction_inventory_any_at(
+        runtime, manifest, project_root=project_root,
     )
-    _require_manifest_journal_coverage(manifest, journal_inventory)
-    manifest_transactions = {
-        str(item.get("transaction_id")): item
-        for item in manifest.get("transactions") or []
-        if isinstance(item, dict)
-    }
-    for transaction_id, (journal, journal_plan) in journal_inventory.items():
-        if journal.get("state") != "COMMITTED":
-            continue
-        manifest_transaction = manifest_transactions.get(transaction_id)
-        if (
-            manifest_transaction is None
-            or manifest_transaction.get("plan") != journal_plan
-        ):
-            raise TransactionPrimitiveError(
-                "Managed-content manifest/journal plan binding differs: "
-                + transaction_id
-            )
-        topology_failures = _created_directory_inventory_failures_at(
-            runtime.root_fd,
-            [
-                item
-                for item in journal.get("created_directories") or []
-                if isinstance(item, dict)
-            ],
-        )
-        topology_failures.extend(
-            _plan_ancestor_inventory_failures_at(runtime.root_fd, journal_plan)
-        )
-        if topology_failures:
-            raise TransactionPrimitiveError(
-                "Managed-content committed topology changed: "
-                + "; ".join(topology_failures)
-            )
-    return journal_inventory
+    return {key: (journal, plan) for key, (journal, plan, _version) in inventory.items()}
 
 
 def managed_content_sources_current(
@@ -6039,7 +6459,7 @@ def managed_content_sources_current(
             scope_integrity_sha3_512=scope_integrity_sha3_512,
             source_policy_sha256=source_policy_sha256,
         )
-        manifest = _load_manifest_at(
+        manifest, _manifest_version = _load_manifest_any_at(
             runtime.state_fd,
             project_root=root,
             project_id=project_id,
@@ -6052,6 +6472,11 @@ def managed_content_sources_current(
             runtime,
             manifest,
             project_root=root,
+            source_policy_sha256=source_policy_sha256,
+        )
+        _validate_manifest_evidence_any_at(
+            runtime, manifest, project_id=project_id,
+            scope_integrity_sha3_512=scope_integrity_sha3_512,
             source_policy_sha256=source_policy_sha256,
         )
         entries = {
@@ -6163,7 +6588,7 @@ def current_managed_content_paths(
             scope_integrity_sha3_512=scope_integrity_sha3_512,
             source_policy_sha256=source_policy_sha256,
         )
-        manifest = _load_manifest_at(
+        manifest, _manifest_version = _load_manifest_any_at(
             runtime.state_fd,
             project_root=root,
             project_id=project_id,
@@ -6176,6 +6601,11 @@ def current_managed_content_paths(
             runtime,
             manifest,
             project_root=root,
+            source_policy_sha256=source_policy_sha256,
+        )
+        _validate_manifest_evidence_any_at(
+            runtime, manifest, project_id=project_id,
+            scope_integrity_sha3_512=scope_integrity_sha3_512,
             source_policy_sha256=source_policy_sha256,
         )
         result: set[str] = set()
@@ -6428,114 +6858,22 @@ def apply_create_only_plan(
             scope_integrity_sha3_512=scope_integrity_sha3_512,
             source_policy_sha256=scope_source_policy_sha256,
         )
-        existing_manifest = _load_manifest_at(
+        existing_manifest, _manifest_version = _load_manifest_any_at(
             runtime.state_fd,
             project_root=root,
             project_id=project_id,
             scope_integrity_sha3_512=scope_integrity_sha3_512,
             source_policy_sha256=scope_source_policy_sha256,
         )
-        terminal_journal_states: dict[str, str] = {}
-        for existing_transaction_name in sorted(os.listdir(runtime.transactions_fd)):
-            existing_transaction_fd = _open_safe_directory_at(
-                runtime.transactions_fd,
-                existing_transaction_name,
-                label=f"managed-content/transactions/{existing_transaction_name}",
-            )
-            try:
-                existing_journal = _safe_json_object_at(
-                    existing_transaction_fd,
-                    "journal.json",
-                    label=f"{existing_transaction_name}/journal.json",
-                )
-                existing_plan = _validate_journal(
-                    existing_journal,
-                    project_root=root,
-                )
-                if (
-                    existing_journal.get("transaction_id")
-                    != existing_transaction_name
-                    or existing_plan.get("source_policy_sha256")
-                    != scope_source_policy_sha256
-                ):
-                    raise TransactionPrimitiveError(
-                        "Managed-content transaction binding is invalid."
-                    )
-                existing_state = str(existing_journal.get("state") or "")
-                if existing_state not in TERMINAL_CONTENT_STATES:
-                    raise TransactionPrimitiveError(
-                        "A managed-content transaction requires recovery before a new "
-                        f"apply: {existing_transaction_name}"
-                    )
-                terminal_journal_states[existing_transaction_name] = existing_state
-                if existing_state == "COMMITTED":
-                    failures = _committed_transaction_failures_at(
-                        root,
-                        existing_manifest,
-                        transaction_id=existing_transaction_name,
-                        plan=existing_plan,
-                        journal=existing_journal,
-                        runtime=runtime,
-                        project_id=project_id,
-                        scope_integrity_sha3_512=scope_integrity_sha3_512,
-                        source_policy_sha256=scope_source_policy_sha256,
-                    )
-                    if failures:
-                        raise TransactionPrimitiveError(
-                            "A committed managed-content transaction requires "
-                            "evidence recovery before apply: "
-                            + "; ".join(failures)
-                        )
-                else:
-                    try:
-                        os.stat(
-                            f"{existing_transaction_name}.json",
-                            dir_fd=runtime.receipts_fd,
-                            follow_symlinks=False,
-                        )
-                    except FileNotFoundError:
-                        receipt_exists = False
-                    else:
-                        receipt_exists = True
-                    manifest_has_transaction = bool(
-                        existing_manifest
-                        and any(
-                            isinstance(item, dict)
-                            and item.get("transaction_id")
-                            == existing_transaction_name
-                            for item in existing_manifest.get("transactions") or []
-                        )
-                    )
-                    if manifest_has_transaction or receipt_exists:
-                        raise TransactionPrimitiveError(
-                            "A rolled-back managed-content transaction has conflicting "
-                            "commit evidence and requires recovery."
-                        )
-            finally:
-                os.close(existing_transaction_fd)
-        manifest_transaction_ids = {
-            str(item.get("transaction_id"))
-            for item in (existing_manifest or {}).get("transactions") or []
-            if isinstance(item, dict)
-        }
-        committed_journal_ids = {
-            transaction_id
-            for transaction_id, state in terminal_journal_states.items()
-            if state == "COMMITTED"
-        }
-        if manifest_transaction_ids != committed_journal_ids:
-            missing = sorted(manifest_transaction_ids - committed_journal_ids)
-            unexpected = sorted(committed_journal_ids - manifest_transaction_ids)
-            detail: list[str] = []
-            if missing:
-                detail.append("missing committed journals: " + ", ".join(missing))
-            if unexpected:
-                detail.append(
-                    "unmanifested committed journals: " + ", ".join(unexpected)
-                )
-            raise TransactionPrimitiveError(
-                "Managed-content cumulative journal inventory differs from the "
-                "manifest: " + "; ".join(detail)
+        _validate_terminal_transaction_inventory_any_at(
+            runtime, existing_manifest, project_root=root,
+            source_policy_sha256=scope_source_policy_sha256,
+        )
+        if existing_manifest is not None:
+            _validate_manifest_evidence_any_at(
+                runtime, existing_manifest, project_id=project_id,
+                scope_integrity_sha3_512=scope_integrity_sha3_512,
+                source_policy_sha256=scope_source_policy_sha256,
             )
         _validate_plan_preconditions_at(
             root,
@@ -6591,6 +6929,7 @@ def apply_create_only_plan(
         transaction_id = f"MC-{expected_digest[:16]}-{uuid.uuid4().hex[:8]}"
         preparation_name = f".preparing-{transaction_id}"
         runtime.assert_attached()
+        _require_supported_preparation_parents(runtime)
         os.mkdir(preparation_name, 0o700, dir_fd=runtime.transactions_fd)
         os.fsync(runtime.transactions_fd)
         applied: list[str] = []
@@ -6822,8 +7161,11 @@ def apply_create_only_plan(
                     )
                     try:
                         if (
-                            observe_created_directory_metadata_fd(child)
-                            != staged_identity
+                            not created_metadata_identity_matches(
+                                observe_created_directory_metadata_fd(child),
+                                staged_identity,
+                                expected_type="directory",
+                            )
                         ):
                             raise ContentPathError(
                                 "Published directory metadata changed: "
@@ -6920,7 +7262,9 @@ def apply_create_only_plan(
                     created_identity = observe_created_file_metadata_fd(
                         destination_handle
                     )
-                    if created_identity != staged_identity:
+                    if not created_metadata_identity_matches(
+                        created_identity, staged_identity, expected_type="regular_file"
+                    ):
                         raise ContentPathError(
                             f"Managed-content published metadata changed: {relative}"
                         )
@@ -7102,7 +7446,7 @@ def apply_create_only_plan(
             except Exception as pending_exc:
                 pending_cleanup_failure = str(pending_exc)
             try:
-                visible_manifest = _load_manifest_at(
+                visible_manifest, _manifest_version = _load_manifest_any_at(
                     runtime.state_fd,
                     project_root=root,
                     project_id=project_id,
@@ -7470,10 +7814,16 @@ def apply_create_only_plan(
 
 def _validate_terminal_transaction_inventory_any_at(
     runtime: _ManagedRuntimeHandles,
-    manifest: dict[str, Any],
+    manifest: dict[str, Any] | None,
     *,
     project_root: Path,
+    source_policy_sha256: str | None = None,
 ) -> dict[str, tuple[dict[str, Any], dict[str, Any], str]]:
+    manifest_transactions = {
+        item["transaction_id"]: item
+        for item in (manifest or {}).get("transactions") or []
+    }
+    expected_policy = source_policy_sha256 or (manifest or {}).get("source_policy_sha256")
     inventory: dict[str, tuple[dict[str, Any], dict[str, Any], str]] = {}
     for transaction_name in sorted(os.listdir(runtime.transactions_fd)):
         if transaction_name.startswith(".preparing-"):
@@ -7487,15 +7837,8 @@ def _validate_terminal_transaction_inventory_any_at(
                 + transaction_name
             )
         with _open_runtime_transaction(runtime, transaction_name) as transaction_fd:
-            journal = _safe_json_object_at(
-                transaction_fd,
-                "journal.json",
-                label=f"{transaction_name}/journal.json",
-            )
-        transaction_plan, version = _validate_journal_any(
-            journal,
-            project_root=project_root,
-        )
+            journal, transaction_plan, version = _load_content_checkpoint_at(
+                transaction_fd, project_root=project_root, label=transaction_name)
         if journal.get("transaction_id") != transaction_name:
             raise TransactionPrimitiveError(
                 "Managed-content transaction directory/journal binding differs."
@@ -7506,7 +7849,26 @@ def _validate_terminal_transaction_inventory_any_at(
                 "A managed-content transaction requires recovery before apply: "
                 + transaction_name
             )
-        if state == "COMMITTED" and version == "v2":
+        policy_digest = (
+            transaction_plan.get("source_policy_sha256") if version == "v1"
+            else (transaction_plan.get("source_policy", {}).get("provenance") or {}).get("binding_sha256")
+        )
+        if policy_digest != expected_policy:
+            raise TransactionPrimitiveError(
+                "Managed-content transaction source-policy binding differs."
+            )
+        if state == "ROLLED_BACK":
+            try:
+                os.stat(f"{transaction_name}.json", dir_fd=runtime.receipts_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                receipt_exists = False
+            else:
+                receipt_exists = True
+            if transaction_name in manifest_transactions or receipt_exists:
+                raise TransactionPrimitiveError("A rolled-back managed-content transaction has conflicting commit evidence.")
+        if state == "COMMITTED":
+            if manifest_transactions.get(transaction_name, {}).get("plan") != transaction_plan:
+                raise TransactionPrimitiveError("Managed-content manifest/journal plan binding differs: " + transaction_name)
             topology_failures = _committed_content_topology_failures_at(
                 runtime.root_fd,
                 journal,
@@ -7514,13 +7876,14 @@ def _validate_terminal_transaction_inventory_any_at(
             )
             if topology_failures:
                 raise TransactionPrimitiveError(
-                    "Committed managed-content topology differs: "
+                    ("Committed managed-content topology differs: " if version == "v2"
+                     else "Managed-content committed topology changed before apply; evidence recovery required: ")
                     + "; ".join(topology_failures)
                 )
         inventory[transaction_name] = (journal, transaction_plan, version)
     manifest_transaction_ids = {
         str(item.get("transaction_id"))
-        for item in manifest.get("transactions") or []
+        for item in (manifest or {}).get("transactions") or []
         if isinstance(item, dict)
     }
     committed_ids = {
@@ -7530,7 +7893,9 @@ def _validate_terminal_transaction_inventory_any_at(
     }
     if manifest_transaction_ids != committed_ids:
         raise TransactionPrimitiveError(
-            "Managed-content cumulative journal inventory differs from the manifest."
+            "Managed-content cumulative journal inventory differs from the manifest; "
+            "missing committed journals: " + ", ".join(sorted(manifest_transaction_ids - committed_ids))
+            + "; unmanifested committed journals: " + ", ".join(sorted(committed_ids - manifest_transaction_ids))
         )
     return inventory
 
@@ -7568,6 +7933,25 @@ def _validate_manifest_evidence_any_at(
                 "Managed-content receipt generation or digest differs: "
                 + transaction_id
             )
+        identities = (receipt.get("created_metadata") or {}) if receipt_version == "v1" else {
+            action["path"]: action["installed_metadata"] for action in receipt["actions"]
+        }
+        for path, identity in identities.items():
+            lineage = _manifest_entry_lineage_status(
+                manifest, transaction_id=transaction_id, path=path,
+            )
+            if lineage is None:
+                raise TransactionPrimitiveError(
+                    "Managed-content historical installed-path lineage is invalid: " + path
+                )
+            if lineage[0] == "current" and lineage[1]["created_metadata"] != identity:
+                raise TransactionPrimitiveError(
+                    "Managed-content manifest created-metadata binding is invalid: " + path
+                )
+        for entry in manifest.get("entries") or []:
+            current_id = entry.get("last_mutated_by_transaction", entry["introduced_by_transaction"])
+            if current_id == transaction_id and identities.get(entry["path"]) != entry["created_metadata"]:
+                raise TransactionPrimitiveError("Managed-content manifest created-metadata binding is invalid: " + entry["path"])
         historical_base_digests.update(
             _receipt_historical_base_digests(
                 receipt,
@@ -7597,6 +7981,7 @@ def _already_applied_v2_at(
     project_id: str,
     scope_integrity_sha3_512: str,
     source_policy_sha256: str,
+    allow_superseded: bool = False,
 ) -> str | None:
     transaction = next(
         (
@@ -7631,9 +8016,51 @@ def _already_applied_v2_at(
     for action in receipt["actions"]:
         path = str(action["path"])
         entry = entries.get(path)
+        current_transaction_id = transaction_id
+        current_receipt_sha256 = receipt_sha256
+        if entry is not None and entry.get("last_mutated_by_transaction") != transaction_id:
+            if not allow_superseded:
+                return None
+            # Recovery validates an immutable historical commit against the
+            # manifest's later authority, not against the historical live leaf.
+            # Exact-repeat apply retains the default, stricter current check.
+            transactions = manifest.get("transactions") or []
+            positions = {item["transaction_id"]: index for index, item in enumerate(transactions)}
+            current_transaction_id = str(entry.get("last_mutated_by_transaction") or "")
+            if (
+                positions.get(current_transaction_id, -1) <= positions[transaction_id]
+                or _manifest_entry_lineage_status(manifest, transaction_id=transaction_id, path=path) is None
+            ):
+                return None
+            successor = transactions[positions[current_transaction_id]]
+            current_receipt, current_receipt_sha256, current_version = _load_receipt_any_at(
+                runtime.receipts_fd,
+                f"{current_transaction_id}.json",
+                project_id=project_id,
+                scope_integrity_sha3_512=scope_integrity_sha3_512,
+                source_policy_sha256=source_policy_sha256,
+                transaction_id=current_transaction_id,
+                plan=successor["plan"],
+            )
+            if current_receipt_sha256 != successor.get("receipt_sha256"):
+                return None
+            if current_version == "v1":
+                current_item = next((item for item in current_receipt["paths"] if item["path"] == path), None)
+                if current_item is None:
+                    return None
+                action = {
+                    "after": {"presence": "present", **current_item["source"]},
+                    "installed_metadata": current_receipt["created_metadata"][path],
+                }
+            else:
+                current_action = next((item for item in current_receipt["actions"] if item["path"] == path), None)
+                if current_action is None:
+                    return None
+                action = current_action
         if (
             entry is None
-            or entry.get("last_mutated_by_transaction") != transaction_id
+            or entry.get("last_mutated_by_transaction") != current_transaction_id
+            or entry.get("receipt_sha256") != current_receipt_sha256
             or entry.get("base") != _plan_present_identity(action["after"])
             or entry.get("created_metadata") != action["installed_metadata"]
             or not _base_blob_matches_at(runtime.bases_fd, entry)
@@ -7859,7 +8286,15 @@ def apply_content_aware_plan(
         bases_root=bases_root,
         receipts_root=receipts_root,
     )
+    # The caller retains its input object.  All later checkpoints use this
+    # private, type-preserving copy of the exact plan that passed validation.
+    plan = copy.deepcopy(plan)
     validate_content_aware_plan(plan, project_root=root)
+    validated_plan_proof = _ValidatedPlanProof(
+        root=str(root),
+        canonical_plan=canonical_bytes(plan),
+        typed_plan=copy.deepcopy(plan),
+    )
     if plan.get("status") != "ready":
         return CreateOnlyTransactionOutcome(
             "blocked_collision",
@@ -7948,6 +8383,12 @@ def apply_content_aware_plan(
                 prior_transaction,
                 str(receipts_root / f"{prior_transaction}.json"),
             )
+        drift_paths = content_aware_drift_paths(plan["paths"])
+        if drift_paths:
+            raise TransactionPrimitiveError(
+                "GOVERNANCE_DRIFT: selected kit-owned paths require review: "
+                + ", ".join(drift_paths)
+            )
         _validate_content_mutation_authority(existing_manifest, plan)
         snapshot = load_managed_content_manifest_snapshot(
             root,
@@ -7971,18 +8412,19 @@ def apply_content_aware_plan(
         transaction_id = f"MC-{expected_digest[:16]}-{uuid.uuid4().hex[:8]}"
         preparation_name = f".preparing-{transaction_id}"
         published = False
+        _require_supported_preparation_parents(runtime)
         os.mkdir(preparation_name, 0o700, dir_fd=runtime.transactions_fd)
         os.fsync(runtime.transactions_fd)
         applied_actions: list[dict[str, Any]] = []
         created_directories: list[dict[str, object]] = []
         pending_action: dict[str, object] | None = None
-        initial_journal = _journal_v2_value(
-            transaction_id=transaction_id,
-            plan=plan,
-            state="PREPARED",
-            applied_actions=applied_actions,
-            created_directories=created_directories,
-        )
+        plan_raw = validated_plan_proof.canonical_plan + b"\n"
+        initial_body = _compact_checkpoint_body(transaction_id, _compact_plan_reference(plan_raw),
+                                                "PREPARED", applied_actions, created_directories)
+        _validate_content_checkpoint_fields(initial_body, plan,
+            validate_plan=lambda selected: _validate_checkpoint_plan_proof(
+                selected, project_root=root, proof=validated_plan_proof))
+        initial_journal = _with_sha256_integrity(initial_body)
         staged_names = {
             str(item["path"]): f"{index:06d}"
             for index, item in enumerate(mutations)
@@ -8006,6 +8448,10 @@ def apply_content_aware_plan(
                     label=f"{preparation_name}/directories",
                 )
                 try:
+                    _write_bytes_new_at(preparation_fd, _COMPACT_PLAN_NAME, plan_raw)
+                    if _read_compact_plan_at(preparation_fd) != plan_raw:
+                        raise TransactionPrimitiveError("Compact preparation plan readback differs.")
+                    _transaction_checkpoint("prepare:plan")
                     _write_json_new_at(preparation_fd, "journal.json", initial_journal)
                     _transaction_checkpoint("prepare:journal")
                     for item in mutations:
@@ -8086,13 +8532,14 @@ def apply_content_aware_plan(
                     )
                 _transaction_checkpoint(f"base:{path}:published")
 
-            _persist_journal_v2(
+            _persist_content_checkpoint(
                 runtime,
                 transaction_id,
                 plan,
                 "APPLYING",
                 applied_actions,
                 created_directories,
+                validated_plan_proof=validated_plan_proof,
             )
             _transaction_checkpoint("state:applying")
 
@@ -8101,7 +8548,7 @@ def apply_content_aware_plan(
                 relative = safe_relative_path(path)
 
                 def persist_created_directory() -> None:
-                    _persist_journal_v2(
+                    _persist_content_checkpoint(
                         runtime,
                         transaction_id,
                         plan,
@@ -8109,6 +8556,7 @@ def apply_content_aware_plan(
                         applied_actions,
                         created_directories,
                         pending_action=pending_action,
+                        validated_plan_proof=validated_plan_proof,
                     )
 
                 def publish_created_directory(
@@ -8150,7 +8598,7 @@ def apply_content_aware_plan(
                                 "installed_identity": staged_identity,
                                 "backup_identity": None,
                             }
-                            _persist_journal_v2(
+                            _persist_content_checkpoint(
                                 runtime,
                                 transaction_id,
                                 plan,
@@ -8158,6 +8606,7 @@ def apply_content_aware_plan(
                                 applied_actions,
                                 created_directories,
                                 pending_action=pending_action,
+                                validated_plan_proof=validated_plan_proof,
                             )
                             _transaction_checkpoint(
                                 f"directory:{relative_text}:intent"
@@ -8182,8 +8631,11 @@ def apply_content_aware_plan(
                     )
                     try:
                         if (
-                            observe_created_directory_metadata_fd(child)
-                            != staged_identity
+                            not created_metadata_identity_matches(
+                                observe_created_directory_metadata_fd(child),
+                                staged_identity,
+                                expected_type="directory",
+                            )
                         ):
                             raise TransactionPrimitiveError(
                                 "Published directory metadata changed: "
@@ -8256,7 +8708,11 @@ def apply_content_aware_plan(
                         )
                         if (
                             before_content != _plan_present_identity(item["before"])
-                            or backup_identity != item["before_metadata"]
+                            or not created_metadata_identity_matches(
+                                backup_identity,
+                                item["before_metadata"],
+                                expected_type="regular_file",
+                            )
                         ):
                             raise TransactionPrimitiveError(
                                 f"Managed-content replacement precondition changed: {path}"
@@ -8269,7 +8725,7 @@ def apply_content_aware_plan(
                         "backup_identity": backup_identity,
                     }
                     pending_action = {"direction": "forward", **copy.deepcopy(action)}
-                    _persist_journal_v2(
+                    _persist_content_checkpoint(
                         runtime,
                         transaction_id,
                         plan,
@@ -8277,6 +8733,7 @@ def apply_content_aware_plan(
                         applied_actions,
                         created_directories,
                         pending_action=pending_action,
+                        validated_plan_proof=validated_plan_proof,
                     )
                     _transaction_checkpoint(f"action:{path}:intent")
                     if kind == "create":
@@ -8317,13 +8774,14 @@ def apply_content_aware_plan(
                     _transaction_checkpoint(f"action:{path}:validated")
                     applied_actions.append(action)
                     pending_action = None
-                    _persist_journal_v2(
+                    _persist_content_checkpoint(
                         runtime,
                         transaction_id,
                         plan,
                         "APPLYING",
                         applied_actions,
                         created_directories,
+                        validated_plan_proof=validated_plan_proof,
                     )
                     _transaction_checkpoint(f"action:{path}:complete")
                 finally:
@@ -8335,13 +8793,14 @@ def apply_content_aware_plan(
                         os.close(parent_fd)
                     os.close(root_fd)
 
-            _persist_journal_v2(
+            _persist_content_checkpoint(
                 runtime,
                 transaction_id,
                 plan,
                 "VALIDATING",
                 applied_actions,
                 created_directories,
+                validated_plan_proof=validated_plan_proof,
             )
             _transaction_checkpoint("state:validating")
             for action, item in zip(applied_actions, mutations, strict=True):
@@ -8370,10 +8829,8 @@ def apply_content_aware_plan(
                         "path": _content_aware_after_identity(item)["sha256"],
                         "sha256": _content_aware_after_identity(item)["sha256"],
                     },
-                    "publication_adapter": (
-                        "darwin_rename_swap"
-                        if item["mutation"]["kind"] == "replace"
-                        else "darwin_rename_excl"
+                    "publication_adapter": _publication_adapter(
+                        str(item["mutation"]["kind"]), action["installed_identity"]
                     ),
                 }
                 for item, action in zip(mutations, applied_actions, strict=True)
@@ -8430,13 +8887,14 @@ def apply_content_aware_plan(
             )
             _transaction_checkpoint("commit:manifest")
             try:
-                _persist_journal_v2(
+                _persist_content_checkpoint(
                     runtime,
                     transaction_id,
                     plan,
                     "COMMITTED",
                     applied_actions,
                     created_directories,
+                    validated_plan_proof=validated_plan_proof,
                 )
             except Exception as exc:
                 return CreateOnlyTransactionOutcome(
@@ -8460,7 +8918,7 @@ def apply_content_aware_plan(
                     "Committed evidence is durable, but exact private-backup cleanup "
                     f"requires recovery: {exc}"
                 )
-                _persist_journal_v2(
+                _persist_content_checkpoint(
                     runtime,
                     transaction_id,
                     plan,
@@ -8468,6 +8926,7 @@ def apply_content_aware_plan(
                     applied_actions,
                     created_directories,
                     detail=detail,
+                    validated_plan_proof=validated_plan_proof,
                 )
                 return CreateOnlyTransactionOutcome(
                     "recovery_required",
@@ -8504,7 +8963,7 @@ def apply_content_aware_plan(
                     f"backups were preserved: {exc}; {manifest_exc}"
                 )
                 try:
-                    _persist_journal_v2(
+                    _persist_content_checkpoint(
                         runtime,
                         transaction_id,
                         plan,
@@ -8514,6 +8973,7 @@ def apply_content_aware_plan(
                         pending_action=pending_action,
                         detail=detail,
                         require_attached=False,
+                        validated_plan_proof=validated_plan_proof,
                     )
                 except Exception:
                     pass
@@ -8535,7 +8995,7 @@ def apply_content_aware_plan(
                     "Manifest commit point crossed; exact target state and private "
                     f"backups were preserved for recovery: {exc}"
                 )
-                _persist_journal_v2(
+                _persist_content_checkpoint(
                     runtime,
                     transaction_id,
                     plan,
@@ -8545,6 +9005,7 @@ def apply_content_aware_plan(
                     pending_action=pending_action,
                     detail=detail,
                     require_attached=False,
+                    validated_plan_proof=validated_plan_proof,
                 )
                 return CreateOnlyTransactionOutcome(
                     "recovery_required",
@@ -8553,8 +9014,7 @@ def apply_content_aware_plan(
                     detail,
                 )
             try:
-                rollback_journal = _load_runtime_journal(runtime, transaction_id)
-                _validate_journal_v2(rollback_journal, project_root=root)
+                rollback_journal, _rollback_plan, _generation = _load_runtime_content_checkpoint(runtime, transaction_id)
                 return _rollback_v2_transaction(
                     runtime,
                     transaction_id,
@@ -8564,6 +9024,7 @@ def apply_content_aware_plan(
                     scope_integrity_sha3_512=scope_integrity_sha3_512,
                     source_policy_sha256=scope_source_policy_sha256,
                     reason=f"Content-aware apply failed and was rolled back: {exc}",
+                    validated_plan_proof=validated_plan_proof,
                 )
             except Exception as rollback_exc:
                 detail = (
@@ -8571,8 +9032,8 @@ def apply_content_aware_plan(
                     f"{exc}; {rollback_exc}"
                 )
                 try:
-                    current_journal = _load_runtime_journal(runtime, transaction_id)
-                    _persist_journal_v2(
+                    current_journal, _current_plan, _generation = _load_runtime_content_checkpoint(runtime, transaction_id)
+                    _persist_content_checkpoint(
                         runtime,
                         transaction_id,
                         plan,
@@ -8584,6 +9045,7 @@ def apply_content_aware_plan(
                         ),
                         detail=detail,
                         require_attached=False,
+                        validated_plan_proof=validated_plan_proof,
                     )
                 except Exception:
                     pass
@@ -8632,15 +9094,24 @@ def _recover_create_only_transactions_v1(
             scope_integrity_sha3_512=scope_integrity_sha3_512,
             source_policy_sha256=scope_source_policy_sha256,
         )
+        preparations = _unsealed_preparation_outcomes(runtime)
+        if preparations:
+            return preparations
         manifest_load_failure: str | None = None
         try:
-            manifest = _load_manifest_at(
+            manifest, _manifest_version = _load_manifest_any_at(
                 runtime.state_fd,
                 project_root=root,
                 project_id=project_id,
                 scope_integrity_sha3_512=scope_integrity_sha3_512,
                 source_policy_sha256=scope_source_policy_sha256,
             )
+            if manifest is not None:
+                _validate_manifest_evidence_any_at(
+                    runtime, manifest, project_id=project_id,
+                    scope_integrity_sha3_512=scope_integrity_sha3_512,
+                    source_policy_sha256=scope_source_policy_sha256,
+                )
         except Exception as exc:
             manifest = None
             manifest_load_failure = str(exc)
@@ -8671,13 +9142,54 @@ def _recover_create_only_transactions_v1(
                     for transaction_id in missing_journals
                 ]
         for transaction_name in sorted(os.listdir(runtime.transactions_fd)):
+            transaction_id = transaction_name.removeprefix(".preparing-")
+            with _open_runtime_transaction(runtime, transaction_name) as transaction_fd:
+                journal, historical_plan, historical_version = _load_content_checkpoint_at(
+                    transaction_fd, project_root=root, label=transaction_name)
+            policy_digest = (
+                historical_plan.get("source_policy_sha256") if historical_version == "v1"
+                else (historical_plan.get("source_policy", {}).get("provenance") or {}).get("binding_sha256")
+            )
+            if journal.get("transaction_id") != transaction_id or policy_digest != scope_source_policy_sha256:
+                raise TransactionPrimitiveError("Managed-content recovery transaction binding is invalid.")
+            recorded = next(
+                (item for item in (manifest or {}).get("transactions") or []
+                 if item["transaction_id"] == transaction_id), None,
+            )
+            if recorded is not None and recorded["plan"] != historical_plan:
+                raise TransactionPrimitiveError(
+                    "Managed-content manifest/journal plan binding differs: " + transaction_id
+                )
+            if journal.get("state") == "ROLLED_BACK":
+                try:
+                    os.stat(f"{transaction_id}.json", dir_fd=runtime.receipts_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    receipt_exists = False
+                else:
+                    receipt_exists = True
+                if recorded is not None or receipt_exists:
+                    return [CreateOnlyTransactionOutcome(
+                        "recovery_required", transaction_id,
+                        detail="Rolled-back journal conflicts with committed manifest or receipt evidence; targets were preserved.",
+                    )]
+        for transaction_name in sorted(os.listdir(runtime.transactions_fd)):
             if transaction_name.startswith(".preparing-"):
                 transaction_id = transaction_name.removeprefix(".preparing-")
                 if TRANSACTION_ID_RE.fullmatch(transaction_id) is None:
                     raise TransactionPrimitiveError(
                         f"Unknown managed-content preparation entry: {transaction_name}"
                     )
-                _remove_runtime_preparation(runtime, transaction_name)
+                with _open_runtime_transaction(runtime, transaction_name) as preparation_fd:
+                    preparation, _preparation_plan, preparation_version = _load_content_checkpoint_at(
+                        preparation_fd, project_root=root, label=transaction_name)
+                if preparation_version == "v2":
+                    continue
+                try:
+                    _remove_runtime_preparation(runtime, transaction_name)
+                except TransactionPrimitiveError as exc:
+                    return [*outcomes, CreateOnlyTransactionOutcome(
+                        "recovery_required", transaction_id, detail=str(exc)
+                    )]
                 outcomes.append(
                     CreateOnlyTransactionOutcome(
                         "rolled_back",
@@ -8686,8 +9198,9 @@ def _recover_create_only_transactions_v1(
                     )
                 )
                 continue
-            journal = _load_runtime_journal(runtime, transaction_name)
-            plan = _validate_journal(journal, project_root=root)
+            journal, plan, version = _load_runtime_content_checkpoint(runtime, transaction_name)
+            if version == "v2":
+                continue
             state = str(journal.get("state") or "")
             transaction_id = str(journal.get("transaction_id") or "")
             if transaction_id != transaction_name:
@@ -8698,29 +9211,30 @@ def _recover_create_only_transactions_v1(
                 raise TransactionPrimitiveError(
                     "Managed-content recovery source-policy binding is invalid."
                 )
-            try:
-                _remove_runtime_evidence_pending(runtime, transaction_id, plan)
-            except Exception as pending_exc:
-                final = dict(journal)
-                final.pop("integrity", None)
-                final["state"] = "RECOVERY_REQUIRED"
-                final["detail"] = (
-                    "Transaction-specific pending evidence could not be removed: "
-                    f"{pending_exc}"
-                )
-                _replace_runtime_journal(
-                    runtime,
-                    transaction_id,
-                    _with_sha256_integrity(final),
-                )
-                outcomes.append(
-                    CreateOnlyTransactionOutcome(
-                        "recovery_required",
-                        transaction_id,
-                        detail=final["detail"],
+            if state != "COMMITTED":
+                try:
+                    _remove_runtime_evidence_pending(runtime, transaction_id, plan)
+                except Exception as pending_exc:
+                    final = dict(journal)
+                    final.pop("integrity", None)
+                    final["state"] = "RECOVERY_REQUIRED"
+                    final["detail"] = (
+                        "Transaction-specific pending evidence could not be removed: "
+                        f"{pending_exc}"
                     )
-                )
-                continue
+                    _replace_runtime_journal(
+                        runtime,
+                        transaction_id,
+                        _with_sha256_integrity(final),
+                    )
+                    outcomes.append(
+                        CreateOnlyTransactionOutcome(
+                            "recovery_required",
+                            transaction_id,
+                            detail=final["detail"],
+                        )
+                    )
+                    continue
             if manifest_load_failure is not None:
                 final = dict(journal)
                 final.pop("integrity", None)
@@ -8729,11 +9243,12 @@ def _recover_create_only_transactions_v1(
                     "Cumulative managed-content manifest is unreadable or invalid; "
                     f"targets were preserved: {manifest_load_failure}"
                 )
-                _replace_runtime_journal(
-                    runtime,
-                    transaction_id,
-                    _with_sha256_integrity(final),
-                )
+                if state != "COMMITTED":
+                    _replace_runtime_journal(
+                        runtime,
+                        transaction_id,
+                        _with_sha256_integrity(final),
+                    )
                 outcomes.append(
                     CreateOnlyTransactionOutcome(
                         "recovery_required",
@@ -8797,11 +9312,6 @@ def _recover_create_only_transactions_v1(
                 final["detail"] = (
                     "Committed journal is missing its cumulative manifest transaction; "
                     "targets were preserved."
-                )
-                _replace_runtime_journal(
-                    runtime,
-                    transaction_id,
-                    _with_sha256_integrity(final),
                 )
                 outcomes.append(
                     CreateOnlyTransactionOutcome(
@@ -8952,11 +9462,12 @@ def _recover_create_only_transactions_v1(
                         "Manifest records this transaction, but committed evidence "
                         "is incomplete or conflicting: " + "; ".join(commit_failures)
                     )
-                    _replace_runtime_journal(
-                        runtime,
-                        transaction_id,
-                        _with_sha256_integrity(final),
-                    )
+                    if state != "COMMITTED":
+                        _replace_runtime_journal(
+                            runtime,
+                            transaction_id,
+                            _with_sha256_integrity(final),
+                        )
                     outcomes.append(
                         CreateOnlyTransactionOutcome(
                             "recovery_required",
@@ -8975,11 +9486,12 @@ def _recover_create_only_transactions_v1(
                         "Committed evidence is valid, but exact staging cleanup "
                         f"failed: {cleanup_exc}"
                     )
-                    _replace_runtime_journal(
-                        runtime,
-                        transaction_id,
-                        _with_sha256_integrity(final),
-                    )
+                    if state != "COMMITTED":
+                        _replace_runtime_journal(
+                            runtime,
+                            transaction_id,
+                            _with_sha256_integrity(final),
+                        )
                     outcomes.append(
                         CreateOnlyTransactionOutcome(
                             "recovery_required",
@@ -9251,6 +9763,9 @@ def _recover_v2_transactions(
             scope_integrity_sha3_512=scope_integrity_sha3_512,
             source_policy_sha256=scope_source_policy_sha256,
         )
+        preparations = _unsealed_preparation_outcomes(runtime)
+        if preparations:
+            return preparations
         manifest_failure: str | None = None
         try:
             manifest, _manifest_version = _load_manifest_any_at(
@@ -9272,7 +9787,96 @@ def _recover_v2_transactions(
             manifest = None
             manifest_failure = str(exc)
 
-        for transaction_name in sorted(os.listdir(runtime.transactions_fd)):
+        # Validate the complete inventory under the scope lock before any mutation.
+        # An uncommitted successor may temporarily displace a committed live leaf;
+        # restore it before asking historical receipts to validate current targets.
+        transaction_names = sorted(os.listdir(runtime.transactions_fd))
+        manifested_ids = {
+            item["transaction_id"]
+            for item in (manifest or {}).get("transactions") or []
+        }
+        missing_journals = manifested_ids - set(transaction_names)
+        if missing_journals:
+            return [CreateOnlyTransactionOutcome(
+                "recovery_required", transaction_id,
+                detail="Cumulative manifest transaction has no recoverable journal directory; targets were preserved.",
+            ) for transaction_id in sorted(missing_journals)]
+        preparations: list[str] = []
+        unfinished: list[str] = []
+        for transaction_name in transaction_names:
+            preparing = transaction_name.startswith(".preparing-")
+            transaction_id = (
+                transaction_name.removeprefix(".preparing-")
+                if preparing else transaction_name
+            )
+            if preparing:
+                if TRANSACTION_ID_RE.fullmatch(transaction_id) is None:
+                    raise TransactionPrimitiveError(
+                        f"Unknown managed-content preparation entry: {transaction_name}"
+                    )
+                with _open_runtime_transaction(runtime, transaction_name) as preparation_fd:
+                    journal, _plan, version = _load_content_checkpoint_at(
+                        preparation_fd, project_root=root, label=transaction_name)
+                preparations.append(transaction_name)
+            else:
+                journal, _plan, version = _load_runtime_content_checkpoint(runtime, transaction_name)
+            if journal.get("transaction_id") != transaction_id:
+                raise TransactionPrimitiveError(
+                    "Managed-content journal transaction-directory binding is invalid."
+                )
+            policy_digest = (
+                _plan.get("source_policy_sha256") if version == "v1"
+                else (_plan.get("source_policy", {}).get("provenance") or {}).get("binding_sha256")
+            )
+            if policy_digest != scope_source_policy_sha256:
+                raise TransactionPrimitiveError(
+                    "Managed-content recovery source-policy binding is invalid."
+                )
+            recorded = next(
+                (item for item in (manifest or {}).get("transactions") or []
+                 if item["transaction_id"] == transaction_id), None,
+            )
+            if recorded is not None and recorded["plan"] != _plan:
+                raise TransactionPrimitiveError(
+                    "Managed-content manifest/journal plan binding differs: " + transaction_id
+                )
+            if journal.get("state") == "ROLLED_BACK":
+                try:
+                    os.stat(f"{transaction_id}.json", dir_fd=runtime.receipts_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    receipt_exists = False
+                else:
+                    receipt_exists = True
+                if recorded is not None or receipt_exists:
+                    return [CreateOnlyTransactionOutcome(
+                        "recovery_required", transaction_id,
+                        detail="Rolled-back journal conflicts with committed manifest or receipt evidence; targets were preserved.",
+                    )]
+            if version == "v1" and (
+                preparing or journal.get("state") not in TERMINAL_CONTENT_STATES
+            ):
+                raise TransactionPrimitiveError(
+                    "An unfinished v1 transaction must be recovered before v2: "
+                    + transaction_name
+                )
+            if (
+                not preparing and version == "v2"
+                and journal.get("state") not in TERMINAL_CONTENT_STATES
+                and transaction_id not in manifested_ids
+            ):
+                unfinished.append(transaction_name)
+        if not preparations and manifest_failure is None and len(unfinished) > 1:
+            return [
+                CreateOnlyTransactionOutcome(
+                    "recovery_required", name,
+                    detail=("Multiple uncommitted v2 transactions are ambiguous; "
+                            "all state was preserved."),
+                )
+                for name in unfinished
+            ]
+        priority = preparations + (unfinished if manifest_failure is None else [])
+        ordered_names = priority + [name for name in transaction_names if name not in priority]
+        for transaction_name in ordered_names:
             if transaction_name.startswith(".preparing-"):
                 transaction_id = transaction_name.removeprefix(".preparing-")
                 if TRANSACTION_ID_RE.fullmatch(transaction_id) is None:
@@ -9280,20 +9884,18 @@ def _recover_v2_transactions(
                         f"Unknown managed-content preparation entry: {transaction_name}"
                     )
                 with _open_runtime_transaction(runtime, transaction_name) as preparation_fd:
-                    journal = _safe_json_object_at(
-                        preparation_fd,
-                        "journal.json",
-                        label=f"{transaction_name}/journal.json",
-                    )
-                _plan, version = _validate_journal_any(
-                    journal,
-                    project_root=root,
-                )
+                    journal, _plan, version = _load_content_checkpoint_at(
+                        preparation_fd, project_root=root, label=transaction_name)
                 if version != "v2":
                     raise TransactionPrimitiveError(
                         "V1 transaction preparation must be recovered before v2."
                     )
-                _remove_runtime_preparation(runtime, transaction_name)
+                try:
+                    _remove_runtime_preparation(runtime, transaction_name)
+                except TransactionPrimitiveError as exc:
+                    return [*outcomes, CreateOnlyTransactionOutcome(
+                        "recovery_required", transaction_id, detail=str(exc)
+                    )]
                 outcomes.append(
                     CreateOnlyTransactionOutcome(
                         "rolled_back",
@@ -9303,8 +9905,7 @@ def _recover_v2_transactions(
                 )
                 continue
 
-            journal = _load_runtime_journal(runtime, transaction_name)
-            plan, version = _validate_journal_any(journal, project_root=root)
+            journal, plan, version = _load_runtime_content_checkpoint(runtime, transaction_name)
             if journal.get("transaction_id") != transaction_name:
                 raise TransactionPrimitiveError(
                     "Managed-content journal transaction-directory binding is invalid."
@@ -9326,8 +9927,20 @@ def _recover_v2_transactions(
                             ),
                         )
                     )
+                elif journal.get("state") == "COMMITTED":
+                    failures = _committed_transaction_failures_at(
+                        root, manifest, transaction_id=transaction_name, plan=plan,
+                        journal=journal, runtime=runtime, project_id=project_id,
+                        scope_integrity_sha3_512=scope_integrity_sha3_512,
+                        source_policy_sha256=scope_source_policy_sha256,
+                    )
+                    if failures:
+                        outcomes.append(CreateOnlyTransactionOutcome("recovery_required", transaction_name, detail="; ".join(failures)))
                 continue
             transaction_id = transaction_name
+            compact_proof = (_ValidatedPlanProof(root=str(root), canonical_plan=canonical_bytes(plan),
+                              typed_plan=copy.deepcopy(plan))
+                             if journal.get("schema") == _COMPACT_JOURNAL_SCHEMA else None)
             state = str(journal.get("state") or "")
             manifest_transaction = (
                 next(
@@ -9347,17 +9960,19 @@ def _recover_v2_transactions(
                     "Cumulative managed-content manifest is unreadable or invalid; "
                     f"targets and private backups were preserved: {manifest_failure}"
                 )
-                _persist_journal_v2(
-                    runtime,
-                    transaction_id,
-                    plan,
-                    "RECOVERY_REQUIRED",
-                    copy.deepcopy(journal.get("applied_actions") or []),
-                    copy.deepcopy(journal.get("created_directories") or []),
-                    pending_action=copy.deepcopy(journal.get("pending_action")),
-                    detail=detail,
-                    require_attached=False,
-                )
+                if state != "COMMITTED":
+                    _persist_content_checkpoint(
+                        runtime,
+                        transaction_id,
+                        plan,
+                        "RECOVERY_REQUIRED",
+                        copy.deepcopy(journal.get("applied_actions") or []),
+                        copy.deepcopy(journal.get("created_directories") or []),
+                        pending_action=copy.deepcopy(journal.get("pending_action")),
+                        detail=detail,
+                        require_attached=False,
+                        validated_plan_proof=compact_proof,
+                    )
                 outcomes.append(
                     CreateOnlyTransactionOutcome(
                         "recovery_required",
@@ -9391,17 +10006,19 @@ def _recover_v2_transactions(
                         "Committed managed-content topology differs; all state "
                         "was preserved: " + "; ".join(topology_failures)
                     )
-                    _persist_journal_v2(
-                        runtime,
-                        transaction_id,
-                        plan,
-                        "RECOVERY_REQUIRED",
-                        copy.deepcopy(journal.get("applied_actions") or []),
-                        copy.deepcopy(journal.get("created_directories") or []),
-                        pending_action=copy.deepcopy(journal.get("pending_action")),
-                        detail=detail,
-                        require_attached=False,
-                    )
+                    if state != "COMMITTED":
+                        _persist_content_checkpoint(
+                            runtime,
+                            transaction_id,
+                            plan,
+                            "RECOVERY_REQUIRED",
+                            copy.deepcopy(journal.get("applied_actions") or []),
+                            copy.deepcopy(journal.get("created_directories") or []),
+                            pending_action=copy.deepcopy(journal.get("pending_action")),
+                            detail=detail,
+                            require_attached=False,
+                            validated_plan_proof=compact_proof,
+                        )
                     outcomes.append(
                         CreateOnlyTransactionOutcome(
                             "recovery_required",
@@ -9417,23 +10034,26 @@ def _recover_v2_transactions(
                     project_id=project_id,
                     scope_integrity_sha3_512=scope_integrity_sha3_512,
                     source_policy_sha256=scope_source_policy_sha256,
+                    allow_superseded=True,
                 )
                 if prior != transaction_id:
                     detail = (
                         "Manifest records the v2 transaction, but exact committed "
                         "target/receipt evidence differs; all state was preserved."
                     )
-                    _persist_journal_v2(
-                        runtime,
-                        transaction_id,
-                        plan,
-                        "RECOVERY_REQUIRED",
-                        copy.deepcopy(journal.get("applied_actions") or []),
-                        copy.deepcopy(journal.get("created_directories") or []),
-                        pending_action=copy.deepcopy(journal.get("pending_action")),
-                        detail=detail,
-                        require_attached=False,
-                    )
+                    if state != "COMMITTED":
+                        _persist_content_checkpoint(
+                            runtime,
+                            transaction_id,
+                            plan,
+                            "RECOVERY_REQUIRED",
+                            copy.deepcopy(journal.get("applied_actions") or []),
+                            copy.deepcopy(journal.get("created_directories") or []),
+                            pending_action=copy.deepcopy(journal.get("pending_action")),
+                            detail=detail,
+                            require_attached=False,
+                            validated_plan_proof=compact_proof,
+                        )
                     outcomes.append(
                         CreateOnlyTransactionOutcome(
                             "recovery_required",
@@ -9452,7 +10072,12 @@ def _recover_v2_transactions(
                     plan=plan,
                 )
                 with _open_runtime_transaction(runtime, transaction_id) as transaction_fd:
-                    residue = set(os.listdir(transaction_fd)) - {"journal.json"}
+                    durable_names = {"journal.json"}
+                    if journal.get("schema") == _COMPACT_JOURNAL_SCHEMA:
+                        if _read_compact_plan_at(transaction_fd) != compact_proof.canonical_plan + b"\n":
+                            raise TransactionPrimitiveError("Compact terminal plan changed before cleanup.")
+                        durable_names.add(_COMPACT_PLAN_NAME)
+                    residue = set(os.listdir(transaction_fd)) - durable_names
                 if residue:
                     try:
                         _remove_runtime_staging_v2(
@@ -9476,16 +10101,18 @@ def _recover_v2_transactions(
                             "Committed transaction private-backup cleanup remains "
                             f"incomplete: {exc}"
                         )
-                        _persist_journal_v2(
-                            runtime,
-                            transaction_id,
-                            plan,
-                            "RECOVERY_REQUIRED",
-                            copy.deepcopy(journal.get("applied_actions") or []),
-                            copy.deepcopy(journal.get("created_directories") or []),
-                            detail=detail,
-                            require_attached=False,
-                        )
+                        if state != "COMMITTED":
+                            _persist_content_checkpoint(
+                                runtime,
+                                transaction_id,
+                                plan,
+                                "RECOVERY_REQUIRED",
+                                copy.deepcopy(journal.get("applied_actions") or []),
+                                copy.deepcopy(journal.get("created_directories") or []),
+                                detail=detail,
+                                require_attached=False,
+                                validated_plan_proof=compact_proof,
+                            )
                         outcomes.append(
                             CreateOnlyTransactionOutcome(
                                 "recovery_required",
@@ -9494,8 +10121,8 @@ def _recover_v2_transactions(
                             )
                         )
                         continue
-                if state != "COMMITTED" or residue:
-                    _persist_journal_v2(
+                if state != "COMMITTED":
+                    _persist_content_checkpoint(
                         runtime,
                         transaction_id,
                         plan,
@@ -9503,6 +10130,7 @@ def _recover_v2_transactions(
                         copy.deepcopy(journal.get("applied_actions") or []),
                         copy.deepcopy(journal.get("created_directories") or []),
                         require_attached=False,
+                        validated_plan_proof=compact_proof,
                     )
                     outcomes.append(
                         CreateOnlyTransactionOutcome(
@@ -9517,17 +10145,6 @@ def _recover_v2_transactions(
                 detail = (
                     "Committed v2 journal is missing its cumulative manifest "
                     "transaction; targets and private backups were preserved."
-                )
-                _persist_journal_v2(
-                    runtime,
-                    transaction_id,
-                    plan,
-                    "RECOVERY_REQUIRED",
-                    copy.deepcopy(journal.get("applied_actions") or []),
-                    copy.deepcopy(journal.get("created_directories") or []),
-                    pending_action=copy.deepcopy(journal.get("pending_action")),
-                    detail=detail,
-                    require_attached=False,
                 )
                 outcomes.append(
                     CreateOnlyTransactionOutcome(
@@ -9546,8 +10163,12 @@ def _recover_v2_transactions(
                 scope_integrity_sha3_512=scope_integrity_sha3_512,
                 source_policy_sha256=scope_source_policy_sha256,
                 reason="Interrupted content-aware transaction rolled back during recovery.",
+                validated_plan_proof=compact_proof,
             )
             outcomes.append(outcome)
+            if outcome.status != "rolled_back":
+                # Preserve historical terminal journals when pending recovery failed.
+                return outcomes
     return outcomes
 
 
@@ -9566,19 +10187,6 @@ def recover_managed_content_transactions(
     """Recover every supported receipt generation through one public command."""
 
     root = project_root.resolve(strict=True)
-    observed_v2 = False
-    observed_unfinished_v1 = False
-    for transaction_path in sorted(transaction_root.iterdir()):
-        if not transaction_path.is_dir() or transaction_path.is_symlink():
-            raise TransactionPrimitiveError(
-                f"Unknown managed-content transaction entry: {transaction_path.name}"
-            )
-        journal = _safe_json_object(transaction_path / "journal.json")
-        _plan, version = _validate_journal_any(journal, project_root=root)
-        if version == "v2":
-            observed_v2 = True
-        elif journal.get("state") not in TERMINAL_CONTENT_STATES:
-            observed_unfinished_v1 = True
     arguments = {
         "project_id": project_id,
         "scope_integrity_sha3_512": scope_integrity_sha3_512,
@@ -9589,9 +10197,26 @@ def recover_managed_content_transactions(
         "bases_root": bases_root,
         "receipts_root": receipts_root,
     }
+    if any(path.name.startswith(".preparing-") for path in transaction_root.iterdir()):
+        # Presence is a routing hint, never permission to adopt or delete residue.
+        return _recover_create_only_transactions_v1(root, **arguments)
+    observed_v2 = False
+    observed_unfinished_v1 = False
+    for transaction_path in sorted(transaction_root.iterdir()):
+        if not transaction_path.is_dir() or transaction_path.is_symlink():
+            raise TransactionPrimitiveError(
+                f"Unknown managed-content transaction entry: {transaction_path.name}"
+            )
+        journal, _plan, version = _load_content_checkpoint_path(
+            transaction_path / "journal.json", project_root=root)
+        if version == "v2":
+            observed_v2 = True
+        elif journal.get("state") not in TERMINAL_CONTENT_STATES:
+            observed_unfinished_v1 = True
+
     if observed_unfinished_v1:
         outcomes = _recover_create_only_transactions_v1(root, **arguments)
-        if observed_v2:
+        if observed_v2 and all(item.status in {"committed", "rolled_back"} for item in outcomes):
             outcomes.extend(_recover_v2_transactions(root, **arguments))
         return outcomes
     if observed_v2:

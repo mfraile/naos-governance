@@ -35,62 +35,1131 @@
     "summary"
   ],
   "properties": {
-    "schema": {"const": "naos.ai_surface_context_budget.v1"},
-    "generated_at": {"type": "string", "format": "date-time"},
-    "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"type": "string"},
-    "ai_surface_health_posture": {"type": "string", "enum": ["healthy", "warning", "degraded"]},
-    "context_budget_posture": {"type": "string", "enum": ["healthy", "warning", "degraded"]},
-    "naos_root": {"type": "string"},
-    "project_root": {"type": "string"},
-    "deterministic": {"const": true},
-    "advisory": {"const": false},
-    "cycle_safe": {"const": true},
-    "rules": {"type": "object", "additionalProperties": true},
-    "baseline": {"type": "object", "additionalProperties": true},
-    "input_sources": {"type": "object", "additionalProperties": true},
-    "non_inputs": {"type": "array", "items": {"type": "string"}},
-    "downstream_consumers": {"type": "array", "items": {"type": "string"}},
-    "families": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
-    "combined_scenarios": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+    "schema": {
+      "const": "naos.ai_surface_context_budget.v1"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "quickstart",
+        "lite",
+        "standard",
+        "assured"
+      ]
+    },
+    "status": {
+      "type": "string"
+    },
+    "ai_surface_health_posture": {
+      "type": "string",
+      "enum": [
+        "healthy",
+        "warning",
+        "degraded"
+      ]
+    },
+    "context_budget_posture": {
+      "type": "string",
+      "enum": [
+        "healthy",
+        "warning",
+        "degraded"
+      ]
+    },
+    "naos_root": {
+      "type": "string"
+    },
+    "project_root": {
+      "type": "string"
+    },
+    "deterministic": {
+      "const": true
+    },
+    "advisory": {
+      "const": false
+    },
+    "cycle_safe": {
+      "const": true
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "input_sources": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "host_union_files": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "claude_code",
+            "cursor",
+            "copilot_harness",
+            "vscode_local"
+          ],
+          "properties": {
+            "claude_code": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/host_context_file"
+              }
+            },
+            "cursor": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/host_context_file"
+              }
+            },
+            "copilot_harness": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/host_context_file"
+              }
+            },
+            "vscode_local": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/host_context_file"
+              }
+            }
+          }
+        },
+        "host_union_content_manifest": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "non_inputs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "downstream_consumers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "host_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "basis",
+        "observed_loading",
+        "status",
+        "scope",
+        "supported_import_grammar",
+        "limits",
+        "input_files",
+        "startup_files",
+        "startup_estimated_tokens",
+        "conditional_rules",
+        "on_demand_bodies",
+        "import_edges",
+        "unresolved",
+        "github_instructions_basis",
+        "token_basis",
+        "known_limitations",
+        "vendor_guidance",
+        "local_thresholds_are_vendor_limits"
+      ],
+      "properties": {
+        "host": {
+          "const": "claude_code"
+        },
+        "basis": {
+          "const": "project_local_static_loading_estimate"
+        },
+        "observed_loading": {
+          "const": false
+        },
+        "status": {
+          "enum": [
+            "partial",
+            "project_local_subset",
+            "not_present"
+          ]
+        },
+        "scope": {
+          "type": "string"
+        },
+        "supported_import_grammar": {
+          "type": "string"
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_files",
+            "max_import_depth",
+            "max_file_bytes",
+            "max_discovery_entries",
+            "max_directory_depth"
+          ],
+          "properties": {
+            "max_files": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_import_depth": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_file_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_discovery_entries": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_directory_depth": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "input_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_context_file"
+          }
+        },
+        "startup_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_context_file"
+          }
+        },
+        "startup_estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "conditional_rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_context_file"
+          }
+        },
+        "on_demand_bodies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_context_file"
+          }
+        },
+        "import_edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to",
+              "syntax"
+            ],
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "syntax": {
+                "const": "standalone_relative_import"
+              }
+            }
+          }
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "reason"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "github_instructions_basis": {
+          "type": "string"
+        },
+        "token_basis": {
+          "const": "configured_character_estimate_not_provider_tokenizer"
+        },
+        "known_limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "vendor_guidance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "claude_file_target_lines",
+            "hard_token_limit",
+            "source_refs",
+            "verified_on",
+            "authority"
+          ],
+          "properties": {
+            "kind": {
+              "const": "advisory"
+            },
+            "claude_file_target_lines": {
+              "const": 200
+            },
+            "hard_token_limit": {
+              "type": "null"
+            },
+            "source_refs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "verified_on": {
+              "type": "string",
+              "format": "date"
+            },
+            "authority": {
+              "type": "string"
+            }
+          }
+        },
+        "local_thresholds_are_vendor_limits": {
+          "const": false
+        }
+      }
+    },
+    "families": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "combined_scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
     "anchors": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": true,
-        "required": ["id", "label", "present", "matched_phrases", "missing_phrases", "required_phrases"],
+        "required": [
+          "id",
+          "label",
+          "present",
+          "matched_phrases",
+          "missing_phrases",
+          "required_phrases"
+        ],
         "properties": {
-          "id": {"type": "string"},
-          "label": {"type": "string"},
-          "present": {"type": "boolean"},
-          "matched_phrases": {"type": "array", "items": {"type": "string"}},
-          "missing_phrases": {"type": "array", "items": {"type": "string"}},
-          "required_phrases": {"type": "array", "items": {"type": "string"}}
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "profiles": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "quickstart",
+                "lite",
+                "standard",
+                "assured"
+              ]
+            }
+          },
+          "applicable_to_profile": {
+            "type": "boolean"
+          },
+          "matched_phrases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing_phrases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_phrases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
-    "snapshot": {"type": "object", "additionalProperties": true},
-    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
-    "known_gaps": {"type": "array", "items": {"type": "string"}},
-    "residual_risks": {"type": "array", "items": {"type": "string"}},
-    "limitations": {"type": "array", "items": {"type": "string"}},
-    "not_claimed": {"type": "array", "items": {"type": "string"}},
-    "human_review_required": {"type": "boolean"},
-    "summary": {"type": "object", "additionalProperties": true}
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "known_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "human_review_required": {
+      "type": "boolean"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "host_contexts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claude_code",
+        "cursor",
+        "copilot_harness",
+        "vscode_local"
+      ],
+      "properties": {
+        "claude_code": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "host",
+            "basis",
+            "observed_loading",
+            "status",
+            "scope",
+            "supported_import_grammar",
+            "limits",
+            "input_files",
+            "startup_files",
+            "startup_estimated_tokens",
+            "conditional_rules",
+            "on_demand_bodies",
+            "import_edges",
+            "unresolved",
+            "github_instructions_basis",
+            "token_basis",
+            "known_limitations",
+            "vendor_guidance",
+            "local_thresholds_are_vendor_limits"
+          ],
+          "properties": {
+            "host": {
+              "const": "claude_code"
+            },
+            "basis": {
+              "const": "project_local_static_loading_estimate"
+            },
+            "observed_loading": {
+              "const": false
+            },
+            "status": {
+              "enum": [
+                "partial",
+                "project_local_subset",
+                "not_present"
+              ]
+            },
+            "scope": {
+              "type": "string"
+            },
+            "supported_import_grammar": {
+              "type": "string"
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "max_files",
+                "max_import_depth",
+                "max_file_bytes",
+                "max_discovery_entries",
+                "max_directory_depth"
+              ],
+              "properties": {
+                "max_files": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "max_import_depth": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "max_file_bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "max_discovery_entries": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "max_directory_depth": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "input_files": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/host_context_file"
+              }
+            },
+            "startup_files": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/host_context_file"
+              }
+            },
+            "startup_estimated_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "conditional_rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/host_context_file"
+              }
+            },
+            "on_demand_bodies": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/host_context_file"
+              }
+            },
+            "import_edges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "from",
+                  "to",
+                  "syntax"
+                ],
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  },
+                  "syntax": {
+                    "const": "standalone_relative_import"
+                  }
+                }
+              }
+            },
+            "unresolved": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "reason"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "github_instructions_basis": {
+              "type": "string"
+            },
+            "token_basis": {
+              "const": "configured_character_estimate_not_provider_tokenizer"
+            },
+            "known_limitations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "vendor_guidance": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "claude_file_target_lines",
+                "hard_token_limit",
+                "source_refs",
+                "verified_on",
+                "authority"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "advisory"
+                },
+                "claude_file_target_lines": {
+                  "const": 200
+                },
+                "hard_token_limit": {
+                  "type": "null"
+                },
+                "source_refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "verified_on": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "authority": {
+                  "type": "string"
+                }
+              }
+            },
+            "local_thresholds_are_vendor_limits": {
+              "const": false
+            }
+          }
+        },
+        "cursor": {
+          "$ref": "#/$defs/host_candidate_union"
+        },
+        "copilot_harness": {
+          "$ref": "#/$defs/host_candidate_union"
+        },
+        "vscode_local": {
+          "$ref": "#/$defs/host_candidate_union"
+        }
+      }
+    }
   },
   "$defs": {
+    "host_context_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "lines",
+        "chars",
+        "estimated_tokens",
+        "sha256",
+        "relationship"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "relationship": {
+          "enum": [
+            "project_entry",
+            "explicit_import",
+            "unconditional_project_rule",
+            "paths_conditioned_rule",
+            "skill_body_on_demand",
+            "command_body_on_demand",
+            "guidance_reference_on_demand",
+            "source_input",
+            "project_instruction_candidate",
+            "conditional_instruction_candidate"
+          ]
+        },
+        "paths": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      }
+    },
     "finding": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "severity", "status", "message", "source"],
+      "required": [
+        "id",
+        "severity",
+        "status",
+        "message",
+        "source"
+      ],
       "properties": {
-        "id": {"type": "string"},
-        "severity": {"type": "string"},
-        "status": {"type": "string"},
-        "message": {"type": "string"},
-        "source": {"type": "string"},
-        "human_review_required": {"type": "boolean"}
+        "id": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "human_review_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "host_union_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "lines",
+        "chars",
+        "estimated_tokens",
+        "sha256",
+        "relationship"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "relationship": {
+          "enum": [
+            "project_entry",
+            "explicit_import",
+            "unconditional_project_rule",
+            "paths_conditioned_rule",
+            "skill_body_on_demand",
+            "command_body_on_demand",
+            "guidance_reference_on_demand",
+            "source_input",
+            "project_instruction_candidate",
+            "conditional_instruction_candidate"
+          ]
+        },
+        "paths": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "condition": {
+          "type": "string"
+        }
+      }
+    },
+    "host_candidate_union": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "deduplication",
+        "token_basis",
+        "threshold_basis",
+        "host",
+        "basis",
+        "observed_loading",
+        "settings_verified",
+        "status",
+        "limits",
+        "base_candidates",
+        "conditional_candidates",
+        "all_candidates",
+        "input_files",
+        "base_candidate_estimated_tokens",
+        "all_candidate_estimated_tokens",
+        "unresolved",
+        "excluded",
+        "source_refs",
+        "known_limitations"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string"
+        },
+        "deduplication": {
+          "type": "string"
+        },
+        "token_basis": {
+          "type": "string"
+        },
+        "threshold_basis": {
+          "type": "string"
+        },
+        "host": {
+          "enum": [
+            "cursor",
+            "copilot_harness",
+            "vscode_local"
+          ]
+        },
+        "basis": {
+          "const": "project_local_conservative_candidate_union"
+        },
+        "observed_loading": {
+          "const": false
+        },
+        "settings_verified": {
+          "const": false
+        },
+        "status": {
+          "enum": [
+            "partial",
+            "project_local_subset",
+            "not_present"
+          ]
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_files",
+            "max_import_depth",
+            "max_file_bytes",
+            "max_discovery_entries",
+            "max_directory_depth"
+          ],
+          "properties": {
+            "max_files": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_import_depth": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_file_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_discovery_entries": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_directory_depth": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "base_candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_base_candidate"
+          }
+        },
+        "conditional_candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_conditional_candidate"
+          }
+        },
+        "all_candidates": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/host_base_candidate"
+              },
+              {
+                "$ref": "#/$defs/host_conditional_candidate"
+              }
+            ]
+          }
+        },
+        "input_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host_union_file"
+          }
+        },
+        "base_candidate_estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "all_candidate_estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "reason"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "known_limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "host_base_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "lines",
+        "chars",
+        "estimated_tokens",
+        "sha256",
+        "relationship"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "relationship": {
+          "const": "project_instruction_candidate"
+        },
+        "paths": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "host_conditional_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "lines",
+        "chars",
+        "estimated_tokens",
+        "sha256",
+        "relationship",
+        "condition"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "relationship": {
+          "const": "conditional_instruction_candidate"
+        },
+        "paths": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "host_contexts"
+        ]
+      },
+      "then": {
+        "properties": {
+          "input_sources": {
+            "required": [
+              "host_union_files",
+              "host_union_content_manifest"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }

@@ -18,7 +18,7 @@
 <!-- END SYNC_EXEC_METRICS -->
 
 > **Note**: The `<!-- BEGIN SYNC_EXEC_METRICS -->` block above is auto-updated by
-> `make -f Makefile.naos gov-refresh` → `naos/workflows/scripts/sync_from_registry.py`. Do not edit manually.
+> `make -f Makefile.naos gov-refresh` → `scripts/workflows/sync_from_registry.py`. Do not edit manually.
 
 ---
 

@@ -1,21 +1,11 @@
 #!/usr/bin/env sh
 set -u
-
-PROFILE="${NAOS_PROFILE:-standard}"
-TEAM_ARG=""
-if [ "${TEAM_ID:-}" != "" ]; then
-  TEAM_ARG="TEAM_ID=${TEAM_ID}"
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if command -v python3 >/dev/null 2>&1; then
+  python3 "$SCRIPT_DIR/dispatch.py" --event pre-tool-bash
+elif command -v python >/dev/null 2>&1; then
+  python "$SCRIPT_DIR/dispatch.py" --event pre-tool-bash
+else
+  printf "%s\n" "NAOS Claude hook: Python unavailable; run NAOS review manually." >&2
 fi
-
-warn() {
-  printf '%s\n' "NAOS Claude hook: $*" >&2
-}
-
-if ! command -v make >/dev/null 2>&1 || [ ! -f Makefile.naos ]; then
-  warn "Makefile.naos is unavailable; skipped gate-status review."
-  exit 0
-fi
-
-make -f Makefile.naos naos-gate-status NAOS_PROFILE="$PROFILE" $TEAM_ARG || warn "gate-status returned a review finding."
-warn "gate status is review evidence only, not approval or deployment authorization."
 exit 0

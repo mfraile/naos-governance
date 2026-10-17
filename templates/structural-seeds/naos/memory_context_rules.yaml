@@ -168,6 +168,8 @@ human_review_required:
   stale_or_conflicting_memory_resolution: true
   forbidden_category_exception: true
 
+# Assured report severity cannot fall below the selected policy severity.
+# Kit reports stay advisory; lower profiles retain their configured posture.
 profile_severity_behavior:
   quickstart: advisory
   lite: warning

@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from dataclasses import asdict, dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 import yaml
@@ -22,6 +23,8 @@ RULE_ADVISORY_AUTHORITY_OVERCLAIM = "CAPCONTRACT_ADVISORY_AUTHORITY_OVERCLAIM"
 RULE_DETERMINISTIC_PROOF_OVERCLAIM = "CAPCONTRACT_DETERMINISTIC_PROOF_OVERCLAIM"
 RULE_READINESS_RUNTIME_OVERCLAIM = "CAPCONTRACT_READINESS_RUNTIME_OVERCLAIM"
 RULE_REFERENCE_MISSING = "CAPCONTRACT_REFERENCE_MISSING"
+RULE_EXTERNAL_DEPENDENCY = "CAPCONTRACT_EXTERNAL_DEPENDENCY"
+RULE_PROJECT_INPUT_UNRESOLVED = "CAPCONTRACT_PROJECT_INPUT_UNRESOLVED"
 RULE_HASH_SIGNING_OVERCLAIM = "CAPCONTRACT_HASH_SIGNING_OVERCLAIM"
 RULE_SOURCE_OF_TRUTH_CONFUSION = "CAPCONTRACT_SOURCE_OF_TRUTH_CONFUSION"
 
@@ -57,26 +60,6 @@ SAFE_CONTEXT_KEYS = {
     "residual_risks",
     "forbidden_uses",
 }
-SAFE_BOUNDARY_TERMS = (
-    "not ",
-    "not_",
-    "never",
-    "does not",
-    "do not",
-    "cannot",
-    "must not",
-    "may not",
-    "no ",
-    "without",
-    "unless",
-    "non-authoritative",
-    "deferred",
-    "disabled",
-    "bounded",
-    "not claimed",
-    "posture",
-    "hierarchy",
-)
 SOURCE_OF_TRUTH_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
@@ -94,12 +77,6 @@ ADVISORY_AUTHORITY_PATTERNS = [
     for pattern in [
         r"\badvisory controls replace\b",
         r"\bprobabilistic authority\b",
-        r"\badvisory .* approve\b",
-        r"\badvisory .* certify\b",
-        r"\badvisory .* promote\b",
-        r"\bsemantic .* approve\b",
-        r"\bgraph .* prove\b",
-        r"\bmemory .* approve\b",
         r"\bLLM judge approval\b",
     ]
 ]
@@ -245,10 +222,118 @@ def path_has_key(key_path: tuple[str, ...], names: set[str]) -> bool:
 
 
 def is_bounded_context(key_path: tuple[str, ...], text: str) -> bool:
-    if path_has_key(key_path, SAFE_CONTEXT_KEYS):
+    # Explicit non-claim fields retain their schema meaning. No arbitrary scalar
+    # is exempt merely because a boundary word appears somewhere in its text.
+    return path_has_key(key_path, SAFE_CONTEXT_KEYS)
+
+
+_DIRECT_NEGATION = re.compile(
+    r"\b(?:not|never|cannot|without|no)(?:\s+(?:claim|claims|provide|provides|represent|represents|constitute|constitutes|become|becomes|be|act|acts|as|a|an|the|complete|perfect|legal|compliance|runtime|safety)){0,3}\s*$",
+    re.IGNORECASE,
+)
+_RUNTIME_DISABLED = re.compile(r"^\s+(?:is|are)\s+(?:not implemented|disabled|deferred)\b", re.IGNORECASE)
+
+
+_AUTHORITY_SUBJECT = re.compile(r"\b(advisory|semantic|graph|memory)\b", re.IGNORECASE)
+_AUTHORITY_VERBS = {
+    "advisory": re.compile(r"\b(?:approve|certify|promote)\b", re.IGNORECASE),
+    "semantic": re.compile(r"\bapprove\b", re.IGNORECASE),
+    "graph": re.compile(r"\bprove\b", re.IGNORECASE),
+    "memory": re.compile(r"\bapprove\b", re.IGNORECASE),
+}
+# A new explicit subject after a conjunction ends inherited advisory authority.
+# Keep this lexical list narrow: unknown wording is not a semantic exemption.
+_NEW_AUTHORITY_SUBJECT = re.compile(
+    r"^\s*(?:the\s+)?(?:humans?|human\s+(?:reviewers?|operators?|approvers?)|"
+    r"deterministic\s+(?:controls?|validators?|gates?|checks?)|advisory|semantic|graph|memory)\b",
+    re.IGNORECASE,
+)
+
+
+def has_unbounded_authority_verb(text: str) -> bool:
+    """Inspect every coordinated verb, retaining the subject only while implicit."""
+    for subject in _AUTHORITY_SUBJECT.finditer(text):
+        prefix = re.split(r"[.;:!?\n]|\b(?:and|or|but|yet|however)\b", text[:subject.start()], flags=re.IGNORECASE)[-1]
+        if _DIRECT_NEGATION.search(prefix):
+            continue
+        tail = re.split(r"[.;:!?\n]", text[subject.end():], maxsplit=1)[0]
+        clauses = re.split(r"\b(?:and|or|but|yet|however)\b", tail, flags=re.IGNORECASE)
+        verbs = _AUTHORITY_VERBS[subject.group().lower()]
+        for index, clause in enumerate(clauses):
+            if index and _NEW_AUTHORITY_SUBJECT.match(clause):
+                break
+            for verb in verbs.finditer(clause):
+                if not _DIRECT_NEGATION.search(clause[:verb.start()]):
+                    return True
+    return False
+
+
+_NEGATED_LIST_START = re.compile(r"\b(?:does not|do not|is not|are not)\s+", re.IGNORECASE)
+_NEGATED_LIST_ITEMS = {
+    "capture runtime events", "judge behavior", "write memory", "enforce permissions", "call providers",
+    "cryptographic signing", "signature verification", "legal approval", "regulatory approval",
+    "compliance certification",
+}
+_DENIED_DECLARATION_LIST_START = re.compile(
+    r"\bonly through configured deterministic policy when declarations attempt\s+", re.IGNORECASE,
+)
+_DENIED_DECLARATION_LIST_ITEMS = {
+    "literal secrets", "runtime/provider calls", "approval", "certification", "compliance proof",
+    "maturity promotion", "unsafe assured alias posture",
+}
+_LIST_ITEM_SEPARATOR = re.compile(r",\s*(?:(?:and|or)\s+)?|\s+(?:and|or)\s+", re.IGNORECASE)
+_LIST_CLAUSE_END = re.compile(r"[.;:!?\n]|\b(?:but|yet|however)\b", re.IGNORECASE)
+
+
+def bounded_list_occurrences(text: str, key_path: tuple[str, ...]) -> list[tuple[int, int]]:
+    """Return only recognized items governed by a local negative/denial list.
+
+    Unknown items stop inheritance. Punctuation and contrast end the list;
+    no entire scalar or authority.may_block field is exempted.
+    """
+    contexts = [(_NEGATED_LIST_START, _NEGATED_LIST_ITEMS)]
+    if key_path[:2] == ("authority", "may_block"):
+        contexts.append((_DENIED_DECLARATION_LIST_START, _DENIED_DECLARATION_LIST_ITEMS))
+    spans = []
+    for introducer, allowed in contexts:
+        for start in introducer.finditer(text):
+            end = _LIST_CLAUSE_END.search(text, start.end())
+            stop = end.start() if end else len(text)
+            cursor = start.end()
+            for separator in list(_LIST_ITEM_SEPARATOR.finditer(text, cursor, stop)) + [None]:
+                item_end = separator.start() if separator else stop
+                if " ".join(text[cursor:item_end].lower().split()) not in allowed:
+                    break
+                spans.append((cursor, item_end))
+                if separator:
+                    cursor = separator.end()
+    return spans
+
+
+def has_unbounded_match(patterns: list[re.Pattern], text: str, key_path: tuple[str, ...] = ()) -> bool:
+    """Bounded lexical guard, not a semantic or truth verifier.
+
+    A negation must directly govern this occurrence; another sentence, clause,
+    later 'no gaps', or unrelated 'posture' cannot suppress it.
+    """
+    if patterns is ADVISORY_AUTHORITY_PATTERNS and has_unbounded_authority_verb(text):
         return True
-    lower = text.lower()
-    return any(term in lower for term in SAFE_BOUNDARY_TERMS)
+    bounded_items = bounded_list_occurrences(text, key_path)
+    for pattern in patterns:
+        for match in pattern.finditer(text):
+            if any(start <= match.start() and match.end() <= end for start, end in bounded_items):
+                continue
+            prefix = re.split(r"[.;:!?\n]|\b(?:and|or|but|yet|however)\b", text[:match.start()], flags=re.IGNORECASE)[-1]
+            if _DIRECT_NEGATION.search(prefix):
+                continue
+            # Fixed phrases can include a direct negation before their final word.
+            words = match.group().rsplit(" ", 1)
+            if len(words) == 2 and _DIRECT_NEGATION.search(words[0] + " "):
+                continue
+            if patterns is READINESS_RUNTIME_PATTERNS and _RUNTIME_DISABLED.search(text[match.end():]):
+                continue
+            return True
+    return False
 
 
 def normalize_identifier(value: str) -> str:
@@ -613,7 +698,7 @@ def scan_overclaims(path: Path, root: Path, data: dict[str, Any], classes: set[s
         if is_bounded_context(key_path, text):
             continue
 
-        if any(pattern.search(text) for pattern in SOURCE_OF_TRUTH_PATTERNS):
+        if has_unbounded_match(SOURCE_OF_TRUTH_PATTERNS, text, key_path):
             findings.append(
                 finding(
                     path,
@@ -626,7 +711,7 @@ def scan_overclaims(path: Path, root: Path, data: dict[str, Any], classes: set[s
                 )
             )
 
-        if any(pattern.search(text) for pattern in ADVISORY_AUTHORITY_PATTERNS):
+        if has_unbounded_match(ADVISORY_AUTHORITY_PATTERNS, text, key_path):
             findings.append(
                 finding(
                     path,
@@ -639,7 +724,7 @@ def scan_overclaims(path: Path, root: Path, data: dict[str, Any], classes: set[s
                 )
             )
 
-        if "deterministic_primary" in classes and any(pattern.search(text) for pattern in DETERMINISTIC_PROOF_PATTERNS):
+        if "deterministic_primary" in classes and has_unbounded_match(DETERMINISTIC_PROOF_PATTERNS, text, key_path):
             findings.append(
                 finding(
                     path,
@@ -652,7 +737,7 @@ def scan_overclaims(path: Path, root: Path, data: dict[str, Any], classes: set[s
                 )
             )
 
-        if {"readiness_only", "future_or_deferred"} & classes and any(pattern.search(text) for pattern in READINESS_RUNTIME_PATTERNS):
+        if {"readiness_only", "future_or_deferred"} & classes and has_unbounded_match(READINESS_RUNTIME_PATTERNS, text, key_path):
             findings.append(
                 finding(
                     path,
@@ -665,7 +750,7 @@ def scan_overclaims(path: Path, root: Path, data: dict[str, Any], classes: set[s
                 )
             )
 
-        if any(pattern.search(text) for pattern in HASH_SIGNING_PATTERNS):
+        if has_unbounded_match(HASH_SIGNING_PATTERNS, text, key_path):
             findings.append(
                 finding(
                     path,
@@ -694,7 +779,8 @@ def deduplicate_findings(findings: list[Finding]) -> list[Finding]:
 
 
 def strip_reference_args(value: str) -> str:
-    return value.split()[0].strip("\"'")
+    parts = value.split()
+    return parts[0].strip("\"'") if parts else ""
 
 
 def is_generated_reference(value: str) -> bool:
@@ -707,12 +793,70 @@ def is_checkable_reference(value: str) -> bool:
     return clean in CHECKABLE_ROOT_FILES or clean.startswith(CHECKABLE_REFERENCE_PREFIXES)
 
 
-def validate_references(path: Path, root: Path, data: dict[str, Any]) -> list[Finding]:
-    findings: list[Finding] = []
+def valid_local_reference(value: str) -> bool:
+    path = PurePosixPath(value)
+    return bool(value and not path.is_absolute() and ".." not in path.parts
+                and "\\" not in value and ":" not in value and path.as_posix() == value
+                and all(ord(char) >= 32 for char in value))
+
+
+def projected_reference_findings(path: Path, root: Path, data: dict[str, Any]) -> list[Finding]:
+    """Check local generated inputs; preserve explicit external/output scope."""
+    results: list[Finding] = []
+    cap_id = data.get("id")
+    future = ("naos/reports/", ".naos/", "naos/context_index/", "naos/context_queries/",
+              "naos/evidence/", "naos/test_evidence/", "naos/active/")
+    for field in ("related_docs", "related_scripts", "related_schemas", "required_evidence"):
+        values = data.get(field)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if not isinstance(value, str):
+                continue  # Schema validation owns malformed field types.
+            reference = strip_reference_args(value)
+            if reference.startswith(("https://", "http://")):
+                continue
+            if reference.startswith("kit://"):
+                if not valid_local_reference(reference.removeprefix("kit://")):
+                    results.append(finding(path, root, cap_id, "error", RULE_REFERENCE_MISSING,
+                        f"Invalid kit reference in {field}: {reference}", "Use a canonical kit-relative reference."))
+                else:
+                    results.append(finding(path, root, cap_id, "info", RULE_EXTERNAL_DEPENDENCY,
+                        f"Nonlocal kit dependency in {field}: {reference}; not verified present or runnable here.",
+                        "Acquire and review the kit dependency separately; this reference is not satisfied evidence."))
+                continue
+            if field == "required_evidence" and (not any(char in reference for char in "/\\:") or (valid_local_reference(reference) and (reference.startswith(future) or " when approved" in value))):
+                continue
+            local = root / reference
+            safe = valid_local_reference(reference) and local.resolve().is_relative_to(root.resolve())
+            if safe and field == "required_evidence" and reference.startswith(("naos/", "specs/")) and not local.is_file():
+                results.append(finding(path, root, cap_id, "warning", RULE_PROJECT_INPUT_UNRESOLVED,
+                    f"Required project input remains unresolved: {reference}; a kit seed is not project evidence.",
+                    "Supply and review the project input before relying on this capability; optional capability activation remains separate."))
+            elif not safe or not local.is_file():
+                results.append(finding(path, root, cap_id, "error", RULE_REFERENCE_MISSING,
+                    f"Generated local input is missing or unsafe in {field}: {reference}",
+                    "Restore the generated input or correct the explicit dependency scope."))
+    for entry in data.get("validators") or []:
+        if isinstance(entry, dict) and str(entry.get("script", "")).startswith("kit://"):
+            reference = strip_reference_args(entry["script"])
+            if entry.get("status") == "available" or not valid_local_reference(reference.removeprefix("kit://")):
+                results.append(finding(path, root, cap_id, "error", RULE_REFERENCE_MISSING,
+                    "A kit validator cannot be declared locally available or use an unsafe reference.",
+                    "Declare the dependency external and retain its canonical kit reference."))
+            else:
+                results.append(finding(path, root, cap_id, "info", RULE_EXTERNAL_DEPENDENCY,
+                    f"Validator depends on {reference}; execution is nonlocal and unverified.",
+                    "Acquire and verify the kit runtime separately before invoking this validator."))
+    return results
+
+
+def validate_references(path: Path, root: Path, data: dict[str, Any], *, generated: bool = False) -> list[Finding]:
+    findings: list[Finding] = projected_reference_findings(path, root, data) if generated else []
     cap_id = data.get("id")
 
     for key_path, value in iter_scalar_values(data):
-        if not key_path or key_path[0] not in {"related_docs", "related_scripts"}:
+        if generated or not key_path or key_path[0] not in {"related_docs", "related_scripts"}:
             continue
         if not is_checkable_reference(value) or is_generated_reference(value):
             continue
@@ -739,7 +883,12 @@ def validate_references(path: Path, root: Path, data: dict[str, Any]) -> list[Fi
             status = validator.get("status")
             if script and status == "available":
                 reference = strip_reference_args(str(script))
-                if not (root / reference).exists():
+                if reference.startswith("kit://"):
+                    findings.append(finding(path, root, cap_id, "error", RULE_REFERENCE_MISSING,
+                        "Kit validator is not locally available.", "Declare its status external."))
+                    continue
+                if (not valid_local_reference(reference) or not (root / reference).resolve().is_relative_to(root.resolve())
+                        or not (root / reference).is_file()):
                     findings.append(
                         finding(
                             path,
@@ -756,6 +905,11 @@ def validate_references(path: Path, root: Path, data: dict[str, Any]) -> list[Fi
     make_targets = load_make_targets(root)
     for key_path, value in iter_scalar_values(data):
         for command in CLI_COMMAND_RE.findall(value):
+            if generated and not (root / "cli.py").is_file():
+                findings.append(finding(path, root, cap_id, "info", RULE_EXTERNAL_DEPENDENCY,
+                    f"Installed CLI reference `naos {command}` is nonlocal and unverified.",
+                    "Check the separately installed CLI; syntax recognition is not command availability."))
+                continue
             if command not in cli_commands:
                 findings.append(
                     finding(
@@ -797,15 +951,22 @@ def load_cli_commands(root: Path) -> set[str]:
 
 
 def load_make_targets(root: Path) -> set[str]:
-    makefile = root / "templates" / "Makefile.naos"
+    makefile = root / "Makefile.naos"
+    if not makefile.is_file():
+        makefile = root / "templates" / "Makefile.naos"
     if not makefile.exists():
         return set()
     return set(re.findall(r"^([A-Za-z0-9_-]+):", makefile.read_text(encoding="utf-8"), flags=re.MULTILINE))
 
 
-def validate_capability_cards(root: Path) -> dict[str, Any]:
+def validate_capability_cards(root: Path, naos_root: str = "naos") -> dict[str, Any]:
     schema_path = root / "schemas" / "naos" / "capability.schema.json"
     schema = load_json(schema_path) if schema_path.exists() else {"required": []}
+    if not valid_local_reference(naos_root):
+        raise ValueError("NAOS root must be a canonical project-relative path")
+    adopter_capabilities_dir = root / naos_root / "capabilities"
+    if not adopter_capabilities_dir.resolve().is_relative_to(root.resolve()):
+        raise ValueError("Adopter capabilities must remain inside the project")
     capabilities_dir = root / "capabilities"
     installable_capabilities_dir = (
         root / "templates" / "setup-modules" / "capabilities"
@@ -816,6 +977,7 @@ def validate_capability_cards(root: Path) -> dict[str, Any]:
 
     capability_paths = [
         *capabilities_dir.glob("*.yaml"),
+        *adopter_capabilities_dir.glob("*.yaml"),
         *installable_capabilities_dir.glob("*.yaml"),
     ]
     for path in sorted(capability_paths):
@@ -856,7 +1018,7 @@ def validate_capability_cards(root: Path) -> dict[str, Any]:
                     seen_ids[cap_id] = path
             classes = classify_capability(data)
             card_findings.extend(validate_adr_boundaries(path, root, data, classes))
-            card_findings.extend(validate_references(path, root, data))
+            card_findings.extend(validate_references(path, root, data, generated=path.parent == adopter_capabilities_dir))
             cards.append({"file": relative(path, root), "id": cap_id, "classifications": sorted(classes)})
         findings.extend(card_findings)
 
@@ -870,6 +1032,11 @@ def validate_capability_cards(root: Path) -> dict[str, Any]:
         "status": "fail" if counts["error"] else "pass",
         "root": str(root),
         "capabilities_dir": str(capabilities_dir),
+        "adopter_capabilities_dir": str(adopter_capabilities_dir),
+        "adopter_capability_count": sum(1 for item in cards if item["file"].startswith(f"{naos_root}/capabilities/")),
+        "external_dependencies_verified": False,
+        "unresolved_project_inputs": sum(item.rule_id == RULE_PROJECT_INPUT_UNRESOLVED for item in findings),
+        "capability_readiness_evaluated": False,
         "installable_capabilities_dir": str(installable_capabilities_dir),
         "capability_count": len(cards),
         "active_capability_count": sum(
@@ -903,6 +1070,7 @@ def print_text_report(report: dict[str, Any]) -> None:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate NAOS capability-card contracts and ADR-0010: Control-Plane Advisory Boundaries.")
     parser.add_argument("--root", default=".", help="Repository root to validate.")
+    parser.add_argument("--naos-root", default=os.getenv("NAOS_ROOT", "naos"), help="Project-relative governance root for adopter cards.")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
     return parser.parse_args(argv)
 
@@ -910,7 +1078,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     root = Path(args.root).resolve()
-    report = validate_capability_cards(root)
+    report = validate_capability_cards(root, args.naos_root)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

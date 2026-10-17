@@ -38,14 +38,106 @@
     "policy_path": {"type": "string"},
     "policy_present": {"type": "boolean"},
     "policy_valid": {"type": "boolean"},
-    "reports_scanned": {"type": "array", "items": {"type": "object"}},
+    "reports_scanned": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "raw_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+          "raw_byte_count": {"type": ["integer", "null"], "minimum": 0},
+          "scan_generated_at": {"type": "string"},
+          "source_observed_at": {"type": "string"},
+          "source_schema": {},
+          "source_generated_at": {}
+        }
+      }
+    },
+    "scan_semantics": {"const": "historical_scan_time; source report paths may be replaced after this scan"},
+    "source_finding_snapshots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_report", "source_bucket", "source_index", "source_report_sha256", "source_observed_at", "source_item_sha256", "canonical_item_byte_count", "payload_retained"],
+        "properties": {
+          "source_report": {"type": "string"},
+          "source_bucket": {"enum": ["findings", "known_gaps", "residual_risks"]},
+          "source_index": {"type": ["integer", "null"], "minimum": 0},
+          "source_report_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "source_observed_at": {"type": "string"},
+          "source_item_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "canonical_item_byte_count": {"type": "integer", "minimum": 0},
+          "payload_retained": {"type": "boolean"},
+          "retention_reason": {"const": "declared_projection_only"},
+          "retention_limit": {"enum": ["per_item", "total"]}
+        }
+      }
+    },
+    "source_finding_snapshot_summary": {
+      "type": "object",
+      "required": ["retained", "not_retained", "declared_projection_only", "not_retained_due_limit", "retained_canonical_bytes", "per_item_limit_bytes", "total_limit_bytes"],
+      "properties": {
+        "retained": {"type": "integer", "minimum": 0},
+        "not_retained": {"type": "integer", "minimum": 0},
+        "declared_projection_only": {"type": "integer", "minimum": 0},
+        "not_retained_due_limit": {"type": "integer", "minimum": 0},
+        "retained_canonical_bytes": {"type": "integer", "minimum": 0},
+        "per_item_limit_bytes": {"type": "integer", "minimum": 1},
+        "total_limit_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
     "findings_scanned": {"type": "integer", "minimum": 0},
-    "classified_findings": {"type": "array", "items": {"type": "object"}},
-    "missing_classification": {"type": "array", "items": {"type": "object"}},
+    "classified_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_index": {"type": ["integer", "null"], "minimum": 0},
+          "source_report_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "source_item_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "scan_generated_at": {"type": "string"},
+          "source_observed_at": {"type": "string"},
+          "scan_payload_index": {"type": "integer", "minimum": 0},
+          "source_payload_retained": {"type": "boolean"}
+        }
+      }
+    },
+    "unclassified_context": {
+      "type": "array",
+      "description": "Text gap/risk disclosures retained for human review, outside finding classification; never approval or resolution.",
+      "items": {
+        "type": "object",
+        "required": ["source_report", "source_bucket", "source_index", "message", "status", "human_review_required", "not_claimed"],
+        "properties": {
+          "source_report": {"type": "string"},
+          "source_bucket": {"enum": ["known_gaps", "residual_risks"]},
+          "source_index": {"type": "integer", "minimum": 0},
+          "scan_generated_at": {"type": "string"},
+          "source_observed_at": {"type": "string"},
+          "source_report_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "source_item_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "message": {"type": "string"},
+          "status": {"const": "unclassified_context"},
+          "human_review_required": {"const": true},
+          "not_claimed": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "unclassified_context_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "known_gaps": {"type": "integer", "minimum": 0},
+        "residual_risks": {"type": "integer", "minimum": 0}
+      }
+    },
+    "missing_classification": {"type": "array", "items": {"$ref": "#/properties/classified_findings/items"}},
     "classification_counts": {"type": "object"},
+    "declared_classification_counts": {"type": "object", "additionalProperties": false, "properties": {"confirmed": {"type": "integer", "minimum": 0}, "deduced": {"type": "integer", "minimum": 0}, "hypothesized": {"type": "integer", "minimum": 0}, "unknown": {"type": "integer", "minimum": 0}}},
+    "inferred_classification_counts": {"type": "object", "additionalProperties": false, "properties": {"confirmed": {"type": "integer", "minimum": 0}, "deduced": {"type": "integer", "minimum": 0}, "hypothesized": {"type": "integer", "minimum": 0}, "unknown": {"type": "integer", "minimum": 0}}},
+    "classification_count_semantics": {"const": "provenance_labels_not_verified_evidence"},
     "evidence_ref_counts": {"type": "object"},
-    "unknown_findings": {"type": "array", "items": {"type": "object"}},
-    "review_required_findings": {"type": "array", "items": {"type": "object"}},
+    "unknown_findings": {"type": "array", "items": {"$ref": "#/properties/classified_findings/items"}},
+    "review_required_findings": {"type": "array", "items": {"$ref": "#/properties/classified_findings/items"}},
     "findings": {"type": "array", "items": {"type": "object"}},
     "known_gaps": {"type": "array", "items": {"type": "string"}},
     "residual_risks": {"type": "array", "items": {"type": "string"}},

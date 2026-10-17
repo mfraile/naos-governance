@@ -13,7 +13,8 @@ capabilities:
   source_file: templates/agents/naos-conformance.agent.md
   status: active
   schema_version: 0.1.0
-  model: '[ADAPT: e.g. claude-opus-4-5 | o1]'
+  model: null
+  model_selection: host_default_unspecified
   naos_model_role: conformance
   tools:
   - read/readFile
@@ -34,7 +35,8 @@ capabilities:
   source_file: templates/agents/naos-debug.agent.md
   status: active
   schema_version: 0.1.0
-  model: '[ADAPT: e.g. claude-sonnet-4-5 | gpt-4o]'
+  model: null
+  model_selection: host_default_unspecified
   naos_model_role: debug
   tools:
   - read/readFile
@@ -56,7 +58,8 @@ capabilities:
   source_file: templates/agents/naos-implement.agent.md
   status: active
   schema_version: 0.1.0
-  model: '[ADAPT: e.g. claude-sonnet-4-5 | gpt-4o]'
+  model: null
+  model_selection: host_default_unspecified
   naos_model_role: implementation
   tools:
   - read/readFile
@@ -82,7 +85,8 @@ capabilities:
   source_file: templates/agents/naos-plan.agent.md
   status: active
   schema_version: 0.1.0
-  model: '[ADAPT: e.g. claude-sonnet-4-5 | gpt-4o | gemini-1.5-pro]'
+  model: null
+  model_selection: host_default_unspecified
   naos_model_role: planning
   tools:
   - read/readFile
@@ -105,7 +109,8 @@ capabilities:
   source_file: templates/agents/naos-research.agent.md
   status: active
   schema_version: 0.1.0
-  model: '[ADAPT: e.g. claude-sonnet-4-5 | gpt-4o | gemini-1.5-pro]'
+  model: null
+  model_selection: host_default_unspecified
   naos_model_role: research
   tools:
   - read/readFile
@@ -122,7 +127,8 @@ capabilities:
   source_file: templates/agents/naos-review.agent.md
   status: active
   schema_version: 0.1.0
-  model: '[ADAPT: e.g. claude-opus-4-5 | o1 | gemini-1.5-pro]'
+  model: null
+  model_selection: host_default_unspecified
   naos_model_role: review
   tools:
   - read/readFile
@@ -143,7 +149,8 @@ capabilities:
   source_file: templates/agents/naos-triage.agent.md
   status: active
   schema_version: 0.1.0
-  model: '[ADAPT: e.g. claude-sonnet-4-5 | gpt-4o]'
+  model: null
+  model_selection: host_default_unspecified
   naos_model_role: triage
   tools:
   - read/readFile
@@ -258,13 +265,13 @@ capabilities:
   schema_version: 0.1.0
   apply_to: src/**/*.py
 - id: CAP-I-SECURITY
-  name: Security Guidelines
-  description: Scoped instruction for files matching '{src/api/deps.py,src/api/routes/auth.py,src/api/middleware/**/*.py,src/services/auth_service.py,**/auth*.py}'.
+  name: Security task routing
+  description: Scoped instruction for files matching '**'.
   type: instruction
   source_file: templates/instructions/security.instructions.md
   status: active
   schema_version: 0.1.0
-  apply_to: '{src/api/deps.py,src/api/routes/auth.py,src/api/middleware/**/*.py,src/services/auth_service.py,**/auth*.py}'
+  apply_to: '**'
 - id: CAP-I-SESSION-MANAGEMENT
   name: Session Management Guidelines
   description: Scoped instruction for files matching '**'.
@@ -405,14 +412,14 @@ capabilities:
   parameters: []
 - id: CAP-S-DEBUG
   name: debug
-  description: Diagnose and fix bugs with evidence-first discipline — reproduce → localize → minimal-change fix → regression test. Invoke when a test fails, an error appears, or a regression needs investigation.
+  description: 'Diagnose bugs with evidence-first discipline: reproduce, localize, test hypotheses and recommend a minimal fix. Implementation requires an authorized writer.'
   type: skill
   source_file: templates/skills/debug/SKILL.md
   status: active
   schema_version: 0.1.0
   parameters:
   - name: target
-    description: 'Optional: describe the bug, error message, or failing test to focus the investigation'
+    description: Optional bug, error message or failing test to investigate
     required: false
     default: ''
 - id: CAP-S-FORENSIC-AUDIT
@@ -464,7 +471,7 @@ capabilities:
   - Rule 17
 - id: CAP-S-GOV-REFRESH
   name: gov-refresh
-  description: 'Run the full governance refresh pipeline: rebuild function index, sync ARCH tags, update traceability matrix, dashboard, and coherence checks. Call after adding functions, changing task status, or editing specs.'
+  description: Sync task-derived files and dashboard. Rebuild function and traceability indexes separately when needed.
   type: skill
   source_file: templates/skills/gov-refresh/SKILL.md
   status: active

@@ -28,11 +28,15 @@
 - Time to review the generated install set and adapt project specifications
 - An AI coding assistant
 
-Portable preview generation is exercised on Linux with Python 3.11. Managed
-`--activate` mutation is currently supported only on Darwin ARM64 with CPython
-3.11–3.13; Linux, Windows, and other unsupported tuples refuse before target
-mutation. On an unsupported host, review an absent external `--preview-dir`
-and perform activation later on a supported host.
+Native macOS ARM64/APFS, Ubuntu x86_64/ext4 and Windows 11 x86_64/NTFS
+have recorded Python 3.11–3.13 installation checks and selected workflow and
+recovery evidence. These are separate checks: qualification for an activation,
+update or receiving operation depends on its named route and evidence, not
+only the operating system. Linux aarch64 is not qualified. Before activation,
+check the [platform evidence and limits](../PLATFORM_ADAPTERS.md).
+Preview generation and package installation
+do not qualify filesystem recovery. On unsupported hosts, review an absent
+external `--preview-dir` without activating.
 
 ---
 
@@ -43,7 +47,7 @@ and perform activation later on a supported host.
 ```bash
 PROJECT=/path/to/your/new-project
 PREVIEW=/tmp/naos-standard-preview
-pip install naos-governance
+# First complete artifact acquisition in INSTALLATION_MANUAL.md.
 naos-governance init "$PROJECT" --new --tier standard --archetype custom --backend static_only --preview-dir "$PREVIEW"
 # Review $PREVIEW before the supported-host activation below.
 naos-governance init "$PROJECT" --new --tier standard --archetype custom --backend static_only --activate
@@ -54,7 +58,7 @@ cd "$PROJECT"
 
 ```bash
 ls .ai/                          # RULES.md (19 rules)
-ls .github/prompts/              # Profile-generated prompt files; verify against the generated contract
+ls .github/prompts/              # VS Code Local prompt files; verify against the generated contract
 ls naos/                         # Full PM infrastructure
 ls naos/governance/              # Governance truth table + rules
 ls specs/                        # Full spec kit (01–10)
@@ -65,14 +69,27 @@ ls .github/workflows/            # naos-control-plane-ci.yml
 
 ### Step 3: Activate hooks and verify
 
+Create the Git repository before configuring repository-local hooks. Configure
+your Git author identity if needed before making a commit.
+
 ```bash
+git init
 chmod +x .githooks/pre-commit
-git config core.hooksPath .githooks
+git config --local core.hooksPath .githooks
 ```
+
+These are opt-in POSIX-shell commands for this new repository. On native
+Windows, use Git for Windows Bash and set `NAOS_PYTHON` to the absolute path
+of the selected native Python executable before committing, using forward
+slashes (for example, `export NAOS_PYTHON='C:/path/to/python.exe'`). The hook
+refuses a Windows commit without that explicit interpreter. This Bash syntax
+is not PowerShell syntax; no WSL or global Git change is required. Preserve
+any existing effective hook configuration rather than replacing it.
 
 Test the hook:
 ```bash
-git stash  # if you have uncommitted changes
+# In an existing repository with commits, stash unrelated changes if needed.
+# A newly initialized repository has no commit to stash against.
 git commit --allow-empty -m "test: verify pre-commit hook"
 # Should see hook output with all sections passing
 ```
@@ -90,11 +107,23 @@ The spec kit is the foundation of spec-driven development. You need at minimum:
 
 ### Option A: Use the design prompt (recommended for new projects)
 
-```
+In a VS Code **Local** agent session, invoke the generated prompt:
+
+```text
 /naos-design
 ```
 
-This prompt runs a PM-quality spec elicitation session. Answer the questions — the agent fills in the spec templates.
+VS Code **Agent Host** does not load prompt files. For that session, or when
+command discovery is unavailable, read root `AGENTS.md`, then explicitly open
+`.agents/skills/naos-workflow-design/SKILL.md` and ask the assistant to follow
+that file for the design session. This portable file is generated for Standard;
+manual reading does not depend on host skill discovery.
+
+The design guidance elicits the project specifications. Answer the questions and
+review the filled spec templates. Reading or invoking the guidance grants no
+additional execution or approval authority. See
+[generated project host routes](../TOOL_NEUTRAL_USAGE.md#generated-project-host-routes)
+for the host compatibility limits.
 
 ### Option B: Fill templates manually (existing projects)
 

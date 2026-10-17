@@ -10,13 +10,16 @@ work was structured and checked.
 
 Primary review commands:
 
-- `naos gate-status`
-- `naos gate-evaluate`
+- `naos gate-status --output naos/reports/gate_status.json`
+- `naos gate-evaluate --strict-required --output naos/reports/gate_evaluation.json`
 - `naos spec-pack-contract`
 - `naos spec-cascade`
 - `naos evidence-pack`
 - `naos dashboard --json`
 - `naos pr-governance-summary`
+
+Missing required gates and blocked gates fail evaluation. Inspect the saved
+findings before continuing; a successful exit does not authorize delivery.
 
 ---
 

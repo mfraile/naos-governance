@@ -22,7 +22,7 @@ USAGE:
     python scripts/workflows/sync_from_registry.py --execution
     python scripts/workflows/sync_from_registry.py --project-status
 
-    # Filter by team (requires team_config.enabled=true in TASK_REGISTRY.yaml)
+    # Preview by team on stdout only; never writes shared derived files
     python scripts/workflows/sync_from_registry.py --team backend
 
 THIS IS THE ONLY COMMAND YOU NEED TO RUN.
@@ -36,6 +36,7 @@ milestone names and target dates before using this script.
 """
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -49,7 +50,13 @@ SCRIPT_DIR = Path(__file__).resolve().parents[1]
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from naos_task_lifecycle import is_task_delivered, normalize_task_states, validate_task_artifact_identity  # noqa: E402
+from naos_task_lifecycle import (  # noqa: E402
+    TASK_ID_FULL_PATTERN,
+    is_task_delivered,
+    normalize_task_states,
+    validate_task_artifact_identity,
+)
+from naos_console import configure_console_output  # noqa: E402
 from naos_validate_task_registry import (  # noqa: E402
     TeamConfigValidationError,
     require_valid_team_config,
@@ -107,9 +114,9 @@ PHASE_META: Dict[int, Dict[str, str]] = {
 class Task:
     id: str
     title: str
-    requirement: str
-    phase: int
-    priority: str
+    requirement: Optional[str]
+    phase: Optional[int]
+    priority: Optional[str]
     status: str
     estimate_days: float
     owner: str
@@ -147,10 +154,10 @@ def get_tasks(registry: Dict) -> List[Task]:
             Task(
                 id=t["id"],
                 title=t["title"],
-                requirement=t["requirement"],
-                phase=t["phase"],
-                priority=t["priority"],
-                status=t["status"],
+                requirement=t.get("requirement"),
+                phase=t.get("phase"),
+                priority=t.get("priority"),
+                status=t.get("status", "planned"),
                 estimate_days=t.get("estimate_days", 0),
                 owner=t.get("owner", "Engineering"),
                 acceptance=t.get("acceptance", ""),
@@ -238,14 +245,42 @@ def get_metrics(registry: Dict) -> Dict[str, Any]:
     }
 
 
+def _projection_bucket(task: Task) -> str:
+    """Categorize pending work using the canonical state resolver."""
+    states = normalize_task_states(task.state_record())
+    if (
+        states["compatibility_status"] == "unsupported"
+        or states["lifecycle_state"] == "unknown"
+    ):
+        return "review"
+    if is_task_delivered(task.state_record()):
+        return "delivered"
+    if states["lifecycle_state"] in {"active", "implementation_complete", "completed"}:
+        return "active"
+    if states["lifecycle_state"] == "planned":
+        return "planned"
+    return "excluded"
+
+
+def _display_metadata(value: Any) -> str:
+    """Render an absent declaration without assigning a planning value."""
+    return "—" if value is None or value == "" else str(value)
+
+
+def _requirement_key(task: Task) -> Optional[str]:
+    if not task.requirement:
+        return None
+    return task.requirement.split(" (")[0].split(",")[0].strip() or None
+
+
 def sync_backlog(tasks: List[Task], metrics: Dict) -> None:
     """Regenerate BACKLOG.md from registry."""
     print("📝 Syncing BACKLOG.md...")
 
     # Group tasks by status
-    in_progress = [t for t in tasks if t.status == "in_progress"]
-    ready = [t for t in tasks if t.status == "ready"]
-    planned = [t for t in tasks if t.status == "planned"]
+    in_progress = [t for t in tasks if _projection_bucket(t) == "active"]
+    ready = [t for t in tasks if _projection_bucket(t) == "review"]
+    planned = [t for t in tasks if _projection_bucket(t) == "planned"]
 
     def sort_key(t: Task):
         priority_order = {"P0": 0, "P1": 1, "P2": 2}
@@ -270,7 +305,7 @@ def sync_backlog(tasks: List[Task], metrics: Dict) -> None:
 | Status | Count |
 |--------|-------|
 | 🔵 In Progress | {len(in_progress)} |
-| 🟢 Ready | {len(ready)} |
+| ⚠️ Review Required | {len(ready)} |
 | ⚪ Planned | {len(planned)} |
 | **Total Active** | **{len(in_progress) + len(ready) + len(planned)}** |
 
@@ -284,19 +319,19 @@ def sync_backlog(tasks: List[Task], metrics: Dict) -> None:
 
     for t in in_progress:
         progress = f"{t.progress_percent}%" if t.progress_percent else "—"
-        content += f"| **{t.id}** | {t.title} | {t.requirement} | {t.priority} | {t.estimate_days} | {progress} |\n"
+        content += f"| **{t.id}** | {t.title} | {_display_metadata(t.requirement)} | {_display_metadata(t.priority)} | {t.estimate_days} | {progress} |\n"
 
     content += """
 ---
 
-## 🟢 Ready (Next Up)
+## ⚠️ Review Required
 
 | ID | Title | Requirement | Priority | Est (days) |
 |----|-------|-------------|----------|------------|
 """
 
     for t in ready:
-        content += f"| **{t.id}** | {t.title} | {t.requirement} | {t.priority} | {t.estimate_days} |\n"
+        content += f"| **{t.id}** | {t.title} | {_display_metadata(t.requirement)} | {_display_metadata(t.priority)} | {t.estimate_days} |\n"
 
     content += """
 ---
@@ -308,7 +343,7 @@ def sync_backlog(tasks: List[Task], metrics: Dict) -> None:
 """
 
     for t in planned:
-        content += f"| **{t.id}** | {t.title} | {t.requirement} | {t.priority} | {t.estimate_days} |\n"
+        content += f"| **{t.id}** | {t.title} | {_display_metadata(t.requirement)} | {_display_metadata(t.priority)} | {t.estimate_days} |\n"
 
     content += """
 ---
@@ -355,7 +390,20 @@ def sync_execution_task_matrix(tasks: List[Task]) -> None:
         print("   ⚠️ Task Matrix markers not found in 10-execution.md")
         return
 
-    sorted_tasks = sorted(tasks, key=lambda t: (t.phase, t.id))
+    existing_ids = {
+        line.split("|", 2)[1].strip().strip("*")
+        for line in text[start_idx:end_idx].splitlines()
+        if line.startswith("|")
+        and TASK_ID_FULL_PATTERN.fullmatch(line.split("|", 2)[1].strip().strip("*"))
+    }
+    orphan_ids = sorted(existing_ids - {task.id for task in tasks})
+    if orphan_ids:
+        print(
+            "WARNING: Task Matrix rows absent from TASK_REGISTRY: "
+            + ", ".join(orphan_ids)
+        )
+
+    sorted_tasks = sorted(tasks, key=lambda t: (t.phase is None, t.phase, t.id))
 
     matrix = f"""{start_marker}
 | ID | Title | Phase | Type | FR/NFR | Status | Owner | Target End | Acceptance |
@@ -363,15 +411,26 @@ def sync_execution_task_matrix(tasks: List[Task]) -> None:
 """
 
     for t in sorted_tasks:
-        task_type = "nfr" if t.requirement.startswith("NFR") else "feature"
-        status_display = t.status.replace("_", " ").title()
-        if status_display in ("Implemented", "Verified"):
+        task_type = "—" if not t.requirement else "nfr" if t.requirement.startswith("NFR") else "feature"
+        states = normalize_task_states(t.state_record())
+        if is_task_delivered(t.state_record()):
             status_display = "Done"
+        elif (
+            states["compatibility_status"] == "unsupported"
+            or states["lifecycle_state"] == "unknown"
+        ):
+            status_display = "Review Required"
+        elif states["lifecycle_state"] == "active":
+            status_display = "In Progress"
+        elif states["lifecycle_state"] == "completed":
+            status_display = "Completed (Review Required)"
+        else:
+            status_display = states["lifecycle_state"].replace("_", " ").title()
 
-        meta = PHASE_META.get(int(t.phase), {"date": "TBD"})
-        target_end = meta.get("date", "TBD")
+        meta = PHASE_META.get(int(t.phase), {"date": "TBD"}) if t.phase is not None else {}
+        target_end = meta.get("date", "TBD") if t.phase is not None else "—"
 
-        matrix += f"| {t.id} | {t.title} | {t.phase} | {task_type} | {t.requirement} | {status_display} | {t.owner[:3]} | {target_end} | {t.acceptance} |\n"
+        matrix += f"| {t.id} | {t.title} | {_display_metadata(t.phase)} | {task_type} | {_display_metadata(t.requirement)} | {status_display} | {t.owner[:3]} | {target_end} | {t.acceptance} |\n"
 
     matrix += f"{end_marker}"
 
@@ -396,25 +455,32 @@ def sync_dashboard_metrics(tasks: List[Task], metrics: Dict) -> None:
     tasks_total = completion.get("tasks_total", 0)
     percent = completion.get("percent_complete", 0)
 
-    text = re.sub(
-        r"(\d+)\s*/\s*(\d+)\s*tasks",
-        f"{tasks_done}/{tasks_total} tasks",
-        text,
-        flags=re.IGNORECASE,
+    # Overall task metrics have an explicit label. Other task counts (phase,
+    # requirement, or manually annotated values) belong to their own producers.
+    overall_line = re.compile(
+        r"^(\s*(?:\|\s*)?(?:\*\*)?Task Completion(?:\*\*)?\s*[:|]\s*)(.*)$",
+        re.IGNORECASE,
     )
-
-    text = re.sub(
-        r"(\d+/\d+ tasks)\s*\(\d+(?:\.\d+)?%\)",
-        rf"\1 ({percent}%)",
-        text,
-    )
-
-    text = re.sub(
-        r"Task Completion[:\s]*\d+(?:\.\d+)?\s*%",
-        f"Task Completion: {percent}%",
-        text,
-        flags=re.IGNORECASE,
-    )
+    lines = text.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        match = overall_line.match(line.rstrip("\r\n"))
+        if not match:
+            continue
+        value = match.group(2)
+        if re.search(r"\d+\s*/\s*\d+\s*tasks", value, re.IGNORECASE):
+            value = re.sub(
+                r"\d+\s*/\s*\d+\s*tasks(?:\s*\(\d+(?:\.\d+)?%\))?",
+                f"{tasks_done}/{tasks_total} tasks ({percent}%)",
+                value,
+                flags=re.IGNORECASE,
+            )
+        else:
+            value = re.sub(r"\d+(?:\.\d+)?\s*%", f"{percent}%", value, count=1)
+        ending = (
+            "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
+        )
+        lines[index] = match.group(1) + value + ending
+    text = "".join(lines)
 
     DASHBOARD_PATH.write_text(text, encoding="utf-8")
     print(f"   ✅ Updated metrics: {tasks_done}/{tasks_total} ({percent}%)")
@@ -453,16 +519,22 @@ def _phase_key(phase) -> float:
 def _phase_status(tasks_in_phase: List[Task]) -> str:
     """Determine phase status from its tasks."""
     states = [normalize_task_states(task.state_record()) for task in tasks_in_phase]
-    if any(state.get("compatibility_status") == "unsupported" for state in states):
+    if any(
+        state.get("compatibility_status") == "unsupported"
+        or state["lifecycle_state"] == "unknown"
+        for state in states
+    ):
         return "⚠️ REVIEW REQUIRED"
     if states and all(
         state["lifecycle_state"] in {"deferred", "cancelled", "absorbed", "superseded"}
         for state in states
     ):
         return "⏭️ SKIPPED"
-    if tasks_in_phase and all(is_task_delivered(task.state_record()) for task in tasks_in_phase):
+    if tasks_in_phase and all(
+        is_task_delivered(task.state_record()) for task in tasks_in_phase
+    ):
         return "✅ DONE"
-    if any(state["lifecycle_state"] == "active" for state in states):
+    if any(state["lifecycle_state"] in {"active", "completed"} for state in states):
         return "🔵 IN PROGRESS"
     if any(is_task_delivered(task.state_record()) for task in tasks_in_phase) or any(
         state["lifecycle_state"] == "implementation_complete" for state in states
@@ -475,24 +547,30 @@ def _group_tasks_by_major_phase(tasks: List[Task]) -> Dict[int, List[Task]]:
     """Group tasks by major phase number (int part of phase)."""
     groups: Dict[int, List[Task]] = defaultdict(list)
     for t in tasks:
-        major = int(_phase_key(t.phase))
-        groups[major].append(t)
+        if t.phase is not None:
+            groups[int(_phase_key(t.phase))].append(t)
     return groups
 
 
 def _requirement_status(requirement_tasks: List[Task]) -> str:
     """Determine requirement status from canonical task states."""
     states = [normalize_task_states(task.state_record()) for task in requirement_tasks]
-    if any(state.get("compatibility_status") == "unsupported" for state in states):
+    if any(
+        state.get("compatibility_status") == "unsupported"
+        or state["lifecycle_state"] == "unknown"
+        for state in states
+    ):
         return "⚠️ REVIEW REQUIRED"
     if states and all(
         state["lifecycle_state"] in {"deferred", "cancelled", "absorbed", "superseded"}
         for state in states
     ):
         return "⏭️ DEFERRED"
-    if requirement_tasks and all(is_task_delivered(task.state_record()) for task in requirement_tasks):
+    if requirement_tasks and all(
+        is_task_delivered(task.state_record()) for task in requirement_tasks
+    ):
         return "✅ DONE"
-    if any(state["lifecycle_state"] == "active" for state in states):
+    if any(state["lifecycle_state"] in {"active", "completed"} for state in states):
         return "🔵 IN PROGRESS"
     if any(is_task_delivered(task.state_record()) for task in requirement_tasks) or any(
         state["lifecycle_state"] == "implementation_complete" for state in states
@@ -524,8 +602,9 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
     # --- 1. Executive Summary Metrics ---
     req_tasks: Dict[str, List[Task]] = defaultdict(list)
     for t in tasks:
-        req_key = t.requirement.split(" (")[0].split(",")[0].strip()
-        req_tasks[req_key].append(t)
+        req_key = _requirement_key(t)
+        if req_key is not None:
+            req_tasks[req_key].append(t)
 
     reqs_total = len(req_tasks)
     reqs_done = sum(
@@ -535,11 +614,13 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
     )
     reqs_pct = round(reqs_done / reqs_total * 100, 1) if reqs_total else 0
 
-    planned_count = sum(1 for t in tasks if t.status.lower() in ("planned", "ready"))
+    planned_count = sum(
+        1 for t in tasks if _projection_bucket(t) in ("planned", "review")
+    )
 
     exec_metrics = f"""**Phase Status**: 🚀 IMPLEMENTATION PHASE
 **Overall Progress**: {reqs_done}/{reqs_total} requirements delivered ({reqs_pct}%) - from TASK_REGISTRY.yaml
-**Task Progress**: {tasks_done}/{tasks_total} tasks implemented ({percent}%)
+**Task Progress**: {tasks_done}/{tasks_total} tasks delivered ({percent}%)
 **Schedule Health**: {"🟢 ON TRACK" if planned_count < tasks_total * 0.3 else "🟡 AT RISK"}
 **Auto-synced**: {now} (from TASK_REGISTRY.yaml)"""
 
@@ -550,6 +631,7 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
 
     # --- 2. Milestone Gates ---
     phase_groups = _group_tasks_by_major_phase(tasks)
+    unphased = [t.id for t in tasks if t.phase is None]
 
     gate_lines = [
         "## 🎯 Milestone Gates",
@@ -572,6 +654,8 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
             f"| {major_phase} | {meta['name']} | {meta['date']} | {total_ct} | {done_ct} | {status} |"
         )
 
+    if unphased:
+        gate_lines.extend(["", "**Tasks without a declared phase**: " + ", ".join(unphased)])
     text = _replace_between_markers(
         text, "SYNC_MILESTONE_GATES", "SYNC_MILESTONE_GATES", "\n".join(gate_lines)
     )
@@ -592,14 +676,13 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
         total = len(statuses)
         done = sum(1 for task in statuses if is_task_delivered(task.state_record()))
         status = _requirement_status(statuses)
-        sample_ids = [
-            t.id
-            for t in tasks
-            if t.requirement.split(" (")[0].split(",")[0].strip() == req_id
-        ][:3]
+        sample_ids = [t.id for t in statuses[:3]]
         sample = ", ".join(sample_ids)
         wb_lines.append(f"| {req_id} | {total} | {done} | {status} | {sample} |")
 
+    unlinked = [t.id for t in tasks if _requirement_key(t) is None]
+    if unlinked:
+        wb_lines.extend(["", "**Tasks without a declared requirement**: " + ", ".join(unlinked)])
     wb_lines.append("")
     wb_lines.append(
         f"**TOTAL**: {reqs_total} requirements, {tasks_total} tasks, {tasks_done} done ({percent}%)"
@@ -613,16 +696,8 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
     # --- 4. Metrics Summary ---
     fr_reqs = {r: s for r, s in req_tasks.items() if r.startswith("FR")}
     nfr_reqs = {r: s for r, s in req_tasks.items() if r.startswith("NFR")}
-    fr_done = sum(
-        1
-        for s in fr_reqs.values()
-        if _requirement_status(s) == "✅ DONE"
-    )
-    nfr_done = sum(
-        1
-        for s in nfr_reqs.values()
-        if _requirement_status(s) == "✅ DONE"
-    )
+    fr_done = sum(1 for s in fr_reqs.values() if _requirement_status(s) == "✅ DONE")
+    nfr_done = sum(1 for s in nfr_reqs.values() if _requirement_status(s) == "✅ DONE")
     fr_progress = sum(
         1 for s in fr_reqs.values() if _requirement_status(s) == "🔵 IN PROGRESS"
     )
@@ -723,27 +798,27 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
         [
             f"| **TOTAL** | | **{tasks_total}** | **{budget_total_hours:.0f}h** | **{budget_done_hours:.0f}h** | **{budget_total_hours - budget_done_hours:.0f}h** |",
             "",
+            *(["**Tasks without a declared phase**: " + ", ".join(unphased), ""] if unphased else []),
             "### Planned Tasks by Priority",
             "",
-            "| Priority | Planned | Ready | In Progress | Total Pending |",
+            "| Priority | Planned | Review Required | In Progress | Total Pending |",
             "|----------|--------:|------:|------------:|--------------:|",
         ]
     )
 
-    for prio in ["P0", "P1", "P2"]:
+    for prio in ["P0", "P1", "P2", None]:
         p_tasks = [
             t
             for t in tasks
             if t.priority == prio
-            and not is_task_delivered(t.state_record())
-            and t.status.lower() not in ("deferred", "absorbed")
+            and _projection_bucket(t) in {"planned", "review", "active"}
         ]
-        planned_p = sum(1 for t in p_tasks if t.status.lower() == "planned")
-        ready_p = sum(1 for t in p_tasks if t.status.lower() == "ready")
-        ip_p = sum(1 for t in p_tasks if t.status.lower() == "in_progress")
+        planned_p = sum(1 for t in p_tasks if _projection_bucket(t) == "planned")
+        ready_p = sum(1 for t in p_tasks if _projection_bucket(t) == "review")
+        ip_p = sum(1 for t in p_tasks if _projection_bucket(t) == "active")
         if p_tasks:
             budget_lines.append(
-                f"| {prio} | {planned_p} | {ready_p} | {ip_p} | {len(p_tasks)} |"
+                f"| {_display_metadata(prio)} | {planned_p} | {ready_p} | {ip_p} | {len(p_tasks)} |"
             )
 
     text = _replace_between_markers(
@@ -758,6 +833,7 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
 
 
 def main() -> None:
+    configure_console_output()
     parser = argparse.ArgumentParser(
         description="Sync all PM files from TASK_REGISTRY.yaml"
     )
@@ -778,7 +854,7 @@ def main() -> None:
         metavar="TEAM_ID",
         default=None,
         help=(
-            "Filter output to tasks in scope for a specific team "
+            "Preview tasks in scope for a specific team on stdout only; never writes shared views "
             "(requires team_config.enabled=true in TASK_REGISTRY.yaml). "
             "Example: --team backend"
         ),
@@ -816,6 +892,24 @@ def main() -> None:
             print(f"❌ {exc}", file=sys.stderr)
             sys.exit(2)
 
+    if args.team:
+        preview_records = [
+            dict(id=task.id, title=task.title, **task.state_record()) for task in tasks
+        ]
+        preview_metrics = get_metrics({"tasks": preview_records})
+        print("Team preview only; shared derived files were not written.")
+        print(
+            json.dumps(
+                {
+                    "team": args.team,
+                    "tasks": preview_records,
+                    "metrics": preview_metrics,
+                },
+                ensure_ascii=True,
+            )
+        )
+        return
+
     if sync_all or args.backlog:
         sync_backlog(tasks, metrics)
 
@@ -832,7 +926,7 @@ def main() -> None:
     print("✅ SYNC COMPLETE")
     print("=" * 60)
     print("\nNext: Run validators to confirm coherence:")
-    print("  python scripts/workflows/validate_task_coherence.py")
+    print("  python scripts/validators/validate_task_coherence.py")
 
 
 if __name__ == "__main__":

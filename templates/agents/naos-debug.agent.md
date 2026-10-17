@@ -1,6 +1,6 @@
 ---
 name: naos-debug
-model: "[ADAPT: e.g. claude-sonnet-4-5 | gpt-4o]"
+# Model omitted: adopter host selection applies; this does not pin or approve a model.
 naos_model_role: debug
 description: "Debug agent — no-direct-edit evidence gathering, root-cause diagnosis, and fix guidance"
 disable-model-invocation: true
@@ -27,8 +27,8 @@ recommendation and do not edit tracked files.
 
 The manifest has no direct edit/create or agent-invocation tools. Terminal/test
 execution follows host approvals/sandbox; this is not a filesystem security
-boundary. As an `@naos-implement-with-debug` child, do not invoke agents or
-claim implementation.
+boundary. When explicitly delegated by the separately installed, approved optional
+implementation parent, do not invoke agents or claim implementation.
 
 ## When to Use This Agent
 

@@ -29,8 +29,13 @@ semantic drift, approve work, certify compliance, or promote maturity.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.util
 import json
 import sys
+import types
+import uuid
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 from typing import NamedTuple
@@ -42,9 +47,12 @@ import yaml  # type: ignore[import-untyped]
 # ---------------------------------------------------------------------------
 _RUNNER_DIR = Path(__file__).resolve().parent
 _KIT_DIR = _RUNNER_DIR.parent
-for _script_dir in (_KIT_DIR / "scripts", _KIT_DIR.parent / "scripts"):
-    if _script_dir.is_dir() and str(_script_dir) not in sys.path:
-        sys.path.insert(0, str(_script_dir))
+# Bind runtime code to this runner, never to the inspected project or a
+# fallback ancestor. The complete path literal is remapped by brownfield init.
+_RUNTIME_ROOT = _KIT_DIR.parent if _KIT_DIR.name == ".github" else _KIT_DIR
+_SCRIPT_DIR = _RUNTIME_ROOT / Path("scripts/naos_console.py").parent
+if _SCRIPT_DIR.is_dir() and str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
 DEFAULT_BATTERY = (
     _RUNNER_DIR / "task_battery" / "portable_scenarios.yaml"
     if (_RUNNER_DIR / "task_battery" / "portable_scenarios.yaml").exists()
@@ -156,46 +164,68 @@ def run_registry_validation(root: Path) -> list[CheckResult]:
         return [CheckResult("TASK_REGISTRY.yaml is valid YAML", False, str(exc))]
 
 
-def run_frontmatter_checks(root: Path) -> list[CheckResult]:
-    """Validate generated agent, skill, and instruction frontmatter when validators are installed."""
-    validators_dir = root / "scripts" / "validators"
-    if not validators_dir.is_dir():
-        return []
-
-    sys.path.insert(0, str(root))
+@contextmanager
+def frontmatter_validators():
+    """Load the shipped modules by path in a private, temporary namespace."""
+    validators_dir = _SCRIPT_DIR / "validators"
+    names = ("frontmatter_utils", "validate_agents", "validate_skills", "validate_instructions")
+    paths = {name: validators_dir / f"{name}.py" for name in names}
+    for path in paths.values():
+        if not path.is_file() or not path.resolve().is_relative_to(_SCRIPT_DIR.resolve()):
+            raise ImportError(f"Shipped validator unavailable: {path.name}")
+    namespace = "_naos_conformance_validators_" + uuid.uuid4().hex
+    package = types.ModuleType(namespace)
+    package.__path__ = []  # All allowed siblings are loaded explicitly below.
+    sys.modules[namespace] = package
+    modules = {}
     try:
-        from scripts.validators.validate_agents import default_agent_files, validate_agent_files
-        from scripts.validators.validate_instructions import (
-            default_instruction_files,
-            validate_instruction_files,
-        )
-        from scripts.validators.validate_skills import default_skill_files, validate_skill_files
-    except ModuleNotFoundError as exc:
-        return [CheckResult("Frontmatter validators import", False, str(exc))]
+        for name, path in paths.items():
+            qualified_name = f"{namespace}.{name}"
+            spec = importlib.util.spec_from_file_location(qualified_name, path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Cannot load shipped validator: {path.name}")
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[qualified_name] = module
+            spec.loader.exec_module(module)
+            modules[name] = module
+        yield modules
+    finally:
+        for name in list(sys.modules):
+            if name == namespace or name.startswith(namespace + "."):
+                del sys.modules[name]
 
+
+def run_frontmatter_checks(root: Path) -> list[CheckResult]:
+    """Inspect the target using this runner's shipped frontmatter validators."""
     results: list[CheckResult] = []
-    validator_runs = [
-        ("Agent frontmatter", default_agent_files(root), validate_agent_files),
-        ("Skill frontmatter", default_skill_files(root), validate_skill_files),
-        ("Instruction frontmatter", default_instruction_files(root), validate_instruction_files),
-    ]
-    for label, files, validator in validator_runs:
-        if not files:
-            results.append(CheckResult(f"{label}: no applicable files", True, "no files copied for this tier"))
-            continue
-        validation_results = validator(files)
-        for validation_result in validation_results:
-            try:
-                rel = validation_result.path.resolve().relative_to(root.resolve())
-            except ValueError:
-                rel = validation_result.path
-            results.append(
-                CheckResult(
-                    f"{label}: {rel} [{validation_result.check}]",
-                    validation_result.passed,
-                    validation_result.message,
-                )
-            )
+    try:
+        with frontmatter_validators() as modules:
+            agents = modules["validate_agents"]
+            skills = modules["validate_skills"]
+            instructions = modules["validate_instructions"]
+            validator_runs = [
+                ("Agent frontmatter", agents.default_agent_files(root), agents.validate_agent_files),
+                ("Skill frontmatter", skills.default_skill_files(root), skills.validate_skill_files),
+                ("Instruction frontmatter", instructions.default_instruction_files(root), instructions.validate_instruction_files),
+            ]
+            for label, files, validator in validator_runs:
+                validation_results = validator(files, root=root)
+                if not files:
+                    results.append(CheckResult(f"{label}: no applicable files", True, "no files copied for this tier"))
+                    continue
+                for validation_result in validation_results:
+                    try:
+                        rel = validation_result.path.resolve().relative_to(root.resolve())
+                    except ValueError:
+                        rel = validation_result.path
+                    results.append(CheckResult(
+                        f"{label}: {rel} [{validation_result.check}]",
+                        validation_result.passed,
+                        validation_result.message,
+                    ))
+    except Exception as exc:
+        results.append(CheckResult("Shipped frontmatter validators", False,
+                                   f"Frontmatter validation unavailable ({type(exc).__name__}): {exc}; restore the shipped runtime or correct metadata scope and retry."))
     return results
 
 
@@ -242,9 +272,12 @@ def _print_section(title: str, results: list[CheckResult]) -> None:
     print(f"  {title}")
     print(f"{'─' * width}")
     for r in results:
-        status = "✓ PASS" if r.passed else "✗ FAIL"
+        warning = r.note.startswith("WARNING: ")
+        status = "⚠ WARN" if warning else ("✓ PASS" if r.passed else "✗ FAIL")
         print(f"  {status:8}  {r.name}")
-        if not r.passed:
+        if warning:
+            print(f"            {r.note}")
+        elif not r.passed:
             print(f"            missing: {r.note}")
     print(f"{'─' * width}")
 
@@ -252,14 +285,13 @@ def _print_section(title: str, results: list[CheckResult]) -> None:
 # ---------------------------------------------------------------------------
 # Main conformance flow
 # ---------------------------------------------------------------------------
-def _write_conformance_json(
-    output_path: Path,
+def _conformance_payload(
     structural: list[CheckResult],
     frontmatter_checks: list[CheckResult],
     battery_checks: list[CheckResult],
     scenarios: list[dict],
-) -> None:
-    """Write conformance results as structured JSON for dashboard consumption."""
+) -> dict:
+    """Package the actual existing checks without changing their interpretation."""
     all_results = structural + frontmatter_checks + battery_checks
     total = len(all_results)
     n_pass = sum(1 for r in all_results if r.passed)
@@ -308,14 +340,107 @@ def _write_conformance_json(
         "cost_usd": 0.0,
     }
 
+    return data
+
+
+def _conformance_source_binding(project_root: Path, battery_path: Path) -> dict:
+    """Bind exact read inputs and source-owned validator implementation bytes.
+
+    Existence-only checks remain existence observations, including the derived
+    dashboard. They do not acquire authored-content authority through hashing.
+    """
+    from naos_ai_surfaces import checked_path
+    root = project_root.resolve(strict=True)
+    battery = battery_path.absolute()
+    # Inspect aliases lexically, before resolving an operand or opening it.
+    checked_path(Path(battery.anchor), battery.relative_to(Path(battery.anchor)).as_posix())
+    if battery == DEFAULT_BATTERY.absolute():
+        selection = {"kind": "shipped_default"}
+    elif battery.is_relative_to(root):
+        selection = {"kind": "project", "ref": battery.relative_to(root).as_posix()}
+    else:
+        selection = {"kind": "external_unqualified"}
+    if battery.is_relative_to(root):
+        checked_path(root, battery.relative_to(root).as_posix())
+    bindings = {"battery_sha256": hashlib.sha256(battery.read_bytes()).hexdigest(),
+                "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
+    sources = {}
+    # Default-file discovery resolves paths. Reject aliases in its fixed input
+    # directories first, so discovery cannot hide a linked markdown operand.
+    for ref in ("templates/agents", "templates/skills", "templates/instructions",
+                ".github/agents", ".github/skills", ".github/instructions"):
+        directory = checked_path(root, ref)
+        if directory.is_dir():
+            for item in directory.rglob("*"):
+                checked_path(root, item.relative_to(root).as_posix())
+    with frontmatter_validators() as modules:
+        for name, module in modules.items():
+            path = Path(module.__file__)
+            sources["validator:" + name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        for module, method in ((modules["validate_agents"], "default_agent_files"),
+                               (modules["validate_skills"], "default_skill_files"),
+                               (modules["validate_instructions"], "default_instruction_files")):
+            for path in getattr(module, method)(root):
+                ref = path.absolute().relative_to(root).as_posix()
+                checked_path(root, ref)
+                sources["project:" + ref] = hashlib.sha256(path.read_bytes()).hexdigest()
+    for ref in ("naos/TASK_REGISTRY.yaml", "naos/ai_metadata_scope.yaml"):
+        path = checked_path(root, ref)
+        if path.is_file():
+            sources["project:" + ref] = hashlib.sha256(path.read_bytes()).hexdigest()
+    scenarios = load_battery(battery)
+    presence = {}
+    for ref, _ in STRUCTURAL_CHECKS:
+        path = checked_path(root, ref.rstrip("/"))
+        presence["structural:" + ref] = path.is_dir() if ref.endswith("/") else path.is_file()
+    for ref in extract_context_file_paths(scenarios):
+        path = checked_path(root, ref.rstrip("/"))
+        presence["battery:" + ref] = path.exists()
+    bindings.update(battery_selection=selection, source_sha256=sources, selected_path_presence=presence)
+    return bindings
+
+
+def build_conformance_report(project_root: Path, battery_path: Path, *, profile=None,
+                             naos_root=None, policy_path=None) -> dict:
+    """Reproduce the actual local deterministic checks read-only; no CLI execution."""
+    from naos_policy import controlled_utc_now_text, default_naos_root, load_policy, normalize_profile
+    root = project_root.resolve(strict=True)
+    policy = load_policy(policy_path, naos_root, root)
+    selected_root = naos_root or default_naos_root(policy)
+    selected_profile = normalize_profile(profile, policy)
+    before = _conformance_source_binding(root, battery_path)
+    scenarios = load_battery(battery_path)
+    structural = run_structural_checks(root) + run_registry_validation(root)
+    frontmatter = run_frontmatter_checks(root)
+    battery = run_battery_checks(root, scenarios)
+    data = _conformance_payload(structural, frontmatter, battery, scenarios)
+    if _conformance_source_binding(root, battery_path) != before:
+        raise ValueError("Conformance inputs changed during observation")
+    data.update(schema="naos.conformance_latest.v1", generated_at=controlled_utc_now_text(),
+                profile=selected_profile, project_root=str(root), naos_root=selected_root,
+                battery_path=str(battery_path.absolute()), source_binding=before,
+                status=("pass" if structural + frontmatter + battery
+                        and all(item.passed for item in structural + frontmatter + battery) else "failed"),
+                human_review_required=True,
+                claim_ceiling="deterministic_local_conformance_structure_only",
+                not_claimed=["behavioral correctness", "operating effectiveness", "approval", "maturity promotion"])
+    return data
+
+
+def _write_conformance_json(output_path: Path, structural: list[CheckResult],
+                            frontmatter_checks: list[CheckResult], battery_checks: list[CheckResult],
+                            scenarios: list[dict], *, report: dict | None = None) -> None:
+    """Keep compatibility with existing legacy fixtures; real runs pass their report."""
+    data = report if report is not None else _conformance_payload(structural, frontmatter_checks, battery_checks, scenarios)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     print(f"  Written → {output_path}")
 
 
-def run_conformance(project_root: Path, battery_path: Path, output_path: Path | None = None) -> int:
+def run_conformance(project_root: Path, battery_path: Path, output_path: Path | None = None,
+                    *, profile=None, naos_root=None, policy_path=None) -> int:
     """Run static conformance checks. Returns 0 on full pass, 1 on failures."""
-    print(f"\nNAOS Conformance Check")
+    print("\nNAOS Conformance Check")
     print(f"  Project : {project_root}")
     print(f"  Battery : {battery_path}")
 
@@ -341,6 +466,19 @@ def run_conformance(project_root: Path, battery_path: Path, output_path: Path | 
     _print_section("Battery Context File Checks", battery_checks)
 
     all_results = structural + frontmatter_checks + battery_checks
+    report = None
+    if output_path is not None:
+        try:
+            report = build_conformance_report(project_root, battery_path, profile=profile,
+                naos_root=naos_root, policy_path=policy_path)
+            original = _conformance_payload(structural, frontmatter_checks, battery_checks, scenarios)
+            if any(report[key] != value for key, value in original.items() if key != "run_date"):
+                raise ValueError("Conformance checks changed before publication")
+        except (OSError, ValueError, ImportError, TypeError, KeyError) as exc:
+            # Preserve the existing command's observed checks/exit behavior.
+            # An unbound legacy report remains unresolved for typed maturity.
+            report = None
+            print(f"  Source binding unavailable ({type(exc).__name__}); writing legacy observation only")
     total = len(all_results)
     n_pass = sum(1 for r in all_results if r.passed)
     n_fail = total - n_pass
@@ -350,11 +488,11 @@ def run_conformance(project_root: Path, battery_path: Path, output_path: Path | 
         print(f"  ← {n_fail} FAILED")
         print("  Fix the missing files above, then re-run --conformance.\n")
         if output_path is not None:
-            _write_conformance_json(output_path, structural, frontmatter_checks, battery_checks, scenarios)
+            _write_conformance_json(output_path, structural, frontmatter_checks, battery_checks, scenarios, report=report)
         return 1
     print("  ✓ All checks passed.\n")
     if output_path is not None:
-        _write_conformance_json(output_path, structural, frontmatter_checks, battery_checks, scenarios)
+        _write_conformance_json(output_path, structural, frontmatter_checks, battery_checks, scenarios, report=report)
     return 0
 
 
@@ -431,6 +569,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    from naos_console import configure_console_output
+
+    configure_console_output()
     parser = build_parser()
     args = parser.parse_args()
 
@@ -487,7 +628,8 @@ def main() -> None:
         print(f"[ERROR] Battery file not found: {battery_path}")
         sys.exit(2)
 
-    sys.exit(run_conformance(project_root, battery_path, output_path))
+    sys.exit(run_conformance(project_root, battery_path, output_path,
+        profile=args.profile, naos_root=args.naos_root, policy_path=args.policy))
 
 
 if __name__ == "__main__":

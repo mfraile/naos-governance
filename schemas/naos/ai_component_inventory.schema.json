@@ -34,76 +34,202 @@
     "summary"
   ],
   "properties": {
-    "schema": {"const": "naos.ai_component_inventory.v1"},
-    "generated_at": {"type": "string", "minLength": 1},
-    "generator_version": {"const": "1.0.0"},
-    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"enum": ["current", "review_required"]},
-    "required_for_profile": {"type": "boolean"},
-    "project_root": {"type": "string"},
-    "naos_root": {"type": "string", "minLength": 1},
+    "schema": {
+      "const": "naos.ai_component_inventory.v1"
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generator_version": {
+      "const": "1.0.0"
+    },
+    "profile": {
+      "enum": [
+        "quickstart",
+        "lite",
+        "standard",
+        "assured"
+      ]
+    },
+    "status": {
+      "enum": [
+        "current",
+        "review_required"
+      ]
+    },
+    "required_for_profile": {
+      "type": "boolean"
+    },
+    "project_root": {
+      "type": "string"
+    },
+    "naos_root": {
+      "type": "string",
+      "minLength": 1
+    },
     "format": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "version", "kind", "standard_conformance"],
+      "required": [
+        "id",
+        "version",
+        "kind",
+        "standard_conformance"
+      ],
       "properties": {
-        "id": {"const": "ai_component_inventory.v1"},
-        "version": {"const": 1},
-        "kind": {"const": "custom_declared_facts_inventory"},
-        "standard_conformance": {"type": "null"}
+        "id": {
+          "const": "ai_component_inventory.v1"
+        },
+        "version": {
+          "const": 1
+        },
+        "kind": {
+          "const": "custom_declared_facts_inventory"
+        },
+        "standard_conformance": {
+          "type": "null"
+        }
       }
     },
-    "decision_supported": {"type": "string", "minLength": 1},
-    "review_owner": {"type": "string", "minLength": 1},
-    "lifecycle": {"type": "object"},
-    "rules": {"$ref": "#/$defs/source"},
-    "model_policy": {"$ref": "#/$defs/source"},
+    "decision_supported": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lifecycle": {
+      "type": "object"
+    },
+    "rules": {
+      "$ref": "#/$defs/source"
+    },
+    "model_policy": {
+      "$ref": "#/$defs/source"
+    },
     "applicability": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["generated_adopter_required_profiles", "source_kit_missing_report", "rationale"],
+      "required": [
+        "generated_adopter_required_profiles",
+        "source_kit_missing_report",
+        "rationale"
+      ],
       "properties": {
-        "generated_adopter_required_profiles": {"const": ["standard", "assured"]},
-        "source_kit_missing_report": {"const": "not_applicable"},
-        "rationale": {"type": "string", "minLength": 1}
+        "generated_adopter_required_profiles": {
+          "const": [
+            "standard",
+            "assured"
+          ]
+        },
+        "source_kit_missing_report": {
+          "const": "not_applicable"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "field_sources": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["component_id", "component_type", "name", "status", "source_file", "source_sha256", "declarations", "redactions"],
+      "required": [
+        "component_id",
+        "component_type",
+        "name",
+        "status",
+        "source_file",
+        "source_sha256",
+        "declarations",
+        "redactions"
+      ],
       "properties": {
-        "component_id": {"type": "string", "minLength": 1},
-        "component_type": {"type": "string", "minLength": 1},
-        "name": {"type": "string", "minLength": 1},
-        "status": {"type": "string", "minLength": 1},
-        "source_file": {"type": "string", "minLength": 1},
-        "source_sha256": {"type": "string", "minLength": 1},
-        "declarations": {"type": "string", "minLength": 1},
-        "redactions": {"type": "string", "minLength": 1}
+        "component_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_sha256": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declarations": {
+          "type": "string",
+          "minLength": 1
+        },
+        "redactions": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "provenance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["basis", "inputs", "input_set_digest"],
+      "required": [
+        "basis",
+        "inputs",
+        "input_set_digest"
+      ],
       "properties": {
-        "basis": {"const": "repo_local_declared_facts"},
+        "basis": {
+          "const": "repo_local_declared_facts"
+        },
         "inputs": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["path", "role", "sha256"],
+            "required": [
+              "path",
+              "role",
+              "sha256"
+            ],
             "properties": {
-              "path": {"type": "string", "minLength": 1, "not": {"pattern": "^(?:/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))"}},
-              "role": {"enum": ["inventory_rules", "model_policy", "ai_surface_declaration", "generator_or_normalizer"]},
-              "sha256": {"$ref": "#/$defs/sha256"}
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "not": {
+                  "pattern": "^(?:/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))"
+                }
+              },
+              "role": {
+                "enum": [
+                  "inventory_rules",
+                  "model_policy",
+                  "ai_surface_declaration",
+                  "generator_or_normalizer",
+                  "metadata_scope"
+                ]
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              }
             }
           }
         },
-        "input_set_digest": {"$ref": "#/$defs/sha256"}
+        "input_set_digest": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "components": {
@@ -111,53 +237,400 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["component_id", "component_type", "name", "status", "source_file", "source_sha256", "declarations", "redactions"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "component_type": {
+                  "const": "agent"
+                }
+              },
+              "required": [
+                "component_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "declarations": {
+                  "required": [
+                    "model",
+                    "model_selection"
+                  ],
+                  "properties": {
+                    "model": {
+                      "anyOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "$ref": "#/$defs/agent_model_selector"
+                        }
+                      ]
+                    },
+                    "model_selection": {
+                      "enum": [
+                        "host_default_unspecified",
+                        "explicit_declaration"
+                      ],
+                      "description": "Declaration posture only; not observed host selection, model availability, provider identity or policy approval."
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "model_selection": {
+                            "const": "host_default_unspecified"
+                          }
+                        },
+                        "required": [
+                          "model_selection"
+                        ]
+                      },
+                      "then": {
+                        "properties": {
+                          "model": {
+                            "type": "null"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "model_selection": {
+                            "const": "explicit_declaration"
+                          }
+                        },
+                        "required": [
+                          "model_selection"
+                        ]
+                      },
+                      "then": {
+                        "properties": {
+                          "model": {
+                            "$ref": "#/$defs/agent_model_selector"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "component_type": {
+                  "const": "skill"
+                }
+              },
+              "required": [
+                "component_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "declarations": {
+                  "required": [
+                    "parameters"
+                  ],
+                  "properties": {
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "description"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "description": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "authoring_base": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Manual base reference; no inheritance or runtime authority."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "required": [
+          "component_id",
+          "component_type",
+          "name",
+          "status",
+          "source_file",
+          "source_sha256",
+          "declarations",
+          "redactions"
+        ],
         "properties": {
-          "component_id": {"type": "string", "minLength": 1},
-          "component_type": {"enum": ["agent", "skill", "instruction", "model_role", "ai_tool", "tool_model_binding"]},
-          "name": {"type": "string", "minLength": 1},
-          "status": {"enum": ["active", "declared_disabled", "unknown"]},
-          "source_file": {"type": "string", "minLength": 1, "not": {"pattern": "^(?:/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))"}},
-          "source_sha256": {"$ref": "#/$defs/sha256"},
-          "declarations": {"type": "object"},
-          "redactions": {"type": "integer", "minimum": 0}
+          "component_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "component_type": {
+            "enum": [
+              "agent",
+              "skill",
+              "instruction",
+              "model_role",
+              "ai_tool",
+              "tool_model_binding"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "active",
+              "declared_disabled",
+              "unknown"
+            ]
+          },
+          "source_file": {
+            "type": "string",
+            "minLength": 1,
+            "not": {
+              "pattern": "^(?:/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))"
+            }
+          },
+          "source_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "declarations": {
+            "type": "object"
+          },
+          "redactions": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       }
     },
-    "component_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
-    "inventory_digest": {"$ref": "#/$defs/sha256"},
-    "findings": {"type": "array", "items": {"type": "object"}},
-    "known_gaps": {"type": "array", "items": {"type": "string"}},
-    "residual_risks": {"type": "array", "items": {"type": "string"}},
-    "limitations": {"type": "array", "items": {"type": "string"}},
-    "not_claimed": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-    "human_review_required": {"type": "boolean"},
+    "host_declarations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_file",
+          "type",
+          "status",
+          "metadata_scope",
+          "declarations",
+          "source_sha256",
+          "redactions"
+        ],
+        "properties": {
+          "source_file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "enum": [
+              "agent",
+              "skill",
+              "instruction"
+            ]
+          },
+          "status": {
+            "const": "declared_host"
+          },
+          "metadata_scope": {
+            "enum": [
+              "adopter_declared",
+              "portable_skill",
+              "claude_skill"
+            ]
+          },
+          "declarations": {
+            "type": "object"
+          },
+          "nonportable_fields_omitted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "redactions": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "component_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "inventory_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "known_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "residual_risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "not_claimed": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "human_review_required": {
+      "type": "boolean"
+    },
     "summary": {
       "type": "object",
-      "required": ["blocking", "required", "warnings", "advisory", "total_findings", "components", "component_types", "inputs", "required_for_profile"],
+      "required": [
+        "blocking",
+        "required",
+        "warnings",
+        "advisory",
+        "total_findings",
+        "components",
+        "component_types",
+        "inputs",
+        "required_for_profile"
+      ],
       "properties": {
-        "blocking": {"type": "integer", "minimum": 0},
-        "required": {"type": "integer", "minimum": 0},
-        "warnings": {"type": "integer", "minimum": 0},
-        "advisory": {"type": "integer", "minimum": 0},
-        "total_findings": {"type": "integer", "minimum": 0},
-        "components": {"type": "integer", "minimum": 0},
-        "component_types": {"type": "integer", "minimum": 0},
-        "inputs": {"type": "integer", "minimum": 1},
-        "required_for_profile": {"type": "boolean"}
+        "blocking": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "advisory": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "components": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "component_types": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inputs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "required_for_profile": {
+          "type": "boolean"
+        }
       }
     }
   },
   "$defs": {
-    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "agent_model_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "not": {
+        "pattern": "\\[[Aa][Dd][Aa][Pp][Tt]"
+      }
+    },
+    "agent_model_selector": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/agent_model_name"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/agent_model_name"
+          }
+        }
+      ]
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "source", "sha256"],
+      "required": [
+        "path",
+        "source",
+        "sha256"
+      ],
       "properties": {
-        "path": {"type": "string", "minLength": 1, "not": {"pattern": "^(?:/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))"}},
-        "source": {"enum": ["project", "template", "explicit"]},
-        "sha256": {"$ref": "#/$defs/sha256"}
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "^(?:/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))"
+          }
+        },
+        "source": {
+          "enum": [
+            "project",
+            "template",
+            "explicit"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     }
   }

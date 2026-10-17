@@ -5,10 +5,17 @@
 > not the AI, not code review, not your linter. **NAOS helps catch that — and the governance failures
 > ordinary code checks usually miss.**
 > For the shipped deterministic duplicate-function check, "catch" means an identifier-sensitive
-> exact normalized-AST match across distinct files. Parameter or local renaming changes the
-> comparison; this is not semantic-equivalence detection.
+> exact normalized-AST match at multiple locations, including within one file. A separate
+> advisory tier compares bounded local/argument renaming while retaining external names,
+> attributes and literals. Neither tier establishes semantic equivalence.
 
 **NAOS-Governance** (*Native AI Orchestration for SDLC*) is **governance-as-code** for AI-assisted software development. Machine-readable rule posture with selected executable checks. Deterministic conformance checks, including agent/skill/instruction frontmatter validation. Function-index and duplicate-intent review surfaces. Generated traceability surfaces. Profile-aware evidence.
+
+NAOS is intended for development teams using AI to build and maintain complex
+software, including teams in highly regulated enterprises. Its repository
+artifacts support review and traceability from initial design through delivery
+and long-term maintenance; regulatory decisions remain with the responsible
+people and organizations.
 
 NAOS is tool-neutral by design: it works through repository files, commands,
 hooks, schemas, reports, and human-reviewed evidence rather than through a
@@ -167,7 +174,9 @@ Advanced candidate layers remain bounded:
   Advisory findings require explicit inclusion and remain human-review input.
 - Static policy overlays under `naos/policy_overrides.d/` cannot weaken
   `ADR-0010: Control-Plane Advisory Boundaries` or turn advisory findings into
-  authority.
+  authority. They also preserve the initially selected policy
+  profile severities and failure conditions. Merge reports and derived policies
+  require review; consumers use derived output only through explicit `--policy`.
 
 NAOS reports are repository-local evidence surfaces. Someone with repository
 write access can still edit reports, reviewer metadata, claims, manifests, or
@@ -183,25 +192,37 @@ guarantee secure code, prove runtime safety, or prove complete test coverage.
 
 ## Quick Start
 
-Portable preview generation is exercised on Linux with Python 3.11. Managed
-`--activate` mutation is currently supported only on Darwin ARM64 with CPython
-3.11–3.13; Linux, Windows, and other unsupported tuples refuse before target
-mutation. On an unsupported host, use an absent `--preview-dir` to inspect the
-complete install set and activate later on a supported host.
+Managed activation targets native macOS, Ubuntu and Windows 11 with CPython
+3.11–3.13. Bounded native lifecycle and recovery evidence exists on macOS
+ARM64/APFS, Ubuntu x86_64/ext4 and Windows 11 x64/NTFS. Actual brownfield
+activation and selected profile transitions pass on all three with Python 3.11;
+full workflow, Python-minor and installed-artifact qualification remains open.
+Use an absent `--preview-dir` to inspect generated content without activation.
+Do not infer platform qualification from successful package installation.
 
-### Option A: pip install (recommended)
+See [platform implementation and verification](docs/PLATFORM_ADAPTERS.md) for
+native qualification limits, recovery behavior and Git hook interpreter selection.
+
+### Option A: install a verified artifact (recommended)
+
+First follow [artifact acquisition](INSTALLATION_MANUAL.md#artifact-acquisition)
+to install the selected release or local candidate into an isolated environment.
+The named distribution is not currently available from public PyPI; there is no
+implicit index fallback. Package installation and project activation are separate.
 
 ```bash
-pip install naos-governance
 naos-governance init /path/to/your/project --tier quickstart --activate
 
-# Install pre-commit hook
-cd /path/to/your/project
-chmod +x .githooks/pre-commit
-git config core.hooksPath .githooks
+# Review hook integration from the Git worktree root before opting in.
+# Preserve any effective core.hooksPath and existing default hooks; nested targets
+# and shared worktrees need a repository-owner integration decision.
+# Init copies the hook but does not make it executable, configure or execute it.
 
-# Done. Starter scaffold installed. 5 rules. The hook enforces its documented
-# file/path checks; Rule 10 has blocking posture but no licence scanner is installed.
+# A kit-owned hook changed by deliberate chmod needs a separate exact activation
+# review before ordinary upstream updates; see docs/HOOK_ACTIVATION.md.
+
+# Starter scaffold installed. 5 rules. After explicit hook integration, the hook
+# checks its documented file/path rules; no licence scanner is installed.
 ```
 
 First-run evidence route after install:
@@ -407,7 +428,7 @@ Deterministic conformance also validates the metadata contract for generated age
 skills, and instructions. Standard and assured projects can emit the current
 AI tool-surface inventory to `configs/naos_ai_surface_catalogue.yaml`; see
 [docs/FRONTMATTER_CONFORMANCE.md](docs/FRONTMATTER_CONFORMANCE.md) for the
-required `model`, `tools`, `parameters`, and `applyTo` fields.
+required identity, agent and instruction fields, plus optional namespaced skill inputs.
 
 Generated projects also include a **task-capability matrix** in `CLAUDE.md` and
 `.github/copilot-instructions.md`. Use it after choosing a repo-level profile:
@@ -597,13 +618,17 @@ See [MAINTENANCE_PLAYBOOK.md](MAINTENANCE_PLAYBOOK.md) for the 6 maintenance cad
 
 ## CI Integration
 
-GitHub Actions example:
+Opt-in GitHub Actions example. Keep scheduling disabled until separately approved;
+manual dispatch is available after the workflow itself is approved. The optional
+weekly schedule is filtered to the first Monday in UTC:
 
 ```yaml
 # .github/workflows/naos-gov.yml
 on:
-  schedule:
-    - cron: "0 9 1-7 * 1"    # 1st Monday of each month
+  workflow_dispatch:
+  # Uncomment only after schedule approval:
+  # schedule:
+  #   - cron: "0 9 * * 1"    # Mondays at 09:00 UTC; filtered below
   push:
     paths: ["naos/TASK_REGISTRY.yaml"]
 
@@ -611,9 +636,18 @@ jobs:
   gov-refresh:
     runs-on: ubuntu-latest
     steps:
+      - name: Select first Monday or event run
+        id: cadence
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "$(date -u +%d)" -le 7 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.cadence.outputs.run == 'true'
       - run: pip install -r requirements.txt
+        if: steps.cadence.outputs.run == 'true'
       - run: make -f Makefile.naos gov-full
+        if: steps.cadence.outputs.run == 'true'
 ```
 
 See [MAINTENANCE_PLAYBOOK.md](MAINTENANCE_PLAYBOOK.md) for GitLab CI and generic shell examples.
@@ -658,7 +692,7 @@ naos-governance init . --tier standard --archetype custom --backend static_only 
 # Additional steps for teams:
 # 1. Fill in .github/project-context.md with your stack info
 # 2. Review naos/TASK_REGISTRY.yaml conventions with the team
-# 3. Set up branch protection requiring pre-commit on all PRs
+# 3. Require the reviewed CI checks in branch protection; local pre-commit is bypassable
 # 4. Schedule monthly gov-refresh: make -f Makefile.naos gov-refresh
 ```
 

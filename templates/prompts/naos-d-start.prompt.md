@@ -82,7 +82,7 @@ If `mem_context` or `mem_search` is unavailable, record degraded recovery and us
 3. ✅ **Rule 3**: PM status in ONE place (`naos/PROJECT_STATUS.md`)
 4. ✅ **Rule 4**: Verify impact on ALL documentation
 5. ✅ **Rule 7**: If adding dependencies, follow dependency checklist
-6. ✅ **Rule 8**: Inventory & Regeneration Loop completed → `make -f Makefile.naos gov-refresh`
+6. ✅ **Governance refresh**: Inventory & Regeneration Loop completed → `make -f Makefile.naos gov-refresh`
 7. ✅ **Rule 10**: Record source licence evidence/approval; no scanner is installed
 
 **Governance Refresh Command**:
@@ -149,11 +149,11 @@ After this session bootstrap is complete, choose the active task and run the tas
 
 ```yaml
 next_action:
-	label: "Begin or resume the active task with a focused story-card check."
-	preferred_command: "/naos-task-start <TASK_ID>"
-	preferred_agent: "@naos-plan"
-	reason: "Context was requested; next is task-scoped planning."
-	constraints:
-		- "Use the task ID from naos/TASK_REGISTRY.yaml."
-		- "Do not start implementation until the active card and scope are clear."
+  label: "Begin or resume the active task with a focused story-card check."
+  preferred_command: "/naos-task-start <TASK_ID>"
+  preferred_agent: "@naos-plan"
+  reason: "Context was requested; next is task-scoped planning."
+  constraints:
+    - "Use the task ID from naos/TASK_REGISTRY.yaml."
+    - "Do not start implementation until the active card and scope are clear."
 ```

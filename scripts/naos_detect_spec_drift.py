@@ -58,7 +58,7 @@ EXCLUDE_PATTERNS = ["__pycache__", ".pyc", "migrations", "alembic"]
 
 # Shared helpers (single source of truth across cascade scripts)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from source_roots import resolve_source_roots  # noqa: E402
+from source_roots import resolve_source_roots, source_exclusion_reason  # noqa: E402
 
 
 SRC_DIRS = resolve_source_roots(PROJECT_ROOT, os.getenv("SRC_ROOT"), absolute=True)
@@ -86,6 +86,11 @@ _AC_SCEN_TOKEN_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Explicit declaration parsers retain legacy case-insensitive normalization.
+# Inference from arbitrary source text requires standalone canonical prefixes.
+_FREE_FR_TOKEN_RE = re.compile(r"(?<![\w.-])(?:FR|NFR)-[A-Z0-9][\w-]*(?![\w.-])")
+_FREE_AC_SCEN_TOKEN_RE = re.compile(r"(?<![\w.-])(?:AC|SCEN)-[A-Z0-9][A-Z0-9_.-]*(?![\w.-])")
+
 DEFAULT_OVERLOAD_THRESHOLD = 20
 
 
@@ -108,6 +113,7 @@ class DriftReport:
     frs_in_spec: int = 0
     frs_in_source: int = 0
     ac_scen_in_spec: int = 0
+    source_selection: dict[str, Any] = field(default_factory=dict)
 
     @property
     def total_issues(self) -> int:
@@ -271,7 +277,7 @@ def scan_source_files() -> dict[str, list[str]]:
         for py_file in sorted(root.rglob("*.py")):
             if py_file.name == "__init__.py":
                 continue
-            if any(pat in str(py_file) for pat in EXCLUDE_PATTERNS):
+            if source_exclusion_reason(py_file, PROJECT_ROOT, EXCLUDE_PATTERNS):
                 continue
             try:
                 source = py_file.read_text(encoding="utf-8", errors="replace")
@@ -305,14 +311,14 @@ def scan_untraced_sources() -> list[str]:
         for py_file in sorted(root.rglob("*.py")):
             if py_file.name == "__init__.py":
                 continue
-            if any(pat in str(py_file) for pat in EXCLUDE_PATTERNS):
+            if source_exclusion_reason(py_file, PROJECT_ROOT, EXCLUDE_PATTERNS):
                 continue
             try:
                 source = py_file.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
             header_area = _get_header_area(source)
-            if not _IMPLEMENTS_RE.search(header_area) and not spec_header.FR_TOKEN_RE.search(
+            if not _IMPLEMENTS_RE.search(header_area) and not _FREE_FR_TOKEN_RE.search(
                 header_area
             ):
                 untraced.append(str(py_file.relative_to(PROJECT_ROOT)))
@@ -328,7 +334,7 @@ def iter_project_source_files() -> list[Path]:
         for py_file in sorted(root.rglob("*.py")):
             if py_file.name == "__init__.py":
                 continue
-            if any(pat in str(py_file) for pat in EXCLUDE_PATTERNS):
+            if source_exclusion_reason(py_file, PROJECT_ROOT, EXCLUDE_PATTERNS):
                 continue
             files.append(py_file)
     return files
@@ -359,7 +365,7 @@ def scan_unresolved_source_references(
         for line_number, line in enumerate(lines, start=1):
             is_implements_line = _IMPLEMENTS_RE.search(line) is not None
             if check_frs and not is_implements_line:
-                for token in _FR_TOKEN_RE.findall(line):
+                for token in _FREE_FR_TOKEN_RE.findall(line):
                     reference_id = token.upper()
                     if "XXX" in reference_id:
                         continue
@@ -377,7 +383,7 @@ def scan_unresolved_source_references(
                             }
                         )
             if check_ac_scen:
-                for token in _AC_SCEN_TOKEN_RE.findall(line):
+                for token in _FREE_AC_SCEN_TOKEN_RE.findall(line):
                     reference_id = token.upper()
                     if "XXX" in reference_id:
                         continue
@@ -417,15 +423,32 @@ def detect_drift(overload_threshold: int = DEFAULT_OVERLOAD_THRESHOLD) -> DriftR
     report.frs_in_source = len(fr_files)
     report.ac_scen_in_spec = len(defined_ac_scen)
 
-    file_count = 0
-    for root in [*SRC_DIRS, *SCRIPT_SCAN_DIRS]:
-        if root.exists():
-            for py in root.rglob("*.py"):
-                if py.name != "__init__.py" and not any(
-                    p in str(py) for p in EXCLUDE_PATTERNS
-                ):
-                    file_count += 1
-    report.files_scanned = file_count
+    candidates = sorted({py for root in [*SRC_DIRS, *SCRIPT_SCAN_DIRS] if root.exists() for py in root.rglob("*.py")})
+    excluded: dict[str, int] = defaultdict(int)
+    selected = 0
+    for path in candidates:
+        reason = "initializer" if path.name == "__init__.py" else source_exclusion_reason(path, PROJECT_ROOT, EXCLUDE_PATTERNS)
+        if reason:
+            excluded[reason] += 1
+        else:
+            selected += 1
+    unassessed = sorted({
+        path.relative_to(PROJECT_ROOT).as_posix()
+        for root in SRC_DIRS if root.exists()
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix != ".py"
+        and not source_exclusion_reason(path, PROJECT_ROOT, EXCLUDE_PATTERNS)
+    })
+    report.files_scanned = selected  # Legacy field counts selection, not proven content reads.
+    report.source_selection = {
+        "assessment_scope": "configured_python_sources_and_governance_scripts",
+        "candidate_files": len(candidates), "excluded_files": sum(excluded.values()),
+        "eligible_files": selected, "exclusion_reasons": dict(sorted(excluded.items())),
+        "content_read_completeness_verified": False,
+        "supported_source_suffixes": [".py"],
+        "unassessed_non_python_files": unassessed,
+        "language_coverage": "partial" if unassessed else "python_scope_only",
+    }
 
     # --- Detection 4 (RF-C6): Uncovered requirements (spec → no code) ---
     # The reverse of orphan detection: an FR defined in the spec with no
@@ -515,6 +538,9 @@ LIMITATIONS = [
     "Detection is regex/file-first and depends on project-maintained Implements:/FR references.",
     "The report detects structural traceability gaps; it does not execute code or verify behavior.",
     "Untraced source detection is limited to configured Python source roots.",
+    "Non-Python files in configured application roots are listed as unassessed, not parsed or proven untraced.",
+    "Uncovered requirements are advisory/unresolved when non-Python files remain unassessed; Python defects keep profile severity.",
+    "Free-text ID inference requires standalone uppercase FR/NFR/AC/SCEN prefixes; explicit declaration parsing retains legacy normalization.",
     "Source-level free-text reference validation is limited to configured app source roots; scripts/ Implements: header handling remains separate.",
     "AC/SCEN source-reference validation is skipped when no AC/SCEN ids are defined under specs/.",
     "Generated reports are bounded review evidence and do not replace maintainer/adopter judgment.",
@@ -605,15 +631,16 @@ def structured_findings(report: DriftReport, severity: str) -> list[dict[str, An
                 ],
             )
         )
+    partial = bool(report.source_selection.get("unassessed_non_python_files"))
     for fr_id in report.uncovered_requirements:
         findings.append(
             make_finding(
                 finding_id=f"spec_cascade.uncovered_requirement.{fr_id}",
-                severity=severity,
+                severity="advisory" if partial else severity,
                 status="uncovered_requirement",
                 category="spec_to_code_gap",
                 requirement_id=fr_id,
-                message=f"{fr_id} is defined in specs/03-requirements.md but has no matching Implements: header in source.",
+                message=f"{fr_id} has no matching Implements: header in assessed Python source." + (" Non-Python implementation coverage remains unresolved." if partial else ""),
                 required_next_actions=[
                     "Add implementation evidence with an Implements: header or mark the requirement as deferred with review context.",
                     "Run validate_specs.py and the spec cascade check after remediation.",
@@ -672,6 +699,25 @@ def build_report(
 ) -> dict[str, Any]:
     severity = severity_for_profile(profile, policy)
     findings = structured_findings(drift, severity)
+    if drift.source_selection and drift.files_scanned == 0:
+        findings.append(make_finding(
+            finding_id="spec_cascade.no_eligible_source", severity="advisory",
+            status="not_evaluated", category="source_selection",
+            message="No eligible Python source assessed; spec/task findings remain applicable.",
+            required_next_actions=["Review configured source roots and exclusions before interpreting source traceability."],
+        ))
+    unassessed = drift.source_selection.get("unassessed_non_python_files", [])
+    if unassessed:
+        findings.append(make_finding(
+            finding_id="spec_cascade.partial_language_coverage", severity="advisory",
+            status="not_evaluated", category="source_selection",
+            message="Non-Python files in configured application roots remain unassessed; source coverage is partial.",
+            files=unassessed,
+            required_next_actions=["Review traceability in the unassessed files; this Python scan cannot establish whole-project coverage."],
+        ))
+        for item in findings:
+            if item["status"] == "uncovered_requirement" or item["id"] == "spec_cascade.partial_language_coverage":
+                item["requirement_outcome"] = "unresolved"
     summary = finding_counts(findings)
     summary.update(
         {
@@ -703,6 +749,7 @@ def build_report(
         "deterministic": True,
         "overload_threshold": overload_threshold,
         "summary": summary,
+        "source_selection": drift.source_selection,
         "findings": findings,
         "orphan_headers": drift.orphan_headers,
         "overloaded_frs": drift.overloaded_frs,
@@ -721,13 +768,22 @@ def build_report(
 # ---------------------------------------------------------------------------
 
 
-def format_text_report(report: DriftReport) -> str:
+def format_text_report(report: DriftReport, severity: str | None = None) -> str:
     """Format report as human-readable text."""
+    label = severity or "profile-dependent severity"
+    partial = bool(report.source_selection.get("unassessed_non_python_files"))
+    uncovered_label = "advisory; partial coverage" if partial else label
     lines: list[str] = []
     lines.append("=" * 72)
     lines.append("  SPEC-CODE DRIFT DETECTION REPORT")
     lines.append("=" * 72)
-    lines.append(f"  Files scanned:       {report.files_scanned}")
+    lines.append(f"  Files selected:      {report.files_scanned}")
+    if report.source_selection and report.files_scanned == 0:
+        lines.append("  No eligible Python source assessed; spec/task checks remain applicable.")
+    if partial:
+        lines.append("  Partial source coverage: non-Python files remain unassessed.")
+        for path in report.source_selection["unassessed_non_python_files"]:
+            lines.append(f"    - {path}")
     lines.append(f"  FRs in spec:         {report.frs_in_spec}")
     lines.append(f"  FRs in source:       {report.frs_in_source}")
     lines.append(f"  AC/SCEN in spec:     {report.ac_scen_in_spec}")
@@ -784,9 +840,9 @@ def format_text_report(report: DriftReport) -> str:
     lines.append("")
 
     lines.append(
-        f"[4] UNCOVERED REQUIREMENTS ({len(report.uncovered_requirements)} found, advisory)"
+        f"[4] UNCOVERED REQUIREMENTS ({len(report.uncovered_requirements)} found, {uncovered_label})"
     )
-    lines.append("    FR/NFR defined in specs/03-requirements.md but NOT implemented in code")
+    lines.append("    FR/NFR defined in specs/03-requirements.md with no matching Python Implements: header observed")
     lines.append("-" * 72)
     if report.uncovered_requirements:
         for fr_id in report.uncovered_requirements:
@@ -796,7 +852,7 @@ def format_text_report(report: DriftReport) -> str:
     lines.append("")
 
     lines.append(
-        f"[5] UNTRACED SOURCE ({len(report.untraced_sources)} found, advisory)"
+        f"[5] UNTRACED SOURCE ({len(report.untraced_sources)} found, {label})"
     )
     lines.append("    Source files with no Implements:/FR reference (invisible to traceability)")
     lines.append("-" * 72)
@@ -810,7 +866,7 @@ def format_text_report(report: DriftReport) -> str:
     lines.append("")
 
     lines.append(
-        f"[6] UNRESOLVED SOURCE REFERENCES ({len(report.unresolved_source_references)} found, advisory)"
+        f"[6] UNRESOLVED SOURCE REFERENCES ({len(report.unresolved_source_references)} found, {label})"
     )
     lines.append("    FR/NFR/AC/SCEN ids in source text that are not defined in specs")
     lines.append("-" * 72)
@@ -828,8 +884,12 @@ def format_text_report(report: DriftReport) -> str:
     lines.append("")
 
     lines.append("=" * 72)
-    if report.total_issues == 0:
-        lines.append("  ✅ No spec-code drift detected")
+    if report.source_selection and report.files_scanned == 0:
+        lines.append("  Source traceability not evaluated; review source selection and any spec/task findings above.")
+    elif partial:
+        lines.append("  Partial Python-only assessment; unresolved cross-language coverage requires review.")
+    elif report.total_issues == 0:
+        lines.append("  No spec-code drift detected within selected Python scope; complete traceability is not proven.")
     else:
         lines.append(f"  ⚠️  {report.total_issues} issue(s) require attention")
     lines.append("=" * 72)
@@ -848,6 +908,9 @@ def format_json_report(report: dict[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from naos_console import configure_console_output
+
+    configure_console_output()
     parser = argparse.ArgumentParser(
         description=(
             "Detect spec-cascade drift: orphan headers, uncovered requirements, unresolved source references, untraced source, overloads, and stale statuses"
@@ -913,7 +976,7 @@ Examples:
     if args.json:
         print(format_json_report(report))
     else:
-        print(format_text_report(drift))
+        print(format_text_report(drift, severity_for_profile(profile, policy)))
 
     return exit_code_for_summary(profile, report["summary"], policy, args.strict)
 

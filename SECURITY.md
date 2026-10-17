@@ -8,11 +8,14 @@ This file covers the **NAOS-Governance kit itself** (`mfraile/naos-governance`).
 
 | Version | Status | Security fixes |
 | --- | --- | --- |
-| 1.1.0 | Publication candidate; not yet released | Pre-publication fixes only |
+| 1.1.0 | Published 2026-09-16 | Coordinated disclosure under this policy; no fixed support window stated |
 | 1.0.0 | Historical private candidate | Not publicly supported |
 | < 1.0 | Pre-release | Not supported |
 
-No public support period begins until an owner-authorized publication action completes. Any future support window must be stated in the published release record rather than inferred from this candidate.
+The 1.1.0 public release includes a sanitized export archive, its export manifest,
+and SHA-256 checksums. Publication does not set an indefinite security-fix window;
+reports are handled through the coordinated disclosure process below. Later local
+source changes are not part of that published release unless separately released.
 
 ## Reporting a vulnerability
 
@@ -40,7 +43,7 @@ These are *limitations*, not vulnerabilities. They are intentional design choice
 - `git commit --no-verify` bypasses the pre-commit hook. This is git behaviour, not a NAOS defect. (Mitigation: adopter CI enforcement.)
 - `NAOS_TIER` can be set to `lite` to skip standard/assured checks. Adopter CI must enforce the policy-required tier.
 - `core.hooksPath` can be re-pointed. Outside NAOS scope.
-- The `NAOS_CONTEXT_REMAINING_PCT=100` override is documented in the hook itself (`pre-commit:236`) and in `docs/tutorials/MICRO_TUTORIAL_31_PAUL_RUNTIME_GUARD.md`.
+- The `NAOS_CONTEXT_REMAINING_PCT=100` override is documented in the hook itself (generated `.githooks/pre-commit`; kit source `templates/rules-chain/.githooks/pre-commit`) and in `docs/tutorials/MICRO_TUTORIAL_31_PAUL_RUNTIME_GUARD.md`.
 - Allowlist entries that the adopter has approved are not reportable as vulnerabilities. (Adopter review is the mitigation.)
 - The kit does not cryptographically sign its outputs. Adopters who need signed evidence must sign externally.
 

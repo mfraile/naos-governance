@@ -3,7 +3,7 @@
 #
 # Profile presets define depth levels for NAOS governance adoption.
 # They are REFERENCE documents — they do NOT modify live project files.
-# Extraction and packaging into a portable kit is handled by the NAOS CLI.
+# Included paths are generated targets; the kit validator checks their source origins.
 #
 # Four depth levels:
 #   governance-quickstart — scaffold/advisory only, try NAOS with minimal friction

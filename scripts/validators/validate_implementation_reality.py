@@ -9,6 +9,7 @@ This complements docs consistency checks, which verify coherence and links.
 
 from __future__ import annotations
 
+import ast
 import re
 import sys
 from pathlib import Path
@@ -133,10 +134,43 @@ def make_targets(root: Path) -> set[str]:
 
 
 def cli_commands(root: Path) -> set[str]:
+    """Static public dispatch union; never imports CLI code or runs commands.
+
+    Literal SCRIPT_COMMANDS entries count only when main actually dispatches
+    through that mapping. Options/help prose and unused dictionaries do not.
+    Every alias in a real dispatch mapping remains a public command.
+    """
     cli = root / "cli.py"
-    if not cli.exists():
+    if not cli.is_file():
         return set()
-    return set(re.findall(r'if command == "([A-Za-z0-9_-]+)"', read(cli)))
+    tree = ast.parse(read(cli), filename=str(cli))
+    main = next((node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "main"), None)
+    if main is None:
+        return set()
+    names: set[str] = set()
+    mapping_dispatch = False
+    for node in ast.walk(main):
+        if isinstance(node, ast.Compare) and isinstance(node.left, ast.Name) and node.left.id == "command":
+            if len(node.ops) == 1 and isinstance(node.ops[0], ast.Eq) and isinstance(node.comparators[0], ast.Constant):
+                value = node.comparators[0].value
+                if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_-]+", value):
+                    names.add(value)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "_run_script_command":
+            if len(node.args) == 2 and isinstance(node.args[0], ast.Name) and node.args[0].id == "command":
+                lookup = node.args[1]
+                mapping_dispatch |= (isinstance(lookup, ast.Subscript) and isinstance(lookup.value, ast.Name)
+                    and lookup.value.id == "SCRIPT_COMMANDS" and isinstance(lookup.slice, ast.Name) and lookup.slice.id == "command")
+    if mapping_dispatch:
+        declarations = [node.value for node in tree.body if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == "SCRIPT_COMMANDS" for target in node.targets)]
+        if len(declarations) != 1 or not isinstance(declarations[0], ast.Dict):
+            raise ValueError("SCRIPT_COMMANDS dispatch requires one literal dictionary")
+        value = ast.literal_eval(declarations[0])
+        if not isinstance(value, dict) or not all(isinstance(key, str) and re.fullmatch(r"[A-Za-z0-9_-]+", key)
+                and isinstance(target, str) for key, target in value.items()):
+            raise ValueError("SCRIPT_COMMANDS contains unsupported dispatch declarations")
+        names.update(value)
+    return names
 
 
 def template_exists(root: Path, filename: str) -> bool:
@@ -251,8 +285,10 @@ def check_implemented_documented(root: Path) -> list[str]:
     public_cli_docs = "\n".join(
         read(root / doc) for doc in DOC_FILES if (root / doc).exists()
     )
+    # Coverage is the union of DOC_FILES, including the generated quick-reference
+    # seed. Options are not commands; each public alias needs its own exact token.
     for command in sorted(cli_commands(root)):
-        if f"naos {command}" not in public_cli_docs:
+        if not re.search(r"(?<![\w-])naos\s+" + re.escape(command) + r"(?![\w-])", public_cli_docs):
             issues.append(
                 f"implemented CLI command 'naos {command}' is not documented in checked docs"
             )

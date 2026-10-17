@@ -32,8 +32,45 @@ make -f Makefile.naos naos-evidence-pack
 make -f Makefile.naos naos-dashboard
 ```
 
+The self-check command and its Make wrapper inspect live inputs without publishing project state. For persistent evidence collection, use `naos self-check --profile standard --refresh` or `make -f Makefile.naos naos-self-check SELF_CHECK_ARGS=--refresh`. `--output <path>` alone saves only the final inspection report.
+
 The reports are review evidence. They do not approve work, prove compliance,
 authorize deployment, or replace human review.
+
+Code-quality reports use repository-relative `/` paths on every OS. Write
+duplicate allowlist entries in that format; they are matched verbatim.
+Architecture ownership globs match those paths
+case-sensitively, and configuration files use UTF-8. Staged checks select files
+from Git and inspect their working-tree contents; they do not attest the exact
+bytes staged for commit.
+
+Project coherence checks selected file syntax, not tool semantics or complete
+project safety. YAML streams support multiple documents and the validator's
+finite safe CloudFormation short tags; arbitrary tags remain errors. JSON
+accepts a UTF-8 BOM. Comments and trailing commas are allowed only for `.jsonc`,
+`.code-workspace`, `tsconfig*.json`, VS Code `settings.json`/`launch.json`/`tasks.json`,
+and `devcontainer.json`/`.devcontainer.json`; other JSON stays strict. Selected
+YAML/JSON files beneath `templates/` of a contained ordinary chart with a valid
+`Chart.yaml` identity are reported as `NOT_VALIDATED` until rendered and checked
+with Helm; this does not skip template markers elsewhere. Symlink inputs are
+refused. Existing directory exclusions remain in force, and untracked files are
+included. The selected secret-pattern heuristic reuses the shared detector and
+never prints matched values; it is not a general secret scan or approval.
+
+AC/SCEN test-reference checks share the completion-evidence identifier grammar,
+including `AC-001-1` and legacy dotted IDs. Recognized test filename families
+cover Python, JS/TS (including JSX/TSX), Go, Java, C#, and Ruby; other names are
+outside this selected check. Spec implementation-reference and matrix scans
+select `.py`, `.js`, `.jsx`, `.ts`, `.tsx`, `.go`, `.java`, `.cs`, `.rb`, and `.php`
+from configured/inferred roots. They compare complete FR/NFR tokens, not
+substrings, and attest textual links rather than implementation correctness.
+The matrix scans the finite canonical Spec-Kit inventory (including
+`08-market-analysis.md`) and excludes copied-kit scripts
+only by the exact init marker in the first two lines under `scripts/` or
+`naos_tools/`. This lexical selection convention does not authenticate source;
+markers in project source or later prose do not exempt a file. Other source
+suffixes remain explicitly unassessed. `validate-all` passes its `NAOS_PROFILE`
+to spec validation; existing strict-quality profile rules still apply.
 
 Prompts and agents may act as a natural-language router over these commands:
 they can recommend the correct CLI/Make sequence for greenfield adoption,
@@ -99,6 +136,15 @@ python scripts/naos_parallel_lane_handoff.py --profile standard --handoff naos/l
 naos control-plane-review --profile standard
 ```
 
+Lane handoff path fields use repository-relative `/` separators on every OS,
+for example `src/service.py` on Windows as well as macOS and Linux. Matching is
+case-sensitive. Scope declarations accept directory prefixes and globs; changed
+files and evidence/noise lists name individual files. Leading `./` and trailing
+directory `/` remain accepted. Absolute or drive-relative paths, backslashes and
+internal `.`/`..` segments produce an explicit `invalid_path` finding, including
+when the path was declared generated evidence or noise. Backslashes are not
+silently rewritten because they can be literal filename characters on POSIX.
+
 This stays tool-neutral and file-first. It does not create branches or
 worktrees, dispatch agents, run tests, approve work, merge, release, call
 models/providers, activate MCP or memory, or prove compliance.
@@ -113,6 +159,12 @@ naos add setup-module agent_orchestration_plan --profile assured --dry-run
 naos add setup-module agent_orchestration_plan --profile assured --confirm
 naos agent-orchestration-plan --profile assured
 ```
+
+Both the policy and request must be enabled before client-source freshness can
+block a run. A disabled configuration reports `inactive` even when its client
+source dates have aged past the configured limit. Client fields, paths, date
+syntax and future dates are still validated; enabled use still rejects stale
+contracts. An inactive report does not verify or invoke a client runtime.
 
 The planner consumes the current implementation-ready planning projection,
 `TASK_REGISTRY.yaml` priorities/dependencies/parallel decisions, active claims,
@@ -215,3 +267,85 @@ Optional integrations must not:
 
 Deterministic repository evidence remains primary. Advisory findings may
 challenge deterministic evidence but do not replace it.
+
+
+## Generated project host routes
+
+Generated projects include a selected-profile root `AGENTS.md` router,
+`CLAUDE.md` with an explicit `@AGENTS.md` import and `GEMINI.md` with an explicit
+`@./AGENTS.md` import. Read the router to identify actual installed availability
+and manual fallbacks; Markdown references are instructions to read files, not
+claims that hosts expand all links. Existing instruction files remain subject to
+normal ownership/create-only activation controls: collisions cause whole-operation
+refusal and preserve adopter files. Review ownership and migration explicitly.
+
+Generated Claude, Copilot and Cursor core instructions keep the approval, scope,
+security, evidence and memory boundaries in their entry files. Detailed protocols
+are installed under `.github/naos-guidance/` and must be read for the documented
+implementation, completion, governance and other task triggers. They are explicit
+on-demand references, not unconditional imports. Claude imports still consume
+context. A smaller entry file alone does not prove a smaller assembled request.
+The profile-aware role index is `.github/NAOS_AGENTS.md`; placing an index under
+`.github/agents/` would expose it to native custom-agent discovery.
+
+Lite and higher retain their `.github` surfaces and generate distinctly named
+`naos-portable-*` skill adapters plus `naos-workflow-*` prompt adapters under
+`.agents/skills`. Claude receives manually invoked `.claude/commands` adapters
+that instruct the operator to read those portable files. No `.claude/skills`
+mirror or symlink is generated. Select one legacy or portable route; distinct
+adapter names avoid same-name skill collisions in hosts that scan both roots.
+Codex supports `$name`; Cursor and supported VS Code skill selectors use `/name`.
+Every shared adapter includes a Codex `agents/openai.yaml` with
+`policy.allow_implicit_invocation: false`; this contains no model/tool settings.
+An original skill support file at that same path causes generation refusal,
+rather than silently replacing its policy. Portable frontmatter contains only
+`name` and `description`; host controls stay in their own formats. Claude command
+wrappers set `disable-model-invocation: true`. The portable file alone cannot
+enforce invocation policy in other hosts; review that host's controls before use.
+Gemini skill discovery uses relevance and user consent; no arbitrary Gemini slash
+command is asserted. File reading is the fallback when invocation is unavailable.
+Quickstart remains research-only and does not advertise lifecycle automation.
+
+VS Code prompt files are supported by the Local harness. Use the installed workflow
+skills or explicit file-reading route for other harnesses; support is not a global
+prompt-file deprecation claim. These paths reflect vendor documentation inspected
+on 2026-10-16. Generation and static validation do not qualify installed host
+versions, discovery, invocation or adherence.
+See [Codex skills](https://learn.chatgpt.com/docs/build-skills),
+[Claude skills and commands](https://code.claude.com/docs/en/skills),
+[Claude imports](https://code.claude.com/docs/en/memory),
+[Cursor skills](https://cursor.com/docs/skills),
+[VS Code skills](https://code.visualstudio.com/docs/agent-customization/agent-skills),
+[VS Code prompts](https://code.visualstudio.com/docs/agent-customization/prompt-files),
+[Gemini instructions](https://geminicli.com/docs/cli/gemini-md/) and
+[Gemini skills](https://geminicli.com/docs/cli/skills/).
+
+No agent tool lists, model selection or host permissions are translated. Portable
+agent references are human-authorized manual role handoffs. Debug guidance is
+no-direct-edit diagnosis; implementation belongs to a separately authorized
+writer, with regression evidence and human review. Unavailable profile skills
+and agent files carry explicit manual fallbacks instead of assumed discovery.
+All generated adapter/support files participate in generated inventory, LF policy
+and source provenance. Brownfield script layout rewriting applies to their exact
+installed script references before activation.
+
+Portable workflow inputs are manual review inputs. Replace each explicit
+`MANUAL_INPUT` marker with a validated project value before using a command; the
+adapter does not claim that a host expands VS Code input syntax. Profile presets
+describe generated availability; their context-phase suggestions do not schedule
+work or invoke a runtime consumer.
+
+AI-surface reports retain character-based estimates, configured warning/block
+thresholds and explicit loading limits. On-demand guidance inventory is separate
+from modeled startup context; neither is an observed provider token count. Claude's
+under-200-line recommendation is advisory, and Codex's configurable instruction
+byte cap is a different measure. Preserve warnings rather than tuning thresholds
+merely to obtain a green report.
+
+Windows CLI project paths retain the ordinary absolute drive-path contract.
+Managed initialization uses native held reads for destination checks and a
+separate internal I/O address for its owned temporary preview. This avoids
+treating a deep existing file as absent because an ordinary Python path read
+failed. Public extended, device and UNC paths remain refused. This handling
+does not qualify deep paths in every generated script or installed AI host;
+see the bounded evidence in [platform support](PLATFORM_ADAPTERS.md).

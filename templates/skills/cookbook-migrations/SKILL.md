@@ -1,7 +1,8 @@
 ---
-name: "cookbook-migrations"
-description: "If-then recipes for database migrations. Invoke when creating tenant-owned tables with isolation policies, adding enum types, or testing migration idempotency. Works with Alembic, Flyway, Prisma Migrate, and Django Migrations."
-parameters: []
+name: cookbook-migrations
+description: If-then recipes for database migrations. Invoke when creating tenant-owned tables with isolation policies, adding enum types, or testing migration idempotency. Works with Alembic, Flyway, Prisma Migrate, and Django Migrations.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Cookbook: Database Migrations
@@ -78,4 +79,5 @@ flyway migrate && flyway undo && flyway migrate
 npx prisma migrate deploy && [ADAPT: prisma does not have rollback—restore from version control]
 
 # Run tests after
-[ADAPT: pytest -q tests/ | npm test | go test ./...]```
+[ADAPT: pytest -q tests/ | npm test | go test ./...]
+```

@@ -1,7 +1,8 @@
 ---
-name: "cookbook-configs"
-description: "If-then recipes for config YAML files. Invoke when adding config keys, editing primary config files, or reading config values in application code."
-parameters: []
+name: cookbook-configs
+description: If-then recipes for config YAML files. Invoke when adding config keys, editing primary config files, or reading config values in application code.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Cookbook: Configuration Files

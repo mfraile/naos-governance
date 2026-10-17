@@ -70,6 +70,18 @@
           "type": "array",
           "items": {"type": "string"}
         },
+        "evidence_requirements": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {"enum": ["report", "manual"]},
+              "optional": {"type": "boolean"},
+              "require_current_source": {"type": "boolean"}
+            }
+          }
+        },
         "freshness_window_days": {
           "type": "integer",
           "minimum": 0

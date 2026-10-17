@@ -90,6 +90,7 @@
             "required": ["algorithm", "value"],
             "properties": {
               "algorithm": {"const": "sha256"},
+              "canonicalization": {"enum": ["raw-bytes-v1", "crlf-to-lf-v1"]},
               "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
             }
           },

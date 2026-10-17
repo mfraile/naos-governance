@@ -31,6 +31,7 @@
     "generated_at": {"type": "string"},
     "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
     "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "classification_status": {"type": "string", "enum": ["complete", "inconclusive"]},
     "project_root": {"type": "string"},
     "naos_root": {"type": "string"},
     "rules_path": {"type": ["string", "null"]},
@@ -77,7 +78,7 @@
         "changed_files": {"type": "integer", "minimum": 0},
         "risk_files": {"type": "integer", "minimum": 0},
         "category_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
-        "risk_tier": {"type": "string", "enum": ["low", "medium", "high"]},
+        "risk_tier": {"type": "string", "enum": ["low", "medium", "high", "unknown"]},
         "risk_implied_profile": {"type": ["string", "null"]},
         "effective_profile": {"type": "string"}
       }

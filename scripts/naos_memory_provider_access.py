@@ -21,6 +21,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    normalize_boolean_settings,
     default_naos_root,
     exit_code_for_summary,
     finding_counts,
@@ -29,10 +30,11 @@ from naos_policy import (  # noqa: E402
     load_policy,
     normalize_profile,
     report_output_path,
-    severity_for_profile,
+    resolve_report_rule_severity,
     write_report,
 )
 from naos_mcp_config_registry import (  # noqa: E402
+    mcp_config_source_identity,
     resolve_engram_project,
     scan_mcp_configs,
     summarize_mcp_configs,
@@ -162,10 +164,31 @@ def dedupe_strings(values: list[Any]) -> list[str]:
     return list(dict.fromkeys(str(value) for value in values if str(value).strip()))
 
 
+# Consumed input toggles only; derived report booleans are not configuration.
+BOOLEAN_SETTING_PATHS = (
+    "enabled",
+    "provider_binary_check_allowed",
+    "provider_store_metadata_check_allowed",
+    "provider_data_dir_metadata_check_allowed",
+    "provider_database_metadata_check_allowed",
+    "user_mcp_config_metadata_check_allowed",
+    "managed_mcp_config_metadata_check_allowed",
+    "client_policy_mcp_config_metadata_check_allowed",
+    "mcp_config_presence_check_allowed",
+    "memory_payload_reads_allowed",
+    "memory_writes_allowed",
+    "cloud_memory_allowed",
+    "external_sync_allowed",
+    "live_provider_calls_allowed",
+    "live_mcp_calls_allowed",
+    "profile_posture.*.human_review_required_if_memory_configured",
+)
+
+
 def bool_value(value: Any, default: bool = False) -> bool:
     if value is None:
         return default
-    return bool(value)
+    return value if isinstance(value, bool) else False
 
 
 def profile_posture(rules: dict[str, Any], profile: str) -> dict[str, Any]:
@@ -182,15 +205,16 @@ def profile_posture(rules: dict[str, Any], profile: str) -> dict[str, Any]:
     return defaults.get(profile, defaults["quickstart"])
 
 
+def severity_for_rules_resolution(root: Path, naos_root: str, profile: str, policy: dict[str, Any], posture: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+    return resolve_report_rule_severity(
+        profile, policy, posture.get("severity"),
+        advisory=is_kit_repository(root, naos_root),
+        review_required=True,
+    )
+
+
 def severity_for_rules(root: Path, naos_root: str, profile: str, policy: dict[str, Any], posture: dict[str, Any]) -> str:
-    if is_kit_repository(root, naos_root):
-        return "advisory"
-    configured = str(posture.get("severity") or "").strip()
-    if configured == "review_required":
-        return "required" if profile == "standard" else "blocking" if profile == "assured" else "warning"
-    if configured in {"advisory", "warning", "required", "blocking"}:
-        return configured
-    return severity_for_profile(profile, policy)
+    return severity_for_rules_resolution(root, naos_root, profile, policy, posture)[0]
 
 
 def finding(identifier: str, severity: str, status: str, message: str, actions: list[str] | None = None, **extra: Any) -> dict[str, Any]:
@@ -222,18 +246,42 @@ def rel_or_abs(path: Path, root: Path) -> str:
         return str(path)
 
 
+def project_relative_path(path: Path, root: Path) -> Path | None:
+    """Resolve native containment using existing directory identity.
+
+    Path.resolve() resolves symlinks but can retain a case alias on a
+    case-insensitive filesystem. Match the resolved root against candidate
+    ancestors using samefile(), so case aliases are recognized only when the
+    actual filesystem establishes their identity. No case folding is applied.
+    """
+    try:
+        resolved_path = path.resolve()
+        resolved_root = root.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    for ancestor in (resolved_path, *resolved_path.parents):
+        try:
+            if ancestor.samefile(resolved_root):
+                return resolved_path.relative_to(ancestor)
+        except (OSError, RuntimeError, ValueError):
+            # Missing descendants are expected for metadata-only declarations;
+            # an existing root ancestor can still establish containment.
+            continue
+    return None
+
+
 def path_matches(path: Path, root: Path, patterns: list[str]) -> bool:
-    text = rel_or_abs(path, root).replace(os.sep, "/")
-    basename = path.name
+    # Exclusions govern project/index/payload scope, not external storage.
+    relative = project_relative_path(path, root)
+    if relative is None:
+        return False
+    text = relative.as_posix()
+    basename = relative.name
     return any(fnmatch.fnmatch(text, pattern) or fnmatch.fnmatch(basename, pattern) for pattern in patterns)
 
 
 def path_inside(path: Path, root: Path) -> bool:
-    try:
-        path.resolve().relative_to(root.resolve())
-        return True
-    except Exception:
-        return False
+    return project_relative_path(path, root) is not None
 
 
 def provider_binary_names(provider_name: str | None) -> list[str]:
@@ -284,6 +332,10 @@ def inspect_provider_storage(root: Path, memory_config: dict[str, Any], rules: d
         raw_effective_data_dir = "~/.engram"
         data_dir_source = "default"
     try:
+        # Windows named-user expansion can guess a sibling directory without
+        # resolving an account. Require an explicit path instead of that guess.
+        if os.name == "nt" and raw_effective_data_dir.startswith("~") and len(raw_effective_data_dir) > 1 and raw_effective_data_dir[1] not in {"/", "\\"}:
+            raise RuntimeError("Named-user home expansion is unsupported on Windows")
         effective_data_dir = Path(raw_effective_data_dir).expanduser()
         path_expansion_status = "resolved"
     except RuntimeError:
@@ -327,7 +379,7 @@ def inspect_provider_storage(root: Path, memory_config: dict[str, Any], rules: d
         "data_dir_check_allowed": data_dir_check_allowed,
         "database_check_allowed": database_check_allowed,
         "declared_data_dir": declared_data_dir or None,
-        "effective_data_dir": str(effective_data_dir),
+        "effective_data_dir": str(effective_data_dir) if path_metadata_safe else raw_effective_data_dir,
         "data_dir_source": data_dir_source,
         "path_expansion_status": path_expansion_status,
         "data_dir_exists": data_dir_exists,
@@ -364,11 +416,16 @@ def inspect_mcp_configs(root: Path, rules: dict[str, Any]) -> dict[str, Any]:
     allowed_workspace = set(string_list(rules.get("allowed_config_locations")))
     include_user = bool_value(rules.get("user_mcp_config_metadata_check_allowed"), False)
     presence_allowed = bool_value(rules.get("mcp_config_presence_check_allowed"), True)
-    scanned = scan_mcp_configs(root, include_user=include_user) if presence_allowed else []
+    include_managed = bool_value(rules.get("managed_mcp_config_metadata_check_allowed"), False)
+    include_client_policy = bool_value(rules.get("client_policy_mcp_config_metadata_check_allowed"), False)
+    scanned = scan_mcp_configs(
+        root, include_user=include_user, include_managed=include_managed,
+        include_client_policy=include_client_policy,
+    ) if presence_allowed else []
     files = [
         row
         for row in scanned
-        if row.get("scope") == "user"
+        if row.get("scope") in {"user", "managed"}
         or not allowed_workspace
         or str(row.get("path")) in allowed_workspace
     ]
@@ -407,8 +464,12 @@ def inspect_mcp_configs(root: Path, rules: dict[str, Any]) -> dict[str, Any]:
         "scan_scope": {
             "workspace_registry_metadata": presence_allowed,
             "user_registry_metadata": presence_allowed and include_user,
+            "managed_registry_metadata": presence_allowed and include_managed,
+            "client_policy_metadata": presence_allowed and include_client_policy,
+            "managed_coverage": "file_declarations_only; no MDM, registry, remote settings or precedence",
             "values_reported": False,
             "descriptor_ids": [str(row.get("config_id")) for row in files],
+            "source_identity": mcp_config_source_identity(files),
         },
         "project_identity": project_identity,
         "mcp_access_verified": False,
@@ -438,7 +499,7 @@ def evaluate_platforms(
             continue
         row = dict(raw)
         platform_id = str(row.get("id") or "unknown_platform")
-        declared = bool(row.get("memory_access_declared"))
+        declared = bool_value(row.get("memory_access_declared"))
         read_access = str(row.get("read_access") or "none")
         write_access = str(row.get("write_access") or "none")
         admin_access = str(row.get("admin_access") or "none")
@@ -480,7 +541,7 @@ def evaluate_platforms(
                     platform_id=platform_id,
                 )
             )
-        if (write_access in WRITE_LEVELS or admin_access in WRITE_LEVELS) and not bool(row.get("human_review_required_for_write")):
+        if (write_access in WRITE_LEVELS or admin_access in WRITE_LEVELS) and not bool_value(row.get("human_review_required_for_write")):
             findings.append(
                 finding(
                     f"{platform_id}_write_review_boundary",
@@ -547,7 +608,7 @@ def evaluate_surfaces(matrix: dict[str, Any], severity: str) -> tuple[dict[str, 
                     ["Use none, read_only, draft_write, approved_write, or admin_config."],
                 )
             )
-        if write_access in WRITE_LEVELS and not bool(row.get("human_review_required_for_write")):
+        if write_access in WRITE_LEVELS and not bool_value(row.get("human_review_required_for_write")):
             findings.append(
                 finding(
                     f"{row.get('id', 'surface')}_write_review_boundary",
@@ -652,12 +713,15 @@ def build_findings(
                 ["Keep private Engram data and the derived database outside source control and generated context artifacts."],
             )
         )
-    if any(item.get("exists") for item in provider_store.get("excluded_db_metadata") or []):
+    storage_inside_project = bool(provider_store.get("inside_project") or provider_store.get("database_inside_project"))
+    if (provider_configured or storage_inside_project) and any(
+        item.get("exists") for item in provider_store.get("excluded_db_metadata") or []
+    ):
         findings.append(
             finding(
                 "engram_db_detected_metadata_only",
-                severity,
-                "review_required",
+                severity if storage_inside_project else "advisory",
+                "review_required" if storage_inside_project else "observed",
                 "A local memory database path was detected as metadata only; it must not be read, indexed, or committed.",
                 ["Keep database files excluded and do not use them as context-index or evidence inputs."],
             )
@@ -783,13 +847,23 @@ def build_findings(
             )
         )
     for config_file in mcp.get("files") or []:
+        if config_file.get("status") in {
+            "symlink_refused", "workspace_boundary_refused", "managed_boundary_refused", "metadata_error",
+            "size_limit_exceeded", "read_error", "parse_error",
+        }:
+            findings.append(finding(
+                "mcp_config_metadata_unavailable", severity, "review_required",
+                "Selected MCP configuration metadata could not be inspected safely or has an unsupported shape.",
+                ["Review the selected local configuration without treating unavailable inventory as absence."],
+                path=config_file.get("path"),
+            ))
         if config_file.get("secret_like_keys"):
             findings.append(
                 finding(
                     "mcp_config_secret_like_keys",
                     severity,
                     "review_required",
-                    "An MCP config declares secret-like environment key names; values were not exposed.",
+                    "An MCP config declares secret-like configuration key names or bounded credential-shaped fields; values were not exposed.",
                     ["Keep secrets out of committed config and use platform secret storage where needed."],
                     path=config_file.get("path"),
                 )
@@ -815,6 +889,7 @@ def report_status(
             "provider_replication_profile_unsafe",
             "provider_store_prohibited_location",
             "global_fixed_memory_project_detected",
+            "boolean_setting_invalid",
         }
         for item in findings
     ):
@@ -859,15 +934,19 @@ def build_report(
     matrix_path: Path,
     matrix_source: str,
 ) -> dict[str, Any]:
+    rules, invalid_booleans = normalize_boolean_settings(rules, BOOLEAN_SETTING_PATHS)
+    matrix, matrix_invalid = normalize_boolean_settings(matrix, ("platforms.*.memory_access_declared", "platforms.*.human_review_required_for_write", "surfaces.*.human_review_required_for_write"), prefix="matrix")
+    invalid_booleans.extend(matrix_invalid)
     posture = profile_posture(rules, profile)
-    severity = severity_for_rules(root, naos_root, profile, policy, posture)
-    memory_config = load_memory_config(root)
+    severity, severity_downgrade = severity_for_rules_resolution(root, naos_root, profile, policy, posture)
+    memory_config, config_invalid = normalize_boolean_settings(load_memory_config(root), ("enabled",), prefix="memory")
+    invalid_booleans.extend(config_invalid)
     declared_provider = memory_config.get("provider")
     provider_declared = isinstance(declared_provider, str) and bool(declared_provider.strip())
     provider_name = declared_provider.strip() if provider_declared else RECOMMENDED_PROVIDER
     provider_recommended = provider_name.casefold() == RECOMMENDED_PROVIDER
     provider_name_source = "configuration" if provider_declared else "recommended_default"
-    provider_configured = bool(memory_config.get("enabled")) and str(memory_config.get("state") or "") == "configured"
+    provider_configured = bool_value(memory_config.get("enabled")) and str(memory_config.get("state") or "") == "configured"
     provider_binary = inspect_provider_binary(provider_name, bool_value(rules.get("provider_binary_check_allowed"), True))
     provider_store = inspect_provider_store(root, memory_config, rules)
     mcp = inspect_mcp_configs(root, rules)
@@ -889,6 +968,10 @@ def build_report(
         memory_config=memory_config,
         severity=severity,
     )
+    if severity_downgrade and bool_value(rules.get("enabled"), True):
+        findings.append(severity_downgrade)
+    if invalid_booleans:
+        findings.append(finding("boolean_setting_invalid", severity, "review_required", "Expected YAML booleans; invalid values evaluated as false: " + ", ".join(invalid_booleans)))
     findings.extend(platform_findings)
     findings.extend(surface_findings)
     status = report_status(
@@ -927,7 +1010,7 @@ def build_report(
             "platforms_with_declared_memory": sum(1 for row in platform_rows if row.get("memory_access_declared")),
             "ci_memory_access": access_summary["ci"].get("read_access", "none"),
             "human_review_required": any(item.get("status") in {"review_required", "configured_unverified", "blocked"} for item in findings)
-            or bool(posture.get("human_review_required_if_memory_configured") and provider_configured),
+            or bool_value(posture.get("human_review_required_if_memory_configured")) and provider_configured,
         }
     )
     return {

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:function_index_health:v1",
+  "title": "NAOS Function Index Health Report",
+  "description": "Inventory presence and age evidence; this does not establish semantic completeness or source freshness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "generated_at", "profile", "project_root", "naos_root", "status", "index", "semantic_quality_snapshot", "summary", "findings", "limitations"],
+  "properties": {
+    "schema": {"const": "naos.function_index_health.v1"},
+    "generated_at": {"$ref": "#/$defs/timestamp"},
+    "profile": {"$ref": "#/$defs/profile"},
+    "project_root": {"type": "string", "minLength": 1},
+    "naos_root": {"type": "string", "minLength": 1},
+    "status": {"$ref": "#/$defs/status"},
+    "index": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "exists", "entry_count", "age_days", "older_than_source"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "exists": {"type": "boolean"},
+        "entry_count": {"type": ["integer", "null"], "minimum": 0},
+        "age_days": {"type": ["number", "null"]},
+        "older_than_source": {"type": "boolean"},
+        "freshness_basis": {"const": "file_mtime"},
+        "source_freshness": {"const": "not_established"}
+      }
+    },
+    "semantic_quality_snapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["present", "not_configured"]},
+        "errors": {"type": ["integer", "null"], "minimum": 0},
+        "warnings": {"type": ["integer", "null"], "minimum": 0}
+      },
+      "if": {"properties": {"status": {"const": "present"}}},
+      "then": {"required": ["errors", "warnings"]}
+    },
+    "summary": {"$ref": "#/$defs/summary"},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "timestamp": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+    "status": {"enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["blocking", "required", "warnings", "advisory", "total_findings"],
+      "properties": {
+        "blocking": {"type": "integer", "minimum": 0},
+        "required": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "advisory": {"type": "integer", "minimum": 0},
+        "total_findings": {"type": "integer", "minimum": 0}
+      }
+    },
+    "finding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "severity", "status", "message"],
+      "properties": {
+        "id": {"type": "string"},
+        "severity": {"enum": ["advisory", "warning", "required", "blocking"]},
+        "status": {"enum": ["missing_index", "empty_index", "stale_index", "semantic_quality_errors"]},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}

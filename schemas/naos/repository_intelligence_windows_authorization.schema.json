@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/repository_intelligence_windows_authorization.schema.json",
+  "type": "object",
+  "required": [
+    "schema",
+    "profile",
+    "naos_root",
+    "profile_gate",
+    "reviewer",
+    "effective_source_sha256",
+    "rules_sha256",
+    "manifest_sha256",
+    "generation_content_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "naos.repository_intelligence.windows_authorization.v1"
+    },
+    "profile": {
+      "enum": [
+        "quickstart",
+        "lite",
+        "standard",
+        "assured"
+      ]
+    },
+    "naos_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile_gate": {
+      "type": "object"
+    },
+    "reviewer": {
+      "type": "object",
+      "required": [
+        "reviewer_id",
+        "required",
+        "identity_status",
+        "authentication_status"
+      ],
+      "properties": {
+        "reviewer_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "identity_status": {
+          "enum": [
+            "declared_attribution",
+            "not_required"
+          ]
+        },
+        "authentication_status": {
+          "const": "not_claimed"
+        }
+      },
+      "additionalProperties": false
+    },
+    "effective_source_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rules_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "generation_content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

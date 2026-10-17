@@ -9,6 +9,9 @@ import copy
 import hashlib
 import json
 import os
+import shutil
+import stat
+import time
 from pathlib import Path
 import subprocess
 import sys
@@ -144,6 +147,10 @@ class AttestationContracts(unittest.TestCase):
                 self.assertEqual(report.get("artifacts_checked"), 0)
                 self.assertEqual(report.get("digest_validation"), "not_applicable")
                 self.assertNotEqual(report.get("status"), "pass")
+                if scope == "disabled":
+                    self.assertEqual(report["envelope_payload_validation"], "not_applicable")
+                    self.assertFalse(report["tamper_evident"])
+                    self.assertFalse(report["signature_entries_present"])
                 self.assert_consumers(report)
 
     def test_required_missing_coverage_is_distinct_from_empty_root(self):
@@ -156,10 +163,19 @@ class AttestationContracts(unittest.TestCase):
 
     def test_signature_presence_never_means_validation(self):
         self.producer()
-        self.write("naos/evidence/evidence_envelope.json", {"envelope": {"signatures": [{"sig": "synthetic"}]}})
+        _, envelope = self.run_cli("evidence-sign", expected=0)
+        envelope["envelope"]["signatures"] = [{"sig": "synthetic"}]
+        self.write("naos/evidence/evidence_envelope.json", envelope)
         _, report = self.run_cli("evidence-verify", expected=0)
+        self.assertEqual(report["envelope_payload_validation"], "valid")
         self.assertTrue(report["signature_entries_present"])
         self.assertFalse(report["signature_validation_performed"])
+        self.write("naos/evidence/evidence_envelope.json", {"envelope": {"signatures": [{"sig": "synthetic"}]}})
+        _, report = self.run_cli("evidence-verify", expected=1)
+        self.assertEqual(report["envelope_payload_validation"], "invalid")
+        self.assertTrue(report["signature_entries_present"])
+        self.assertFalse(report["signature_validation_performed"])
+        self.assertFalse(report["tamper_evident"])
         self.write("naos/evidence/evidence_envelope.json", [])
         _, report = self.run_cli("evidence-verify", expected=1)
         self.assertFalse(report["signature_entries_present"])
@@ -245,6 +261,47 @@ class AttestationContracts(unittest.TestCase):
             self.assertTrue(any(i.get("status") == "output_is_subject" for i in report["findings"]))
             self.assertEqual(subject.read_bytes(), before)
 
+    def test_epoch_kit_generates_fresh_configuration(self):
+        # Model deterministic tar extraction without changing the input kit.
+        epoch_kit = self.root / "epoch-kit"
+
+        def copy_epoch(source, destination):
+            copied = shutil.copy2(source, destination)
+            os.utime(copied, ns=(0, 0))
+            return copied
+
+        shutil.copytree(KIT, epoch_kit, copy_function=copy_epoch,
+                        ignore=shutil.ignore_patterns(".git", "__pycache__", ".venv", "venv",
+                                                     "build", "dist", "*.egg-info", ".ruff_cache"))
+        paths = {
+            "naos/evidence_attestation_rules.yaml": "templates/structural-seeds/naos/evidence_attestation_rules.yaml",
+            "naos/secure_coding_control_register.yaml": "configs/secure_coding_control_register.yaml",
+        }
+        for profile in ("quickstart", "lite", "standard", "assured"):
+            with self.subTest(profile=profile):
+                preview = self.root / f"epoch-preview-{profile}"
+                started = time.time()
+                result = subprocess.run([sys.executable, "-B", str(epoch_kit / "cli.py"), "init",
+                    str(self.root / f"absent-{profile}"), "--new", "--tier", profile,
+                    "--archetype", "custom", "--backend", "static_only", "--preview-dir", str(preview)],
+                    cwd=self.root, text=True, capture_output=True, timeout=120)
+                self.assertEqual(result.returncode, 0, result.stdout[-2000:] + result.stderr)
+                finished = time.time()
+                for relative, source_relative in paths.items():
+                    source = epoch_kit / source_relative
+                    self.assertEqual(source.stat().st_mtime_ns, 0)
+                    destination = preview / relative
+                    if profile == "quickstart" and "secure_coding" in relative:
+                        self.assertFalse(destination.exists())
+                        continue
+                    self.assertEqual(destination.read_bytes(), source.read_bytes())
+                    self.assertEqual(stat.S_IMODE(destination.stat().st_mode), stat.S_IMODE(source.stat().st_mode))
+                    # Two seconds tolerates coarse filesystem timestamp resolution.
+                    self.assertGreaterEqual(destination.stat().st_mtime, started - 2)
+                    self.assertLessEqual(destination.stat().st_mtime, finished + 2)
+                # Copies outside the two seed families retain their source metadata.
+                self.assertEqual((preview / "naos/profile_generated_surface_contract.json").stat().st_mtime_ns, 0)
+
     def test_generated_profile_defaults_repeat(self):
         fixture_parent = self.root
         entry = (["-m", "naos_governance.cli"] if os.environ.get("NAOS_TEST_INSTALLED") == "1"
@@ -277,6 +334,20 @@ class AttestationContracts(unittest.TestCase):
                 _, report = self.run_cli("evidence-verify")
                 self.assertFalse(report["tamper_evident"])
                 self.assertEqual(report["digest_validation"], "invalid")
+                # Fresh generation must never exempt genuinely old adopter inputs.
+                stale_paths = ("naos/evidence_attestation_rules.yaml", "naos/reports/claims_validation.json")
+                old = time.time() - 91 * 24 * 60 * 60
+                old_state = {}
+                for relative in stale_paths:
+                    target = preview / relative
+                    os.utime(target, (old, old))
+                    old_state[relative] = (target.read_bytes(), target.stat().st_mtime_ns)
+                code, stale = self.run_cli("evidence-attestation")
+                self.assertEqual(code, 0 if profile == "quickstart" else 1)
+                self.assertTrue(set(stale_paths).issubset({item["path"] for item in stale["stale_artifacts"]}))
+                for relative, state in old_state.items():
+                    target = preview / relative
+                    self.assertEqual((target.read_bytes(), target.stat().st_mtime_ns), state)
         self.root = fixture_parent
 
 

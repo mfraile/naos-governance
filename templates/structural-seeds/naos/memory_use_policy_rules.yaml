@@ -58,6 +58,8 @@ allowed_memory_states:
   - supporting_context_memory
   - instruction_grade_memory
 
+# Restrict the canonical approved/approved_with_limits vocabulary; do not add aliases.
+# Missing or [] retains the canonical default; malformed values are refused.
 approved_review_statuses:
   - approved
   - approved_with_limits
@@ -235,6 +237,8 @@ ci_memory_access_policy:
   memory_write_allowed: false
   mcp_access_allowed: false
 
+# Assured report severity cannot fall below the selected policy severity.
+# Kit reports stay advisory; lower profiles retain their configured posture.
 profile_posture:
   quickstart:
     state: disabled

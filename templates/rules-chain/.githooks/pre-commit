@@ -10,7 +10,7 @@ set -euo pipefail
 #
 # BEHAVIOR SUMMARY (section labels are not a one-to-one governance-rule count):
 #  CORE — quickstart, lite, standard, and assured:
-#   - Best-effort TASK_REGISTRY synchronization when its source is staged.
+#   - Reminder to review derived files when TASK_REGISTRY is staged; no auto-staging.
 #   - Hard failures for defined archive, backup, session-summary, and temp/draft
 #     filename patterns.
 #   - Warnings for new-doc indexing and, only when a message-file argument is
@@ -37,12 +37,26 @@ set -euo pipefail
 NAOS_ROOT="${NAOS_ROOT:-naos}"
 NAOS_TIER="${NAOS_TIER:-lite}"   # quickstart | lite | standard | assured
 
-# [ADAPT: Update PYTHON_CMD for your environment]
-# Examples:
-#   PYTHON_CMD="python"                                          # system python
-#   PYTHON_CMD="conda run -n myenv python"                      # conda env
-#   PYTHON_CMD="source .venv/bin/activate && python"            # venv
-#   PYTHON_CMD="/home/user/.venv/bin/python"                    # absolute path
+# NAOS_PYTHON is one executable path, never a shell command string. A wrapper
+# script may be selected explicitly if environment setup is required.
+# Git for Windows ships the Bash used by this hook. On that host, require the
+# operator-selected native interpreter instead of guessing a different Python.
+case "${OS:-}:${MSYSTEM:-}:$(uname -s 2>/dev/null || true)" in
+  Windows_NT:*|*:MINGW*:*|*:MSYS*:*|*:UCRT*:*|*:CLANG*:*|*:MINGW*|*:MSYS*|*:CYGWIN*)
+    if [ -z "${NAOS_PYTHON:-}" ]; then
+      echo "[pre-commit] NAOS_PYTHON must name the selected native Python executable under Git for Windows" >&2
+      exit 1
+    fi
+    case "$NAOS_PYTHON" in
+      /*|[A-Za-z]:/*) ;;
+      *) echo "[pre-commit] NAOS_PYTHON must be an absolute executable path" >&2; exit 1 ;;
+    esac
+    if [ ! -f "$NAOS_PYTHON" ] || [ ! -x "$NAOS_PYTHON" ]; then
+      echo "[pre-commit] Selected NAOS_PYTHON executable is unavailable" >&2
+      exit 1
+    fi
+    ;;
+esac
 PYTHON_CMD="${NAOS_PYTHON:-python}"
 
 # Colors
@@ -58,16 +72,21 @@ VIOLATIONS=0
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
 
 # ============================================================================
-# 0. AUTO-SYNC: If TASK_REGISTRY.yaml modified, sync derived files
+# 0. Registry changes: preserve the index and all adopter edits
 # ============================================================================
-if echo "$STAGED_FILES" | grep -q "^${NAOS_ROOT}/TASK_REGISTRY\\.yaml\$"; then
-  echo -e "${CYAN}[pre-commit] TASK_REGISTRY.yaml modified — auto-syncing derived files...${NC}"
-  # [ADAPT: update script path if your sync script lives elsewhere]
-  $PYTHON_CMD "${NAOS_ROOT}/workflows/scripts/sync_from_registry.py" 2>/dev/null || true
-  # [ADAPT: update these paths to match your auto-generated files]
-  git add "${NAOS_ROOT}/BACKLOG.md" "${NAOS_ROOT}/DASHBOARD.md" "${NAOS_ROOT}/PROJECT_STATUS.md" 2>/dev/null || true
-  echo -e "   ${YELLOW}[WARN]${NC} Best-effort sync attempted — review and stage derived files"
-  STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+# A commit hook must not regenerate working files or stage unrelated edits.
+# Query the literal registry path so remapped roots, spaces and non-ASCII names
+# do not depend on Git's quoted name-only output or regular-expression syntax.
+if git --literal-pathspecs diff --cached --quiet -- "${NAOS_ROOT}/TASK_REGISTRY.yaml"; then
+  :
+else
+  REGISTRY_DIFF_STATUS=$?
+  if [ "$REGISTRY_DIFF_STATUS" -ne 1 ]; then
+    echo "[pre-commit] Cannot inspect staged TASK_REGISTRY changes" >&2
+    exit "$REGISTRY_DIFF_STATUS"
+  fi
+  echo "[pre-commit] TASK_REGISTRY is staged: review and stage intended derived-file changes explicitly."
+  echo "[pre-commit] Registry sync is a separate operation; this hook does not regenerate or stage derived files."
 fi
 
 # ============================================================================
@@ -76,8 +95,8 @@ fi
 echo "[pre-commit] Running project validators..."
 # [ADAPT: Add your project-specific validators here]
 # Examples:
-#   $PYTHON_CMD scripts/validate_spec_consistency.py
-#   $PYTHON_CMD scripts/naos_validate_truth.py
+#   "$PYTHON_CMD" scripts/validate_spec_consistency.py
+#   "$PYTHON_CMD" scripts/naos_validate_truth.py
 #
 # Remove this echo line once you've added real validators below:
 echo "   (no project validators configured — add to section 1 of pre-commit)"
@@ -87,29 +106,46 @@ echo "   (no project validators configured — add to section 1 of pre-commit)"
 # ============================================================================
 echo "[pre-commit] AI governance checks (CORE)"
 
-# Check 2: No archive/ folders
-echo "  - Checking for archive folders..."
-if echo "$STAGED_FILES" | grep -iE '(^|/)archive/' >/dev/null 2>&1; then
-  echo -e "${RED}[FAIL]${NC} Archive folders forbidden (.ai/RULES.md Rule 2)"
-  echo "$STAGED_FILES" | grep -iE '(^|/)archive/' | sed 's/^/    /'
-  echo "  Fix: Delete with 'git rm' instead of moving to archive/"
-  VIOLATIONS=$((VIOLATIONS + 1))
-fi
-
-# Check 3: No backup files
-echo "  - Checking for backup files..."
-if echo "$STAGED_FILES" | grep -E '\.(bak|backup)$|_backup\.' >/dev/null 2>&1; then
-  echo -e "${RED}[FAIL]${NC} Backup files forbidden"
-  echo "$STAGED_FILES" | grep -E '\.(bak|backup)$|_backup\.' | sed 's/^/    /'
-  echo "  Fix: Delete backup files, rely on git history"
-  VIOLATIONS=$((VIOLATIONS + 1))
+# Checks 2-3: Defined history locations and explicit backup extensions.
+# Domain code such as src/archive/domain.py and db_backup.py is not a copy
+# merely because of its name. Rule 2 still requires review of obsolete copies.
+# NUL records preserve literal staged paths, including spaces and non-ASCII.
+echo "  - Checking archive history locations and backup extensions..."
+STAGED_SCAN_COMPLETE=0
+while IFS= read -r -d '' STAGED_PATH; do
+  if [ -z "$STAGED_PATH" ]; then
+    STAGED_SCAN_COMPLETE=1
+    break
+  fi
+  case "$STAGED_PATH" in
+    [Aa][Rr][Cc][Hh][Ii][Vv][Ee]/*|[Dd][Oo][Cc][Ss]/[Aa][Rr][Cc][Hh][Ii][Vv][Ee]/*|"${NAOS_ROOT%/}"/[Aa][Rr][Cc][Hh][Ii][Vv][Ee]/*)
+      echo -e "${RED}[FAIL]${NC} Archive folders forbidden in history locations (.ai/RULES.md Rule 2)"
+      printf '    %q\n' "$STAGED_PATH"
+      echo "  Fix: Remove obsolete copies through normal Git review"
+      VIOLATIONS=$((VIOLATIONS + 1))
+      ;;
+  esac
+  case "$STAGED_PATH" in
+    *.[Bb][Aa][Kk]|*.[Bb][Aa][Cc][Kk][Uu][Pp])
+      echo -e "${RED}[FAIL]${NC} Backup files forbidden (.bak/.backup extensions)"
+      printf '    %q\n' "$STAGED_PATH"
+      echo "  Fix: Remove backup copies, rely on Git history"
+      VIOLATIONS=$((VIOLATIONS + 1))
+      ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACMR -z && printf '\0')
+if [ "$STAGED_SCAN_COMPLETE" -ne 1 ]; then
+  echo "[pre-commit] Cannot completely inspect staged history/backup paths" >&2
+  exit 1
 fi
 
 # Check 4: No session summary files
 echo "  - Checking for session summary files..."
-if echo "$STAGED_FILES" | grep -iE '(session_|session_notes_|session-summary)' >/dev/null 2>&1; then
-  echo -e "${RED}[FAIL]${NC} Session summaries forbidden (.ai/RULES.md Rule 3)"
-  echo "$STAGED_FILES" | grep -iE '(session_|session_notes_|session-summary)' | sed 's/^/    /'
+# Match summary documents, not Python session modules or lifecycle configuration.
+SESSION_SUMMARY_PATTERN='(^|/)(session[-_]summary[^/]*|session_notes_[^/]*)\.md$'
+if echo "$STAGED_FILES" | grep -iE "$SESSION_SUMMARY_PATTERN" >/dev/null 2>&1; then
+  echo -e "${RED}[FAIL]${NC} Session summaries forbidden (.ai/RULES.md Rule 1)"
+  echo "$STAGED_FILES" | grep -iE "$SESSION_SUMMARY_PATTERN" | sed 's/^/    /'
   echo "  Fix: Update ${NAOS_ROOT}/PROJECT_STATUS.md 'Update History' instead"
   VIOLATIONS=$((VIOLATIONS + 1))
 fi
@@ -161,8 +197,11 @@ if [ "$NAOS_TIER" = "standard" ] || [ "$NAOS_TIER" = "assured" ]; then
   if command -v ruff >/dev/null 2>&1; then
     PY_STAGED=$(echo "$STAGED_FILES" | grep '\.py$' || true)
     if [ -n "$PY_STAGED" ]; then
-      if ! echo "$PY_STAGED" | xargs ruff check --quiet 2>/dev/null; then
-        echo -e "${YELLOW}[WARN]${NC} Ruff lint issues found (enforcement: soft — fix before merge)"
+      if echo "$PY_STAGED" | xargs ruff check --quiet; then
+        :
+      else
+        CHECK_STATUS=$?
+        echo -e "${YELLOW}[WARN]${NC} Ruff check did not succeed (exit $CHECK_STATUS); review diagnostics above (enforcement: soft)"
         echo "  Run: ruff check <files>"
       fi
     fi
@@ -175,13 +214,19 @@ if [ "$NAOS_TIER" = "standard" ] || [ "$NAOS_TIER" = "assured" ]; then
   echo "  - Anti-duplication gate (duplicate hygiene)..."
   PY_STAGED=$(echo "$STAGED_FILES" | grep '\.py$' || true)
   if [ -n "$PY_STAGED" ] && [ -f scripts/naos_duplicate_function_hygiene.py ]; then
-    if ! $PYTHON_CMD scripts/naos_duplicate_function_hygiene.py --profile "$NAOS_TIER" --naos-root "$NAOS_ROOT" --json >/tmp/naos_duplicate_function_hygiene_precommit.json 2>/dev/null; then
-      echo -e "${YELLOW}[WARN]${NC} Duplicate-function hygiene findings detected (enforcement: soft — review before merge)"
+    if "$PYTHON_CMD" scripts/naos_duplicate_function_hygiene.py --profile "$NAOS_TIER" --naos-root "$NAOS_ROOT" --json; then
+      :
+    else
+      CHECK_STATUS=$?
+      echo -e "${YELLOW}[WARN]${NC} Duplicate-function hygiene validator did not succeed (exit $CHECK_STATUS); review diagnostics above (enforcement: soft)"
       echo "  Run: make -f Makefile.naos naos-duplicate-function-hygiene"
     fi
   elif [ -n "$PY_STAGED" ] && [ -f scripts/naos_code_quality_audit.py ]; then
-    if ! $PYTHON_CMD scripts/naos_code_quality_audit.py --check-duplicates --staged-only >/tmp/naos_duplicate_function_hygiene_precommit.json 2>/dev/null; then
-      echo -e "${YELLOW}[WARN]${NC} Potential duplicate functions detected (enforcement: soft — review before merge)"
+    if "$PYTHON_CMD" scripts/naos_code_quality_audit.py --check-duplicates --staged-only; then
+      :
+    else
+      CHECK_STATUS=$?
+      echo -e "${YELLOW}[WARN]${NC} Duplicate-function audit did not succeed (exit $CHECK_STATUS); review diagnostics above (enforcement: soft)"
       echo "  Run: python scripts/naos_code_quality_audit.py --check-duplicates --staged-only"
     fi
   else
@@ -212,12 +257,15 @@ if [ "$NAOS_TIER" = "standard" ] || [ "$NAOS_TIER" = "assured" ]; then
   echo "  - Task registry schema + dependency/parallelism validation..."
   if echo "$STAGED_FILES" | grep -q "TASK_REGISTRY\\.yaml\$"; then
     # [ADAPT: update script path]
-    if ! $PYTHON_CMD scripts/naos_validate_task_registry.py; then
+    if "$PYTHON_CMD" scripts/naos_validate_task_registry.py; then
+      :
+    else
+      CHECK_STATUS=$?
       if [ "$NAOS_TIER" = "assured" ]; then
-        echo -e "${RED}[FAIL]${NC} TASK_REGISTRY.yaml validation failed — check schema, dependencies, and parallelizable metadata"
+        echo -e "${RED}[FAIL]${NC} Task-registry validator did not succeed (exit $CHECK_STATUS); review diagnostics above"
         VIOLATIONS=$((VIOLATIONS + 1))
       else
-        echo -e "${YELLOW}[WARN]${NC} TASK_REGISTRY.yaml validation failed — check schema, dependencies, and parallelizable metadata"
+        echo -e "${YELLOW}[WARN]${NC} Task-registry validator did not succeed (exit $CHECK_STATUS); review diagnostics above"
       fi
     fi
   fi
@@ -244,8 +292,11 @@ if [ "$NAOS_TIER" = "standard" ] || [ "$NAOS_TIER" = "assured" ]; then
   # enforcement_level: hard (Standard and Assured)
   # Reads test and spec blobs from the same index snapshot; spec edits recheck tests.
   echo "  - Test-AC reference validator..."
-  if ! $PYTHON_CMD scripts/validators/validate_test_ac_references.py --staged; then
-    echo -e "${RED}[FAIL]${NC} Test-AC validation failed or its validator is unavailable"
+  if "$PYTHON_CMD" scripts/validators/validate_test_ac_references.py --staged; then
+    :
+  else
+    CHECK_STATUS=$?
+    echo -e "${RED}[FAIL]${NC} Test-AC validator did not succeed (exit $CHECK_STATUS); review diagnostics above"
     echo "  Run: python scripts/validators/validate_test_ac_references.py"
     VIOLATIONS=$((VIOLATIONS + 1))
   fi
@@ -262,8 +313,11 @@ if [ "$NAOS_TIER" = "assured" ]; then
   # enforcement_level: hard
   echo "  - Architecture boundary gate..."
   if [ -f "configs/naos_architecture_boundaries.yaml" ]; then
-    if ! $PYTHON_CMD scripts/validators/validate_architecture_coherence.py 2>/dev/null; then
-      echo -e "${RED}[FAIL]${NC} Architecture boundary violations detected"
+    if "$PYTHON_CMD" scripts/validators/validate_architecture_coherence.py; then
+      :
+    else
+      CHECK_STATUS=$?
+      echo -e "${RED}[FAIL]${NC} Architecture validator did not succeed (exit $CHECK_STATUS); review diagnostics above"
       echo "  Run: python scripts/validators/validate_architecture_coherence.py"
       VIOLATIONS=$((VIOLATIONS + 1))
     fi
@@ -276,8 +330,11 @@ if [ "$NAOS_TIER" = "assured" ]; then
   echo "  - Mermaid diagram lint..."
   MD_STAGED=$(echo "$STAGED_FILES" | grep '\.md$' || true)
   if [ -n "$MD_STAGED" ]; then
-    if ! $PYTHON_CMD scripts/validators/lint_mermaid_diagrams.py . 2>/dev/null; then
-      echo -e "${RED}[FAIL]${NC} Repository Mermaid scan failed (triggered because Markdown is staged)"
+    if "$PYTHON_CMD" scripts/validators/lint_mermaid_diagrams.py .; then
+      :
+    else
+      CHECK_STATUS=$?
+      echo -e "${RED}[FAIL]${NC} Mermaid validator did not succeed (exit $CHECK_STATUS); review diagnostics above"
       echo "  Run: python scripts/validators/lint_mermaid_diagrams.py"
       VIOLATIONS=$((VIOLATIONS + 1))
     fi
@@ -287,8 +344,11 @@ if [ "$NAOS_TIER" = "assured" ]; then
   # enforcement_level: hard
   echo "  - Metrics coherence check..."
   if echo "$STAGED_FILES" | grep -qE '(DASHBOARD|PROJECT_STATUS|03-requirements)'; then
-    if ! $PYTHON_CMD scripts/validators/validate_metrics_coherence.py 2>/dev/null; then
-      echo -e "${RED}[FAIL]${NC} Metrics coherence violation — DASHBOARD.md may be out of sync"
+    if "$PYTHON_CMD" scripts/validators/validate_metrics_coherence.py; then
+      :
+    else
+      CHECK_STATUS=$?
+      echo -e "${RED}[FAIL]${NC} Metrics validator did not succeed (exit $CHECK_STATUS); review diagnostics above"
       echo "  Run: python scripts/validators/validate_metrics_coherence.py"
       VIOLATIONS=$((VIOLATIONS + 1))
     fi
@@ -299,8 +359,11 @@ if [ "$NAOS_TIER" = "assured" ]; then
   echo "  - Task coherence check..."
   TASK_FILES=$(echo "$STAGED_FILES" | grep -E '(TASK_REGISTRY|DASHBOARD|BACKLOG|PROJECT_STATUS)' || true)
   if [ -n "$TASK_FILES" ]; then
-    if ! $PYTHON_CMD scripts/validators/validate_task_coherence.py 2>/dev/null; then
-      echo -e "${RED}[FAIL]${NC} Task coherence violation — governance files out of sync with TASK_REGISTRY"
+    if "$PYTHON_CMD" scripts/validators/validate_task_coherence.py; then
+      :
+    else
+      CHECK_STATUS=$?
+      echo -e "${RED}[FAIL]${NC} Task-coherence validator did not succeed (exit $CHECK_STATUS); review diagnostics above"
       echo "  Run: python scripts/validators/validate_task_coherence.py"
       VIOLATIONS=$((VIOLATIONS + 1))
     fi
@@ -312,7 +375,7 @@ fi
 # ============================================================================
 if [ "$VIOLATIONS" -gt 0 ]; then
   echo ""
-  echo -e "${RED}❌ Commit BLOCKED: $VIOLATIONS violation(s) found${NC}"
+  echo -e "${RED}❌ Commit BLOCKED: $VIOLATIONS failed check(s)${NC}"
   echo "   Fix the issues above and try again."
   echo "   See: .ai/RULES.md for governance rules"
   exit 1

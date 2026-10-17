@@ -87,7 +87,7 @@ maturity_path:
   L2: "Task context packs reference specs, function index, module headers, tests, gates, evidence, and dashboard signals where configured."
   L3: "Missing, stale, conflicting, or bloated context is routed through human review and control-plane items."
   L4: "Task context packs support cross-tool handoff while remaining derived from authoritative repository evidence."
-  L5: "Context-pack generation participates in governed context learning without becoming an editable source of truth."
+  L5: "Context-pack generation participates in governed context learning while remaining a derived aid; never a source of truth."
 known_limitations:
   - "The pack summarizes local artifacts and may miss project-specific intent not recorded in task cards or specs."
   - "Markdown output is derived for readability and can become stale if not regenerated."

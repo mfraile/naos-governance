@@ -46,18 +46,18 @@ modes:
     family: factual
     name: "API/library fabrication"
     coverage: gap
-    control_refs: []
+    control_refs: ["control:api_symbol_reality"]
     evidence_refs: []
-    known_gaps: []
+    known_gaps: ["api_symbol_reality_is_a_bounded_review_signal_not_failure_prevention"]
     residual_risks: []
     human_review_required: false
   - mode_id: F2
     family: factual
     name: "Package fabrication"
     coverage: gap
-    control_refs: []
+    control_refs: ["control:package_reality"]
     evidence_refs: []
-    known_gaps: []
+    known_gaps: ["package_reality_is_a_bounded_review_signal_not_failure_prevention"]
     residual_risks: []
     human_review_required: false
   - mode_id: F3
@@ -82,9 +82,9 @@ modes:
     family: structural
     name: "Silent duplication"
     coverage: gap
-    control_refs: []
+    control_refs: ["control:duplicate_function_hygiene"]
     evidence_refs: []
-    known_gaps: []
+    known_gaps: ["duplicate_function_hygiene_is_a_bounded_review_signal_not_failure_prevention"]
     residual_risks: []
     human_review_required: false
   - mode_id: S2
@@ -136,18 +136,18 @@ modes:
     family: behavioral
     name: "Coverage theater"
     coverage: gap
-    control_refs: []
+    control_refs: ["control:test_quality_hygiene"]
     evidence_refs: []
-    known_gaps: []
+    known_gaps: ["test_quality_hygiene_is_a_bounded_review_signal_not_failure_prevention"]
     residual_risks: []
     human_review_required: false
   - mode_id: B4
     family: behavioral
     name: "Assertion hallucination"
     coverage: gap
-    control_refs: []
+    control_refs: ["control:test_quality_hygiene"]
     evidence_refs: []
-    known_gaps: []
+    known_gaps: ["test_quality_hygiene_is_a_bounded_review_signal_not_failure_prevention"]
     residual_risks: []
     human_review_required: false
   - mode_id: D1

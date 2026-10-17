@@ -26,7 +26,7 @@ Pre-commit hook failed with this error:
 - **Pattern Leak**: [ADAPT: your domain-specific patterns to guard against]
 
 **Fix Strategy**:
-- If broken link: Update link or create missing file
+- If broken link: Update the link to the correct existing file; report genuinely missing content for separately approved scope
 - If missing header: Add proper FR/NFR + Task ID
 - If unauthorized file: Move content to authorized location
 - If orphan spec: Add link in README.md

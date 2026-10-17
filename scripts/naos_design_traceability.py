@@ -13,11 +13,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
+import stat
 import sys
 from collections import Counter
-from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]
@@ -27,6 +26,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    controlled_utc_now_text,
     build_generated_by,
     default_naos_root,
     exit_code_for_summary,
@@ -89,6 +89,7 @@ LIMITATIONS = [
     "Design traceability reports evaluate local declarations and local path references only.",
     "Optional design-tool references are treated as references, not proof of design state or sync.",
     "The report does not inspect Figma, MCP, html.to.design, browsers, screenshots, runtime UI, providers, models, memory tools, APIs, or networks.",
+    "Evidence reference validation establishes local artifact availability and content digests only; changed-file status, test outcomes, and semantic relationships are not verified.",
     "Path existence and evidence presence do not prove design quality, accessibility, privacy, brand correctness, implementation correctness, or user-experience quality.",
     "Assured-profile blocking is not enabled by this implementation; findings remain review evidence unless a later validated maturity control changes posture.",
 ]
@@ -129,10 +130,7 @@ RESIDUAL_RISKS = [
 
 
 def utc_now_text() -> str:
-    fixed = os.environ.get("NAOS_FIXED_TIME")
-    if fixed:
-        return fixed
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return controlled_utc_now_text()
 
 
 def as_mapping(value: Any) -> dict[str, Any]:
@@ -281,6 +279,76 @@ def normalize_design_refs(value: Any) -> list[dict[str, Any]]:
     return refs
 
 
+def evidence_file_status(root: Path, value: Any) -> tuple[str, str | None]:
+    """Observe a portable local artifact, without interpreting its contents."""
+    if not isinstance(value, str) or not value.strip() or is_adapt_placeholder(value):
+        return "missing_or_placeholder", None
+    text = value.strip()
+    parts = PurePosixPath(text).parts
+    if (not parts or "\\" in text or ":" in text or text.startswith("/")
+            or PureWindowsPath(text).drive or ".." in parts
+            or any(ord(char) < 32 or ord(char) == 127 for char in text)):
+        return "unsafe_path", None
+    try:
+        target = root.resolve(strict=True)
+        for part in parts:
+            target = target / part
+            info = target.lstat()
+            if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+                return "unsafe_path", None
+        if not target.resolve(strict=True).is_relative_to(root.resolve(strict=True)):
+            return "unsafe_path", None
+        if not stat.S_ISREG(info.st_mode):
+            return "not_regular_file", None
+        digest = hashlib.sha256()
+        size = 0
+        with target.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                size += len(chunk)
+                digest.update(chunk)
+        if not size:
+            return "empty_file", None
+    except FileNotFoundError:
+        return "missing", None
+    except (OSError, RuntimeError, ValueError):
+        return "unreadable", None
+    return "available", digest.hexdigest()
+
+
+def normalize_evidence_refs(root: Path, value: Any) -> tuple[list[str], list[dict[str, Any]]]:
+    """Keep reference context distinct from its available local artifact.
+
+    A string selects a local artifact. A mapping pairs descriptive reference
+    context (including commands, URLs or deleted paths) with evidence_ref.
+    Neither form proves a change, a test outcome or a semantic relationship.
+    """
+    refs: list[str] = []
+    results: list[dict[str, Any]] = []
+    items = value if isinstance(value, list) else ([] if value is None else [value])
+    for index, item in enumerate(items):
+        context = isinstance(item, dict)
+        ref = item.get("ref") if context else item
+        evidence_ref = item.get("evidence_ref") if context else item
+        valid_ref = isinstance(ref, str) and bool(ref.strip()) and not is_adapt_placeholder(ref)
+        reference = ref.strip() if isinstance(ref, str) else None
+        artifact = evidence_ref.strip() if isinstance(evidence_ref, str) else None
+        if not isinstance(value, list) or not valid_ref:
+            status, digest = "invalid_declaration", None
+        else:
+            status, digest = evidence_file_status(root, evidence_ref)
+        if reference:
+            refs.append(reference)
+        results.append({
+            "index": index, "reference": reference,
+            "reference_kind": "reference_context" if context else "local_artifact",
+            "evidence_ref": artifact, "availability": status,
+            "content_sha256": digest,
+            "claim_ceiling": "local_artifact_available" if status == "available" else "none",
+            "external_reference_verified": False,
+        })
+    return refs, results
+
+
 def normalize_object(raw: dict[str, Any], index: int, root: Path) -> dict[str, Any]:
     object_id = str(raw.get("object_id") or raw.get("id") or "").strip()
     object_type = str(raw.get("object_type") or raw.get("type") or "").strip()
@@ -290,6 +358,8 @@ def normalize_object(raw: dict[str, Any], index: int, root: Path) -> dict[str, A
     for item in string_list(raw.get("implementation_paths")):
         text, safe, exists = path_status(root, item)
         implementation_paths.append({"path": text, "safe": safe, "exists": exists})
+    changed_refs, changed_results = normalize_evidence_refs(root, raw.get("changed_file_refs"))
+    test_refs, test_results = normalize_evidence_refs(root, raw.get("test_evidence_refs"))
     return {
         "index": index,
         "object_id": object_id or None,
@@ -302,8 +372,10 @@ def normalize_object(raw: dict[str, Any], index: int, root: Path) -> dict[str, A
         "screen_spec_path_safe": screen_path_safe,
         "screen_spec_path_exists": screen_path_exists,
         "implementation_paths": implementation_paths,
-        "changed_file_refs": string_list(raw.get("changed_file_refs")),
-        "test_evidence_refs": string_list(raw.get("test_evidence_refs")),
+        "changed_file_refs": changed_refs,
+        "test_evidence_refs": test_refs,
+        "changed_file_evidence_results": changed_results,
+        "test_evidence_results": test_results,
         "optional_design_refs": normalize_design_refs(raw.get("optional_design_refs")),
         "design_ref_reviewed": bool_value(raw.get("design_ref_reviewed"), default=False),
         "human_review_required": bool_value(raw.get("human_review_required"), default=False),
@@ -412,27 +484,26 @@ def evaluate_object(raw: dict[str, Any], normalized: dict[str, Any], root: Path,
                 )
             )
 
-    if status in IMPLEMENTED_STATUSES and not normalized["changed_file_refs"]:
-        findings.append(
-            finding(
-                "design_traceability.changed_file_evidence_gap",
-                severity,
-                "changed_file_evidence_gap",
-                "Implemented or review-required object is missing changed_file_refs.",
+    for field, result_field, reason in (
+        ("changed_file_refs", "changed_file_evidence_results", "changed_file_evidence_gap"),
+        ("test_evidence_refs", "test_evidence_results", "test_evidence_gap"),
+    ):
+        results = normalized[result_field]
+        if status in IMPLEMENTED_STATUSES and not results:
+            findings.append(finding(
+                f"design_traceability.{reason}", severity, reason,
+                f"Implemented or review-required object is missing {field}.",
                 object_id=str(object_id),
-            )
-        )
-
-    if status in IMPLEMENTED_STATUSES and not normalized["test_evidence_refs"]:
-        findings.append(
-            finding(
-                "design_traceability.test_evidence_gap",
-                severity,
-                "test_evidence_gap",
-                "Implemented or review-required object is missing test_evidence_refs.",
-                object_id=str(object_id),
-            )
-        )
+            ))
+        for result in results:
+            if result["availability"] != "available":
+                findings.append(finding(
+                    f"design_traceability.{reason}.{result['index']}", severity, reason,
+                    f"Declared {field} reference lacks an available nonempty local supporting artifact.",
+                    object_id=str(object_id), field=field,
+                    reference=result["reference"], path=result["evidence_ref"],
+                    availability=result["availability"],
+                ))
 
     design_refs = normalized["optional_design_refs"]
     any_ref_unreviewed = any(not item.get("reviewed") for item in design_refs)
@@ -518,6 +589,7 @@ def build_report(
     policy: dict[str, Any],
     declaration_path: Path,
     declaration_source: str,
+    collect_provenance: bool = True,
 ) -> dict[str, Any]:
     generated_at = utc_now_text()
     declaration = load_yaml_mapping(declaration_path)
@@ -613,6 +685,14 @@ def build_report(
         "object_type_counts": dict(object_type_counts),
         "object_status_counts": dict(object_status_counts),
         "objects": objects,
+        "evidence_contract": {
+            "version": 1,
+            "claim_ceiling": "local_artifact_availability_review",
+            "changed_status_verified": False,
+            "test_outcome_verified": False,
+            "relationship_verified": False,
+            "external_reference_verified": False,
+        },
         "referenced_paths": referenced_paths,
         "findings": findings,
         "reason_code_counts": reason_code_counts(findings),
@@ -621,7 +701,7 @@ def build_report(
         "limitations": LIMITATIONS,
         "not_claimed": not_claimed,
         "human_review_required": human_review_required,
-        "generated_by": build_generated_by(root, generated_at=generated_at),
+        "generated_by": build_generated_by(root, generated_at=generated_at) if collect_provenance else {},
         "summary": summary,
     }
 

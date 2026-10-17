@@ -1,7 +1,8 @@
 ---
-name: "naos-forensic-review"
-description: "Use a forensic, evidence-first review style for NAOS-governed repositories from Codex without treating advisory findings as truth."
-parameters: []
+name: naos-forensic-review
+description: Use a forensic, evidence-first review style for NAOS-governed repositories from Codex without treating advisory findings as truth.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # NAOS Forensic Review

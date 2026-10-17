@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
+import hashlib
+from itertools import islice
+import stat
 import json
 import os
 import shutil
 import sys
 import tempfile
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 import yaml
@@ -27,11 +31,14 @@ from naos_policy import (  # noqa: E402
     is_kit_repository,
     kit_root,
     load_policy,
+    load_operand_yaml,
     normalize_profile,
     report_output_path,
     status_from_counts,
     write_report,
 )
+
+from naos_evidence_contracts import _safe_file  # noqa: E402
 
 _REPOSITORY_INTELLIGENCE_IMPORT_ERROR: ImportError | None = None
 try:  # Kit checkout or installed console surface.
@@ -171,62 +178,247 @@ def any_files(root: Path, patterns: list[str]) -> bool:
     return False
 
 
+# These names describe intent or posture that local file presence cannot prove.
+# They remain unresolved: there is no setup-recommendations intake CLI for them.
+RESERVED_PROJECT_SIGNALS = frozenset({
+    "active_task_tracking", "agent_orchestration_requested", "ai_assisted_sdlc",
+    "ambiguous_requirements", "brownfield_onboarding", "complex_debugging_expected",
+    "concurrent_naos_runs", "governed_agent_delegation_requested", "greenfield_setup",
+    "has_memory_context", "local_policy_variation", "many_cross_artifact_links",
+    "multi_operator", "multi_team_use", "multi_user_requested",
+    "operator_traceability_requested", "optional_tool_integration_requested",
+    "team_coordination_requested", "team_usage_expected", "uses_spec_kit",
+})
+PROFILE_PROJECT_SIGNALS = frozenset({"selected_profile", "regulated_posture_requested"})
+DETECTED_PROJECT_SIGNALS = frozenset({
+    "has_specs", "has_docs", "has_tests", "has_python", "has_source",
+    "has_ai_surfaces", "has_ci", "has_naos_state", "brownfield_like",
+    "greenfield_like", "uses_claude_code", "uses_codex", "uses_pull_requests",
+})
+PROJECT_SIGNAL_LIMITS = [
+    "Static signals mean plain local regular-file metadata presence, not readability, configuration validity, host loading, provider execution, adoption, or team intent.",
+    "Reserved/intake-only signals remain unresolved; this command provides no intake mechanism for them.",
+    "Unknown custom signals never match automatically. Profile defaults still apply independently of signal matching.",
+    "Metadata inventory excludes linked/reparse paths, multi-link files and common generated/dependency directories; traversal examines at most 10001 entries (10000 plus one overflow sentinel) and descends at most 16 directory levels. Refused/incomplete inventory cannot prove greenfield absence; observed positives remain. This is not a complete language or framework parser.",
+    "CI and pull-request signals require valid local workflow YAML; they do not prove remote CI execution or pull-request use.",
+]
+
+
+PROJECT_INVENTORY_ENTRY_LIMIT = 10000
+PROJECT_INVENTORY_DEPTH_LIMIT = 16
+
+
+def _project_inventory(root: Path) -> tuple[list[Path], list[str], dict[str, Any]]:
+    """Deterministic capped metadata walk; never read arbitrary file content.
+
+    A directory listing that exceeds the remaining budget is discarded, rather
+    than using a nondeterministic filesystem-order subset as positive evidence.
+    Static no-link checks do not claim safety against hostile concurrent changes.
+    """
+    files: list[Path] = []
+    refused: list[str] = []
+    excluded = {".git", ".venv", "venv", "node_modules", "vendor", "target", "build", "dist", "__pycache__"}
+    inventory = {"status": "refused", "complete": False, "root_valid": False,
+                 "entries_examined": 0, "entry_limit": PROJECT_INVENTORY_ENTRY_LIMIT,
+                 "depth_limit": PROJECT_INVENTORY_DEPTH_LIMIT, "excluded_directories": []}
+    try:
+        info = root.lstat()
+        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+            return [], ["project_root: unsafe or non-directory"], inventory
+        inventory["root_valid"] = True
+        pending = [(root, 0)]
+        while pending:
+            parent, depth = pending.pop()
+            if parent != root and _safe_file(root, parent) != "not_regular_file":
+                refused.append(parent.relative_to(root).as_posix() + ": unsafe_or_unreadable_directory")
+                continue
+            remaining = PROJECT_INVENTORY_ENTRY_LIMIT - inventory["entries_examined"]
+            try:
+                entries = []
+                with os.scandir(parent) as iterator:
+                    for entry in islice(iterator, remaining + 1):
+                        inventory["entries_examined"] += 1
+                        entries.append(entry)
+                if len(entries) > remaining:
+                    refused.append("inventory: entry_limit_exceeded")
+                    break
+            except OSError:
+                refused.append((parent.relative_to(root).as_posix() if parent != root else "project_root") + ": unreadable_directory")
+                continue
+            child_directories = []
+            for entry in sorted(entries, key=lambda item: item.name):
+                path = parent / entry.name
+                relative = path.relative_to(root).as_posix()
+                try:
+                    metadata = path.lstat()
+                    if stat.S_ISLNK(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & 0x400:
+                        refused.append(relative + ": unsafe_path")
+                    elif stat.S_ISDIR(metadata.st_mode):
+                        if entry.name in excluded:
+                            inventory["excluded_directories"].append(relative)
+                        elif depth >= PROJECT_INVENTORY_DEPTH_LIMIT:
+                            refused.append(relative + ": depth_limit_exceeded")
+                        else:
+                            child_directories.append((path, depth + 1))
+                    elif stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1 and _safe_file(root, path) == "available":
+                        files.append(path)
+                    else:
+                        refused.append(relative + ": unsafe_or_nonregular")
+                except (OSError, RuntimeError, ValueError):
+                    refused.append(relative + ": unreadable_metadata")
+            pending.extend(reversed(child_directories))
+    except (OSError, RuntimeError, ValueError):
+        refused.append("project_root: missing_or_unreadable_metadata")
+    inventory["complete"] = inventory["root_valid"] and not refused
+    inventory["status"] = "complete" if inventory["complete"] else "incomplete" if inventory["root_valid"] else "refused"
+    inventory["excluded_directories"].sort()
+    return sorted(files), sorted(set(refused)), inventory
+
+
+def _workflow_trigger(path: Path, root: Path) -> tuple[bool, bool, str | None]:
+    """Reuse strict operand YAML; YAML 1.1 resolves unquoted `on` to True."""
+    try:
+        if _safe_file(root, path) != "available":
+            raise ValueError("unsafe workflow operand")
+        before = path.lstat()
+        if before.st_nlink != 1:
+            raise ValueError("linked workflow operand")
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        with os.fdopen(os.open(path, flags), "rb") as handle:
+            opened = os.fstat(handle.fileno())
+            if (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns) != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns):
+                raise ValueError("workflow changed during inspection")
+            raw = handle.read(1024 * 1024 + 1)
+        after = path.lstat()
+        if _safe_file(root, path) != "available" or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_nlink) != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, 1):
+            raise ValueError("workflow changed during inspection")
+        if len(raw) > 1024 * 1024:
+            raise ValueError("workflow exceeds 1 MiB inspection limit")
+        # BaseLoader preserves string keys (notably `on`); safe operand parsing
+        # independently rejects executable tags and malformed YAML.
+        safe_data = load_operand_yaml(raw)
+        if not isinstance(safe_data, dict):
+            raise ValueError("workflow requires a mapping")
+        safe_trigger = safe_data.get("on", safe_data.get(True))
+        if not (isinstance(safe_trigger, str)
+                or isinstance(safe_trigger, list) and all(isinstance(event, str) for event in safe_trigger)
+                or isinstance(safe_trigger, dict) and all(isinstance(event, str) and (options is None or isinstance(options, dict)) for event, options in safe_trigger.items())):
+            raise ValueError("workflow requires string event names")
+        # Strict string-key parsing with BaseLoader retains GitHub's event names
+        # while rejecting duplicate keys at every mapping level.
+        from naos_policy import _operand_yaml_unique_loader, _operand_yaml_parse
+        data = _operand_yaml_parse(raw, _operand_yaml_unique_loader(yaml.BaseLoader))
+        if not isinstance(data, dict) or not isinstance(data.get("jobs"), dict) or not data["jobs"]:
+            raise ValueError("workflow requires a jobs mapping")
+        trigger = data.get("on")
+        if isinstance(trigger, str):
+            events = [trigger]
+        elif isinstance(trigger, list) and all(isinstance(item, str) for item in trigger):
+            events = trigger
+        elif isinstance(trigger, dict):
+            events = list(trigger)
+        else:
+            raise ValueError("workflow requires an event declaration")
+        if not events or any(not event.strip() for event in events):
+            raise ValueError("workflow has empty event declaration")
+        return True, bool({"pull_request", "pull_request_target"} & set(events)), hashlib.sha256(raw).hexdigest()
+    except (OSError, RuntimeError, ValueError, UnicodeError, yaml.YAMLError):
+        return False, False, None
+
+
 def detect_project_signals(root: Path, naos_root: str, profile: str) -> dict[str, Any]:
-    has_specs = any_files(root, ["specs/*.md", "requirements/**/*.md"])
-    has_docs = any_files(root, ["README.md", "docs/**/*.md"])
-    has_tests = any_files(root, ["tests/test_*.py", "tests/**/*.py", "test/**/*.py"])
-    has_python = any_files(root, ["*.py", "src/**/*.py", "app/**/*.py", "scripts/**/*.py"])
-    has_ai_surfaces = any_files(
-        root,
-        [
-            "templates/agents/*.md",
-            "templates/skills/*/SKILL.md",
-            "templates/instructions/*.md",
-            "templates/prompts/*.md",
-            ".github/instructions/*.md",
-            ".github/prompts/*.md",
-            ".github/copilot-instructions.md",
-            ".ai/*",
-            "AGENTS.md",
-            "CLAUDE.md",
-            "GEMINI.md",
-        ],
-    )
-    has_ci = any_files(root, [".github/workflows/*.yml", ".github/workflows/*.yaml"])
-    has_naos_state = (root / naos_root).is_dir()
-    brownfield_like = bool(has_python or has_tests or has_specs or has_docs or has_ci)
-    greenfield_like = not brownfield_like
-    regulated_posture_requested = profile == "assured"
-    return {
+    files, refused, inventory = _project_inventory(root)
+    paths = [path.relative_to(root).as_posix() for path in files]
+    provenance: dict[str, Any] = {}
+    def present(name: str, patterns: list[str]) -> bool:
+        matches = sorted(path for path in paths if any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns))
+        provenance[name] = {"source": "plain_local_file_metadata", "paths": matches}
+        return bool(matches)
+    source_extensions = ("py", "ts", "tsx", "js", "jsx", "java", "go", "rs", "rb", "cs", "c", "cc", "cpp", "swift", "kt", "kts", "php")
+    source_paths = [path for path in paths if Path(path).suffix.lstrip(".") in source_extensions]
+    test_paths = [path for path in source_paths if (
+        any(part.lower() in {"test", "tests", "__tests__"} for part in Path(path).parts[:-1])
+        or fnmatch.fnmatchcase(Path(path).name, "test_*.py")
+        or any(fnmatch.fnmatchcase(Path(path).name, pattern) for pattern in ("*_test.go", "*_test.py", "*.test.*", "*.spec.*", "*Test.java", "*Tests.java", "*Test.kt", "*Tests.cs", "*_spec.rb"))
+    )]
+    claude_surfaces = ["CLAUDE.md", ".claude/CLAUDE.md", ".claude/settings.json", ".claude/settings.local.json", ".claude/agents/*.md", ".claude/skills/*/SKILL.md", ".claude/commands/*.md", ".claude/rules/*.md"]
+    codex_surfaces = [".codex/config.toml", ".codex/instructions.md", ".codex/AGENTS.md", ".codex/skills/*/SKILL.md"]
+    values = {
         "selected_profile": profile,
-        "has_specs": has_specs,
-        "has_docs": has_docs,
-        "has_tests": has_tests,
-        "has_python": has_python,
-        "has_ai_surfaces": has_ai_surfaces,
-        "has_ci": has_ci,
-        "has_naos_state": has_naos_state,
-        "brownfield_like": brownfield_like,
-        "greenfield_like": greenfield_like,
-        "regulated_posture_requested": regulated_posture_requested,
-        "matched_signals": sorted(
-            signal
-            for signal, enabled in {
-                "has_specs": has_specs,
-                "has_docs": has_docs,
-                "has_tests": has_tests,
-                "has_python": has_python,
-                "has_ai_surfaces": has_ai_surfaces,
-                "has_ci": has_ci,
-                "has_naos_state": has_naos_state,
-                "brownfield_like": brownfield_like,
-                "greenfield_like": greenfield_like,
-                "regulated_posture_requested": regulated_posture_requested,
-                "selected_profile": True,
-            }.items()
-            if enabled
-        ),
+        "regulated_posture_requested": profile == "assured",
+        "has_specs": present("has_specs", ["specs/*.md", "requirements/*.md"]),
+        "has_docs": present("has_docs", ["README.md", "docs/*.md"]),
+        "has_python": present("has_python", ["*.py"]),
+        "has_source": bool(source_paths),
+        "has_tests": bool(test_paths),
+        "uses_claude_code": present("uses_claude_code", claude_surfaces),
+        "uses_codex": present("uses_codex", codex_surfaces),
+        "has_ai_surfaces": present("has_ai_surfaces", [
+            *claude_surfaces, *codex_surfaces,
+            "AGENTS.md", "GEMINI.md", ".cursor/rules/*.mdc", ".cursor/rules/*.md",
+            ".github/agents/*.md", ".github/skills/*/SKILL.md", ".github/instructions/*", ".github/prompts/*",
+            ".github/copilot-instructions.md", ".ai/*", "templates/agents/*.md",
+            "templates/skills/*/SKILL.md", "templates/instructions/*.md", "templates/prompts/*.md",
+        ]),
     }
+    for name in ("uses_claude_code", "uses_codex"):
+        provenance[name]["meaning"] = "compatible configuration-family presence only; no exclusive host attribution or actual tool use"
+    provenance["has_source"] = {"source": "plain_local_file_metadata", "paths": source_paths}
+    provenance["has_tests"] = {"source": "test_path_conventions", "paths": test_paths}
+    ci_paths, pr_paths, digests = [], [], {}
+    for path in files:
+        relative = path.relative_to(root).as_posix()
+        if path.parent == root / ".github" / "workflows" and path.suffix in {".yml", ".yaml"}:
+            valid, pr_trigger, digest = _workflow_trigger(path, root)
+            if valid:
+                ci_paths.append(relative)
+                digests[relative] = digest
+                if pr_trigger:
+                    pr_paths.append(relative)
+            else:
+                refused.append(relative + ": invalid_or_unreadable_workflow")
+    values["has_ci"] = bool(ci_paths)
+    values["uses_pull_requests"] = bool(pr_paths)
+    provenance["has_ci"] = {"source": "local_workflow_yaml", "paths": ci_paths, "sha256": digests}
+    provenance["uses_pull_requests"] = {"source": "local_workflow_pull_request_trigger", "paths": pr_paths, "sha256": {path: digests[path] for path in pr_paths}}
+    naos = Path(naos_root)
+    windows_naos = PureWindowsPath(naos_root)
+    safe_naos = (not naos.is_absolute() and not windows_naos.drive and not windows_naos.root
+                 and ".." not in naos.parts and ".." not in windows_naos.parts and bool(naos.parts))
+    values["has_naos_state"] = (inventory["root_valid"] and safe_naos
+                                and _safe_file(root, root / naos) == "not_regular_file"
+                                and (root / naos).is_dir())
+    provenance["has_naos_state"] = {"source": "local_directory", "paths": [naos.as_posix()] if values["has_naos_state"] else []}
+    values["brownfield_like"] = any(values[name] for name in ("has_source", "has_tests", "has_specs", "has_docs", "has_ci"))
+    values["greenfield_like"] = inventory["complete"] and not refused and not values["brownfield_like"]
+    for name in ("brownfield_like", "greenfield_like"):
+        provenance[name] = {"source": "derived_local_inventory", "inputs": ["has_source", "has_tests", "has_specs", "has_docs", "has_ci"], "inventory_complete": inventory["complete"] and not refused}
+    for name in PROFILE_PROJECT_SIGNALS:
+        provenance[name] = {"source": "selected_profile", "profile": profile}
+    return {
+        **values,
+        "matched_signals": sorted(name for name, value in values.items() if value is True or name == "selected_profile" and profile in PROFILE_ORDER),
+        "provenance": provenance,
+        "refused_subjects": sorted(set(refused)),
+        "inventory": {**inventory, "complete": inventory["complete"] and not refused, "status": "incomplete" if inventory["root_valid"] and refused else inventory["status"]},
+        "limitations": PROJECT_SIGNAL_LIMITS,
+    }
+
+
+def classify_project_signals(catalog: dict[str, Any], signals: dict[str, Any]) -> dict[str, Any]:
+    references = {name for module in catalog.get("modules", []) if isinstance(module, dict) for name in as_list(module.get("project_signals"))}
+    classified = {}
+    for name in sorted(references | DETECTED_PROJECT_SIGNALS | PROFILE_PROJECT_SIGNALS):
+        if name in PROFILE_PROJECT_SIGNALS:
+            source = "profile_derived"
+        elif name in DETECTED_PROJECT_SIGNALS:
+            source = "detected"
+        elif name in RESERVED_PROJECT_SIGNALS:
+            source = "reserved_intake_only"
+        else:
+            source = "unknown_custom"
+        classified[name] = {"classification": source, "value": signals.get(name) if source in {"detected", "profile_derived"} else None, "provenance": signals.get("provenance", {}).get(name)}
+    return classified
 
 
 def build_repository_intelligence_guidance(
@@ -378,6 +570,7 @@ def build_repository_intelligence_guidance(
             }
 
         if lifecycle == "stale":
+            identity_drift = bool(active_context.get("identity_drift_fields"))
             return {
                 "applicable": True,
                 "applicability_status": "applicable",
@@ -386,7 +579,8 @@ def build_repository_intelligence_guidance(
                 "selected_profile": profile,
                 "engine_execution": "completed",
                 "plan_status": "refresh_required",
-                "recommendation": "refresh_and_revalidate",
+                "recommendation": ("restore_bound_environment_or_review_migration"
+                                   if identity_drift else "refresh_and_revalidate"),
                 "required_usage_scopes": required_scopes,
                 "usage_scope_satisfied": False,
                 "active_context": active_context,
@@ -396,7 +590,8 @@ def build_repository_intelligence_guidance(
                     "capability_enrollment_required": False,
                     "transaction_and_recovery_required": True,
                     "source_artifacts_remain_authoritative": True,
-                    "next_action": "Prepare, review, apply, and validate a refresh plan before continuing onboarding.",
+                    "next_action": (str(active_context["finding"]) if identity_drift else
+                                    "Prepare, review, apply, and validate a refresh plan before continuing onboarding."),
                 },
                 "not_claimed": ["current repository context", "activation readiness"],
             }
@@ -491,7 +686,15 @@ def build_repository_intelligence_guidance(
                 "then use the printed digest with the separate `apply` command."
             )
         elif status == "blocked_prerequisite":
-            next_action = "Resolve the exact blocking findings before enrollment or activation."
+            blockers = []
+            for item in plan["findings"]:
+                identifier = " ".join(str(item.get("id") or "unidentified_finding").split())
+                detail = " ".join(str(item.get("error") or item.get("message") or "Review the structured finding.").split())
+                blockers.append(f"{identifier}: {detail}")
+            next_action = (
+                "Resolve before enrollment or activation: " + "; ".join(blockers)
+                + f". Run `naos repository-intelligence plan . --profile {profile}` for the complete diagnostic, then re-plan after repair."
+            )
         else:
             next_action = "Continue ordinary setup; executed inspection found no multi-surface indexing need."
         graph_action = (
@@ -576,7 +779,7 @@ def build_repository_intelligence_guidance(
                 "capability_enrollment_required": False,
                 "transaction_and_recovery_required": True,
                 "source_artifacts_remain_authoritative": True,
-                "next_action": "Resolve the exact engine prerequisite and run the diagnostic again.",
+                "next_action": "Resolve the engine prerequisite: " + " ".join(str(exc).split()) + ". Run repository-intelligence plan again after repair.",
             },
             "not_claimed": ["repository-intelligence applicability", "activation readiness"],
         }
@@ -602,7 +805,7 @@ def build_profile_guidance(profile: str, signals: dict[str, Any]) -> dict[str, A
         rationale.append("The selected profile requests an evidence-heavy regulated posture.")
     elif signals.get("has_ci") and signals.get("has_ai_surfaces") and (signals.get("has_tests") or signals.get("has_specs")):
         target = "standard"
-        rationale.append("CI, AI governance surfaces, and specs or tests are present, which fits governed team review.")
+        rationale.append("CI, AI governance surfaces, and specs or tests are present, which fits a structured review baseline; file presence does not prove team adoption.")
     elif signals.get("brownfield_like") or signals.get("has_ai_surfaces") or signals.get("has_python") or signals.get("has_tests"):
         target = "lite"
         rationale.append("Existing source, tests, specs, CI, or AI surfaces suggest more than quickstart orientation.")
@@ -648,7 +851,10 @@ def recommendation_for_module(module: dict[str, Any], profile: str, signals: dic
     recommendation = normalize_recommendation(profile_default.get(profile))
     module_id = str(module.get("id") or "")
     module_status = str(module.get("status") or "active")
-    signal_matches = [signal for signal in as_list(module.get("project_signals")) if bool(signals.get(signal))]
+    signal_matches = [signal for signal in as_list(module.get("project_signals"))
+                      if signal in DETECTED_PROJECT_SIGNALS and signals.get(signal) is True
+                      or signal in PROFILE_PROJECT_SIGNALS and (signals.get(signal) is True
+                          or signal == "selected_profile" and signals.get(signal) in PROFILE_ORDER)]
 
     if profile != "quickstart" and recommendation in {"optional", "defer"} and signal_matches and module_status == "active":
         recommendation = "recommended"
@@ -933,6 +1139,7 @@ def build_report(
     }
     policy_meta = policy.get("_meta", {})
     signals = detect_project_signals(root, naos_root, profile)
+    signals["catalog_classifications"] = classify_project_signals(catalog, signals)
     profile_guidance = build_profile_guidance(profile, signals)
     repository_intelligence = build_repository_intelligence_guidance(
         root, naos_root, profile
@@ -954,7 +1161,7 @@ def build_report(
             "detected_signals": signals,
             "profile_guidance": profile_guidance,
             "repository_intelligence": repository_intelligence,
-            "summary": {"modules": 0, "disabled": 1, "total_findings": 0},
+            "summary": {"modules": 0, "disabled": 1, "total_findings": 0, "guidance_warning_count": 0},
             "recommended_modules": [],
             "optional_modules": [],
             "deferred_modules": [],
@@ -1016,7 +1223,7 @@ def build_report(
             "disabled": rec_counts.get("disabled", 0),
             "not_applicable": rec_counts.get("not_applicable", 0),
             "unknown": rec_counts.get("unknown", 0),
-            "warnings": len(warnings),
+            "guidance_warning_count": len(warnings),
             "advanced_readiness_modules": sum(1 for module in evaluated_modules if module.get("module_id") in ADVANCED_READINESS),
             "human_review_required": sum(1 for module in evaluated_modules if module.get("recommendation") in {"recommended", "readiness_only", "experimental"} and module.get("human_review_boundary")),
         }
@@ -1051,6 +1258,7 @@ def build_report(
         "next_actions": next_actions,
         "findings": catalog_findings,
         "limitations": [
+            *PROJECT_SIGNAL_LIMITS,
             "Setup recommendations are guidance and orientation, not automatic setup.",
             "NAOS does not automatically enable modules, approve maturity, certify compliance, or guarantee project readiness.",
             "Simple project signals can miss project-specific context; humans choose final setup posture.",

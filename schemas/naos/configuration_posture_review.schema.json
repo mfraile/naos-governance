@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:configuration_posture_review:v1",
+  "title": "Declared configuration posture review entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "report_key",
+    "scope",
+    "binding",
+    "reviewer_id",
+    "reviewed_at",
+    "review_outcome",
+    "rationale",
+    "subject_snapshot",
+    "evidence_sha256",
+    "acknowledged_findings"
+  ],
+  "properties": {
+    "schema": {
+      "const": "naos.configuration_posture_review.v1"
+    },
+    "report_key": {
+      "enum": ["semantic_candidate_layer", "graph_context_readiness", "local_context_index", "ai_surface_context_budget"]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project_root",
+        "naos_root",
+        "profile"
+      ],
+      "properties": {
+        "project_root": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "naos_root": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "profile": {
+          "enum": [
+            "quickstart",
+            "lite",
+            "standard",
+            "assured"
+          ]
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rules_sha256",
+        "policy_sha256",
+        "effective_policy_sha256",
+        "subject_sha256"
+      ],
+      "properties": {
+        "rules_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policy_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effective_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "subject_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "reviewer_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+    },
+    "review_outcome": {"enum": ["reviewed_configuration_only", "reviewed_budget_warnings_only"]},
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "subject_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "evidence_sha256": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "acknowledged_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "sha256"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "source": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  },
+  "allOf": [{"if": {"properties": {"report_key": {"const": "ai_surface_context_budget"}}, "required": ["report_key"]}, "then": {"properties": {"review_outcome": {"const": "reviewed_budget_warnings_only"}}}, "else": {"properties": {"review_outcome": {"const": "reviewed_configuration_only"}}}}]
+}

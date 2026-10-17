@@ -1,143 +1,31 @@
 ---
-description: NAOS governance coding standards
-globs: ["**/*.py", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+description: NAOS Source inspection, reuse, architecture and code conventions
+globs: "**/*"
 alwaysApply: true
 ---
-<!-- NAOS Kit: Replace [ADAPT] markers with your project details. -->
+# NAOS coding
 
-# [ADAPT: Project Name] — Coding Standards
+Read root `AGENTS.md`, `.ai/RULES.md`, `.github/copilot-instructions.md` and
+`.github/project-context.md` before work. Only generated, existing routes are
+available; unavailable dependencies never waive required governance evidence.
 
-## 🚨 ANALYZE BEFORE GENERATE
+Before editing code, read the relevant detailed protocol in
+`.github/naos-guidance/cursor-coding.md`. This is a required task-time read;
+it is not an inline import, automatic context injection or execution authority.
+Detailed requirements remain binding for their stated triggers.
 
-**Before writing ANY code, complete this review process:**
+Inspect source, schemas, existing implementations, tests, active task and specs.
+Present scope, files, dependency/risk analysis and obtain required human approval.
+Prefer reuse; preserve behavior and privacy/security boundaries. Follow project
+conventions, module headers, task/commit links and test execution instructions.
 
-### Step 1: Search for Existing Implementations
-```bash
-# [ADAPT: update paths and file extensions for your stack]
-grep -r "keyword" src/ --include="*.py"
-grep -r "keyword" frontend/ --include="*.ts" --include="*.tsx"
-```
+Do not silently enable providers, memory, MCP, hooks, integrations, model/tools,
+delegation, merge or release. No-direct-edit diagnostic roles remain read-only.
+Memory is advisory and requires verified authorization/policy plus explicit human
+approval for writes; otherwise use a local compact/task-card checkpoint. Preserve
+caller-supplied context pressure as UNKNOWN when telemetry is absent.
 
-### Step 2: Analyze Existing Code
-If similar code exists:
-1. **READ the entire file(s)** — understand the full context
-2. **Trace dependencies** — what does it import/export?
-3. **Check callers** — who uses this code?
-4. **Review tests** — what behavior is expected?
-5. **Check source-to-test mapping** — inspect `naos/test_evidence/source_to_test_map.json` when present
-
-### Step 3: Check Schema Implications
-Before modifying ANY data structures:
-- **Database**: Check `[ADAPT: src/db/models.py]` and migrations in `[ADAPT: alembic/versions/]`
-- **API Contracts**: Check `[ADAPT: src/api/routes/]` for existing endpoints
-- **Frontend Types**: Check `[ADAPT: frontend/lib/api.ts]` for existing interfaces
-
-### Step 4: Present Plan Before Coding
-
-**ALWAYS present a plan to the user BEFORE coding:**
-```
-## Proposed Change: [Title]
-
-### Existing Code Analysis
-- Found: [list existing implementations]
-- Schema impact: [database/API changes needed]
-
-### Files to Modify
-- [file] — [what change]
-
-### Risk Assessment
-- Breaking changes: [yes/no]
-```
-
-**WAIT for confirmation before generating code.**
-
----
-
-## 🎯 Architectural Context
-
-Before generating any code, reference:
-
-1. **[ADAPT: specs/03-requirements.md]** — FR/NFR definitions
-2. **[ADAPT: specs/04-architecture.md]** — Technical architecture
-3. **naos/active/*.md** — Active task constraints
-
-Code must trace to a requirement (FR-XXX) and task (T-XXX).
-
----
-
-## 📝 Code Standards
-
-### Module Header
-```
-Module: src/path/to/module.py
-
-Purpose:
-    Short module-level description.
-
-Implements:
-    - FR-XXX: Requirement/control name
-    - NFR-XXX: Non-functional requirement/control name
-
-Tasks:
-    - T-XXX: Task title
-    - T-YYY: Task title
-
-Specs:
-    - specs/03-requirements.md#fr-xxx
-    - specs/04-architecture.md#architecture-section
-
-Rationale:
-    Short paragraph explaining why this module exists, why the logic belongs
-    here, what boundary it owns, and how it avoids duplication or architecture
-    drift.
-
-Design notes:
-    - Optional stable architectural constraints/patterns.
-```
-
-Use one canonical module header per source module. Update the existing header
-when purpose changes; do not create duplicate/stale module docstrings with
-overlapping metadata.
-
-After adding or materially changing source modules, run or recommend
-`naos module-headers` and, when specs, profile-required spec files, brownfield
-evidence, tasks, source headers, source spec references, or source traceability
-changed, `naos spec-pack-contract`, `naos spec-pack-materialize --dry-run`,
-`naos spec-assembly-worksheet`, and `naos spec-cascade` as applicable. Treat findings as source traceability review evidence;
-do not auto-rewrite all headers blindly or treat structural traceability as
-code-correctness, filled-content, candidate-promotion, or spec-quality proof.
-
-### Commit Format
-```
-feat(T-XXX): description
-fix(FR-XXX): description
-```
-
-### Datetime (Python projects — ADAPT if different)
-- NEVER use `datetime.utcnow()` — returns naive datetime
-- USE timezone-aware UTC: `datetime.now(timezone.utc)` or project utility
-
-### Configuration
-- NEVER hard-code config values in source files
-- Load from `[ADAPT: configs/*.yaml]` via settings object
-- Pattern: `from [ADAPT: src.core.config] import settings`
-
----
-
-## Anti-Duplication Protocol
-
-Before creating ANY function:
-1. Check `naos/inventory/FUNCTION_INDEX.yaml`
-2. `grep -r "def function_name" src/`
-3. Inspect related tests and capability constraints in `naos/capabilities/*.yaml` when present
-4. Prefer reuse or refactor; if creating a new function, justify why existing functions are insufficient
-
-After creating new functions:
-```bash
-python scripts/naos_code_quality_audit.py --generate-index
-make -f Makefile.naos naos-function-index-health
-make -f Makefile.naos naos-test-evidence-map
-make -f Makefile.naos naos-test-evidence
-```
-
-If duplicate intent is suspected, report the finding and remediation options. Do not silently merge or rewrite security, encryption, authentication, authorization, database, public API, or regulatory-control code without explicit approval.
+Run applicable checks after changes. Governance/AI-surface changes also require
+systemic impact/control-plane review and disposition of actionable findings.
+Reports support human review; they are not approval, proof of correctness,
+certification, compliance or permission. Preserve failed and unexecuted evidence.

@@ -1,7 +1,8 @@
 ---
-name: "strategic-compact"
-description: "Invoke when starting, resuming, updating, closing, or handing off a multi-workstream task; create or maintain a five-field Strategic Compact for continuity."
-parameters: []
+name: strategic-compact
+description: Invoke when starting, resuming, updating, closing, or handing off a multi-workstream task; create or maintain a five-field Strategic Compact for continuity.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # SKILL: strategic-compact

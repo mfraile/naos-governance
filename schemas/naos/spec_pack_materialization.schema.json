@@ -168,7 +168,7 @@
         "severity": {"type": "string", "enum": ["advisory", "warning", "required", "blocking"]},
         "status": {
           "type": "string",
-          "enum": ["missing_source", "manifest_load_error", "invalid_manifest", "unsafe_path", "copy_failed", "copy_cleanup_failed", "report_write_failed"]
+          "enum": ["missing_source", "manifest_load_error", "invalid_manifest", "unsafe_path", "unsupported_platform", "copy_failed", "copy_cleanup_failed", "report_write_failed"]
         },
         "category": {"type": "string"},
         "message": {"type": "string"},

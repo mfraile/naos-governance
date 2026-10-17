@@ -1,7 +1,8 @@
 ---
-name: "cookbook-tests"
-description: "If-then recipes for test writing. Invoke when running tests as an AI agent, writing timestamp-comparison tests, testing event bus/ASGI lifespan, or testing authenticated endpoints."
-parameters: []
+name: cookbook-tests
+description: If-then recipes for test writing. Invoke when running tests as an AI agent, writing timestamp-comparison tests, testing event bus/ASGI lifespan, or testing authenticated endpoints.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Cookbook: Tests
@@ -14,18 +15,15 @@ tests, testing event bus or ASGI lifespan, or testing authenticated endpoints.
 > Extracted from `.github/instructions/tests.instructions.md`. See that file for full domain rules.
 
 ### If: Running the test suite as an AI agent or in a script
-**Then**: Load env vars first, then call `pytest` directly — never use `conda run` (buffers stdout, creates zombie processes)
+**Then**: Inspect the project's runner and environment setup, then invoke its documented test command in the selected environment. Do not assume a `.env` file, pytest installation or environment manager.
 **Example**:
-```bash
-# WRONG — conda run buffers all stdout, creates zombie processes
-# [ADAPT: your conda env name if applicable]
-conda run -n your-env-name pytest -q tests/unit tests/acceptance
-
-# RIGHT
-# [ADAPT: your env setup command, e.g. source .env or conda activate + direct call]
-set -a && source .env && set +a
-pytest -q tests/unit tests/acceptance
+```text
+[ADAPT: use the project's documented runner and existing test directories]
+Python/pytest example if installed: python -m pytest -q tests/unit tests/acceptance
 ```
+Do not source `.env` as shell code. Use a configured dotenv loader only if the
+project implements it; use explicit Bash/PowerShell environment assignments for
+reviewed test values when needed. No credential values belong in this example.
 
 ### If: Writing a test that uses timestamp comparison
 **Then**: Use a timezone-aware comparison helper for ORM-loaded timestamps — SQLite strips tzinfo

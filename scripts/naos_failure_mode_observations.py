@@ -3,8 +3,8 @@
 
 This command reads configured local NAOS report files and maps their findings
 to the canonical 21 failure modes. It is deterministic review evidence only:
-it does not read control_plane_review.json, write learning records, mutate
-skills/prompts/workflows, call providers or models, activate MCP/Engram/memory,
+it excludes configured control-plane and observation outputs. It does not write
+learning records, mutate skills/prompts/workflows, call providers or models, activate MCP/Engram/memory,
 run networks or hooks, approve work, block gates, certify, attest, release, or
 prove compliance.
 """
@@ -44,6 +44,13 @@ from naos_policy import (  # noqa: E402
 
 
 REPORT_SCHEMA = "naos.failure_mode_observations.v1"
+# These existing producers expose status-coded findings. Keep their canonical
+# report contracts separate from project-configurable reason-to-mode mappings.
+DETECTOR_SCHEMAS = {
+    name + "_finding": name + ".schema.json"
+    for name in ("api_symbol_reality", "package_reality",
+                 "duplicate_function_hygiene", "test_quality_hygiene")
+}
 CANONICAL_MODES = [
     {"mode_id": "F1", "family": "factual", "name": "API/library fabrication"},
     {"mode_id": "F2", "family": "factual", "name": "Package fabrication"},
@@ -101,10 +108,13 @@ REASON_GATES = {
     "runtime_or_provider_authority_attempt": ["G6"],
     "failure_mode_observations_review_required": ["G6"],
 }
-DEFAULT_EXCLUDED_REFS = {"naos/reports/control_plane_review.json"}
+CYCLIC_REPORT_DEFAULTS = {
+    "control_plane_review_report": "control_plane_review.json",
+    "failure_mode_observations_report": "failure_mode_observations.json",
+}
 LIMITATIONS = [
     "Failure-mode observations aggregate configured local report findings only.",
-    "control_plane_review.json is intentionally excluded as an input to avoid cyclic review evidence.",
+    "Configured control-plane and observation outputs are excluded as inputs to avoid cyclic review evidence.",
     "Observation counts are deterministic review statistics, not a numeric risk score or approval authority.",
     "Observation mappings may inform human review, learning-loop review, or autoresearch scoping, but they do not write learning records or promote guidance.",
     "The report does not call providers, models, APIs, MCP, Engram, memory tools, browsers, networks, hooks, behavioral batteries, or runtime systems.",
@@ -217,9 +227,9 @@ def resolve_declaration_path(
 
 def relative_path(path: Path, root: Path) -> str:
     try:
-        return str(path.resolve(strict=False).relative_to(root.resolve()))
+        return path.resolve(strict=False).relative_to(root.resolve()).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix()
 
 
 def relative_ref(root: Path, path: Path) -> str:
@@ -290,6 +300,54 @@ def load_json_report(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     return data, None
 
 
+def detector_report_error(source: dict[str, Any], data: dict[str, Any]) -> str | None:
+    """Reject unsupported/malformed detector evidence, never silently clean it.
+
+    Only the four detector source types opt in. Their canonical schemas contain
+    local references only; source reports cannot choose a schema or remote ref.
+    """
+    filename = DETECTOR_SCHEMAS.get(str(source.get("source_type") or ""))
+    if filename is None:
+        return None
+    try:
+        from jsonschema import Draft202012Validator
+        from jsonschema.exceptions import SchemaError
+        from referencing import Registry
+        from referencing.exceptions import NoSuchResource, Unresolvable
+        schema = json.loads((kit_root() / "schemas" / "naos" / filename).read_text(encoding="utf-8"))
+        # Installed schemas are mutable local inputs. Never permit them to
+        # turn this local evidence reader into a remote reference fetcher.
+        def deny_retrieval(uri: str) -> Any:
+            raise NoSuchResource(ref=uri)
+
+        try:
+            Draft202012Validator.check_schema(schema)
+            stack = [schema]
+            while stack:
+                node = stack.pop()
+                if isinstance(node, dict):
+                    for key, value in node.items():
+                        if key in {"$ref", "$dynamicRef"} and (
+                            not isinstance(value, str) or not value.startswith("#")
+                        ):
+                            return "Detector schema contains unsupported references."
+                        stack.append(value)
+                elif isinstance(node, list):
+                    stack.extend(node)
+            validator = Draft202012Validator(schema, registry=Registry(retrieve=deny_retrieval))
+            if any(validator.iter_errors(data)):
+                return "Detector report does not conform to its canonical schema."
+        except (SchemaError, Unresolvable):
+            # Schema/ref exception text can include private schema or payload
+            # values. Return a stable diagnostic without serializing it.
+            return "Detector schema is invalid or contains unresolved references."
+    except ImportError:
+        return "Detector schema validator is unavailable."
+    except (OSError, UnicodeError, ValueError, TypeError) as exc:
+        return f"Detector schema could not be validated: {type(exc).__name__}."
+    return None
+
+
 def normalize_mode_ids(value: Any) -> tuple[list[str], list[str]]:
     mode_ids = string_list(value)
     valid = [mode_id for mode_id in mode_ids if mode_id in CANONICAL_INDEX]
@@ -343,10 +401,33 @@ def source_mapping_index(mappings: list[Any]) -> dict[tuple[str, str], list[str]
     return result
 
 
-def excluded_source_ref(source_ref: str, declaration: dict[str, Any]) -> bool:
-    excluded = set(DEFAULT_EXCLUDED_REFS)
-    excluded.update(string_list(declaration.get("excluded_source_report_paths")))
-    return source_ref in excluded
+def excluded_source_paths(
+    root: Path, naos_root: str, policy: dict[str, Any],
+    declaration: dict[str, Any], output_path: Path | None,
+) -> tuple[Path, ...]:
+    """Bind cycle exclusions to configured paths, not report-name substrings."""
+    paths = as_mapping(policy.get("paths"))
+    reports = root / naos_root / str(paths.get("reports_dir") or "reports")
+    excluded = [reports / str(paths.get(key) or default)
+                for key, default in CYCLIC_REPORT_DEFAULTS.items()]
+    excluded.extend(root / ref for ref in string_list(declaration.get("excluded_source_report_paths")))
+    if output_path is not None:
+        excluded.append(output_path)
+    return tuple(dict.fromkeys(path.resolve(strict=False) for path in excluded))
+
+
+def excluded_source_path(source_path: Path, excluded: tuple[Path, ...]) -> bool:
+    resolved = source_path.resolve(strict=False)
+    for path in excluded:
+        if resolved == path:
+            return True
+        try:
+            if resolved.samefile(path):
+                return True
+        except OSError:
+            # Missing inputs remain visible in the ordinary source findings.
+            pass
+    return False
 
 
 def authority_attempts(declaration: dict[str, Any]) -> list[str]:
@@ -456,6 +537,8 @@ def build_report(
     policy: dict[str, Any],
     declaration_path: Path,
     declaration_source: str,
+    output_path: Path | None = None,
+    collect_provenance: bool = True,
 ) -> dict[str, Any]:
     generated_at = utc_now_text()
     try:
@@ -477,6 +560,7 @@ def build_report(
     observations: list[dict[str, Any]] = []
     invalid_modes: list[str] = []
     mapping_index = source_mapping_index(as_list(declaration.get("reason_mappings")))
+    excluded_paths = excluded_source_paths(root, naos_root, policy, declaration, output_path)
 
     if declaration_error:
         findings.append(
@@ -501,6 +585,12 @@ def build_report(
         )
 
     if enabled:
+        # Invalid mapping ids must remain visible even when the mapping index
+        # cannot retain any valid destination for that reason.
+        for mapping in as_list(declaration.get("reason_mappings")):
+            if isinstance(mapping, dict):
+                _, invalid = normalize_mode_ids(mapping.get("mode_ids"))
+                invalid_modes.extend(invalid)
         for source in as_list(declaration.get("source_reports")):
             if not isinstance(source, dict) or not bool_value(source.get("enabled"), True):
                 continue
@@ -522,7 +612,7 @@ def build_report(
                 continue
             for candidate_path in candidate_paths:
                 source_ref = relative_ref(root, candidate_path)
-                excluded = excluded_source_ref(source_ref, declaration)
+                excluded = excluded_source_path(candidate_path, excluded_paths)
                 if excluded:
                     source_reports.append(
                         {"source_id": source_id, "path": source_ref, "present": candidate_path.exists(), "required": required, "excluded": True}
@@ -553,6 +643,8 @@ def build_report(
                         )
                     continue
                 data, error = load_json_report(candidate_path)
+                if error is None and isinstance(data, dict):
+                    error = detector_report_error(source, data)
                 source_reports.append(
                     {
                         "source_id": source_id,
@@ -753,7 +845,7 @@ def build_report(
         "limitations": limitations,
         "not_claimed": not_claimed,
         "human_review_required": bool(findings) or bool(review_observations),
-        "generated_by": build_generated_by(root),
+        "generated_by": build_generated_by(root) if collect_provenance else {},
         "summary": summary,
     }
 
@@ -783,6 +875,7 @@ def main(argv: list[str] | None = None) -> int:
         policy,
         args.failure_mode_observations,
     )
+    output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "failure_mode_observations_report")
     report = build_report(
         root=root,
         profile=profile,
@@ -790,8 +883,8 @@ def main(argv: list[str] | None = None) -> int:
         policy=policy,
         declaration_path=declaration_path,
         declaration_source=declaration_source,
+        output_path=output,
     )
-    output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "failure_mode_observations_report")
     write_report(output, report)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

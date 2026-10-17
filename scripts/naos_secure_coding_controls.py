@@ -8,10 +8,11 @@ control is satisfied, that code is secure, or that a framework is met.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    controlled_now_utc,
     default_naos_root,
     evidence_staleness_days,
     exit_code_for_summary,
@@ -36,6 +38,32 @@ from naos_policy import (  # noqa: E402
     status_from_counts,
     write_report,
 )
+
+from naos_evidence_contracts import (  # noqa: E402
+    REPORT_REGISTRY, ReportDescriptor, _classify_one, _json_value, _safe_parts,
+)
+
+# These are evidence-routing sources, not additional gate requirements.
+DETECTOR_REPORTS = {
+    "CAP-SECRET-HYGIENE": REPORT_REGISTRY["secret_hygiene"],
+    "CAP-DEPENDENCY-INTEGRITY": REPORT_REGISTRY["dependency_integrity"],
+    "VALIDATOR-CLAIMS": REPORT_REGISTRY["claims_validation"],
+    "CAP-PR-RISK-CLASSIFICATION": ReportDescriptor(
+        "pr_risk_classification", "pr_risk_classification_report",
+        "pr_risk_classification.schema.json", "naos.pr_risk_classification.v1",
+        ("pass",), "local_path_diff_risk_metadata",
+    ),
+    "EXTERNAL-SARIF-INGEST": ReportDescriptor(
+        "external_evidence_ingest", "external_evidence_ingest_report",
+        "external_evidence_ingest.schema.json", "naos.external_evidence_ingest.v2",
+        ("pass",), "unverified_external_review_evidence",
+    ),
+    "VALIDATOR-AGENT-TRACE": ReportDescriptor(
+        "agent_trace_validation", "agent_trace_report",
+        "agent_trace_validation.schema.json", "naos.agent_trace_validation.v1",
+        ("ready",), "declared_trace_structure_review",
+    ),
+}
 
 PROFILE_ORDER = {"quickstart": 0, "lite": 1, "standard": 2, "assured": 3}
 FORBIDDEN_ROUTE_KEYS = {
@@ -202,19 +230,33 @@ def parse_generated_at(value: Any) -> datetime | None:
 
 
 def evidence_freshness(path: Path, artifact: dict[str, Any], now: datetime, max_days: int) -> dict[str, Any]:
-    generated = parse_generated_at(artifact.get("generated_at"))
-    if generated is None:
-        generated = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+    """Measure report time, or bounded file age when the report omits it."""
+    timestamp = artifact.get("generated_at")
+    generated = None
+    source = "generated_at"
+    if "generated_at" not in artifact:
         source = "file_mtime"
-    else:
-        source = "generated_at"
-    age_days = max(0.0, (now - generated).total_seconds() / 86400)
+        try:
+            generated = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+        except (OSError, ValueError, OverflowError):
+            generated = None
+    elif isinstance(timestamp, str):
+        try:
+            generated = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if generated.tzinfo is None or generated.utcoffset() is None:
+                generated = None
+            else:
+                generated = generated.astimezone(UTC)
+        except (ValueError, OverflowError):
+            generated = None
+    valid = generated is not None and generated <= now + timedelta(minutes=5)
+    age_days = max(0.0, (now - generated).total_seconds() / 86400) if valid else None
     return {
         "source": source,
-        "observed_at": generated.isoformat().replace("+00:00", "Z"),
-        "age_days": round(age_days, 3),
+        "observed_at": generated.isoformat().replace("+00:00", "Z") if generated else None,
+        "age_days": round(age_days, 3) if age_days is not None else None,
         "maximum_age_days": max_days,
-        "state": "stale" if max_days > 0 and age_days > max_days else "fresh",
+        "state": "invalid_timestamp" if not valid else "stale" if max_days > 0 and age_days > max_days else "fresh",
     }
 
 
@@ -234,7 +276,7 @@ def build_report(
     external_evidence_supplied: bool,
     generated_at: str | None,
 ) -> dict[str, Any]:
-    now = parse_generated_at(generated_at) or datetime.now(UTC)
+    now = parse_generated_at(generated_at) or controlled_now_utc()
     generated = now.isoformat().replace("+00:00", "Z")
     severity = "advisory" if is_kit_repository(root, naos_root) else severity_for_profile(profile, policy)
     findings: list[dict[str, Any]] = []
@@ -387,7 +429,7 @@ def build_report(
 
     max_days = evidence_staleness_days(policy)
     evidence_results: list[dict[str, Any]] = []
-    adopter_root = (root / naos_root).resolve(strict=False)
+    adopter_root = root / naos_root
     for detector_id in sorted(route_by_detector):
         route = route_by_detector[detector_id]
         evidence_rel = Path(str(route.get("evidence_path", "")))
@@ -405,8 +447,9 @@ def build_report(
             "freshness": None,
         }
         try:
-            evidence_path = (adopter_root / evidence_rel).resolve(strict=False)
-            evidence_path.relative_to(adopter_root)
+            evidence_path = adopter_root / evidence_rel
+            evidence_path.resolve(strict=False).relative_to(adopter_root.resolve(strict=False))
+            reference = evidence_path.relative_to(root).as_posix()
         except (ValueError, OSError):
             result["state"] = "invalid_path"
             findings.append(
@@ -458,41 +501,59 @@ def build_report(
                 )
             evidence_results.append(result)
             continue
-        try:
-            artifact = load_data(evidence_path)
-            if not isinstance(artifact, dict):
-                raise ValueError("Evidence artifact must be a JSON object")
-        except Exception as exc:
-            result["state"] = "parse_error"
-            findings.append(
-                {
-                    "id": f"invalid-evidence:{detector_id}",
-                    "severity": severity,
-                    "status": "evidence_parse_error",
-                    "message": str(exc),
-                    "path": str(evidence_path),
-                    "human_review_required": True,
-                    "not_claimed": NOT_CLAIMED,
-                }
+        descriptor = DETECTOR_REPORTS.get(detector_id)
+        if descriptor is None or _safe_parts(reference, glob_allowed=False) is None:
+            result.update(state="parse_error", validation="unsupported", reason_codes=["unsupported_evidence_source"])
+            classified = None
+        else:
+            classified = _classify_one(
+                root, reference, evidence_path, descriptor, True,
+                profile, naos_root, policy, {}, "gate",
             )
-            evidence_results.append(result)
-            continue
-        freshness = evidence_freshness(evidence_path, artifact, now, max_days)
-        result["freshness"] = freshness
-        result["artifact_status"] = artifact.get("status") or artifact.get("report_status")
-        result["state"] = "stale" if freshness["state"] == "stale" else "available"
-        if result["state"] == "stale":
-            findings.append(
-                {
-                    "id": f"stale-evidence:{detector_id}",
-                    "severity": severity,
-                    "status": "evidence_stale",
-                    "message": f"Evidence for {detector_id} is {freshness['age_days']} days old; limit is {max_days}.",
-                    "path": str(evidence_path),
-                    "human_review_required": True,
-                    "not_claimed": NOT_CLAIMED,
-                }
+            result.update({key: classified[key] for key in (
+                "availability", "validation", "scope", "producer_outcome",
+                "reason_codes", "source_findings", "content_sha256", "claim_ceiling",
+            )})
+            result["expected_schema"] = descriptor.schema_id
+            result["state"] = "parse_error" if classified["validation"] != "valid" else "unknown"
+
+        artifact = None
+        if classified and classified["validation"] == "valid":
+            try:
+                content = evidence_path.read_bytes()
+                if hashlib.sha256(content).hexdigest() != classified["content_sha256"]:
+                    raise ValueError("Evidence changed during classification")
+                artifact = _json_value(evidence_path, data=content)
+            except (OSError, UnicodeError, ValueError, TypeError):
+                result.update(state="parse_error", validation="invalid")
+                result["reason_codes"].append("evidence_changed_or_unreadable")
+
+        if isinstance(artifact, dict):
+            result["artifact_status"] = artifact.get("status") or artifact.get("report_status")
+            freshness = evidence_freshness(evidence_path, artifact, now, max_days)
+            result["freshness"] = freshness
+            if freshness["state"] == "invalid_timestamp":
+                result["reason_codes"].append("invalid_evidence_timestamp")
+            elif freshness["state"] == "stale":
+                result["state"] = "stale"
+            elif classified["scope"] != "mismatched" and classified["producer_outcome"] == "passed":
+                result["state"] = "available"
+
+        if result["state"] != "available":
+            status = (
+                "evidence_stale" if result["state"] == "stale" else
+                "evidence_parse_error" if result["state"] == "parse_error" else
+                "evidence_invalid_timestamp" if (result.get("freshness") or {}).get("state") == "invalid_timestamp" else
+                "evidence_reports_failure"
             )
+            findings.append({
+                "id": f"stale-evidence:{detector_id}" if result["state"] == "stale" else f"invalid-evidence:{detector_id}",
+                "severity": severity,
+                "status": status,
+                "message": f"Evidence for {detector_id} remains unresolved: {', '.join(result.get('reason_codes', [])) or result['state']}.",
+                "path": str(evidence_path), "human_review_required": True,
+                "not_claimed": NOT_CLAIMED,
+            })
         evidence_results.append(result)
 
     evidence_by_detector = {item["detector_id"]: item for item in evidence_results}

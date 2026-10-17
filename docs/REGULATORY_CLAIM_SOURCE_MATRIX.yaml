@@ -84,11 +84,15 @@ inventory:
     unsupported: 22
   document_claim_rule: Every DORA-* or E23-* claim identifier in either governed mapping must occur exactly once in this matrix and exactly once in its assigned document; the validator rejects omissions, duplicates, cross-document rows, unsupported rows treated as results, and undeclared numeric derivations.
 
+# The historical receipt is retained verbatim within the current receipt.
+# A bounded delegated-agent source review binds this payload to its stable hash.
+# Hash binding checks payload integrity only; it does not authenticate a reviewer.
 review_template: &independent_review
-  status: pass
-  reviewer: Independent exact-diff reviewer
-  review_scope: Row identity, official-source metadata, locator fidelity, bounded interpretation, numeric derivation, document disposition, and reviewed integration
-  receipt: Independent exact-diff review passed on 2026-08-22; the row-level review scope is recorded in this matrix.
+  status: "pass"
+  reviewer: "Independent delegated AI source reviewer recorded in the retained review artifact; GPT-6 family; exact serving model ID not exposed"
+  review_scope: "Row identity, official-source metadata, locator fidelity, bounded interpretation, numeric derivation, document disposition, and reviewed integration"
+  receipt: "Delegated AI source review recorded PASS on 2026-10-16 UTC for stable payload SHA-256 a63933cc437abe46e2757fce47946e05013f1e5523569805b71e6937a58ff137. Retained review artifact SHA-256 7c5c17c1fe1520a0c1cf82644cc615f489b01fd8790eab73157f512ea4d2aadf. The full review artifact is retained privately and is not distributed in this kit; this integrity reference does not imply public retrieval, an authenticated human signature, institutional reviewer independence, or regulatory/professional assurance. The bounded review covers the exact 58-row payload and two governed mapping documents, supplied official-source observations and reviewer-retrieved missing official OSFI lifecycle/Appendix text. Historical 2026-08-22 access metadata remains recorded provenance; the source observations are dated 2026-10-16 and do not authenticate past access or provide exhaustive current-law, entity-applicability, native-test or executed-integration proof. Historical receipt retained verbatim: Independent exact-diff review passed on 2026-08-22; the row-level review scope is recorded in this matrix."
+  reviewed_payload_sha256: "a63933cc437abe46e2757fce47946e05013f1e5523569805b71e6937a58ff137"
 
 claims:
 - id: DORA-SOURCE-001

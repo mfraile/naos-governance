@@ -205,9 +205,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.contract:
         contract_path, contract_source = args.contract, "explicit"
     schema_path = args.schema or (root / "schemas" / "naos" / "research_record.schema.json")
-    if not schema_path.is_file():
+    if args.schema is None and not schema_path.is_file():
         schema_path = kit_root() / "schemas" / "naos" / "research_record.schema.json"
     try:
+        if args.schema is not None and not schema_path.is_file():
+            raise ValueError(f"Explicit research record schema is not a file: {schema_path}")
         record = load_mapping(args.record)
         contract = load_mapping(contract_path)
         if contract.get("schema") != CONTRACT_SCHEMA:
@@ -250,6 +252,7 @@ def main(argv: list[str] | None = None) -> int:
             "record_id": None,
             "research_outcome": None,
             "record_path": str(args.record),
+            "record_schema_path": str(schema_path),
             "findings": [{"id": "research_record.load_error", "message": str(exc)}],
             "human_review_required": True,
             "limitations": ["The research record could not be validated."],

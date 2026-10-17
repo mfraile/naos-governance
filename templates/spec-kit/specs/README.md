@@ -63,3 +63,5 @@ Each upstream document gates downstream ones. Do not define architecture before 
 1. Edit `naos/TASK_REGISTRY.yaml` to add/update tasks
 2. Run `make -f Makefile.naos gov-refresh` — syncs status badges into 03-requirements.md and TASK_MATRIX into 10-execution.md
 3. Never manually edit SYNC-block sections (marked `<!-- BEGIN ... -->...<!-- END ... -->`)
+
+Architecture component IDs (`ARCH-N`) name rows in the Components section or exact component headings. Section navigation anchors use `ARCH-SEC-*`; they do not satisfy component references. Existing projects should rename numeric section anchors and their navigation links without renumbering component IDs.

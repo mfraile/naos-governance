@@ -27,11 +27,15 @@
 - An AI coding assistant
 - Enough uninterrupted time to review generated files and run the local checks
 
-Portable preview generation is exercised on Linux with Python 3.11. Managed
-`--activate` mutation is currently supported only on Darwin ARM64 with CPython
-3.11–3.13; Linux, Windows, and other unsupported tuples refuse before target
-mutation. On an unsupported host, review an absent external `--preview-dir`
-and perform activation later on a supported host.
+Native macOS ARM64/APFS, Ubuntu x86_64/ext4 and Windows 11 x86_64/NTFS
+have recorded Python 3.11–3.13 installation checks and selected workflow and
+recovery evidence. These are separate checks: qualification for an activation,
+update or receiving operation depends on its named route and evidence, not
+only the operating system. Linux aarch64 is not qualified. Before activation,
+check the [platform evidence and limits](../PLATFORM_ADAPTERS.md).
+Preview generation and package installation
+do not qualify filesystem recovery. On unsupported hosts, review an absent
+external `--preview-dir` without activating.
 
 ---
 
@@ -39,10 +43,12 @@ and perform activation later on a supported host.
 
 ### Step 1: Install NAOS with the lite profile
 
+Complete [artifact acquisition](../../INSTALLATION_MANUAL.md#artifact-acquisition)
+in an isolated Python environment before running these commands.
+
 ```bash
 PROJECT=/path/to/your/new-project
 PREVIEW=/tmp/naos-lite-preview
-pip install naos-governance
 naos-governance init "$PROJECT" --new --tier lite --archetype custom --backend static_only --preview-dir "$PREVIEW"
 # Review $PREVIEW before the supported-host activation below.
 naos-governance init "$PROJECT" --new --tier lite --archetype custom --backend static_only --activate
@@ -59,11 +65,19 @@ python naos_init.py "$PROJECT" --new --tier lite --archetype custom --backend st
 
 ```bash
 ls .ai/                     # RULES.md — governance constitution
-ls .github/prompts/         # All prompt files
+ls .github/prompts/         # Profile-generated VS Code Local prompt files
 ls .github/workflows/       # naos-control-plane-ci.yml
 ls naos/                    # Project management infrastructure
 ls specs/                   # Spec kit (partial)
 ```
+
+VS Code prompt files are available in **Local** agent sessions; **Agent Host**
+does not load them. Read root `AGENTS.md` for the selected Lite workflow routes.
+When command or skill discovery is unavailable, explicitly open the corresponding
+generated `.agents/skills/naos-workflow-*/SKILL.md` file listed there and ask the
+assistant to follow it. See
+[generated project host routes](../TOOL_NEUTRAL_USAGE.md#generated-project-host-routes)
+for host limits; this manual route grants no additional execution or approval authority.
 
 Key files installed:
 - `.ai/RULES.md` — governance rules (9 rules, 3 blocking-posture)
@@ -130,10 +144,22 @@ naos dashboard --profile lite --json
 
 ### Step 3: Activate the pre-commit hook
 
+Create the Git repository before configuring repository-local hooks. Configure
+your Git author identity if needed before making a commit.
+
 ```bash
+git init
 chmod +x .githooks/pre-commit
-git config core.hooksPath .githooks
+git config --local core.hooksPath .githooks
 ```
+
+These are opt-in POSIX-shell commands for this new repository. On native
+Windows, use Git for Windows Bash and set `NAOS_PYTHON` to the absolute path
+of the selected native Python executable before committing, using forward
+slashes (for example, `export NAOS_PYTHON='C:/path/to/python.exe'`). The hook
+refuses a Windows commit without that explicit interpreter. This Bash syntax
+is not PowerShell syntax; no WSL or global Git change is required. Preserve
+any existing effective hook configuration rather than replacing it.
 
 ### Step 4: Configure your AI instruction file
 
@@ -324,8 +350,12 @@ naos-governance upgrade . --tier standard --archetype custom --backend static_on
 ```
 
 The preview writes nothing to the project and does not prove a profile
-transition. To apply, persist an external immutable plan, review its exact
-`plan_sha256`, and invoke apply separately:
+transition. To apply, persist an external immutable plan and review every
+decision. Current v3 approval uses SHA-256 of the complete saved plan file,
+not an embedded field or redirected console output. Legacy POSIX plans use
+`plan_sha256`; legacy Windows plans use `digest_sha256`. Follow the
+[exact digest procedure](./INTEGRAL_TUTORIAL_STANDARD_TO_ASSURED.md#step-2-review-the-plan-and-copy-its-exact-digest),
+then invoke apply separately:
 
 ```bash
 naos-governance upgrade . --tier standard --plan-out /tmp/naos-standard-plan.json

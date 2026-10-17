@@ -1,14 +1,8 @@
 ---
-name: "spec-extract"
-description: "Extract a specific section from the requirements or architecture specs into a context-window-friendly chunk (≤5 KB). Use before implementing any feature to load only the relevant spec text rather than the full spec file."
-parameters:
-  - name: target
-    description: "What to extract: FR or NFR ID (e.g. 'FR-023'), ARCH component (e.g. 'ARCH-N'), API path (e.g. '/api/v1/events'), or '--list-requirements' to see all IDs"
-    required: true
-  - name: spec_file
-    description: "Override the default spec file path if needed"
-    required: false
-    default: ""
+name: spec-extract
+description: Extract a specific section from the requirements or architecture specs into a context-window-friendly chunk (≤5 KB). Use before implementing any feature to load only the relevant spec text rather than the full spec file.
+metadata:
+  naos-parameters: '[{"name":"target","description":"What to extract: FR or NFR ID (e.g. ''FR-023''), ARCH component (e.g. ''ARCH-N''), API path (e.g. ''/api/v1/events''), or ''--list-requirements'' to see all IDs","required":true},{"name":"spec_file","description":"Override the default spec file path if needed","required":false,"default":""}]'
 ---
 
 # Skill: Spec Extract
@@ -61,6 +55,8 @@ python scripts/naos_extract_spec_section.py --api "/api/v1/events"
 | `specs/09-integration-contract.md` | External API integration contracts |
 
 ## Output Interpretation
+
+Output is UTF-8 on every OS, including captured Windows pipes, and is bounded to 5 KB. A missing FR/NFR, ARCH component or API endpoint returns a nonzero exit status. ARCH component IDs are exact: `ARCH-1` never selects `ARCH-10` or an `ARCH-SEC-*` section.
 
 The script returns:
 1. The spec section header (FR-XXX title, acceptance criteria, rationale)
