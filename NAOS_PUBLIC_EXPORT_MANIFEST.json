@@ -1593,10 +1593,10 @@
       "sha256": "6b65a733328eaba021e634a30ec8349f682d4273fa5a33c7f835e9b3d303179d"
     },
     {
-      "bytes": 27046,
+      "bytes": 27084,
       "mode": "0644",
       "path": "public_tests/test_operator_guidance_contract.py",
-      "sha256": "0f537ac4344848037b5c4caf818720e0f3bfd01851ea21095bc5bdc464c12fbc"
+      "sha256": "c2314bc0065f2e485d9e9771b7bde464ee1d3fc471898a6c207852fd723d91f4"
     },
     {
       "bytes": 11414,
@@ -6185,8 +6185,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 20857778,
+  "source_bytes": 20857816,
   "source_file_count": 1029,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "3c12ef6679db97c0df968c002e339e392a437557339e888cf70718d5ca0d2395"
+  "tree_sha256": "d6ec3d5b22bbbb20048bd20bed059a788ee810f67455affe13b4f1fdb2f83dba"
 }

@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 import yaml
 
+NATIVE_ACTIVATION_TIMEOUT_SECONDS = 180
+
 KIT = Path(
     os.environ.get("NAOS_TEST_KIT", Path(__file__).resolve().parents[1])
 ).resolve()
@@ -438,10 +440,10 @@ class OperatorGuidanceTests(unittest.TestCase):
             "--backend",
             "static_only",
             "--activate",
-            # Assured's complete durable journal took 82 seconds on the native
-            # Ubuntu diagnostic. Give this integration call headroom while
-            # retaining the other command bounds and all refusal assertions.
-            timeout=180 if profile == "assured" else 90,
+            # Complete durable activation needs the same bounded headroom on
+            # every profile. Other commands, including collision refusal,
+            # retain their existing 90-second bound and functional assertions.
+            timeout=NATIVE_ACTIVATION_TIMEOUT_SECONDS,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
