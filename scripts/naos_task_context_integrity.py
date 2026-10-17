@@ -141,6 +141,9 @@ def project_identity(root: Path, expected: Any) -> str:
                 or parsed.password or (parsed.scheme == 'https' and parsed.username)
                 or parsed.query or parsed.fragment or any(ord(c) < 33 for c in expected)):
             return 'unsafe'
+    except ValueError:
+        return 'unsafe'
+    try:
         top = subprocess.run(['git', '-C', str(root), 'rev-parse', '--show-toplevel'],
                              capture_output=True, text=True, timeout=5, check=False)
         origin = subprocess.run(['git', '-C', str(root), 'config', '--get-all', 'remote.origin.url'],
@@ -209,7 +212,7 @@ def freeze_selection(root: Path, naos_root: str, policy: dict[str, Any], *,
                         'size_bytes': len(raw) if raw is not None else None,
                         'expected_output': reference in expected_outputs})
     binding = association(root, naos_root, policy, project_id, report.get('task_id'), session_id, report['profile'])
-    if binding == 'unsafe':
+    if binding == 'unsafe' or not isinstance(project_id, str) or len(project_id) > 1024:
         raise ValueError('Unsafe project identity URL; no frozen selection was written.')
     selection = {
         'schema': SELECTION_SCHEMA, 'project_id': project_id, 'task_id': report.get('task_id'),

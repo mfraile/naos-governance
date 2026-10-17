@@ -22,6 +22,12 @@ from naos_session_identity import ensure_session_context  # noqa: E402
 
 ORIGIN = 'https://example.test/synthetic/project.git'
 SESSION = 'synthetic-session-001'
+UNSAFE_IDENTITIES = [
+    'https://fixture-user:fixture-value@example.test/synthetic.git',
+    'ssh://fixture-user:fixture-value@example.test/synthetic.git',
+    'https://fixture-user:fixture-value@[invalid/synthetic.git',
+    'https://fixture-user:fixture-value@' + 'x' * 1100,
+]
 
 
 class ContextIntegrityTests(unittest.TestCase):
@@ -103,8 +109,7 @@ class ContextIntegrityTests(unittest.TestCase):
             ('session_id', None, 'unknown'), ('manifest_sha256', '0' * 64, 'scope_mismatch')]:
             with self.subTest(field=key):
                 self.assertEqual(self.check(**{key: value})['status'], expected)
-        for identity in ['https://fixture-user:fixture-value@example.test/synthetic.git',
-                         'ssh://fixture-user:fixture-value@example.test/synthetic.git']:
+        for identity in UNSAFE_IDENTITIES:
             with self.subTest(unsafe_identity=True), self.assertRaises(ValueError):
                 integrity.freeze_selection(
                     self.root, 'naos', self.policy, report=self.pack, project_id=identity,
@@ -285,12 +290,14 @@ class ContextIntegrityTests(unittest.TestCase):
         self.assertNotIn('pack_sha256', pack['context_integrity'])
         self.assertEqual(run().returncode, 2)
         self.assertNotIn('markdown_output', pack)
-        args[args.index(ORIGIN)] = 'https://fixture-user:fixture-value@example.test/synthetic.git'
+        identity_index = args.index(ORIGIN)
         args[args.index('naos/another-frozen.json')] = 'naos/unsafe-frozen.json'
-        rejected = run()
-        self.assertEqual(rejected.returncode, 2)
-        self.assertFalse((self.root / 'naos/unsafe-frozen.json').exists())
-        self.assertNotIn('fixture-value', rejected.stdout + rejected.stderr)
+        for identity in UNSAFE_IDENTITIES:
+            args[identity_index] = identity
+            rejected = run()
+            self.assertEqual(rejected.returncode, 2)
+            self.assertFalse((self.root / 'naos/unsafe-frozen.json').exists())
+            self.assertNotIn('fixture-value', rejected.stdout + rejected.stderr)
 
     def test_report_and_selected_binding_schemas(self):
         import jsonschema
