@@ -330,68 +330,320 @@
       }
     },
     "source_metadata": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schema",
-        "platform",
-        "machine",
-        "python_minor",
-        "file_type",
-        "mode",
-        "uid",
-        "gid",
-        "flags",
-        "acl_entries",
-        "xattrs"
-      ],
-      "properties": {
-        "schema": {"const": "naos.metadata.darwin_source.v1"},
-        "platform": {"const": "Darwin"},
-        "machine": {"type": "string", "enum": ["arm64", "aarch64"]},
-        "python_minor": {"type": "string", "enum": ["3.11", "3.12", "3.13"]},
-        "file_type": {"const": "regular_file"},
-        "mode": {"type": "integer", "minimum": 0, "maximum": 511},
-        "uid": {"type": "integer", "minimum": 0},
-        "gid": {"type": "integer", "minimum": 0},
-        "flags": {"type": "integer", "minimum": 0},
-        "acl_entries": {"type": "array", "items": {"type": "string"}},
-        "xattrs": {"type": "array", "items": {"$ref": "#/$defs/xattr"}}
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "platform",
+            "machine",
+            "python_minor",
+            "file_type",
+            "mode",
+            "uid",
+            "gid",
+            "flags",
+            "acl_entries",
+            "xattrs"
+          ],
+          "properties": {
+            "schema": {
+              "const": "naos.metadata.darwin_source.v1"
+            },
+            "platform": {
+              "const": "Darwin"
+            },
+            "machine": {
+              "type": "string",
+              "enum": [
+                "arm64",
+                "aarch64"
+              ]
+            },
+            "python_minor": {
+              "type": "string",
+              "enum": [
+                "3.11",
+                "3.12",
+                "3.13"
+              ]
+            },
+            "file_type": {
+              "const": "regular_file"
+            },
+            "mode": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 511
+            },
+            "uid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "flags": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "acl_entries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "xattrs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/xattr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "platform",
+            "machine",
+            "python_minor",
+            "file_type",
+            "mode",
+            "uid",
+            "gid",
+            "flags",
+            "acl_entries",
+            "xattrs"
+          ],
+          "properties": {
+            "schema": {
+              "const": "naos.metadata.linux_source.v1"
+            },
+            "platform": {
+              "const": "Linux"
+            },
+            "machine": {
+              "type": "string",
+              "enum": [
+                "x86_64",
+                "aarch64"
+              ]
+            },
+            "python_minor": {
+              "type": "string",
+              "enum": [
+                "3.11",
+                "3.12",
+                "3.13"
+              ]
+            },
+            "file_type": {
+              "const": "regular_file"
+            },
+            "mode": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 511
+            },
+            "uid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "flags": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "acl_entries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "xattrs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/xattr"
+              }
+            }
+          }
+        }
+      ]
     },
     "current_metadata": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schema",
-        "platform",
-        "machine",
-        "python_minor",
-        "file_type",
-        "device",
-        "inode",
-        "mode",
-        "uid",
-        "gid",
-        "flags",
-        "acl_entries",
-        "xattrs"
-      ],
-      "properties": {
-        "schema": {"const": "naos.metadata.darwin_create_only.v1"},
-        "platform": {"const": "Darwin"},
-        "machine": {"type": "string", "enum": ["arm64", "aarch64"]},
-        "python_minor": {"type": "string", "enum": ["3.11", "3.12", "3.13"]},
-        "file_type": {"const": "regular_file"},
-        "device": {"type": "integer", "minimum": 0},
-        "inode": {"type": "integer", "minimum": 0},
-        "mode": {"type": "integer", "minimum": 0, "maximum": 511},
-        "uid": {"type": "integer", "minimum": 0},
-        "gid": {"type": "integer", "minimum": 0},
-        "flags": {"type": "integer", "minimum": 0},
-        "acl_entries": {"type": "array", "items": {"type": "string"}},
-        "xattrs": {"type": "array", "items": {"$ref": "#/$defs/xattr"}}
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "platform",
+            "machine",
+            "python_minor",
+            "file_type",
+            "device",
+            "inode",
+            "mode",
+            "uid",
+            "gid",
+            "flags",
+            "acl_entries",
+            "xattrs"
+          ],
+          "properties": {
+            "schema": {
+              "const": "naos.metadata.darwin_create_only.v1"
+            },
+            "platform": {
+              "const": "Darwin"
+            },
+            "machine": {
+              "type": "string",
+              "enum": [
+                "arm64",
+                "aarch64"
+              ]
+            },
+            "python_minor": {
+              "type": "string",
+              "enum": [
+                "3.11",
+                "3.12",
+                "3.13"
+              ]
+            },
+            "file_type": {
+              "const": "regular_file"
+            },
+            "device": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "inode": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mode": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 511
+            },
+            "uid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "flags": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "acl_entries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "xattrs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/xattr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "platform",
+            "machine",
+            "python_minor",
+            "file_type",
+            "device",
+            "inode",
+            "mode",
+            "uid",
+            "gid",
+            "flags",
+            "acl_entries",
+            "xattrs"
+          ],
+          "properties": {
+            "schema": {
+              "const": "naos.metadata.linux_create_only.v1"
+            },
+            "platform": {
+              "const": "Linux"
+            },
+            "machine": {
+              "type": "string",
+              "enum": [
+                "x86_64",
+                "aarch64"
+              ]
+            },
+            "python_minor": {
+              "type": "string",
+              "enum": [
+                "3.11",
+                "3.12",
+                "3.13"
+              ]
+            },
+            "file_type": {
+              "const": "regular_file"
+            },
+            "device": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "inode": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mode": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 511
+            },
+            "uid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gid": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "flags": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "acl_entries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "xattrs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/xattr"
+              }
+            }
+          }
+        }
+      ]
     },
     "nullable_source_metadata": {
       "oneOf": [

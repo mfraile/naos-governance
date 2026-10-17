@@ -1,7 +1,7 @@
 # NAOS Optional Spec-Kit Adapter
 
 This directory is an optional convenience template for teams that already use
-Spec-Kit-style `.specify/specs/*.md` files and want a repeatable way to relate
+Spec-Kit-style `specs/<feature>/spec.md` files and want a repeatable way to relate
 those specs to NAOS evidence, task context, claims, and gates.
 
 It is not part of the NAOS core runtime. NAOS remains usable without Spec-Kit.
@@ -10,18 +10,21 @@ and not an endorsement by the Spec-Kit or Microsoft projects.
 
 ## What It Does
 
-- Reads local `.specify/specs/*.md` files.
+- Reads markdown recursively from one selected project-contained root: current
+  `specs/` by default, with historical `.specify/specs/` fallback only when
+  `specs/` is absent.
 - Produces a dry-run mapping summary that links spec files to NAOS concepts:
   evidence packs, task context packs, task claims, gate review, and control-plane
   review.
 - Helps reviewers decide which NAOS reports to generate for a spec-backed task.
-- Leaves `.specify/` unchanged by default.
+- Leaves spec files unchanged by default.
 
 ## When To Use It
 
 Use this adapter when:
 
-- a project already keeps requirements or design notes under `.specify/specs/`;
+- a project already keeps requirements or design notes under `specs/` or the
+  historical `.specify/specs/` layout;
 - a team wants NAOS evidence packs to point at spec artifacts;
 - reviewers need a simple handoff from spec text to NAOS reports;
 - greenfield setup, brownfield onboarding, or later adoption needs an optional
@@ -36,7 +39,7 @@ The recommended NAOS path is review-first:
 
 ```bash
 naos add setup-module spec_kit_adapter --profile standard --dry-run
-naos add setup-module spec_kit_adapter --profile standard
+naos add setup-module spec_kit_adapter --profile standard --confirm
 ```
 
 The setup-module action copies this template into:
@@ -58,9 +61,29 @@ python naos/integrations/spec-kit/speckit_adapter.py --dry-run --json
 
 By default the script:
 
-- reads `.specify/specs/*.md`;
+- selects `specs/` when present, otherwise historical `.specify/specs/` when
+  present, and scans markdown recursively only under that selected root;
+- reports an advisory `no_specs_found` for `specs` when neither root exists;
 - writes nothing;
 - prints a deterministic JSON summary when `--json` is provided.
+
+When both roots exist, `specs/` wins. To select the historical root explicitly:
+
+```bash
+python naos/integrations/spec-kit/speckit_adapter.py --specs-root .specify/specs --dry-run --json
+```
+
+An explicit `--specs-root` is authoritative, including a different contained root.
+Roots are never merged. A present `specs` symlink, including a broken link, does
+not trigger legacy fallback. The selected root must resolve inside the project;
+references resolving outside the project are not read. Report paths use POSIX
+separators.
+
+The upstream [feature creation script](https://github.com/github/spec-kit/blob/main/scripts/bash/create-new-feature.sh)
+was observed on 2026-10-15 to create `specs/<feature>/spec.md`. This supports the
+current default for that observed layout; mutable upstream main is not a pinned
+installed version or proof of universal Spec-Kit compatibility. The adapter does
+not inspect vendor state files or execute vendor scripts.
 
 To write a local mapping report explicitly:
 
@@ -77,7 +100,8 @@ items, or task context.
 
 Reads:
 
-- `.specify/specs/*.md`
+- `specs/**/*.md` or historical `.specify/specs/**/*.md`, or an explicit
+  project-contained root; only the selected root is scanned recursively
 - optional NAOS files if reviewers cross-reference them manually
 
 Writes by default:

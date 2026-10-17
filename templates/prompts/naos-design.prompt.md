@@ -8,9 +8,9 @@
 - `/naos-design enhance`      → Revision mode — update a previously filled spec
 
 **Relationships**:
-- `/naos-design` ≠ `@naos-plan` — `/naos-design` is project-altitude (all specs, once); `@naos-plan` is task-altitude (one task at a time, repeatedly)
-- `/naos-design` ≠ `naos-specify` — `/naos-design spec 03` orchestrates the full spec 03; `naos-specify` is surgical for one FR/NFR
-- `/naos-design` PRECEDES coding — complete the profile-required specs before writing code
+- `/naos-design` covers the project spec pack; `@naos-plan` plans each task.
+- `/naos-design spec 03` covers the whole spec; `naos-specify` edits one FR/NFR.
+- Complete profile-required specs before coding.
 
 ---
 
@@ -53,10 +53,6 @@ when present; otherwise read the source manifest under
 filenames, sections, anchors, sync markers, and traceability codes such as
 PAIN, SOL, FR/NFR, ARCH, API, AC, SCEN, COST, MKT, INT, EXEC, and TASK.
 
-Suggested elicitation order for standard/assured is 01 → 02 → 03 → 04, then
-triage 05-09 from the project facts, then complete 10. This order does not make
-05-09 optional files in standard or assured profiles.
-
 ---
 
 ## 🔁 Full Cascade Mode
@@ -70,17 +66,13 @@ Work through each profile-required spec in order. For each spec:
 4. **Run the quality gate** before advancing to the next spec.
 5. **Carry forward** key decisions to inform questions for the next spec.
 
-After completing spec 04 in standard/assured, triage specs 05-09 before filling
-spec 10. Fill applicable content where the topic applies; otherwise write an
-explicit non-applicability rationale inside the file.
 After creating or revising specs, run or recommend
 `naos spec-pack-contract --profile <profile>` before cascade review. If
 profile-required files may be missing, use
 `naos spec-pack-materialize . --profile <profile> --dry-run` and ask before
 copying. If brownfield/candidate evidence exists, use
 `naos spec-assembly-worksheet . --profile <profile>`. Before planning or coding,
-run `--mode filled`. Standard/assured keep all ten spec files and record
-non-applicability in-file. Reports are review evidence only, not proof of
+run `--mode filled`. Reports are review evidence only, not proof of
 quality, completeness, approval, implementation, traceability, certification, or
 compliance.
 
@@ -90,7 +82,7 @@ compliance.
 
 ### Spec 01 — Problem Statement
 
-**Purpose**: Define the problem space with precision. Everything downstream (solution, requirements, architecture) flows from this.
+**Purpose**: Define the problem that drives the solution, requirements and architecture.
 
 **Before asking questions**, read `specs/01-problem.md` if it exists.
 Check if the file has been partially filled (look for `[ADAPT` markers not yet replaced).
@@ -105,7 +97,7 @@ Check if the file has been partially filled (look for `[ADAPT` markers not yet r
 
 4. **Why do existing solutions fail?** Name 2-3 existing approaches and explain exactly WHY each fails for your target user. (This carves your differentiation niche.)
 
-5. **What is the root cause?** Not just the symptom — what structural or systemic factor creates this problem? (This informs whether a product fix is durable or band-aid.)
+5. **What is the root cause?** Identify the structural or systemic cause, beyond symptoms, to guide a durable fix.
 
 **Fill into**: `specs/01-problem.md` — sections: Executive Summary, Problem Statement, Target Users (if present), Evidence.
 
@@ -273,7 +265,7 @@ human accepts, revises, or defers.
 
 5. **Who does what?** If you have a team, which roles own which phases (PM, backend, frontend, data, DevOps)?
 
-**Fill into**: `specs/10-execution.md` — sections: Phase Overview, Task Matrix (seed with initial tasks), Risk Register.
+**Fill into**: `specs/10-execution.md` — Phase Overview and Risk Register. Seed initial tasks in `naos/TASK_REGISTRY.yaml` first, preserving identity and existing records. Include ID, title, requirement, phase, priority, owner, estimate and acceptance; new tasks use planned lifecycle/not_started delivery/unverified verification. Run `python scripts/workflows/sync_from_registry.py`, then `python scripts/workflows/sync_spec_statuses.py` to derive the Task Matrix, project status and requirement statuses without requiring Make. Where Make is installed, `make -f Makefile.naos gov-refresh` remains the full refresh wrapper. Do not manually edit rows inside `BEGIN/END TASK_MATRIX` or `BEGIN/END SYNC_*` markers. Team filtering (`sync_from_registry.py --team TEAM_ID`) previews on stdout without publishing shared views.
 
 **Quality Gate (spec 10 complete)**:
 - [ ] At least 2 delivery phases defined with distinct exit criteria
@@ -297,11 +289,9 @@ After completing spec 04 in standard/assured, ask the user:
 | `08-market-analysis.md` | this is a product (not internal tool) | TAM/SAM/SOM, competitors, positioning |
 | `09-integration-contract.md` | spec 04 has external API calls | Integration schemas, versioning, vendor SLAs |
 
-For each applicable standard/assured spec, run the same **ask → fill → quality
-gate** cycle. For each non-applicable standard/assured spec, preserve the
-required structure and anchors while recording why it is not applicable to this
-product. Each profile-conditional spec playbook uses 3 targeted questions
-derived from the already-filled core specs.
+Before spec 10, apply **ask → fill → quality gate** to applicable specs 05-09,
+using 3 targeted questions from the filled core specs. For non-applicable topics,
+keep the manifest structure and anchors and record the product-specific rationale.
 
 ### Spec 05 — API Design (Contextual)
 
@@ -378,6 +368,6 @@ Use this when you want to update a spec that has already been filled.
 
 - **Specs drive tech, not vice versa.** Never suggest a technology during spec elicitation. Technology appears in spec 04, after the WHAT (spec 03) is locked.
 - **Each spec has one owner**: spec 01-02 = PM altitude; spec 03-04 = tech lead altitude (but elicited collaboratively); spec 10 = delivery manager altitude.
-- **Questions should cascade.** The answer to "who suffers the problem" (spec 01) should appear in the user story preamble of spec 03. Make those connections explicit.
-- **Quality gates are non-negotiable.** If a gate fails, fix the spec before advancing. Don't generate fake content to pass a placeholder check.
-- **[ADAPT] is a red flag, not a destination.** A spec with `[ADAPT]` markers is not filled. The goal is zero `[ADAPT]` markers in mandatory specs before coding starts.
+- **Connect spec 01's user role to spec 03's user story preamble.**
+- **Fix failed gates before advancing; never fabricate content to pass.**
+- **Before coding, mandatory specs must have zero `[ADAPT]` markers.**

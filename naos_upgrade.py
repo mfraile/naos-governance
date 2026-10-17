@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import re
 import stat
 import sys
@@ -16,6 +17,7 @@ from typing import Any
 
 try:
     from . import naos_init
+    from .upgrade_contract.plan_stdout import emit_canonical_plan
     from .upgrade_contract.canonical import canonical_bytes, loads_strict_json
     from .upgrade_contract.planner import (
         ContentPlanningError,
@@ -39,6 +41,7 @@ except ImportError:  # Direct checkout execution through ``python cli.py``.
     if str(_KIT_IMPORT_ROOT) not in sys.path:
         sys.path.insert(0, str(_KIT_IMPORT_ROOT))
     import naos_init  # type: ignore[no-redef]
+    from upgrade_contract.plan_stdout import emit_canonical_plan
     from upgrade_contract.canonical import (  # type: ignore[no-redef]
         canonical_bytes,
         loads_strict_json,
@@ -111,13 +114,35 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--expect-plan-digest",
-        help="Required SHA-256 digest for --apply-plan",
+        help="Required SHA-256 digest for --apply-plan or explicit approved recovery",
     )
     parser.add_argument(
         "--recover",
         action="store_true",
         help="Recover supported managed-content transactions",
     )
+    parser.add_argument(
+        "--inspect-provenance",
+        action="store_true",
+        help="Read and validate portable v3 history without granting mutation authority",
+    )
+    parser.add_argument('--plan-hook-activation', action='store_true',
+        help='Review exact existing POSIX owned-hook activation; never configures or executes Git')
+    parser.add_argument('--hook-mode-octal', help='Exact observed full activation mode, four octal digits')
+    parser.add_argument("--plan-migration", action="store_true",
+        help="Review explicit legacy history migration using independently selected inputs")
+    parser.add_argument("--migration-inputs", type=Path,
+        help="External canonical migration inputs and original policy/mode file paths")
+    parser.add_argument(
+        "--plan-rebind", action="store_true",
+        help="Review explicit receiving enrollment with absent local and legacy storage",
+    )
+    parser.add_argument("--expected-owner-sha256", help="Independently selected portable owner SHA-256 for rebind planning")
+    parser.add_argument("--expected-head-sha256", help="Independently selected portable head SHA-256 for rebind planning")
+    parser.add_argument("--binding-id", help="Explicit new 32-character lowercase hexadecimal receiving binding ID")
+    parser.add_argument('--inspect-receiving-store',action='store_true',help='Review completed populated receiving evidence without mutation')
+    parser.add_argument('--plan-receive-store',action='store_true',help='Review explicit in-place receiving of a completed populated store')
+    parser.add_argument('--expected-store-inventory-sha256',help='Independently selected complete old receiving evidence inventory SHA-256')
     parser.add_argument(
         "--force",
         action="store_true",
@@ -139,19 +164,100 @@ def _selected_mode(args: argparse.Namespace) -> str:
             "upgrade preserves provenance-bound archetype and backend choices; "
             "command-line overrides are refused"
         )
+    if args.plan_hook_activation:
+        if (args.plan_migration or args.migration_inputs is not None or args.plan_rebind
+                or args.inspect_provenance or args.recover or args.dry_run
+                or args.inspect_receiving_store or args.plan_receive_store
+                or any(v is not None for v in (args.tier, args.apply_plan, args.expect_plan_digest,
+                    args.binding_id, args.expected_store_inventory_sha256))):
+            raise UpgradeCliError('Hook activation planning requires its exclusive option set')
+        if (args.hook_mode_octal is None or re.fullmatch(r'[0-7]{4}', args.hook_mode_octal) is None
+                or any(v is None or SHA256_RE.fullmatch(v) is None for v in
+                    (args.expected_owner_sha256, args.expected_head_sha256))):
+            raise UpgradeCliError('Hook activation requires exact mode and independent owner/head digests')
+        return 'plan_hook_activation'
+    if args.hook_mode_octal is not None:
+        raise UpgradeCliError('Hook mode selection requires --plan-hook-activation')
+    inspect_receiving=getattr(args,'inspect_receiving_store',False)
+    plan_receiving=getattr(args,'plan_receive_store',False)
+    inventory_digest=getattr(args,'expected_store_inventory_sha256',None)
+    if inspect_receiving or plan_receiving:
+        if (inspect_receiving and plan_receiving or args.plan_migration or args.migration_inputs is not None
+                or args.plan_rebind or args.inspect_provenance or args.recover or args.dry_run
+                or any(v is not None for v in (args.tier,args.apply_plan,args.expect_plan_digest))):
+            raise UpgradeCliError('Receiving inspection/planning requires its exact exclusive option set')
+        if inspect_receiving:
+            if any(v is not None for v in (args.plan_out,args.expected_owner_sha256,args.expected_head_sha256,args.binding_id,inventory_digest)):
+                raise UpgradeCliError('Receiving inspection accepts no planning authority inputs')
+            return 'inspect_receiving'
+        if any(v is None or SHA256_RE.fullmatch(v) is None for v in
+               (args.expected_owner_sha256,args.expected_head_sha256,inventory_digest)):
+            raise UpgradeCliError('Receiving plan requires independent owner/head/store inventory SHA-256')
+        if args.binding_id is None or re.fullmatch(r'[0-9a-f]{32}',args.binding_id) is None:
+            raise UpgradeCliError('Receiving plan requires a fresh explicit binding ID')
+        return 'plan_receiving'
+    if inventory_digest is not None:
+        raise UpgradeCliError('Store inventory expectation requires --plan-receive-store')
+    if args.plan_migration:
+        if (args.migration_inputs is None or args.plan_rebind or args.inspect_provenance
+                or args.recover or args.dry_run or any(value is not None for value in
+                (args.tier, args.apply_plan, args.expect_plan_digest,
+                 args.expected_owner_sha256, args.expected_head_sha256, args.binding_id))):
+            raise UpgradeCliError("--plan-migration requires --migration-inputs and only optional --plan-out")
+        return "plan_migration"
+    if args.migration_inputs is not None:
+        if (args.apply_plan is None or args.expect_plan_digest is None or args.plan_rebind
+                or args.inspect_provenance or args.dry_run or args.tier is not None
+                or args.plan_out is not None or any(value is not None for value in
+                (args.expected_owner_sha256, args.expected_head_sha256, args.binding_id))):
+            raise UpgradeCliError("--migration-inputs requires exact migration plan apply or recovery")
+        if SHA256_RE.fullmatch(args.expect_plan_digest) is None:
+            raise UpgradeCliError("--expect-plan-digest must be lowercase SHA-256")
+        return "recover_migration" if args.recover else "apply_migration"
+    rebind_values = (args.expected_owner_sha256, args.expected_head_sha256, args.binding_id)
+    if args.plan_rebind:
+        if (args.inspect_provenance or args.recover or args.dry_run
+                or any(value is not None for value in (args.tier, args.apply_plan, args.expect_plan_digest))):
+            raise UpgradeCliError("--plan-rebind cannot be combined with profile planning, apply or recovery")
+        if any(value is None for value in rebind_values):
+            raise UpgradeCliError("--plan-rebind requires --expected-owner-sha256, --expected-head-sha256 and --binding-id")
+        if any(SHA256_RE.fullmatch(value) is None for value in rebind_values[:2]):
+            raise UpgradeCliError("rebind owner/head expectations must be lowercase SHA-256")
+        if re.fullmatch(r"[0-9a-f]{32}", args.binding_id) is None:
+            raise UpgradeCliError("--binding-id must be 32 lowercase hexadecimal characters")
+        return "plan_rebind"
+    if any(value is not None for value in rebind_values):
+        raise UpgradeCliError("owner/head/binding options require --plan-rebind")
+    if args.inspect_provenance:
+        if args.recover or args.dry_run or any(
+            value is not None
+            for value in (args.tier, args.plan_out, args.apply_plan, args.expect_plan_digest)
+        ):
+            raise UpgradeCliError(
+                "--inspect-provenance cannot be combined with planning, apply or recovery options"
+            )
+        return "inspect"
     if args.recover:
+        if args.apply_plan is not None:
+            if (args.expect_plan_digest is None or SHA256_RE.fullmatch(args.expect_plan_digest) is None
+                    or args.tier is not None or args.plan_out is not None or args.dry_run):
+                raise UpgradeCliError('External receiving recovery requires exact plan and digest only')
+            return 'recover_receiving'
         if any(
             value is not None
             for value in (
                 args.tier,
                 args.plan_out,
                 args.apply_plan,
-                args.expect_plan_digest,
             )
         ) or args.dry_run:
             raise UpgradeCliError(
                 "--recover cannot be combined with planning or apply options"
             )
+        if args.expect_plan_digest is not None:
+            if SHA256_RE.fullmatch(args.expect_plan_digest) is None:
+                raise UpgradeCliError("--expect-plan-digest must be lowercase SHA-256")
+            return "recover_rebind"
         return "recover"
     if args.apply_plan is not None or args.expect_plan_digest is not None:
         if args.apply_plan is None or args.expect_plan_digest is None:
@@ -173,10 +279,11 @@ def _selected_mode(args: argparse.Namespace) -> str:
 
 def _canonical_project_path(supplied: Path) -> Path:
     try:
-        return naos_init._canonical_init_target(
+        target = naos_init._canonical_init_target(
             supplied,
             must_exist=True,
-        ).resolve(strict=True)
+        )
+        return target if naos_init._windows_cli() is not None else target.resolve(strict=True)
     except (OSError, RuntimeError, ValueError) as exc:
         raise UpgradeCliError(
             "upgrade requires an existing non-symlink project directory; "
@@ -233,7 +340,57 @@ def _external_plan_path(
     return result
 
 
+def _check_external_plan_parent(path: Path, parent_fd: int) -> None:
+    opened = os.fstat(parent_fd)
+    live = os.stat(path.parent, follow_symlinks=False)
+    if not stat.S_ISDIR(live.st_mode) or (
+        opened.st_dev, opened.st_ino
+    ) != (live.st_dev, live.st_ino):
+        raise UpgradeCliError("external plan parent changed during publication")
+
+
+def _check_external_plan_entry(
+    parent_fd: int, name: str, descriptor: int, owned: os.stat_result,
+    payload: bytes,
+) -> None:
+    before = os.fstat(descriptor)
+    live = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if (
+        not stat.S_ISREG(live.st_mode)
+        or not stat.S_ISREG(before.st_mode)
+        or (live.st_dev, live.st_ino) != (owned.st_dev, owned.st_ino)
+        or (before.st_dev, before.st_ino) != (owned.st_dev, owned.st_ino)
+        or before.st_nlink != 1 or live.st_nlink != 1
+        or stat.S_IMODE(before.st_mode) != 0o600
+        or stat.S_IMODE(live.st_mode) != 0o600
+        or (before.st_uid, before.st_gid) != (owned.st_uid, owned.st_gid)
+        or before.st_size != len(payload)
+    ):
+        raise UpgradeCliError("external plan file identity changed during publication")
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    remaining = len(payload) + 1
+    while remaining:
+        block = os.read(descriptor, min(1024 * 1024, remaining))
+        if not block:
+            break
+        chunks.append(block)
+        remaining -= len(block)
+    after = os.fstat(descriptor)
+    if b"".join(chunks) != payload or (
+        before.st_size, before.st_mtime_ns, before.st_ctime_ns
+    ) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+        raise UpgradeCliError("external plan bytes changed during publication")
+    current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if (current.st_dev, current.st_ino) != (owned.st_dev, owned.st_ino):
+        raise UpgradeCliError("external plan name changed during publication")
+
+
 def _publish_external_plan(path: Path, payload: bytes) -> None:
+    if platform.system() not in {"Darwin", "Linux"}:
+        raise UpgradeCliError(
+            "External plan publication requires a macOS or Linux descriptor adapter."
+        )
     parent_fd = os.open(
         path.parent,
         os.O_RDONLY
@@ -244,9 +401,10 @@ def _publish_external_plan(path: Path, payload: bytes) -> None:
     temporary_name = f".{path.name}.naos-plan-{uuid.uuid4().hex}.pending"
     descriptor: int | None = None
     try:
+        _check_external_plan_parent(path, parent_fd)
         descriptor = os.open(
             temporary_name,
-            os.O_WRONLY
+            os.O_RDWR
             | os.O_CREAT
             | os.O_EXCL
             | getattr(os, "O_CLOEXEC", 0)
@@ -254,6 +412,7 @@ def _publish_external_plan(path: Path, payload: bytes) -> None:
             0o600,
             dir_fd=parent_fd,
         )
+        owned = os.fstat(descriptor)
         view = memoryview(payload)
         while view:
             written = os.write(descriptor, view)
@@ -261,8 +420,8 @@ def _publish_external_plan(path: Path, payload: bytes) -> None:
                 raise OSError("short write while publishing canonical plan")
             view = view[written:]
         os.fsync(descriptor)
-        os.close(descriptor)
-        descriptor = None
+        _check_external_plan_entry(parent_fd, temporary_name, descriptor, owned, payload)
+        _check_external_plan_parent(path, parent_fd)
         transaction.rename_no_replace_at(
             parent_fd,
             temporary_name,
@@ -270,21 +429,31 @@ def _publish_external_plan(path: Path, payload: bytes) -> None:
             path.name,
         )
         os.fsync(parent_fd)
+        _check_external_plan_entry(parent_fd, path.name, descriptor, owned, payload)
+        _check_external_plan_parent(path, parent_fd)
     except FileExistsError as exc:
         raise UpgradeCliError(
-            "plan output appeared concurrently and was preserved"
+            "plan publication path collision; existing entries were preserved; "
+            f"inspect any retained pending entry at {path.parent / temporary_name}"
+        ) from exc
+    except (OSError, UpgradeCliError, transaction.TransactionPrimitiveError) as exc:
+        raise UpgradeCliError(
+            f"external plan publication refused: {exc}; "
+            f"inspect retained entries, if present, at {path.parent / temporary_name} "
+            f"and {path}; no cleanup was attempted"
         ) from exc
     finally:
         if descriptor is not None:
             os.close(descriptor)
-        try:
-            os.unlink(temporary_name, dir_fd=parent_fd)
-        except FileNotFoundError:
-            pass
+        # Name-based cleanup cannot atomically establish ownership. Preserve
+        # uncertain entries on failure; successful rename consumes our name.
         os.close(parent_fd)
 
 
-def _read_external_plan(path: Path) -> tuple[dict[str, Any], bytes]:
+def _read_external_bytes(path: Path, *, limit: int | None = None) -> bytes:
+    limit = MAX_PLAN_BYTES if limit is None else limit
+    if not 0 < limit <= MAX_PLAN_BYTES:
+        raise UpgradeCliError("unsupported external file read limit")
     descriptor = os.open(
         path,
         os.O_RDONLY
@@ -296,11 +465,11 @@ def _read_external_plan(path: Path) -> tuple[dict[str, Any], bytes]:
         if (
             not stat.S_ISREG(before.st_mode)
             or before.st_nlink != 1
-            or before.st_size > MAX_PLAN_BYTES
+            or before.st_size > limit
         ):
             raise UpgradeCliError("apply plan file identity or size is unsupported")
         chunks: list[bytes] = []
-        remaining = MAX_PLAN_BYTES + 1
+        remaining = limit + 1
         while remaining:
             block = os.read(descriptor, min(1024 * 1024, remaining))
             if not block:
@@ -308,7 +477,7 @@ def _read_external_plan(path: Path) -> tuple[dict[str, Any], bytes]:
             chunks.append(block)
             remaining -= len(block)
         raw = b"".join(chunks)
-        if len(raw) > MAX_PLAN_BYTES:
+        if len(raw) > limit:
             raise UpgradeCliError("apply plan exceeds the supported size")
         after = os.fstat(descriptor)
         if (
@@ -327,6 +496,11 @@ def _read_external_plan(path: Path) -> tuple[dict[str, Any], bytes]:
             raise UpgradeCliError("apply plan changed while it was read")
     finally:
         os.close(descriptor)
+    return raw
+
+
+def _read_external_plan(path: Path) -> tuple[dict[str, Any], bytes]:
+    raw = _read_external_bytes(path)
     value = loads_strict_json(raw)
     if not isinstance(value, dict):
         raise UpgradeCliError("apply plan must be a JSON object")
@@ -419,12 +593,84 @@ def _external_temp_root(project_root: Path) -> Path:
     return temp_root
 
 
+def _emit_lf_preview_diagnostics(
+    project_root: Path,
+    preview: dict[str, Any],
+    plan: dict[str, Any],
+) -> None:
+    """Report attribute limits on stderr; stdout remains the exact plan JSON."""
+    policy = preview.get("lf_policy")
+    if not isinstance(policy, dict):
+        return
+    for line in naos_init.lf_policy_diagnostic_lines(policy):
+        print(line, file=sys.stderr)
+    rows = plan.get("paths") or plan.get("rows") or []
+    row = next(
+        (item for item in rows if item.get("path") == ".gitattributes"),
+        None,
+    )
+    action = row.get("action") if isinstance(row, dict) else None
+    if action in {"CREATE_NEW_UPSTREAM", "UPDATE_FROM_UPSTREAM"}:
+        print(
+            "LF_POLICY_PENDING_APPLY: effective Git attributes for the "
+            "proposed generated policy require post-apply verification.",
+            file=sys.stderr,
+        )
+        return
+    effective_paths = list(policy.get("text_paths") or [])
+    if policy.get("status") == "generated":
+        effective_paths.append(".gitattributes")
+    effective = naos_init.inspect_effective_lf_attributes(
+        project_root, effective_paths,
+    )
+    for line in naos_init.lf_policy_diagnostic_lines(
+        {"status": "checked", "omitted_text_paths": []}, effective,
+    ):
+        print(line, file=sys.stderr)
+
+
+def _emit_lf_current_diagnostics(project_root: Path, policy: dict[str, Any]) -> None:
+    """Report current attribute limits without changing a reviewed operation."""
+    if not isinstance(policy, dict):
+        return
+    effective_paths = list(policy.get("text_paths") or [])
+    if policy.get("status") == "generated":
+        effective_paths.append(".gitattributes")
+    effective = naos_init.inspect_effective_lf_attributes(project_root, effective_paths)
+    for line in naos_init.lf_policy_diagnostic_lines(policy, effective):
+        print(line, file=sys.stderr)
+
+
+def _emit_managed_init_summary(*, requested_profile: str, status: str, plan_saved: bool = False) -> None:
+    """Emit a bounded routing summary, never a replacement approval artifact."""
+    if requested_profile not in {"quickstart", "lite", "standard", "assured"}:
+        raise ValueError("Unsupported managed-init summary profile")
+    if status not in {"plan_only", "no_changes", "diagnostic_only"}:
+        raise ValueError("Unsupported managed-init summary status")
+    print(json.dumps({
+        "status": status,
+        "requested_profile": requested_profile,
+        "mutation_authorized": False,
+        "plan_saved": plan_saved,
+        "next_action": "Persist and review an external upgrade plan before digest-bound apply.",
+    }, sort_keys=True, separators=(",", ":")))
+
+
 def _plan_command(
     project_root: Path,
     *,
     requested_profile: str,
     plan_out: Path | None,
+    summary_only: bool = False,
 ) -> int:
+    summary_options = {"summary_only": True} if summary_only else {}
+    if _v3_recovery_api().has_v3_control(project_root):
+        return _v3_public_profile_api().plan_command(project_root, requested_profile=requested_profile,
+                            plan_out=plan_out, cli=sys.modules[__name__], **summary_options)
+    windows = naos_init._windows_cli()
+    if windows is not None:
+        return windows.plan_upgrade(project_root, requested_profile=requested_profile,
+                                    plan_out=plan_out, **summary_options)
     inspection = inspect_managed_content_manifest(project_root)
     with tempfile.TemporaryDirectory(
         prefix="naos-upgrade-plan-",
@@ -461,6 +707,7 @@ def _plan_command(
             provenance_refusal=provenance_refusal,
             fixed_checks=list(preview["checks"]),
         )
+        _emit_lf_preview_diagnostics(project_root, preview, plan)
         if inspection.apply_eligible and (
             plan["profile"]["effective_inputs"] != preview["effective_inputs"]
         ):
@@ -475,7 +722,12 @@ def _plan_command(
             must_exist=False,
         )
         _publish_external_plan(external, payload)
-    sys.stdout.write(payload.decode("utf-8") + "\n")
+    if summary_only:
+        _emit_managed_init_summary(requested_profile=requested_profile,
+            status="diagnostic_only" if plan["status"] == "diagnostic_only" else "plan_only",
+            plan_saved=plan_out is not None)
+    else:
+        emit_canonical_plan(payload)
     return 3 if plan["status"] == "diagnostic_only" else 0
 
 
@@ -484,6 +736,7 @@ def plan_profile_transition(
     *,
     requested_profile: str,
     plan_out: Path | None = None,
+    summary_only: bool = False,
 ) -> int:
     """Public in-process entry point for consumers that must use upgrade planning."""
 
@@ -491,6 +744,7 @@ def plan_profile_transition(
         _canonical_project_path(project_root),
         requested_profile=requested_profile,
         plan_out=plan_out,
+        **({"summary_only": True} if summary_only else {}),
     )
 
 
@@ -512,6 +766,8 @@ def _require_upgrade_checks(plan: dict[str, Any]) -> None:
     checks = plan.get("checks")
     if (
         not isinstance(checks, list)
+        or len(checks) != len(UPGRADE_CHECK_IDS)
+        or any(not isinstance(check, dict) for check in checks)
         or {
             str(check.get("check_id"))
             for check in checks
@@ -530,6 +786,7 @@ def _require_add_checks(plan: dict[str, Any]) -> None:
     if (
         not isinstance(checks, list)
         or len(checks) != 1
+        or not isinstance(checks[0], dict)
         or checks[0].get("check_id") != "managed_request_source_authority"
         or checks[0].get("status") != "passed"
         or not isinstance(checks[0].get("evidence_sha256"), str)
@@ -600,8 +857,23 @@ def _apply_command(
     plan_path: Path,
     expected_digest: str,
 ) -> int:
-    external = _external_plan_path(project_root, plan_path, must_exist=True)
-    plan, _raw = _read_external_plan(external)
+    public_rebind = _public_rebind_api()
+    body, raw = public_rebind.read_external_plan(project_root, plan_path, cli=sys.modules[__name__])
+    if body.get('schema') == _public_foreign_store_api().PLAN_SCHEMA:
+        return _public_foreign_store_api().approved_command(project_root,raw=raw,expected_digest=expected_digest)
+    if body.get("schema") in _public_migration_api().PLAN_SCHEMAS:
+        raise UpgradeCliError("Exact migration plan requires --migration-inputs")
+    if body.get("schema") == public_rebind.PLAN_SCHEMA:
+        return public_rebind.apply_command(project_root, raw=raw, expected_digest=expected_digest,
+                                           cli=sys.modules[__name__])
+    if _v3_recovery_api().has_v3_control(project_root):
+        return _v3_public_profile_api().apply_command(project_root, plan_path=plan_path,
+                             expected_digest=expected_digest, cli=sys.modules[__name__])
+    windows = naos_init._windows_cli()
+    if windows is not None:
+        return windows.apply_upgrade(project_root, plan_path=plan_path,
+                                     expected_digest=expected_digest)
+    plan, _raw = body, raw
     validate_content_aware_plan(plan, project_root=project_root)
     if plan.get("plan_sha256") != expected_digest:
         raise UpgradeCliError(
@@ -722,10 +994,61 @@ def _apply_command(
                 f"validation reported {closing.status}: {closing.refusal or ''}"
             ),
         )
+    if is_profile_transition:
+        policy = preview.get("lf_policy")
+        _emit_lf_current_diagnostics(project_root, policy)
     return _emit_apply_outcome(outcome, expected_digest)
 
 
+def _public_foreign_store_api():
+    try:
+        from .upgrade_contract import public_foreign_store
+    except ImportError:
+        from upgrade_contract import public_foreign_store
+    return public_foreign_store
+
+
+def _public_migration_api():
+    try:
+        from .upgrade_contract import public_migration
+    except ImportError:
+        from upgrade_contract import public_migration
+    return public_migration
+
+
+def _public_rebind_api():
+    try:
+        from .upgrade_contract import public_rebind
+    except ImportError:
+        from upgrade_contract import public_rebind
+    return public_rebind
+
+
+def _v3_public_profile_api():
+    try:
+        from .upgrade_contract import v3_public_profile
+    except ImportError:
+        from upgrade_contract import v3_public_profile
+    return v3_public_profile
+
+
+def _v3_recovery_api():
+    try:
+        from .upgrade_contract import v3_recovery
+    except ImportError:
+        from upgrade_contract import v3_recovery
+    return v3_recovery
+
+
 def _recover_command(project_root: Path) -> int:
+    portable_recovery = _v3_recovery_api()
+    if portable_recovery.has_v3_control(project_root):
+        outcome = portable_recovery.recover_active_j2(project_root)
+        print(json.dumps([outcome], sort_keys=True, separators=(",", ":")))
+        return 0
+    windows = naos_init._windows_cli()
+    if windows is not None:
+        return windows.recover(project_root)
     scope = inspect_managed_content_scope(project_root)
     if scope.status != "valid":
         raise UpgradeCliError(
@@ -754,12 +1077,88 @@ def _recover_command(project_root: Path) -> int:
     return 3 if any(item["status"] in unresolved for item in payload) else 0
 
 
+def _inspect_provenance_command(project_root: Path) -> int:
+    """Inspect portable consistency only; local ownership and mutation are separate."""
+    if platform.system() == "Windows":
+        try:
+            from .upgrade_contract.portable_provenance_windows import read_portable_snapshot
+        except ImportError:
+            from upgrade_contract.portable_provenance_windows import read_portable_snapshot
+        snapshot = read_portable_snapshot(str(project_root))
+    elif platform.system() in {"Darwin", "Linux"}:
+        try:
+            from .upgrade_contract.portable_provenance_posix import read_portable_snapshot
+        except ImportError:
+            from upgrade_contract.portable_provenance_posix import read_portable_snapshot
+        snapshot = read_portable_snapshot(project_root)
+    else:
+        raise UpgradeCliError("Portable provenance inspection requires macOS, Linux or Windows")
+    print(json.dumps({
+        "schema": "naos.upgrade.portable_inspection.v1",
+        "status": "history_internally_consistent",
+        "project_id": snapshot.project_id,
+        "owner_sha256": snapshot.owner_sha256,
+        "manifest_sha256": snapshot.manifest_sha256,
+        "head_receipt_sha256": snapshot.head_receipt_sha256,
+        "entry_count": len(snapshot.entries),
+        "inputs": snapshot.inputs,
+        "local_binding_status": "not_assessed",
+        "working_tree_status": "not_assessed",
+        "mutation_eligible": False,
+        "authority": "Self-hashes establish internal consistency, not authorship or checkout ownership.",
+    }, indent=2, sort_keys=True))
+    return 0
+
+
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
     try:
         mode = _selected_mode(args)
+        if mode == "inspect":
+            # Native readers validate the supplied ancestor chain. Do not first
+            # resolve symlinks and thereby erase the path that must be checked.
+            return _inspect_provenance_command(args.project_path.expanduser().absolute())
         project_root = _canonical_project_path(args.project_path)
+        if mode == 'plan_hook_activation':
+            try:
+                from .upgrade_contract import hook_activation
+            except ImportError:
+                from upgrade_contract import hook_activation
+            return hook_activation.plan_command(project_root,
+                approved_mode_octal=args.hook_mode_octal,
+                expected_owner_sha256=args.expected_owner_sha256,
+                expected_head_sha256=args.expected_head_sha256,
+                plan_out=args.plan_out, cli=sys.modules[__name__])
+        if mode == 'inspect_receiving':
+            return _public_foreign_store_api().inspect_command(project_root)
+        if mode == 'plan_receiving':
+            return _public_foreign_store_api().plan_command(project_root,
+                expected_owner_sha256=args.expected_owner_sha256,expected_head_sha256=args.expected_head_sha256,
+                expected_inventory_sha256=args.expected_store_inventory_sha256,binding_id=args.binding_id,
+                plan_out=args.plan_out,cli=sys.modules[__name__])
+        if mode == 'recover_receiving':
+            body,raw=_public_rebind_api().read_external_plan(project_root,args.apply_plan,cli=sys.modules[__name__])
+            if body.get('schema')!=_public_foreign_store_api().PLAN_SCHEMA:
+                raise UpgradeCliError('External receiving recovery refuses a different plan schema')
+            return _public_foreign_store_api().approved_command(project_root,raw=raw,
+                expected_digest=args.expect_plan_digest,recover=True)
+        if mode == "plan_migration":
+            return _public_migration_api().plan_command(project_root,
+                inputs_path=args.migration_inputs, plan_out=args.plan_out, cli=sys.modules[__name__])
+        if mode in {"apply_migration", "recover_migration"}:
+            return _public_migration_api().approved_command(project_root,
+                inputs_path=args.migration_inputs, plan_path=args.apply_plan,
+                expected_digest=args.expect_plan_digest, recover=mode == "recover_migration",
+                cli=sys.modules[__name__])
+        if mode == "plan_rebind":
+            return _public_rebind_api().plan_command(
+                project_root, expected_owner_sha256=args.expected_owner_sha256,
+                expected_head_sha256=args.expected_head_sha256, binding_id=args.binding_id,
+                plan_out=args.plan_out, cli=sys.modules[__name__])
+        if mode == "recover_rebind":
+            return _public_rebind_api().recover_command(
+                project_root, expected_digest=args.expect_plan_digest)
         if mode == "plan":
             return _plan_command(
                 project_root,
@@ -774,7 +1173,8 @@ def main() -> int:
             )
         return _recover_command(project_root)
     except (OSError, RuntimeError, ValueError, ContentPlanningError) as exc:
-        print(f"NOT_APPLIED: {exc}", file=sys.stderr)
+        prefix = "PROVENANCE_REFUSED" if args.inspect_provenance else "NOT_APPLIED"
+        print(f"{prefix}: {exc}", file=sys.stderr)
         return 3
 
 

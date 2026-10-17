@@ -52,7 +52,7 @@ def detect_tier(root: Path) -> str:
     if not rules_path.exists():
         return "none"
 
-    content = rules_path.read_text(errors="replace")
+    content = rules_path.read_text(encoding="utf-8", errors="replace")
     rule_count = content.count("## Rule ")
 
     # Prefer the explicit marker in the generated/adapted RULES document. The
@@ -96,7 +96,7 @@ TIER_EXPECTATIONS = {
         "needs_validators": False,
         "needs_function_index": False,
         "needs_truth_table": False,
-        "needs_semantic_config": False,
+        "checks_optional_semantic_config": False,
         "needs_session_mgmt": False,
         "needs_agents": False,
     },
@@ -114,7 +114,7 @@ TIER_EXPECTATIONS = {
         "needs_validators": False,
         "needs_function_index": False,
         "needs_truth_table": False,
-        "needs_semantic_config": False,
+        "checks_optional_semantic_config": False,
         "needs_session_mgmt": False,
         "needs_agents": True,
     },
@@ -132,8 +132,10 @@ TIER_EXPECTATIONS = {
         "needs_validators": True,
         "needs_function_index": True,
         "needs_truth_table": False,
-        "needs_semantic_config": True,
+        "checks_optional_semantic_config": True,
         "needs_session_mgmt": True,
+        # Standard generates context-pressure and checkpoint, but not this instruction.
+        "needs_session_instruction": False,
         "needs_agents": True,
     },
     "assured": {
@@ -150,8 +152,9 @@ TIER_EXPECTATIONS = {
         "needs_validators": True,
         "needs_function_index": True,
         "needs_truth_table": True,
-        "needs_semantic_config": True,
+        "checks_optional_semantic_config": True,
         "needs_session_mgmt": True,
+        "needs_session_instruction": True,
         "needs_agents": True,
     },
 }
@@ -167,7 +170,7 @@ def check_rules_enforcement(root: Path, expect: dict) -> dict:
     checks.append({"name": "RULES.md exists", "pass": rules_path.exists()})
 
     if rules_path.exists():
-        content = rules_path.read_text(errors="replace")
+        content = rules_path.read_text(encoding="utf-8", errors="replace")
         rule_count = content.count("## Rule ")
         min_r = expect["min_rules"]
         checks.append({
@@ -201,8 +204,9 @@ def check_instruction_surface(root: Path, expect: dict) -> dict:
             "pass": (root / ".github" / "copilot-instructions.md").exists(),
         })
         checks.append({
-            "name": ".cursorrules exists",
-            "pass": (root / ".cursorrules").exists(),
+            "name": "Cursor rules exist (modern or legacy)",
+            "pass": any(p.is_file() for p in (root / ".cursor" / "rules").glob("*.mdc"))
+            or (root / ".cursorrules").is_file(),
         })
 
     min_inst = expect["min_instructions"]
@@ -271,7 +275,7 @@ def check_automation_pipeline(root: Path, expect: dict) -> dict:
     if expect["needs_makefile"]:
         has_makefile = (root / "Makefile.naos").exists()
         if not has_makefile and (root / "Makefile").exists():
-            content = (root / "Makefile").read_text(errors="replace")
+            content = (root / "Makefile").read_text(encoding="utf-8", errors="replace")
             has_makefile = "gov-refresh" in content
         checks.append({"name": "Makefile with governance targets", "pass": has_makefile})
 
@@ -308,12 +312,15 @@ def check_automation_pipeline(root: Path, expect: dict) -> dict:
         truth_table = root / "naos" / "governance" / "GOVERNANCE_TRUTH_TABLE.md"
         checks.append({"name": "GOVERNANCE_TRUTH_TABLE.md exists", "pass": truth_table.exists()})
 
-    if expect["needs_semantic_config"]:
-        semantic = root / "configs" / "semantic_allowlist.yaml"
+    if expect["checks_optional_semantic_config"]:
+        semantic = root / "configs" / "naos_semantic_allowlist.yaml"
+        legacy_semantic = root / "configs" / "semantic_allowlist.yaml"
         thresholds = root / "configs" / "thresholds.yaml"
         checks.append({
-            "name": "Semantic quality config exists",
-            "pass": semantic.exists() or thresholds.exists(),
+            "name": "Optional semantic quality config exists",
+            "pass": True if any(p.is_file() for p in (semantic, legacy_semantic, thresholds)) else None,
+            "status": "pass" if any(p.is_file() for p in (semantic, legacy_semantic, thresholds)) else "not_applicable",
+            "reason": "Optional project configuration; absence is excluded from completeness scoring.",
         })
 
     if not checks:
@@ -331,7 +338,8 @@ def check_session_management(root: Path, expect: dict) -> dict:
         checks.append({"name": "Context pressure instruction", "pass": ctx.exists()})
 
         session = root / ".github" / "instructions" / "session-management.instructions.md"
-        checks.append({"name": "Session management instruction", "pass": session.exists()})
+        if expect.get("needs_session_instruction", False):
+            checks.append({"name": "Session management instruction", "pass": session.exists()})
 
         skill = root / ".github" / "skills" / "cognitive-checkpoint" / "SKILL.md"
         checks.append({"name": "Cognitive checkpoint skill", "pass": skill.exists()})
@@ -339,8 +347,8 @@ def check_session_management(root: Path, expect: dict) -> dict:
     if expect["needs_agents"]:
         agents_dir = root / ".github" / "agents"
         checks.append({
-            "name": "Agents directory with AGENTS.md",
-            "pass": agents_dir.is_dir() and (agents_dir / "AGENTS.md").exists(),
+            "name": "AGENTS.md exists (canonical or legacy)",
+            "pass": (root / "AGENTS.md").is_file() or (agents_dir / "AGENTS.md").is_file(),
         })
 
     if not checks:
@@ -353,7 +361,7 @@ def check_session_management(root: Path, expect: dict) -> dict:
 
 def score_category(result: dict) -> float:
     """Normalize category to 0-10 scale."""
-    checks = result["checks"]
+    checks = [c for c in result["checks"] if c.get("status") != "not_applicable"]
     if not checks:
         return 0.0
     passed = sum(1 for c in checks if c["pass"])
@@ -381,7 +389,8 @@ def run_audit(root: Path, tier: str, category_filter: str | None = None) -> dict
         results.append(result)
 
     total_passed = sum(sum(1 for c in r["checks"] if c["pass"]) for r in results)
-    total_checks = sum(len(r["checks"]) for r in results)
+    total_checks = sum(sum(c.get("status") != "not_applicable" for c in r["checks"]) for r in results)
+    not_applicable = sum(sum(c.get("status") == "not_applicable" for c in r["checks"]) for r in results)
     overall = round((total_passed / total_checks) * 10, 1) if total_checks > 0 else 0.0
 
     return {
@@ -390,6 +399,7 @@ def run_audit(root: Path, tier: str, category_filter: str | None = None) -> dict
         "categories": results,
         "summary": {
             "total_checks": total_checks,
+            "not_applicable": not_applicable,
             "passed": total_passed,
             "failed": total_checks - total_passed,
             "overall_score": overall,
@@ -414,7 +424,7 @@ def display_text(audit: dict) -> None:
         emoji = "OK" if score >= 7 else ("!!" if score >= 4 else "XX")
         print(f"\n  [{emoji}] {cat['category']:30s} [{bar}] {score}/10")
         for check in cat["checks"]:
-            status = "  ok" if check["pass"] else "FAIL"
+            status = " N/A" if check.get("status") == "not_applicable" else ("  ok" if check["pass"] else "FAIL")
             print(f"       {status}  {check['name']}")
 
     s = audit["summary"]

@@ -71,6 +71,8 @@ cross_checks:
   specs:
     enabled: true
 
+# Assured report severity cannot fall below the selected policy severity.
+# Kit reports stay advisory; lower profiles retain their configured posture.
 profile_severity_behavior:
   quickstart: advisory
   lite: warning
@@ -88,6 +90,8 @@ waivers: []
 
 limitations:
   - "Python source modules are the default scope for Group 14."
-  - "Non-Python language adapters are future or project-configured."
+  - "Only Python module headers are evaluated; non-Python sources are not assessed."
+  - "No applicable Python modules yields visible advisory not-configured evidence, never pass."
+  - "Unmatched applicable Python sources and malformed scan configuration retain profile severity."
   - "The report does not prove code correctness or complete source traceability."
   - "Rationale quality requires human review."

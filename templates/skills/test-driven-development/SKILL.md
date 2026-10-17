@@ -1,11 +1,8 @@
 ---
-name: "test-driven-development"
-description: "Use acceptance-linked TDD discipline for behavior changes: scenario link -> failing test -> minimal implementation -> refactor -> evidence."
-parameters:
-  - name: requirement
-    description: "Optional FR/NFR or acceptance scenario id to anchor the test-first workflow"
-    required: false
-    default: ""
+name: test-driven-development
+description: 'Use acceptance-linked TDD discipline for behavior changes: scenario link -> failing test -> minimal implementation -> refactor -> evidence.'
+metadata:
+  naos-parameters: '[{"name":"requirement","description":"Optional FR/NFR or acceptance scenario id to anchor the test-first workflow","required":false,"default":""}]'
 ---
 
 # Skill: Test-Driven Development

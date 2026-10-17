@@ -40,9 +40,31 @@ Run:
 make -f Makefile.naos naos-policy-overrides
 ```
 
-The canonical policy remains the NAOS default policy plus validated adopter
-overlays. Any generated effective policy is derived and reviewable; it is not a
-separate source of authority.
+The merge command produces a review report and, when requested, a derived
+effective policy. It does not install that policy or automatically apply overlays
+to other commands. Consumers keep their configured adopter or default policy
+unless a reviewed policy is explicitly selected with `--policy`.
+
+Review the applied paths and effective thresholds before selecting derived
+output. Evidence budgets and allowlisted customization still need review; schema
+validation is not approval. The effective policy remains derived and reviewable,
+and durable policy decisions remain human-owned.
+
+The merge validates profile control minima against the initially selected policy:
+`profiles.severity_by_profile` cannot be lowered, and existing recognized
+`fail_on`, `strict_fail_on`, and `transition_fail_on` entries cannot be removed.
+Nonweakening additions use recognized severity values; ordinary evidence budgets
+and allowlisted customization remain configurable. This is merge validation,
+not access control or approval. A human-owned explicitly selected base policy
+still defines its own baseline.
+
+Derived output is used by a consumer only when explicitly selected with
+`--policy`; overlays are not automatically loaded or installed.
+`summary.effective_policy_written` is true only after a successful write in that
+invocation. A rejected merge, stale target, dry-run, or failed write leaves it
+false. Dry-run does not resolve the unused effective target; requested unsafe or
+unwritable targets produce a structured finding. YAML output retains its direct
+write semantics and does not claim interruption recovery.
 
 Team/operator overlays are configuration scopes only. They do not prove identity,
 authorize work, grant access, approve policy changes, satisfy separation of

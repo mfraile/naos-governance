@@ -3,10 +3,11 @@
 > Installed by `naos init`; the selected profile and exact active rows are
 > recorded in `.ai/RULES.md`.
 
-> Portable preview generation is exercised on Linux with Python 3.11. Managed
-> `--activate` mutation is currently supported only on Darwin ARM64 with CPython
-> 3.11–3.13; Linux, Windows, and other unsupported tuples refuse before target
-> mutation. This installed guide does not widen that mutation boundary.
+> Managed activation targets native macOS, Ubuntu and Windows 11 with CPython
+> 3.11–3.13. Darwin has local execution evidence; the integrated Linux and Windows
+> adapters await native qualification. Preview generation and package installation
+> do not qualify filesystem recovery. On unsupported hosts, review an absent
+> external `--preview-dir` without activating.
 
 ## Verify What's Active
 
@@ -62,14 +63,13 @@ hook itself. It does not scan dependency licences.
 
 ### Activate the Hook
 
-```bash
-# Option A: Symlink (recommended)
-ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-chmod +x .githooks/pre-commit
-
-# Option B: Git config (all hooks in .githooks/)
-git config core.hooksPath .githooks
-```
+Review `.githooks/pre-commit` before opting in. From the Git worktree root,
+inspect `git config --get core.hooksPath` and `git rev-parse --git-path hooks`.
+Preserve existing hooks and configuration, including global/worktree values.
+Nested targets and shared worktrees need a repository-owner integration decision.
+Do not assume `.git` is a directory or replace an existing hook with a symlink.
+Copying a hook, making it executable, configuring Git and executing it are
+separate states; init performs only the first after explicit activation.
 
 ## What's Next
 
@@ -118,6 +118,8 @@ separate digest-bound invocation. Do not use `naos init --activate` or legacy
 | **Purpose** | evaluation | reduced workflow | broader evidence | strongest configured evidence |
 | **Behavioral scenario metadata** | - | - | 49 scenarios | 49 scenarios |
 | **Semantic runtime** | not installed | not installed | not installed | not installed |
+
+The blocking-posture row counts rule review obligations, not automated checks or currently blocking gates. Gate severity is capped by mapped capability maturity; `gate-status` shows effective severity, and `gate-evaluate` applies the selected policy transition. Use `--strict` or `--strict-required` deliberately and inspect the reported enforcement reason and exit code.
 
 ## Learn More
 

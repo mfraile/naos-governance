@@ -38,6 +38,7 @@
     "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
     "status": {
       "type": "string",
+      "description": "Ready requires all supported structural dimensions to pass and no project findings. Fixed unsupported behavioral dimensions remain visible as coverage limitations; ready does not mean behavioral safety, approval or maturity promotion.",
       "enum": ["ready", "advisory", "review_required", "blocked", "not_configured", "unknown"]
     },
     "naos_root": {"type": "string"},

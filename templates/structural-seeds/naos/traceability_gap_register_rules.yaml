@@ -1,10 +1,21 @@
 schema: naos.traceability_gap_register_rules.v1
 profile: quickstart
 updated_at: null
+contract_role: descriptive_reference
+runtime_configurable: false
+# This seed documents producer behavior. Editing it does not change runtime
+# evaluation, activation boundaries or mandatory human review.
 description: >
-  Rules for recording traceability gaps between candidate requirements,
-  existing docs/specs/source/tests, evidence reports, and human decisions.
+  Reference for candidate-review obligations and manual baseline review.
+  This producer does not analyze requirement-to-code/test links or verify
+  truth, ownership or closure of candidate records.
+analysis_scope: candidate_review_only
+automated_missing_link_detection: false
 gap_types:
+  - candidate_requires_review
+  - baseline_review
+# Topics for human review; not gap types automatically detected by this command.
+manual_review_topics:
   - requirement_without_code
   - code_without_requirement
   - test_without_requirement

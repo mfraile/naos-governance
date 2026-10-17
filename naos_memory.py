@@ -116,8 +116,19 @@ def _inside_project(path: Path, root: Path) -> bool:
 
 
 def _expand_user_path(value: str | Path) -> Path:
+    raw = str(value)
+    # Windows pathlib may expand ~name using the current profile without
+    # resolving that account. Match the metadata-only provider-access contract:
+    # require an explicit absolute path or current-user home form instead.
     try:
-        return Path(str(value)).expanduser()
+        if (
+            os.name == "nt"
+            and raw.startswith("~")
+            and len(raw) > 1
+            and raw[1] not in {"/", "\\"}
+        ):
+            raise RuntimeError("Named-user home expansion is unsupported on Windows")
+        return Path(raw).expanduser()
     except RuntimeError as exc:
         raise ValueError(f"cannot expand user-home reference in path: {value!s}") from exc
 
@@ -325,8 +336,33 @@ def _read_regular_file(path: Path) -> bytes:
             os.close(fd)
 
 
+def _windows_config_writes_supported() -> bool:
+    return os.name == "nt"
+
+
+def _write_windows_config(path: Path, text: str) -> None:
+    try:
+        from naos_windows_report import write_strict_report
+    except ImportError as exc:
+        raise ValueError("Native Windows memory config writer is unavailable") from exc
+    try:
+        write_strict_report(path, text, private_new_file=True)
+    except RuntimeError as exc:
+        if str(exc) not in {
+            "Native report primitives are unavailable",
+            "Native Windows report publication requires Windows",
+            "Native Windows handles require CPython on Windows",
+            "Native Windows handles require CPython 3.11, 3.12, or 3.13",
+        }:
+            raise
+        raise ValueError("Native Windows memory config writer is unavailable") from exc
+
+
 def _atomic_write_config(root: Path, path: Path, text: str) -> None:
     _validate_config_destination(root, path)
+    if _windows_config_writes_supported():
+        _write_windows_config(path, text)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     _validate_config_destination(root, path)
     mode = 0o600

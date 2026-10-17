@@ -6,6 +6,8 @@ Set NAOS_TEST_KIT for kit resources and NAOS_TEST_INSTALLED=1 to test a wheel.
 from __future__ import annotations
 
 import json
+import hashlib
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
@@ -298,7 +300,7 @@ class ReportTraceContracts(unittest.TestCase):
             for name in ('model_provider_policy', 'model_telemetry_evidence'):
                 (project / 'naos/reports' / (name + '.json')).write_text('{}')
             # Overall scaffold readiness may remain blocked for unrelated reasons.
-            run(project, 'self-check')
+            run(project, 'self-check', 'assured', '--refresh')
             for name in ('model_provider_policy', 'model_telemetry_evidence'):
                 report = json.loads((project / 'naos/reports' / (name + '.json')).read_text())
                 self.assertEqual(report['schema'], 'naos.' + name + '.v1')
@@ -307,6 +309,189 @@ class ReportTraceContracts(unittest.TestCase):
             self.assertEqual(report['status'], 'blocked')
             for name in ('model_provider_policy', 'model_telemetry_evidence'):
                 self.assertGreater(report[name + '_reconciliation']['summary']['routes_generated'], 0)
+
+
+class IncompleteScanContracts(unittest.TestCase):
+    def test_human_summary_exposes_input_state_without_changing_json_or_policy(self):
+        cases = [('empty', 'not_configured', 0, 0, 0), ('valid', 'complete', 1, 1, 0),
+                 ('invalid', 'incomplete', 1, 0, 1), ('mixed', 'incomplete', 2, 1, 1)]
+        for command in ('duplicate-function-hygiene', 'test-quality-hygiene'):
+            for profile in ('standard', 'assured'):
+                for case, state, selected, scanned, failed in cases:
+                    with self.subTest(command=command, profile=profile, case=case), tempfile.TemporaryDirectory() as temporary:
+                        project = Path(temporary) / 'project with spaces café'
+                        (project / 'tests').mkdir(parents=True)
+                        if case in {'valid', 'mixed'}:
+                            (project / 'tests/test_valid.py').write_text('def test_valid():\n    assert 2 + 2 == 4\n', encoding='utf-8')
+                        if case in {'invalid', 'mixed'}:
+                            (project / 'tests/broken.py').write_text('def broken(:\n', encoding='utf-8')
+                        output = project / 'report.json'
+                        args = ['--profile', profile, '--output', str(output)]
+                        if profile == 'assured':
+                            args.append('--strict')
+                        human = subprocess.run([*COMMAND, command, *args], cwd=project, text=True, capture_output=True, timeout=30)
+                        self.assertEqual(human.returncode, int(profile == 'assured' and failed > 0), human.stderr)
+                        self.assertIn(f'scan inputs: {state}; selected {selected}, scanned {scanned}, failed {failed}', human.stdout)
+                        saved = json.loads(output.read_text(encoding='utf-8'))
+                        machine, report = execute(project, command, *args, '--json')
+                        self.assertEqual(machine.returncode, human.returncode, machine.stderr)
+                        saved.pop('generated_at', None)
+                        report.pop('generated_at', None)
+                        self.assertEqual(saved, report)
+        # Secret and dependency controls also expose selected-input coverage.
+        with tempfile.TemporaryDirectory() as temporary:
+            for command in ('secret-hygiene', 'dependency-integrity'):
+                result = subprocess.run([*COMMAND, command, '--profile', 'quickstart'], cwd=temporary,
+                                        text=True, capture_output=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('scan inputs: not_configured; selected 0, scanned 0, failed 0', result.stdout)
+            project = Path(temporary)
+            legacy = project / 'legacy.json'
+            legacy.write_text(json.dumps({'status': 'pass', 'summary': {},
+                                          'mappings': [{'source': 'a.py', 'mapped': True}]}), encoding='utf-8')
+            args = ['--profile', 'assured', '--strict', '--map-file', str(legacy)]
+            human = subprocess.run([*COMMAND, 'test-evidence', *args], cwd=project,
+                                   text=True, capture_output=True, timeout=30)
+            self.assertEqual(human.returncode, 0, human.stderr)
+            self.assertIn('coverage inputs: unknown', human.stdout)
+            machine, report = execute(project, 'test-evidence', *args, '--json')
+            self.assertEqual(machine.returncode, human.returncode, machine.stderr)
+            self.assertEqual(report['status'], 'pass')
+            self.assertEqual(report['summary']['coverage_input_status'], 'unknown')
+            self.assertTrue(report['known_gaps'])
+
+    def test_unreadable_discovered_test_is_not_clean_or_filename_evidence(self):
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(ROOT / 'scripts'))
+        import naos_test_evidence_map as mapper
+        from naos_policy import load_policy
+
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            (project / 'src').mkdir()
+            (project / 'tests').mkdir()
+            (project / 'src/app.py').write_text('value = 1\n')
+            denied = project / 'tests/test_app.py'
+            denied.write_text('import app\n')
+            original = mapper.tokenize.open
+
+            def read(path):
+                if Path(path) == denied:
+                    raise PermissionError('synthetic private OS detail')
+                return original(path)
+
+            with patch.object(mapper.tokenize, 'open', read):
+                mapping = mapper.build_map(project, 'assured', [str(project / 'src')],
+                                           [str(project / 'tests')], [], load_policy(root=ROOT))
+            self.assertEqual(mapping['status'], 'mapped_with_gaps')
+            self.assertEqual(mapping['summary']['mapped_sources'], 0)
+            self.assertEqual(mapping['summary']['test_inputs_failed'], 1)
+            self.assertEqual(mapping['mappings'][0]['tests'], [])
+            self.assertEqual(mapping['mappings'][0]['candidate_tests'], [])
+            self.assertNotIn('synthetic private OS detail', json.dumps(mapping))
+            with (
+                patch.object(mapper.tokenize, 'open', side_effect=RuntimeError('unexpected reader defect')),
+                self.assertRaisesRegex(RuntimeError, 'unexpected reader defect'),
+            ):
+                mapper.build_map(project, 'assured', [str(project / 'src')],
+                                 [str(project / 'tests')], [], load_policy(root=ROOT))
+            map_file = project / 'naos/test_evidence/source_to_test_map.json'
+            map_file.parent.mkdir(parents=True)
+            map_file.write_text(json.dumps(mapping))
+            result, health = run(project, 'test-evidence', 'assured', '--map-file', str(map_file))
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(health['summary']['test_input_status'], 'incomplete')
+            self.assertIn('test_input_unreadable', {item['status'] for item in health['findings']})
+            execute(project, 'dashboard', '--profile', 'assured', '--json')
+            self.assertIn('| Test evidence inputs | selected 1; read 0; failed 1 | incomplete |',
+                          (project / 'naos/DASHBOARD.md').read_text())
+
+    def test_incomplete_inputs_survive_cli_dashboard_pack_and_sarif(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            (project / 'naos').mkdir()
+            (project / 'src').mkdir()
+            (project / 'tests').mkdir()
+            (project / 'src/app.py').write_text('value = 1\n')
+            # Mapping requires an AST import declaration; filenames alone are candidates.
+            (project / 'tests/test_app.py').write_text('import app\n\ndef test_app():\n    assert 2 + 2 == 4\n')
+            (project / 'tests/broken.py').write_text('def broken(:\n')
+            (project / 'coverage.json').write_text('{broken')
+            producer_reports = {}
+            for command in ('duplicate-function-hygiene', 'test-quality-hygiene'):
+                result, report = run(project, command)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(report['status'], 'blocked')
+                self.assertEqual(report['summary']['files_failed'], 1)
+                self.assertTrue(report['known_gaps'])
+                producer_reports[command.replace('-', '_')] = report
+            result, mapping = execute(project, 'test-evidence-map', '--profile', 'assured', '--json')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(mapping['status'], 'mapped_with_gaps')
+            self.assertEqual(mapping['summary']['unmapped_sources'], 0)
+            result, health = run(project, 'test-evidence')
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(health['summary']['coverage_inputs_failed'], 1)
+            self.assertEqual(health['summary']['test_inputs_failed'], 1)
+            self.assertEqual({item['status'] for item in health['findings']},
+                             {'coverage_input_parse_error', 'test_input_parse_error'})
+            producer_reports['test_evidence_health'] = health
+            result, dashboard = execute(project, 'dashboard', '--profile', 'assured', '--json')
+            self.assertEqual(result.returncode, 1, result.stderr)
+            markdown = (project / 'naos/DASHBOARD.md').read_text()
+            self.assertIn('| Coverage inputs | selected 1; parsed 0; failed 1;', markdown)
+            self.assertIn('| Test scan inputs | selected 2; scanned 1; failed 1 | incomplete |', markdown)
+            result, pack = execute(project, 'evidence-pack', '--profile', 'assured', '--json')
+            artifact = pack['artifacts']['test_evidence_health_report']
+            self.assertEqual(pack['schema'], 'naos.evidence_pack.v2')
+            self.assertEqual(artifact['status'], 'present')
+            self.assertNotIn('data', artifact)
+            self.assertEqual(artifact['schema'], 'naos.report_source_reference.v1')
+            self.assertEqual(artifact['composition_kind'], 'source_reference')
+            self.assertEqual(artifact['detail_availability'], 'source_bound')
+            source = project / artifact['source_reference']
+            raw = source.read_bytes()
+            self.assertEqual(len(raw), artifact['source_size_bytes'])
+            self.assertEqual(hashlib.sha256(raw).hexdigest(), artifact['source_sha256'])
+            spec = importlib.util.spec_from_file_location(
+                'public_trace_report_composition', ROOT / 'scripts/naos_report_composition.py',
+            )
+            composition = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(composition)
+            self.assertEqual(Path(pack['project_root']), project.resolve())
+            detail = composition.read_collection_entry(artifact, Path(pack['project_root']))
+            self.assertEqual(detail['detail_availability'], 'available', detail)
+            self.assertEqual(detail['requirement_outcome'], 'unresolved')
+            self.assertEqual(detail['data'], json.loads(raw))
+            self.assertEqual(detail['data']['status'], 'blocked')
+            self.assertEqual(detail['data']['findings'][0]['status'], 'coverage_input_parse_error')
+            sarif_path = project / 'findings.sarif'
+            result, summary = execute(project, 'sarif-export', '--profile', 'assured', '--output', str(sarif_path), '--json')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            sarif = json.loads(sarif_path.read_text())
+            failures = sarif['runs'][0]['results']
+            self.assertEqual(len(failures), 4)
+            # Compare original producer IDs; SARIF ruleId adds a namespace and hash.
+            self.assertEqual({(item['properties']['naos_source_report'], item['properties']['naos_source_finding_id'])
+                              for item in failures},
+                             {(source, finding['id']) for source, report in producer_reports.items()
+                              for finding in report['findings']})
+            self.assertTrue(all(item['level'] == 'error' and item['locations'] and item['properties']['naos_human_review_required'] for item in failures))
+            (project / 'tests/deep_duplicate.py').write_text(
+                'def deep(value):\n    return ' + '+'.join(['value'] * 400) + '\n', encoding='utf-8')
+            result, report = run(project, 'duplicate-function-hygiene')
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(report['summary']['analysis_errors'], 1)
+            analysis_ids = {item['id'] for item in report['findings'] if item['status'] == 'analysis_error'}
+            execute(project, 'sarif-export', '--profile', 'assured', '--output', str(sarif_path), '--json')
+            sarif = json.loads(sarif_path.read_text())
+            analysis = [item for item in sarif['runs'][0]['results']
+                        if item['properties']['naos_source_finding_id'] in analysis_ids]
+            self.assertEqual(len(analysis), 1)
+            self.assertEqual(analysis[0]['properties']['naos_source_report'], 'duplicate_function_hygiene')
+            self.assertEqual(analysis[0]['level'], 'error')
+            self.assertTrue(analysis[0]['locations'])
 
 
 if __name__ == '__main__':

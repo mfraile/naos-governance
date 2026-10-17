@@ -30,10 +30,31 @@ profile_posture:
     human_review_required: true
     notes: "Required review only in this slice; blocking requires future validated L3+ maturity and explicit gate wiring."
 
-excluded_source_report_paths:
-  - "naos/reports/control_plane_review.json"
+# Configured control-plane and observation outputs are excluded automatically.
+# Add any other project-relative paths that must not contribute observations.
+excluded_source_report_paths: []
 
 source_reports:
+  - source_id: api_symbol_reality
+    source_type: api_symbol_reality_finding
+    path_key: api_symbol_reality_report
+    required: false
+    enabled: true
+  - source_id: package_reality
+    source_type: package_reality_finding
+    path_key: package_reality_report
+    required: false
+    enabled: true
+  - source_id: duplicate_function_hygiene
+    source_type: duplicate_function_hygiene_finding
+    path_key: duplicate_function_hygiene_report
+    required: false
+    enabled: true
+  - source_id: test_quality_hygiene
+    source_type: test_quality_hygiene_finding
+    path_key: test_quality_hygiene_report
+    required: false
+    enabled: true
   - source_id: failure_mode_posture
     source_type: failure_mode_posture_finding
     path_key: failure_mode_posture_report
@@ -70,7 +91,30 @@ source_reports:
     required: false
     enabled: true
 
+# These are detector review signals, not proof of fabrication or prevention.
+# Other statuses (including unverified/parse/consent gaps) stay unmapped for review.
 reason_mappings:
+  - source_type: api_symbol_reality_finding
+    reason_code: symbol_not_found
+    mode_ids: [F1]
+  - source_type: package_reality_finding
+    reason_code: typo_near_known_package
+    mode_ids: [F2]
+  - source_type: package_reality_finding
+    reason_code: registry_package_not_found
+    mode_ids: [F2]
+  - source_type: package_reality_finding
+    reason_code: docs_install_package_not_declared
+    mode_ids: [F2]
+  - source_type: duplicate_function_hygiene_finding
+    reason_code: duplicate_function_body
+    mode_ids: [S1]
+  - source_type: test_quality_hygiene_finding
+    reason_code: missing_assertion
+    mode_ids: [B3]
+  - source_type: test_quality_hygiene_finding
+    reason_code: trivial_assertion
+    mode_ids: [B4]
   - source_type: model_provider_policy_finding
     reason_code: missing_role
     mode_ids: [S3, D2]

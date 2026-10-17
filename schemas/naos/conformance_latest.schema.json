@@ -1,0 +1,323 @@
+{
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "naos.conformance_latest.v1"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "profile": {
+      "enum": [
+        "lite",
+        "standard",
+        "assured"
+      ]
+    },
+    "project_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "naos_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "battery_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_binding": {
+      "type": "object",
+      "properties": {
+        "battery_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "runner_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "battery_selection": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "shipped_default"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "project"
+                },
+                "ref": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "kind",
+                "ref"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "external_unqualified"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "source_sha256": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "selected_path_presence": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
+      },
+      "required": [
+        "battery_sha256",
+        "runner_sha256",
+        "battery_selection",
+        "source_sha256",
+        "selected_path_presence"
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "failed"
+      ]
+    },
+    "human_review_required": {
+      "const": true
+    },
+    "claim_ceiling": {
+      "const": "deterministic_local_conformance_structure_only"
+    },
+    "not_claimed": {
+      "const": [
+        "behavioral correctness",
+        "operating effectiveness",
+        "approval",
+        "maturity promotion"
+      ]
+    },
+    "run_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "mode": {
+      "const": "conformance"
+    },
+    "structural_checks": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "passed",
+        "total",
+        "score"
+      ],
+      "additionalProperties": false
+    },
+    "frontmatter_checks": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "passed",
+              "note"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "passed",
+        "total",
+        "score",
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "battery_checks": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "passed",
+        "total",
+        "score"
+      ],
+      "additionalProperties": false
+    },
+    "dimensions": {
+      "type": "object",
+      "properties": {
+        "D1_rule_compliance": {
+          "type": "null"
+        },
+        "D2_agent_instructions": {
+          "type": "null"
+        },
+        "D3_scoped_instructions": {
+          "type": "null"
+        },
+        "D4_prompt_templates": {
+          "type": "null"
+        },
+        "D5_efficiency": {
+          "type": "null"
+        },
+        "D6_portability": {
+          "type": "null"
+        },
+        "D7_session_hygiene": {
+          "type": "null"
+        },
+        "D8_ai_output_quality": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "D1_rule_compliance",
+        "D2_agent_instructions",
+        "D3_scoped_instructions",
+        "D4_prompt_templates",
+        "D5_efficiency",
+        "D6_portability",
+        "D7_session_hygiene",
+        "D8_ai_output_quality"
+      ],
+      "additionalProperties": false
+    },
+    "overall_conformance": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "scenarios_run": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost_usd": {
+      "const": 0.0
+    }
+  },
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "project_root",
+    "naos_root",
+    "battery_path",
+    "source_binding",
+    "status",
+    "human_review_required",
+    "claim_ceiling",
+    "not_claimed",
+    "run_date",
+    "mode",
+    "structural_checks",
+    "frontmatter_checks",
+    "battery_checks",
+    "dimensions",
+    "overall_conformance",
+    "scenarios_run",
+    "cost_usd"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://naos.dev/schemas/naos/conformance_latest.schema.json",
+  "title": "Deterministic local conformance observation with current replay bindings"
+}

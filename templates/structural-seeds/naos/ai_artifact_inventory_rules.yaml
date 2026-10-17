@@ -4,17 +4,38 @@ updated_at: null
 description: >
   Rules for classifying local AI instruction, prompt, agent, workflow, hook,
   and third-party tool artifacts before adoption.
+# Literal project-relative file/directory paths; globs are not supported.
+scan_limits:
+  max_files_per_path: 50
+  max_discovery_files: 5000
 artifact_patterns:
   - CLAUDE.md
   - AGENTS.md
+  - AGENTS.override.md
   - .github/copilot-instructions.md
   - .github/agents
   - .github/prompts
   - .github/skills
   - .github/instructions
   - .cursor/rules
+  - .cursor/skills
+  - .cursor/mcp.json
+  - .vscode/mcp.json
+  - .mcp.json
   - .claude/settings.json
   - GEMINI.md
+  - .ai/RULES.md
+  - .claude/skills
+  - .agents/skills
+  - .claude/agents
+  - .claude/commands
+  - .claude/settings.local.json
+  - CLAUDE.local.md
+  - .github/hooks
+  - .cursor/hooks.json
+  - .cursorrules
+  - .gemini/settings.json
+  - .codex
   - .specify
   - .bmad
   - .gsd

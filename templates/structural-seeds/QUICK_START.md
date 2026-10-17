@@ -23,7 +23,10 @@ conda create -n [ADAPT: env-name] python=[ADAPT: 3.12]
 conda activate [ADAPT: env-name]
 
 # Option B: venv
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv
+# Bash only: source .venv/bin/activate
+# PowerShell only: .\.venv\Scripts\Activate.ps1
+# Activation is optional: invoke the selected environment's Python directly.
 
 # Install dependencies
 pip install -r requirements.txt          # [ADAPT: adjust if different]
@@ -81,8 +84,8 @@ docker compose up -d    # starts DB, cache, etc.
 ## 6. Run Tests
 
 ```bash
-# Load env vars (required)
-set -a && source .env && set +a
+# [ADAPT] Use only the project's documented environment-loading mechanism.
+# Do not execute .env as shell code; use an existing configured dotenv loader.
 
 # Run test suite
 [ADAPT: pytest -q tests/unit tests/acceptance]
@@ -130,8 +133,15 @@ git add ... && git commit -m "feat(T-XXX): description"
 ## Common Issues
 
 **Tests fail with missing env var**:
+Confirm the required variable names and the project's documented test loader.
+Do not execute `.env` as shell code. For reviewed non-secret test values only:
+
 ```bash
-set -a && source .env && set +a  # reload env vars
+export TESTING=true  # Bash; only if the application implements this setting
+```
+
+```powershell
+$env:TESTING = "true"  # PowerShell; same application-specific condition
 ```
 
 **Pre-commit hook fails**:

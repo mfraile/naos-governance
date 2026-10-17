@@ -110,6 +110,7 @@ def build_pack(root: Path, pack_date: str, output: Path | None = None) -> Path:
                 _missing_conformance_text(root),
             )
 
+    with ZipFile(output_path, "r") as archive:
         corrupt = archive.testzip()
         if corrupt:
             raise RuntimeError(f"Zip integrity check failed at {corrupt}")

@@ -12,7 +12,7 @@ body:
     id: version
     attributes:
       label: NAOS kit version
-      description: Output of `cat NAOS_CATALOG.md | grep '^\*\*Version\*\*'` or `pip show naos-governance`
+      description: Output of `python -m pip show naos-governance` from the selected environment; for a source checkout, include its NAOS_CATALOG.md version and exact source revision.
       placeholder: "1.1.0"
     validations:
       required: true

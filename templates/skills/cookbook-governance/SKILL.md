@@ -1,7 +1,8 @@
 ---
-name: "cookbook-governance"
-description: "If-then recipes for governance workflow. Invoke when scope changes, creating tasks, ending sessions, or asked to create summary/analysis files."
-parameters: []
+name: cookbook-governance
+description: If-then recipes for governance workflow. Invoke when scope changes, creating tasks, ending sessions, or asked to create summary/analysis files.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Cookbook: Governance Workflow

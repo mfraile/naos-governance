@@ -1,58 +1,35 @@
 ---
-name: "debug"
-description: "Diagnose and fix bugs with evidence-first discipline — reproduce → localize → minimal-change fix → regression test. Invoke when a test fails, an error appears, or a regression needs investigation."
-parameters:
-  - name: target
-    description: "Optional: describe the bug, error message, or failing test to focus the investigation"
-    required: false
-    default: ""
+name: debug
+description: 'Diagnose bugs with evidence-first discipline: reproduce, localize, test hypotheses and recommend a minimal fix. Implementation requires an authorized writer.'
+metadata:
+  naos-parameters: '[{"name":"target","description":"Optional bug, error message or failing test to investigate","required":false,"default":""}]'
 ---
 
-# Skill: Debug Agent
+# Skill: evidence-first diagnosis
 
-Invokes the `@naos-debug` agent for structured, evidence-first bug diagnosis. Purpose-built to compensate for AI's weaker long-horizon debugging capability (MIT CSAIL SWE-bench finding).
+## When to Invoke
 
-## When to Use
+Use this skill to investigate a bug, error message or failing test.
 
-- A `pytest` test is failing and you need to diagnose why
-- A runtime error appears in logs or terminal output
-- A recent commit introduced a regression
-- Before attempting any fix — to confirm root cause first
+Follow a no-direct-edit diagnostic role. This skill does not invoke an agent.
+Where installed, read `.github/agents/naos-debug.agent.md` as the diagnostic
+contract; native selection requires the active host's manual invocation and
+human authorization. Lite has no debug agent: follow this protocol directly.
 
-## What This Invokes
+1. Reproduce the supplied failure with project-appropriate commands. Record the
+   exact symptom, expected behavior, failing test and affected source paths.
+2. State competing root-cause hypotheses, evidence, confidence and falsifiers.
+   Preserve failed hypotheses and missing evidence; never infer a fix from a name.
+3. Recommend the smallest correction and a regression test. Do not edit files,
+   invoke another agent, claim implementation or repeatedly run an unchanged
+   failing command. Architectural uncertainty goes to human planning review.
+4. Hand the diagnosis and proposed validation to a separately authorized writer.
+   Only that writer implements and runs the relevant checks; then request human
+   quality/governance review. A diagnostic report is not proof of a verified fix.
 
-`@naos-debug` agent (`debug.agent.md`) with a 4-step protocol:
+Manual role guidance, where installed: `.github/agents/naos-plan.agent.md`,
+`.github/agents/naos-implement.agent.md`, `.github/agents/naos-review.agent.md`.
+If any file is absent, use a human-reviewed plan, authorized writer and human
+review without claiming a named agent was loaded or invoked.
 
-1. **Evidence Gathering** — reproduce the failure, grep related code, review recent git log. NO file modifications in this step.
-2. **Hypothesis Formulation** — state root cause explicitly with evidence. Escalate to `@naos-plan` if architectural.
-3. **Minimal-Change Fix** — touch ONLY the confirmed root cause file(s). Maximum 5 file changes.
-4. **Regression Test** — write a test that fails before and passes after. Run full suite.
-
-## Quick Commands
-
-```bash
-# Reproduce
-pytest tests/<path> -v --tb=short
-
-# Localize
-grep -rn "ErrorKeyword" src/
-git log --oneline -20 -- <affected_file>
-
-# Validate fix
-pytest -q tests/unit tests/acceptance
-```
-
-## Handoff Rules
-
-- Root cause is architectural → escalate to `@naos-plan` with evidence
-- Fix verified + regression test green → hand off to `@naos-review`
-
-## Anti-Patterns
-
-| Pattern | Status |
-|---------|--------|
-| "It's probably X" without a stack trace | **FORBIDDEN** |
-| Refactoring adjacent code while fixing | **FORBIDDEN** |
-| Skipping regression test | **FORBIDDEN** |
-| `--no-verify` to bypass pre-commit | **FORBIDDEN** |
-| >5 file changes without escalating to @naos-plan | **FORBIDDEN** |
+Do not refactor adjacent code, omit regression evidence or bypass pre-commit.

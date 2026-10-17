@@ -32,7 +32,7 @@
     "schema": {"const": "naos.api_symbol_reality.v1"},
     "generated_at": {"type": "string"},
     "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked"]},
+    "status": {"type": "string", "enum": ["pass", "advisory", "warning", "required_missing", "blocked", "not_configured"]},
     "configured": {"type": "boolean"},
     "project_root": {"type": "string"},
     "naos_root": {"type": "string"},
@@ -87,6 +87,7 @@
         "line": {"type": ["integer", "null"], "minimum": 1},
         "import_executed": {"type": "boolean"},
         "inspection": {"type": "string"},
+        "static_resolution": {"enum": ["declaration_found", "absent_in_supported_scope", "unresolved"]},
         "reason": {"type": "string"}
       }
     },

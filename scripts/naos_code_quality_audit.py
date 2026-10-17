@@ -30,13 +30,20 @@ import json
 import os
 import re
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import UTC
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional
 
 import yaml
+from naos_console import configure_console_output
+from architecture_boundaries import (
+    BoundaryPolicyError,
+    find_boundary_violations,
+    load_boundary_policy,
+)
+from source_roots import existing_source_roots, source_exclusion_reason, iter_function_index_modules
 
 # ---------------------------------------------------------------------------
 # Path constants — all parameterized via environment variables
@@ -93,10 +100,12 @@ class AuditReport:
     threshold: int
     total_functions: int
     violations: int
-    compliance_rate: float
+    compliance_rate: float | None
     functions_over_threshold: List[FunctionInfo]
     summary_by_file: Dict[str, int]
     priority_refactor_list: List[FunctionInfo]
+    scan_coverage: dict[str, Any] = field(default_factory=dict)
+    assessment_status: str = "not_evaluated"
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +121,8 @@ def count_function_lines(node: ast.FunctionDef) -> tuple[int, int]:
     if (
         node.body
         and isinstance(node.body[0], ast.Expr)
-        and isinstance(node.body[0].value, (ast.Str, ast.Constant))
+        and isinstance(node.body[0].value, ast.Constant)
+        and isinstance(node.body[0].value.value, str)
     ):
         doc_node = node.body[0]
         if hasattr(doc_node, "end_lineno") and hasattr(doc_node, "lineno"):
@@ -133,7 +143,7 @@ def analyze_file(file_path: Path, threshold: int) -> List[FunctionInfo]:
         print(f"⚠️  Skipping {file_path}: {e}", file=sys.stderr)
         return []
 
-    rel_path = str(file_path.relative_to(PROJECT_ROOT))
+    rel_path = file_path.relative_to(PROJECT_ROOT).as_posix()
 
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -171,23 +181,30 @@ def run_audit(threshold: int = DEFAULT_THRESHOLD) -> AuditReport:
     total_functions = 0
     summary_by_file: Dict[str, int] = {}
 
-    for py_file in SRC_DIR.rglob("*.py"):
-        if any(pattern in str(py_file) for pattern in EXCLUDE_PATTERNS):
+    coverage = {"assessment_scope": "configured_python_source", "source_roots": [SRC_ROOT_VAL], "candidate_files": 0, "excluded_files": 0, "exclusion_reasons": {}, "inspected_files": 0, "read_or_parse_failures": 0}
+    for py_file in sorted(SRC_DIR.rglob("*.py")):
+        coverage["candidate_files"] += 1
+        reason = source_exclusion_reason(py_file, PROJECT_ROOT, EXCLUDE_PATTERNS)
+        if reason:
+            coverage["excluded_files"] += 1
+            coverage["exclusion_reasons"][reason] = coverage["exclusion_reasons"].get(reason, 0) + 1
             continue
 
         try:
             with open(py_file, encoding="utf-8") as f:
                 source = f.read()
             tree = ast.parse(source, filename=str(py_file))
+            coverage["inspected_files"] += 1
             for node in ast.walk(tree):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     total_functions += 1
-        except (SyntaxError, UnicodeDecodeError):
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            coverage["read_or_parse_failures"] += 1
             continue
 
         long_functions = analyze_file(py_file, threshold)
         if long_functions:
-            rel_path = str(py_file.relative_to(PROJECT_ROOT))
+            rel_path = py_file.relative_to(PROJECT_ROOT).as_posix()
             summary_by_file[rel_path] = len(long_functions)
             all_long_functions.extend(long_functions)
 
@@ -196,17 +213,19 @@ def run_audit(threshold: int = DEFAULT_THRESHOLD) -> AuditReport:
     compliance_rate = (
         (total_functions - len(all_long_functions)) / total_functions * 100
         if total_functions > 0
-        else 100.0
+        else None
     )
 
     return AuditReport(
         threshold=threshold,
         total_functions=total_functions,
         violations=len(all_long_functions),
-        compliance_rate=round(compliance_rate, 2),
+        compliance_rate=round(compliance_rate, 2) if compliance_rate is not None else None,
         functions_over_threshold=all_long_functions,
         summary_by_file=summary_by_file,
         priority_refactor_list=priority_list[:15],
+        scan_coverage=coverage,
+        assessment_status=("incomplete" if coverage["read_or_parse_failures"] else "not_evaluated" if not total_functions else "needs_attention" if all_long_functions else "pass"),
     )
 
 
@@ -220,6 +239,8 @@ def print_report(report: AuditReport, format: str = "text") -> None:
                     "total_functions": report.total_functions,
                     "violations": report.violations,
                     "compliance_rate": report.compliance_rate,
+                    "assessment_status": report.assessment_status,
+                    "scan_coverage": report.scan_coverage,
                     "priority_refactor_list": [
                         asdict(f) for f in report.priority_refactor_list
                     ],
@@ -237,7 +258,12 @@ def print_report(report: AuditReport, format: str = "text") -> None:
     print(f"   Threshold: {report.threshold} lines (code only, excluding docstrings)")
     print(f"   Total Functions: {report.total_functions}")
     print(f"   Violations: {report.violations}")
-    print(f"   Compliance Rate: {report.compliance_rate}%")
+    print(f"   Compliance Rate: {str(report.compliance_rate) + chr(37) if report.compliance_rate is not None else 'not evaluated'}")
+
+    if report.assessment_status in {"not_evaluated", "incomplete"}:
+        print(f"\nAssessment {report.assessment_status}: {report.scan_coverage}. No complete function-quality conclusion is available.")
+        if report.violations == 0:
+            return
 
     if report.violations == 0:
         print("\n✅ No functions exceed the threshold. Code quality target MET!")
@@ -345,7 +371,7 @@ def _build_index_for_file(file_path: Path) -> dict[str, Any]:
     try:
         source = file_path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(file_path))
-    except (SyntaxError, UnicodeDecodeError):
+    except (OSError, SyntaxError, UnicodeDecodeError):
         return {}
 
     TAG_PATTERN = re.compile(r"^(Implements|Module|Task|Specs|Rationale|ID):")
@@ -414,80 +440,116 @@ def _build_index_for_file(file_path: Path) -> dict[str, Any]:
     return result
 
 
-def _build_import_graph() -> tuple[dict[str, set[str]], dict[str, set[str]]]:
-    """Build import graph from all src/*.py files.
-
-    Returns:
-        (imports_graph, imported_by_graph) where:
-        - imports_graph[module] = set of modules it imports
-        - imported_by_graph[module] = set of modules that import it
-    """
-    imports_graph: dict[str, set[str]] = defaultdict(set)
-    imported_by: dict[str, set[str]] = defaultdict(set)
-
-    py_files = sorted(SRC_DIR.rglob("*.py"))
-    for py_file in py_files:
-        if any(pattern in str(py_file) for pattern in EXCLUDE_PATTERNS):
-            continue
-        try:
-            source = py_file.read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=str(py_file))
-        except (SyntaxError, UnicodeDecodeError):
-            continue
-
-        rel_path = str(py_file.relative_to(PROJECT_ROOT))
-        module_path = rel_path.replace("/", ".").replace(".py", "")
-
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith(_SRC_PKG_PREFIX):
-                        imports_graph[module_path].add(alias.name)
-                        imported_by[alias.name].add(module_path)
-            elif isinstance(node, ast.ImportFrom):
-                if node.module and node.module.startswith(_SRC_PKG_PREFIX):
-                    imports_graph[module_path].add(node.module)
-                    imported_by[node.module].add(module_path)
-
-    return dict(imports_graph), dict(imported_by)
+def _index_files() -> tuple[list[Path], list[Path]]:
+    """Use shared explicit/inferred roots, deduplicating overlapping selections."""
+    roots = existing_source_roots(PROJECT_ROOT, os.getenv("SRC_ROOT"))
+    relative_roots = [root.relative_to(PROJECT_ROOT) if root.is_absolute() else root for root in roots]
+    files = sorted({path for root in roots for path in (PROJECT_ROOT / root).rglob("*.py")
+                    if not source_exclusion_reason(path, PROJECT_ROOT, EXCLUDE_PATTERNS)})
+    return relative_roots, files
 
 
-def _inject_used_by(index: dict[str, Any], imported_by: dict[str, set[str]]) -> None:
-    """Inject used_by metadata into the function index.
+def _module_name(relative: Path) -> str:
+    parts = relative.with_suffix("").parts
+    return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
 
-    For each module in the index, adds a used_by field listing modules that
-    import it. Truncates to top-5 importers to stay within token budget.
-    """
-    MAX_USED_BY = 5
 
-    def _walk(node: dict[str, Any], module_prefix: str = f"{_SRC_PKG_PREFIX}") -> None:
-        for key, value in node.items():
-            if not isinstance(value, dict):
+def _build_import_graph(files=None, roots=None, coverage=None) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    """Resolve static references to uniquely indexed Python modules; never import them."""
+    if files is None or roots is None:
+        roots, files = _index_files()
+    coverage = coverage if coverage is not None else {}
+    coverage.update(language="Python", execution="static_references_only", unresolved_count=0,
+                    unresolved_samples=[], sample_limit=25, parse_failures=0)
+    aliases: dict[str, set[str]] = defaultdict(set)
+    names: dict[str, str] = {}
+    for path in files:
+        rel = path.relative_to(PROJECT_ROOT)
+        identity = rel.as_posix()
+        names[identity] = _module_name(rel)
+        aliases[names[identity]].add(identity)
+        for root in roots:
+            try:
+                local = rel.relative_to(root)
+            except ValueError:
                 continue
-            is_leaf = any(k in value for k in ("public", "classes", "purpose"))
-            if is_leaf:
-                full_module = f"{module_prefix}{key}"
-                importers = imported_by.get(full_module, set())
-                if importers:
-                    short = sorted(m.replace(_SRC_PKG_PREFIX, "", 1) for m in importers)
-                    if len(short) > MAX_USED_BY:
-                        short = short[:MAX_USED_BY] + [
-                            f"+{len(short) - MAX_USED_BY} more"
-                        ]
-                    value["used_by"] = short
-            else:
-                _walk(value, f"{module_prefix}{key}.")
+            alias = _module_name(local)
+            if alias:
+                aliases[alias].add(identity)
+    canonical_counts = Counter(names.values())
+    imports: dict[str, set[str]] = defaultdict(set)
+    reverse: dict[str, set[str]] = defaultdict(set)
 
-    _walk(index)
+    def unresolved(identity, node, reference, reason):
+        coverage["unresolved_count"] += 1
+        if len(coverage["unresolved_samples"]) < coverage["sample_limit"]:
+            coverage["unresolved_samples"].append({"source": identity, "line": getattr(node, "lineno", 1), "reference": reference, "reason": reason})
+
+    for path in files:
+        rel = path.relative_to(PROJECT_ROOT)
+        identity = rel.as_posix()
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            coverage["parse_failures"] += 1
+            continue
+        module = names[identity]
+        if canonical_counts[module] > 1:
+            unresolved(identity, tree, module, "ambiguous_importer_module")
+            continue
+        package = module.split(".") if rel.name == "__init__.py" else module.split(".")[:-1]
+        for node in ast.walk(tree):
+            references = []
+            if isinstance(node, ast.Import):
+                references = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                if node.level:
+                    if node.level > len(package):
+                        unresolved(identity, node, node.module or "", "relative_import_beyond_package")
+                        continue
+                    parent = package[:len(package) - node.level + 1]
+                    base = ".".join(parent + (node.module.split(".") if node.module else []))
+                else:
+                    base = node.module or ""
+                children = [base + "." + alias.name for alias in node.names if alias.name != "*" and base + "." + alias.name in aliases]
+                if base in aliases or not children:
+                    references.append(base)
+                references.extend(children)
+                if any(alias.name == "*" for alias in node.names):
+                    unresolved(identity, node, base, "wildcard_symbols_not_resolved")
+            elif isinstance(node, ast.Call) and (isinstance(node.func, ast.Name) and node.func.id == "__import__" or isinstance(node.func, ast.Attribute) and node.func.attr == "import_module"):
+                unresolved(identity, node, "dynamic import", "dynamic_import_not_resolved")
+            for reference in references:
+                targets = aliases.get(reference, set())
+                if len(targets) != 1:
+                    unresolved(identity, node, reference, "ambiguous_module" if targets else "external_or_unindexed_module")
+                    continue
+                target = names[next(iter(targets))]
+                imports[module].add(target)
+                reverse[target].add(module)
+    coverage["samples_truncated"] = coverage["unresolved_count"] > len(coverage["unresolved_samples"])
+    return dict(imports), dict(reverse)
 
 
-def _inject_anomaly_markers(index: dict[str, Any]) -> None:
+def _inject_used_by(index: dict[str, Any], imported_by: dict[str, set[str]], source_prefix: str | None = None) -> None:
+    """Attach up to five deterministic static importers using each leaf's identity."""
+    prefix = _SRC_PKG_PREFIX.rstrip(".") if source_prefix is None else source_prefix
+    for parts, value in iter_function_index_modules(index):
+        source = value.get("source_path")
+        module = _module_name(PurePosixPath(source)) if source else ".".join(filter(None, (prefix, ".".join(parts))))
+        importers = imported_by.get(module, set())
+        if importers:
+            short = sorted(item[len(prefix) + 1:] if prefix and item.startswith(prefix + ".") else item for item in importers)
+            value["used_by"] = short[:5] + ([f"+{len(short) - 5} more"] if len(short) > 5 else [])
+
+
+def _inject_anomaly_markers(index: dict[str, Any], source_files=None, source_prefix=None) -> None:
     """Inject DUP markers into the function index.
 
     Runs duplicate detection internally and scans for duplication patterns.
     Modifies the index dict in-place by appending markers to public entries.
     """
-    dup_report = check_duplicates(staged_only=False, report_format="silent")
+    dup_report = check_duplicates(staged_only=False, report_format="silent", source_files=source_files)
     dup_names: dict[str, list[str]] = {}
     for item in dup_report.errors + dup_report.warnings:
         name = item["name"]
@@ -499,11 +561,8 @@ def _inject_anomaly_markers(index: dict[str, Any]) -> None:
             if not isinstance(value, dict):
                 continue
             if "public" in value and isinstance(value["public"], list):
-                module_file = (
-                    f"{SRC_ROOT_VAL}/{current_path}{key}.py"
-                    if current_path
-                    else f"{SRC_ROOT_VAL}/{key}.py"
-                )
+                prefix = SRC_ROOT_VAL if source_prefix is None else source_prefix
+                module_file = value.get("source_path") or "/".join(part for part in (prefix, f"{current_path}{key}.py") if part)
                 new_public = []
                 for entry in value["public"]:
                     func_name = entry.split("(")[0].strip()
@@ -533,9 +592,12 @@ def generate_function_index(output_path: Path | None = None) -> dict[str, Any]:
     output_path = output_path or INDEX_OUTPUT
     index: dict[str, Any] = {}
 
-    py_files = sorted(SRC_DIR.rglob("*.py"))
+    roots, py_files = _index_files()
+    single_root = roots[0] if len(roots) == 1 else None
+    source_prefix = ".".join(single_root.parts) if single_root else ""
+    selected_paths = []
     for py_file in py_files:
-        if any(pattern in str(py_file) for pattern in EXCLUDE_PATTERNS):
+        if source_exclusion_reason(py_file, PROJECT_ROOT, EXCLUDE_PATTERNS):
             continue
         if py_file.name == "__init__.py":
             continue
@@ -545,10 +607,9 @@ def generate_function_index(output_path: Path | None = None) -> dict[str, Any]:
         if not file_index:
             continue
 
-        parts = list(rel.parts)
-        if parts[0] == SRC_ROOT_VAL:
-            parts = parts[1:]
-        parts[-1] = parts[-1].replace(".py", "")
+        selected_paths.append(rel.as_posix())
+        parts = list((rel.relative_to(single_root) if single_root else rel).with_suffix("").parts)
+        file_index["source_path"] = rel.as_posix()
 
         current = index
         for part in parts[:-1]:
@@ -559,20 +620,21 @@ def generate_function_index(output_path: Path | None = None) -> dict[str, Any]:
             current = current[part]
         current[parts[-1]] = file_index
 
-    _, imported_by = _build_import_graph()
-    _inject_used_by(index, imported_by)
-    _inject_anomaly_markers(index)
+    coverage = {}
+    _, imported_by = _build_import_graph(py_files, roots, coverage)
+    _inject_used_by(index, imported_by, source_prefix)
+    _inject_anomaly_markers(index, py_files, single_root.as_posix() if single_root else "")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    from datetime import datetime
 
     header = (
         f"# FUNCTION_INDEX.yaml — Codebase cognitive map\n"
         f"# Auto-generated via: python scripts/naos_code_quality_audit.py --generate-index\n"
-        f"# Last refresh: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}\n"
         f"#\n"
-        f"# PURPOSE: Compact AI-readable map of all public functions/classes in {SRC_ROOT_VAL}/.\n"
+        f"# PURPOSE: Static Python public declarations in selected roots: {', '.join(root.as_posix() for root in roots)}.\n"
+        f"# Initializer files contribute import references but are not declaration leaves.\n"
+        f"# Import coverage (not runtime availability): {json.dumps(coverage, sort_keys=True)}\n"
+        f"# Importer lists are capped at five plus an omitted-count marker.\n"
         f"# Serves as 'external hippocampus' — persistent memory across AI sessions.\n"
         f"# Read this BEFORE creating new functions to avoid duplication.\n"
         f"\n"
@@ -588,14 +650,10 @@ def generate_function_index(output_path: Path | None = None) -> dict[str, Any]:
 
     output_path.write_text(header + yaml_content, encoding="utf-8")
 
-    total_modules = sum(
-        1
-        for _ in SRC_DIR.rglob("*.py")
-        if "__pycache__" not in str(_) and _.name != "__init__.py"
-    )
+    total_modules = len(selected_paths)
     token_estimate = len(yaml_content.split())
     print(f"✅ Function Index generated: {output_path}")
-    print(f"   Modules scanned: {total_modules}")
+    print(f"   Modules indexed: {total_modules}")
     print(f"   Approximate size: {len(yaml_content)} chars (~{token_estimate} tokens)")
 
     return index
@@ -615,27 +673,58 @@ class DuplicateReport:
     allowlisted: list[str] = field(default_factory=list)
 
 
+class DuplicateAllowlistError(ValueError):
+    """A configured exact-name/path exception cannot be interpreted safely."""
+
+
 def _load_allowlist() -> dict[str, list[str]]:
     """Load duplicate allowlist from configs/naos_duplicate_allowlist.yaml."""
     if not ALLOWLIST_PATH.exists():
         return {}
     try:
-        with open(ALLOWLIST_PATH) as f:
-            data = yaml.safe_load(f) or {}
-        return data.get("allowed_duplicates", {})
-    except Exception:
-        return {}
+        with open(ALLOWLIST_PATH, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        if not isinstance(data, dict) or sum(key in data for key in ("allowlist", "allowed_duplicates")) != 1:
+            raise DuplicateAllowlistError("use exactly one of allowlist or allowed_duplicates")
+        if "allowlist" in data:
+            entries = data["allowlist"]
+            if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
+                raise DuplicateAllowlistError("allowlist must be a list of pattern/locations entries")
+            items = [(entry.get("pattern"), entry.get("locations")) for entry in entries]
+        else:
+            mapping = data["allowed_duplicates"]
+            if not isinstance(mapping, dict):
+                raise DuplicateAllowlistError("allowed_duplicates must map names to path lists")
+            items = list(mapping.items())
+        result: dict[str, list[str]] = {}
+        for name, locations in items:
+            if not isinstance(name, str) or not name.isidentifier():
+                raise DuplicateAllowlistError("pattern must be a literal Python name; regex/globs are unsupported")
+            if not isinstance(locations, list) or any(not isinstance(item, str) for item in locations):
+                raise DuplicateAllowlistError("locations must be a list of relative file paths")
+            normalized = []
+            for location in locations:
+                path = location.replace("\\", "/")
+                if (not path or path != path.strip() or any(part in {"", ".", ".."} for part in path.split("/"))
+                        or any(char in path for char in ":*?\x00")):
+                    raise DuplicateAllowlistError("locations require exact project-relative paths without traversal or globs")
+                normalized.append(path)
+            result[name] = sorted(set(result.get(name, []) + normalized))
+        return result
+    except (yaml.YAMLError, OSError, UnicodeError) as exc:
+        raise DuplicateAllowlistError("duplicate allowlist is unreadable or malformed") from exc
 
 
 def _get_package(file_path: str) -> str:
     """Extract package from relative file path."""
-    parts = Path(file_path).parts[:-1]
+    parts = PurePosixPath(file_path).parts[:-1]
     return ".".join(parts)
 
 
 def check_duplicates(
     staged_only: bool = False,
     report_format: str = "text",
+    source_files=None,
 ) -> DuplicateReport:
     """Scan src/ for duplicate function names.
 
@@ -682,7 +771,7 @@ def check_duplicates(
         "model_post_init",
     }
 
-    py_files = sorted(SRC_DIR.rglob("*.py"))
+    py_files = sorted(SRC_DIR.rglob("*.py")) if source_files is None else source_files
 
     staged_files: set[str] = set()
     if staged_only:
@@ -703,7 +792,7 @@ def check_duplicates(
     func_index: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     for py_file in py_files:
-        if any(pattern in str(py_file) for pattern in EXCLUDE_PATTERNS):
+        if source_exclusion_reason(py_file, PROJECT_ROOT, EXCLUDE_PATTERNS):
             continue
         try:
             source = py_file.read_text(encoding="utf-8")
@@ -711,7 +800,7 @@ def check_duplicates(
         except (SyntaxError, UnicodeDecodeError):
             continue
 
-        rel_path = str(py_file.relative_to(PROJECT_ROOT))
+        rel_path = py_file.relative_to(PROJECT_ROOT).as_posix()
 
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -898,21 +987,36 @@ def _load_semantic_thresholds() -> dict:
         return defaults
 
 
+class SemanticAllowlistError(ValueError):
+    """Configured semantic exceptions cannot be interpreted safely."""
+
+
 def _load_semantic_allowlist() -> set[tuple[str, str]]:
     """Load semantic allowlist pairs from configs/naos_semantic_allowlist.yaml."""
     if not SEMANTIC_ALLOWLIST_PATH.exists():
         return set()
     try:
         with open(SEMANTIC_ALLOWLIST_PATH, encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+            data = yaml.safe_load(f)
+        if not isinstance(data, dict) or "semantic_allowlist" not in data:
+            raise SemanticAllowlistError("expected semantic_allowlist: [{pair: [left, right]}]")
+        if "allowlist" in data or "auto_exempt_categories" in data:
+            raise SemanticAllowlistError("legacy pattern/category exemptions are unsupported; migrate approved exact pairs")
+        entries = data["semantic_allowlist"]
+        if not isinstance(entries, list):
+            raise SemanticAllowlistError("semantic_allowlist must be a list")
         pairs: set[tuple[str, str]] = set()
-        for entry in data.get("semantic_allowlist", []):
-            pair_list = entry.get("pair", [])
-            if len(pair_list) == 2:
-                pairs.add(tuple(sorted(pair_list)))
+        for entry in entries:
+            pair_list = entry.get("pair") if isinstance(entry, dict) else None
+            if (not isinstance(pair_list, list) or len(pair_list) != 2
+                    or any(not isinstance(item, str) or not item.strip() or item != item.strip()
+                           for item in pair_list)
+                    or pair_list[0] == pair_list[1]):
+                raise SemanticAllowlistError("each pair requires two distinct nonempty exact symbol keys")
+            pairs.add(tuple(sorted(pair_list)))
         return pairs
-    except (yaml.YAMLError, OSError):
-        return set()
+    except (yaml.YAMLError, OSError, UnicodeError) as exc:
+        raise SemanticAllowlistError("semantic allowlist is unreadable or malformed") from exc
 
 
 def _tokenize_name(text: str) -> set[str]:
@@ -1027,15 +1131,7 @@ def check_semantic_duplicates(
 
     allowlist = _load_semantic_allowlist()
 
-    exact_name_allowlisted: set[str] = set()
-    if ALLOWLIST_PATH.exists():
-        try:
-            with open(ALLOWLIST_PATH, encoding="utf-8") as f:
-                al_data = yaml.safe_load(f) or {}
-            for name in (al_data.get("allowed_duplicates") or {}).keys():
-                exact_name_allowlisted.add(name)
-        except (yaml.YAMLError, OSError):
-            pass
+    exact_allowlist = _load_allowlist()
 
     if not SIMILARITY_INDEX_PATH.exists():
         return report
@@ -1083,9 +1179,9 @@ def check_semantic_duplicates(
             return report
     else:
         staged_files = {
-            str(p.relative_to(PROJECT_ROOT))
+            p.relative_to(PROJECT_ROOT).as_posix()
             for p in SRC_DIR.rglob("*.py")
-            if not any(pat in str(p) for pat in EXCLUDE_PATTERNS)
+            if not source_exclusion_reason(p, PROJECT_ROOT, EXCLUDE_PATTERNS)
         }
 
     staged_funcs: list[dict[str, Any]] = []
@@ -1099,10 +1195,10 @@ def check_semantic_duplicates(
         except (SyntaxError, UnicodeDecodeError):
             continue
 
-        parts = rel_path.replace("\\", "/").split("/")
+        parts = PurePosixPath(rel_path).parts
         if len(parts) >= 3 and parts[0] == SRC_ROOT_VAL:
             pkg = parts[1]
-            mod = Path(parts[-1]).stem
+            mod = PurePosixPath(parts[-1]).stem
         else:
             continue
 
@@ -1165,8 +1261,9 @@ def check_semantic_duplicates(
                 func_name = func["key"].rsplit(".", 1)[-1]
                 idx_name = idx_key.rsplit(".", 1)[-1]
                 is_exact_allowlisted = (
-                    func_name in exact_name_allowlisted
-                    and idx_name in exact_name_allowlisted
+                    func_name == idx_name
+                    and func["file"] in exact_allowlist.get(func_name, [])
+                    and idx_entry.get("module") in exact_allowlist.get(func_name, [])
                 )
 
                 if (
@@ -1229,22 +1326,31 @@ class BoundaryViolation:
 
 def check_boundaries(staged_only: bool = False) -> list[BoundaryViolation]:
     """Check for forbidden import patterns per configs/naos_architecture_boundaries.yaml."""
-    if not BOUNDARIES_CONFIG.exists():
-        print(f"⚠️  Boundaries config not found: {BOUNDARIES_CONFIG}", file=sys.stderr)
+    try:
+        policy = load_boundary_policy(BOUNDARIES_CONFIG)
+    except BoundaryPolicyError as exc:
+        violation = BoundaryViolation(
+            str(BOUNDARIES_CONFIG), "", f"Malformed boundary policy: {exc}", "ERROR", 0
+        )
+        print(f"🔴 {violation.rule_reason}", file=sys.stderr)
+        return [violation]
+    if policy.status == "unconfigured":
+        print(
+            f"⚠️  Boundary policy unconfigured ({policy.placeholders} placeholder rules)."
+        )
         return []
 
-    with open(BOUNDARIES_CONFIG) as f:
-        config = yaml.safe_load(f) or {}
-
-    rules = config.get("forbidden_imports", [])
-    if not rules:
-        print("✅ No boundary rules defined.")
-        return []
-
-    import fnmatch
-
-    imports_graph, _ = _build_import_graph()
-
+    roots = tuple(existing_source_roots(PROJECT_ROOT))
+    root_prefixes = tuple(
+        (
+            source_root.relative_to(PROJECT_ROOT)
+            if source_root.is_absolute()
+            else source_root
+        )
+        .as_posix()
+        .rstrip("/")
+        for source_root in roots
+    )
     staged_files: set[str] = set()
     if staged_only:
         import subprocess
@@ -1258,40 +1364,28 @@ def check_boundaries(staged_only: bool = False) -> list[BoundaryViolation]:
         staged_files = {
             f.strip()
             for f in result.stdout.strip().split("\n")
-            if f.strip().endswith(".py") and f.strip().startswith(SRC_ROOT_VAL + "/")
+            if f.strip().endswith(".py")
+            and any(
+                prefix == "." or f.strip().startswith(prefix + "/")
+                for prefix in root_prefixes
+            )
         }
 
-    violations: list[BoundaryViolation] = []
-
-    for module_path, imported_modules in imports_graph.items():
-        file_path = module_path.replace(".", "/") + ".py"
-
-        if staged_only and staged_files and file_path not in staged_files:
-            continue
-
-        for imported in imported_modules:
-            imported_file = imported.replace(".", "/") + ".py"
-            imported_dir = imported.replace(".", "/")
-
-            for rule in rules:
-                from_pattern = rule["from"]
-                to_pattern = rule["to"]
-
-                if not fnmatch.fnmatch(file_path, from_pattern):
-                    continue
-
-                if fnmatch.fnmatch(imported_file, to_pattern) or fnmatch.fnmatch(
-                    imported_dir, to_pattern
-                ):
-                    violations.append(
-                        BoundaryViolation(
-                            importer_file=file_path,
-                            imported_module=imported,
-                            rule_reason=rule["reason"],
-                            severity=rule.get("severity", "ERROR"),
-                            line=0,
-                        )
-                    )
+    violations = [
+        BoundaryViolation(
+            finding.source,
+            finding.target,
+            finding.reason,
+            finding.severity,
+            finding.line,
+        )
+        for source_root in roots
+        for py_file in sorted((PROJECT_ROOT / source_root).rglob("*.py"))
+        if not source_exclusion_reason(py_file, PROJECT_ROOT, EXCLUDE_PATTERNS)
+        if not staged_only
+        or py_file.relative_to(PROJECT_ROOT).as_posix() in staged_files
+        for finding in find_boundary_violations(py_file, PROJECT_ROOT, roots, policy)
+    ]
 
     errors = [v for v in violations if v.severity == "ERROR"]
     warnings = [v for v in violations if v.severity == "WARNING"]
@@ -1379,7 +1473,7 @@ def check_arch_ownership(staged_only: bool = False) -> ArchOwnershipResult:
         print(f"⚠️  Boundaries config not found: {BOUNDARIES_CONFIG}", file=sys.stderr)
         return result
 
-    with open(BOUNDARIES_CONFIG) as f:
+    with open(BOUNDARIES_CONFIG, encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
 
     arch_components = config.get("arch_components", {})
@@ -1405,17 +1499,17 @@ def check_arch_ownership(staged_only: bool = False) -> ArchOwnershipResult:
         files_to_check = sorted(SRC_DIR.rglob("*.py"))
 
     files_to_check = [
-        f for f in files_to_check if "__pycache__" not in str(f) and f.exists()
+        f for f in files_to_check if not source_exclusion_reason(f, PROJECT_ROOT, ["__pycache__"]) and f.exists()
     ]
 
     for file_path in files_to_check:
-        rel_path = str(file_path.relative_to(PROJECT_ROOT))
+        rel_path = file_path.relative_to(PROJECT_ROOT).as_posix()
 
         owning_archs: list[str] = []
         for arch_id, arch_data in arch_components.items():
             modules = arch_data.get("affected_modules", [])
             for pattern in modules:
-                if fnmatch.fnmatch(rel_path, pattern):
+                if fnmatch.fnmatchcase(rel_path, pattern):
                     owning_archs.append(arch_id)
                     break
 
@@ -1630,13 +1724,13 @@ def check_spec_alignment(staged_only: bool = False) -> SpecAlignmentReport:
             py_files.extend(sorted(scripts_dir.rglob("*.py")))
 
     for py_file in py_files:
-        if any(pattern in str(py_file) for pattern in EXCLUDE_PATTERNS):
+        if source_exclusion_reason(py_file, PROJECT_ROOT, EXCLUDE_PATTERNS):
             continue
         if not py_file.exists():
             continue
 
         report.files_checked += 1
-        rel_path = str(py_file.relative_to(PROJECT_ROOT))
+        rel_path = py_file.relative_to(PROJECT_ROOT).as_posix()
 
         frs = _parse_implements_from_file(py_file)
         for fr_id in frs:
@@ -1672,7 +1766,7 @@ def check_spec_alignment(staged_only: bool = False) -> SpecAlignmentReport:
     if not staged_only:
         all_referenced_frs: set[str] = set()
         for py_file in py_files:
-            if any(pattern in str(py_file) for pattern in EXCLUDE_PATTERNS):
+            if source_exclusion_reason(py_file, PROJECT_ROOT, EXCLUDE_PATTERNS):
                 continue
             if not py_file.exists():
                 continue
@@ -1705,7 +1799,10 @@ def check_spec_alignment(staged_only: bool = False) -> SpecAlignmentReport:
         for warn in report.warnings:
             print(f"  {warn['file']}: {warn['reason']}")
     if not report.errors and not report.warnings:
-        print(f"✅ Spec alignment OK ({report.files_checked} files checked)")
+        if report.files_checked:
+            print(f"✅ Spec alignment OK ({report.files_checked} files checked)")
+        else:
+            print("No eligible Python source assessed for spec alignment.")
 
     return report
 
@@ -1716,6 +1813,7 @@ def check_spec_alignment(staged_only: bool = False) -> SpecAlignmentReport:
 
 
 def main():
+    configure_console_output()
     parser = argparse.ArgumentParser(
         description="Code Quality Audit — line-length, duplicates, spec alignment, boundaries"
     )
@@ -1744,6 +1842,11 @@ def main():
         help="Check for duplicate function names across src/",
     )
     parser.add_argument(
+        "--semantic-audit",
+        action="store_true",
+        help="Deprecated compatibility command: LLM quality audit is unavailable (exit 2)",
+    )
+    parser.add_argument(
         "--staged-only",
         action="store_true",
         help="Only check git-staged files (for pre-commit use)",
@@ -1770,19 +1873,47 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.semantic_audit:
+        report = {
+            "status": "unavailable",
+            "reason_code": "SEMANTIC_AUDIT_NOT_IMPLEMENTED",
+            "assessment_performed": False,
+            "message": "NAOS does not implement an LLM code-quality audit. "
+                       "--check-duplicates is a separate exact/near-match check, not an AI quality review.",
+        }
+        if args.report == "json":
+            print(json.dumps(report, indent=2))
+        else:
+            print(report["reason_code"] + ": " + report["message"], file=sys.stderr)
+        sys.exit(2)
+
     if args.generate_index:
-        generate_function_index()
+        try:
+            generate_function_index()
+        except DuplicateAllowlistError as exc:
+            print("DUPLICATE_ALLOWLIST_INVALID: " + str(exc), file=sys.stderr)
+            sys.exit(2)
         sys.exit(0)
 
     if args.check_duplicates:
-        report = check_duplicates(
-            staged_only=args.staged_only,
-            report_format=args.report,
-        )
-        check_semantic_duplicates(
-            staged_only=args.staged_only,
-            report=report,
-        )
+        try:
+            report = check_duplicates(
+                staged_only=args.staged_only,
+                report_format=args.report,
+            )
+            check_semantic_duplicates(
+                staged_only=args.staged_only,
+                report=report,
+            )
+        except (SemanticAllowlistError, DuplicateAllowlistError) as exc:
+            reason = "DUPLICATE_ALLOWLIST_INVALID" if isinstance(exc, DuplicateAllowlistError) else "SEMANTIC_ALLOWLIST_INVALID"
+            failure = {"status": "invalid_configuration", "reason_code": reason,
+                       "message": str(exc)}
+            if args.report == "json":
+                print(json.dumps(failure, indent=2))
+            else:
+                print(failure["reason_code"] + ": " + str(exc), file=sys.stderr)
+            sys.exit(2)
         if args.report == "json":
             semantic_errors = [
                 e for e in report.errors if "Semantic near-match" in e.get("reason", "")

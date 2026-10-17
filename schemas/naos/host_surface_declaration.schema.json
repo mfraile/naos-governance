@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_file",
+    "type",
+    "status",
+    "metadata_scope",
+    "declarations"
+  ],
+  "properties": {
+    "source_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "enum": [
+        "agent",
+        "skill",
+        "instruction"
+      ]
+    },
+    "status": {
+      "const": "declared_host"
+    },
+    "metadata_scope": {
+      "enum": ["adopter_declared", "portable_skill", "claude_skill"]
+    },
+    "declarations": {
+      "type": "object"
+    },
+    "nonportable_fields_omitted": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -32,7 +32,7 @@ Monthly governance review for {{input:month_year}}:
 1. **Governance Metrics** (run `make -f Makefile.naos gov-refresh` first, then read outputs):
    - Total commits last 30 days: `git log --oneline --since="30 days ago" | wc -l`
    - FR/NFR completed this month
-   - Bypass markers (not blocker count): `git log --oneline --since="30 days ago" | grep -i "no-verify\|skip" | wc -l`
+   - Self-reported hook-bypass message mentions: run `naos governance-bypass-posture --since-days 30 --json` and review `scans.bypass_commit_messages` plus `scans.bypass_commit_message_inspection`. The local search is bounded to 200 commits across refs. These mentions are review leads, not observed hook invocations, bypass counts, blocker counts, or a bypass rate. A failed inspection is unknown; zero mentions does not prove hooks ran.
    - New unauthorized files (target: 0)
    - Spec-pack contract and spec-cascade coherence: run or recommend `make -f Makefile.naos naos-spec-pack-contract` and `make -f Makefile.naos naos-spec-cascade` when specs, task registry entries, module headers, source spec references, or source traceability changed
 
@@ -46,7 +46,7 @@ Monthly governance review for {{input:month_year}}:
    **Purpose**: Review accepted lessons for governance/PM updates
 
    **Audit Sources** (last 30 days):
-   - Pre-commit failures: Check git log for `--no-verify`
+   - Pre-commit failures: inspect retained hook/check output when available. Commit-message mentions are self-reports only; Git does not record use of `--no-verify` by default. Separately retained local or CI check results establish only those executed checks, not past hook invocation.
    - Test failures: `git log --oneline --since="30 days ago" | grep -i "fix test\|test fix"`
    - Commit messages: `git log --oneline --since="30 days ago" | grep -i "workaround\|hack\|temporary"`
    - Validator issues: `git log --oneline --since="30 days ago" | grep -i "fix validator\|update validator"`

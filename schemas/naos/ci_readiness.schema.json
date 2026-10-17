@@ -1,0 +1,333 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:ci_readiness:v1",
+  "title": "Local CI command execution receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "run_id", "started_at", "profile", "status", "status_dimension", "commands", "gate_outputs", "limitations"],
+  "properties": {
+    "schema": {"const": "naos.ci_readiness.v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "started_at": {"type": "string"},
+    "finished_at": {"type": "string"},
+    "profile": {"enum": ["lite", "standard", "assured"]},
+    "status": {"enum": ["running", "pass", "failed"]},
+    "status_dimension": {"enum": ["command_execution_and_output_collection", "dependency_acquisition_and_final_evaluation"]},
+    "dependency_resolution_refresh": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "path",
+        "prior_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "no_prior_proof",
+            "prior_proof_invalidated"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "no_prior_proof"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "prior_sha256": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "prior_sha256": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "acquisition_status": {"enum": ["pass", "failed"]},
+    "ac_validator": {
+      "type": "object", "additionalProperties": false,
+      "required": ["authority", "path", "sha256", "applicable"],
+      "properties": {
+        "authority": {"enum": ["runner_adjacent", "adopter_override"]},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "applicable": {"type": "boolean"}
+      },
+      "allOf": [{"if": {"properties": {"applicable": {"const": true}}},
+                 "then": {"properties": {"sha256": {"type": "string"}}},
+                 "else": {"properties": {"sha256": {"type": "null"}}}}]
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "argv",
+          "returncode",
+          "outcome"
+        ],
+        "properties": {
+          "argv": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string"
+            }
+          },
+          "returncode": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "completed",
+              "nonzero_exit",
+              "launch_error",
+              "timeout",
+              "cleanup_error",
+              "publication_error"
+            ]
+          },
+          "phase": {
+            "enum": [
+              "acquisition",
+              "final_evaluation"
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "gate_publication": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "status",
+              "prior_sha256",
+              "output_sha256"
+            ],
+            "properties": {
+              "mode": {
+                "const": "prior_retained_until_changed_output"
+              },
+              "status": {
+                "enum": [
+                  "produced",
+                  "missing_output",
+                  "unchanged_invalidated",
+                  "incomplete_invalidated",
+                  "guarded_output_refused"
+                ]
+              },
+              "prior_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "output_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "publication": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "default_receipt"
+            ],
+            "properties": {
+              "mode": {
+                "const": "invocation_only_no_context"
+              },
+              "default_receipt": {
+                "const": "preserved_not_validated"
+              }
+            }
+          },
+          "budget_review_disposition": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "reference",
+              "prior_sha256",
+              "output_sha256",
+              "review_record_reference",
+              "subject_sha256",
+              "review_outcome",
+              "raw_returncode",
+              "raw_outcome",
+              "final_dependency_proof_required",
+              "invocation_started_at",
+              "review_record_sha256"
+            ],
+            "properties": {
+              "status": {
+                "const": "recorded_warning_review_acquisition_only"
+              },
+              "reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prior_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "output_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "review_record_reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "subject_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "review_outcome": {
+                "const": "reviewed_budget_warnings_only"
+              },
+              "raw_returncode": {
+                "const": 1
+              },
+              "raw_outcome": {
+                "const": "nonzero_exit"
+              },
+              "final_dependency_proof_required": {
+                "const": true
+              },
+              "invocation_started_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "review_record_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "budget_review_disposition"
+              ]
+            },
+            "then": {
+              "required": [
+                "phase"
+              ],
+              "properties": {
+                "phase": {
+                  "const": "acquisition"
+                },
+                "returncode": {
+                  "const": 1
+                },
+                "outcome": {
+                  "const": "nonzero_exit"
+                },
+                "argv": {
+                  "minItems": 3,
+                  "prefixItems": [
+                    {},
+                    {},
+                    {
+                      "const": "ai-surface-budget"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "gate_outputs": {
+      "type": "object", "required": ["gate-status", "gate-evaluate"],
+      "additionalProperties": {"type": "string"}
+    },
+    "gate_outputs_present": {
+      "type": "object", "required": ["gate-status", "gate-evaluate"],
+      "additionalProperties": {"type": "boolean"}
+    },
+    "output_checks": {
+      "type": "object",
+      "required": ["dashboard_summary_report", "secure_coding_reporting_report", "evidence_pack_report"],
+      "additionalProperties": {"type": "boolean"}
+    },
+    "gate_readiness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gate_status", "gate_evaluation"],
+      "properties": {
+        "gate_status": {"$ref": "#/$defs/gate_projection"},
+        "gate_evaluation": {"$ref": "#/$defs/gate_projection"}
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "gate_projection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_path", "readiness", "validation", "scope", "reason_codes", "source_finding_refs", "evaluation_scope", "summary", "gates", "protected_invariant_violations", "enforcement"],
+      "properties": {
+        "source_path": {"type": "string"},
+        "required_readiness": {"enum": ["not_evaluated", "unresolved", "ready"]},
+        "required_reason_codes": {"type": "array", "items": {"type": "string"}},
+        "source_content_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+        "readiness": {"enum": ["ready", "unresolved", "not_evaluated"]},
+        "validation": {"enum": ["valid", "invalid", "unsupported", "not_evaluated"]},
+        "scope": {"enum": ["matched", "mismatched", "not_established", "not_applicable"]},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "source_finding_refs": {"type": "array", "items": {"type": "object", "required": ["reference", "id"], "properties": {"reference": {"type": "string"}, "id": {"type": "string"}}}},
+        "evaluation_scope": {"type": ["object", "null"]},
+        "summary": {"type": ["object", "null"]},
+        "gates": {"type": "array", "items": {"type": "object"}},
+        "protected_invariant_violations": {"type": "array", "items": {"type": "object"}},
+        "enforcement": {"type": ["object", "null"]}
+      }
+    }
+  },
+  "allOf": [{
+    "if": {"properties": {"status": {"enum": ["pass", "failed"]}}},
+    "then": {"required": ["finished_at", "gate_outputs_present", "output_checks", "gate_readiness"]}
+  }]
+}

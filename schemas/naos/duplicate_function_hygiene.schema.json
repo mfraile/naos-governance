@@ -16,8 +16,24 @@
     "rules_path": {"type": ["string", "null"]},
     "deterministic": {"type": "boolean"},
     "cost_posture": {"$ref": "#/$defs/cost_posture"},
-    "summary": {"type": "object", "additionalProperties": true},
-    "scans": {"type": "object", "additionalProperties": true},
+    "summary": {"type": "object", "additionalProperties": true, "properties": {
+      "renamed_identifier_groups": {"type": "integer", "minimum": 0},
+      "alpha_unassessed_functions": {"type": "integer", "minimum": 0},
+      "files_selected": {"type": "integer", "minimum": 0},
+      "files_scanned": {"type": "integer", "minimum": 0},
+      "files_failed": {"type": "integer", "minimum": 0},
+      "parse_errors": {"type": "integer", "minimum": 0},
+      "read_errors": {"type": "integer", "minimum": 0},
+      "analysis_errors": {"type": "integer", "minimum": 0},
+      "coverage_status": {"enum": ["complete", "incomplete", "not_configured"]}
+    }},
+    "scans": {"type": "object", "additionalProperties": true, "properties": {
+      "coverage_status": {"enum": ["complete", "incomplete", "not_configured"]},
+      "input_files": {"type": "array", "items": {
+        "type": "object", "required": ["path", "status"], "additionalProperties": false,
+        "properties": {"path": {"type": "string"}, "status": {"enum": ["parsed", "parse_error", "read_error", "analysis_error"]}}
+      }}
+    }},
     "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
     "waivers": {"type": "array", "items": {"type": "object"}},
     "known_gaps": {"type": "array", "items": {"type": "string"}},

@@ -5,6 +5,8 @@
 # Depth: guardrails — minimum friction, maximum safety
 #
 # REFERENCE document only — does NOT modify live project files.
+# Membership describes this named profile, not the current project installation.
+# Root AGENTS.md and actual files are authoritative for installed availability.
 # Use the NAOS CLI to extract and adapt these components for a new project.
 
 ---
@@ -197,12 +199,14 @@ notes: >
   For an existing project, use `naos upgrade . --tier standard --dry-run` for
   comparison only.
 
-# ─── Context Phase Injection (fresh-context-per-task principle) ───────────────
-# For each SDLC phase, only the listed files should be injected into the AI
-# agent's context. Excluding irrelevant files reduces context pollution and
-# drift across tasks.
+# ─── Manual Context Phase Suggestions (no runtime injection) ───────────────
+# For each SDLC phase, an operator may select relevant files manually.
+# No runtime consumer injects/excludes these paths or overrides required
+# instruction reads, evidence duties or the selected profile.
 # [ADAPT] Adjust paths to match your project structure.
 # ─────────────────────────────────────────────────────────────────────────────
+# Manual context reading suggestions only. No runtime loader consumes this field;
+# it neither injects nor excludes files and cannot waive governance duties.
 context_phases:
   plan:
     inject:

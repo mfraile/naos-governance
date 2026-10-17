@@ -205,7 +205,12 @@ Recommended path:
 8. Run `naos governance-bypass-posture --profile <profile>` to generate `naos/reports/governance_bypass_posture.json` for hook, CI, commit-message, and tier/profile bypass posture. Run `naos external-evidence-ingest --source <scan.sarif> --profile <profile>` when local SARIF scanner output should be visible as unverified external review evidence. These reports are evidence inputs only: they do not prevent bypasses, prove CI ran, verify external findings, approve PRs, attest evidence, certify controls, or prove compliance.
 8. Run `naos memory-readiness --profile <profile>` for memory-governance posture, `naos memory-access --profile <profile>` before asking agents to claim memory or MCP access, `naos memory-use-policy --profile <profile>` before treating any memory reference as supporting context or instruction-grade, and `naos learning-loop-review --profile <profile>` before treating lessons as active guidance or using them to change governed artifacts. Memory is advisory recall only until reviewed: repository evidence and current user instructions remain authoritative, configured providers and MCP config files do not prove usable access, instruction-grade memory requires approval/provenance/scope/reviewer/timestamp/freshness, durable writes require configured, authorized, verified, and memory-use-policy-permitted access plus human review, learning candidates are proposal-only, active learning requires reviewed evidence/scope/approval/review metadata, cloud memory is not enabled by default, and unavailable memory means degraded recovery from task cards, compact summaries, git state, governance files, and NAOS reports.
 9. Review `naos/agentic_workflow.yaml`, `naos/AGENTIC_CODING_PLAYBOOK.md`, and `naos/PRE_IMPLEMENTATION_ALIGNMENT.md` before substantial AI-assisted work. Run `naos agentic-workflow-review --profile <profile>` and `naos pre-implementation-alignment-review --profile <profile>` to surface missing workflow sections, unsafe context/approval flags, missing first vertical slice, and missing test/evidence strategy. These reports are review aids only: they do not inspect chat history, approve design or implementation, prove requirements completeness, prove compliance, or replace human review.
-10. Run `naos calibration-shadow --profile <profile>` and `naos evidence-classification --profile <profile>` after representative reports exist. Calibration shadow monitors deterministic report metadata drift, not model calibration or release authorization. Evidence classification separates `confirmed`, `deduced`, `hypothesized`, and `unknown` provenance from severity; inferred categories remain review candidates, not truth proof, issue resolution, approval, or proof of compliance.
+10. Run `naos calibration-shadow --profile <profile>` and `naos evidence-classification --profile <profile>` after representative reports exist. Calibration shadow monitors deterministic report metadata drift, not model calibration or release authorization. Its comparisons have fixed metadata exclusions; the deprecated `comparison_rules.ignore_fields` field is optional for older configurations and cannot suppress schema, status, finding, source, or summary drift. New configurations should omit it. Evidence classification separates `confirmed`, `deduced`, `hypothesized`, and `unknown` provenance from severity; inferred categories remain review candidates, not truth proof, issue resolution, approval, or proof of compliance.
+
+    AI artifact, memory metadata and installation decision reports can declare `confirmed` with `classification_scope: generated_adoption_review_obligation_only`. This confirms that the producer emitted a pending review obligation. It does not confirm a conflict, resource safety, an accepted disposition or activation approval. The source finding and decision remain `review_required`; a `ready` evidence-classification report means provenance is complete for its selected inputs.
+
+    Evidence-classification diagnostics can declare `confirmed` with `classification_scope: classifier_diagnostic_observed_at_scan_only`. This confirms only the classifier's scan-time observation, bound to the source report and item hashes where available; it does not confirm the original finding or resolve its severity or review status. Copied classifier diagnostics therefore do not generate nested diagnostics on later scans, while copied unclassified source findings can still produce a steady duplicate review item.
+
 10. For active implementation work, run `naos task-context --task <TASK-ID> --profile <profile>` before handing a task to an AI tool. Use `--write-markdown` only when a bounded human/AI handoff pack is helpful.
 10. Run `naos context-index --profile <profile>` when a generated local candidate index would help task-context or review workflows. The index is generated, cache-like, and not authoritative; it does not use sqlite-vec, embeddings, graph traversal, Engram, MCP, private memory payloads, or automatic context injection.
 11. Run `naos context-query --query "<keywords>" --profile <profile>` when you need bounded candidate references from the generated index. Query results are candidates, not answers; check source paths, hashes, freshness, and authority levels before acting.
@@ -213,7 +218,9 @@ Recommended path:
 13. Run `naos graph-context --profile <profile>` to inspect future graph-context traversal guardrails. It is disabled/readiness-only by default: graph links are relationship candidates, not source of truth, NetworkX/GraphML/graph databases/graph algorithms/global scans are deferred, memory payload graphing is prohibited, and there is no hallucination-prevention guarantee.
 14. Run `naos graph-query --task <TASK-ID> --profile <profile>` after a local context index exists when bounded explicit-link relationship candidates would help. Results are not truth, source authority, or implementation proof; check source paths, hashes, freshness, and authority before acting.
 15. Run `naos session-id --profile <profile>` or `make -f Makefile.naos naos-session-id` to create or reuse a session id and session report namespace. Session-specific evidence lives under `naos/sessions/<session_id>/reports/`; latest reports under `naos/reports/` remain compatibility outputs.
-16. Run `naos operator-attribution --profile <profile>` or `make -f Makefile.naos naos-operator-attribution` to record local operator attribution for who initiated a run/session. Prefer `NAOS_OPERATOR_ID` for project-approved identifiers. Operator attribution may be personal data and is not identity proof, authentication, authorization, task ownership, locking, separation-of-duties evidence, non-repudiation, or approval.
+16. Run `naos operator-attribution --profile <profile>` or `make -f Makefile.naos naos-operator-attribution` to record local operator attribution for who initiated a run/session. Prefer `NAOS_OPERATOR_ID` for project-approved identifiers. Git fallback intentionally uses repository-local configuration only; global/effective Git identity is excluded. Explicit `NAOS_OPERATOR_ID` retains its strict ASCII grammar. Local Git/OS names can contain bounded Unicode letters, numbers, combining marks and spaces, and Git email permits bot brackets. Invalid signals that force fallback remain review findings; lower-priority signals unused after resolution do not add invalid-identifier findings. Operator attribution may be personal data and is not identity proof, authentication, authorization, task ownership, locking, separation-of-duties evidence, non-repudiation, or approval.
+
+    `naos self-check` inspects existing session context without starting, updating, or ending a session. Its session identity, operator attribution, and lifecycle child commands use `--inspect-session` and print JSON without writing session/index records, session-scoped reports, or audit events. You can use `naos session-id --inspect-session --json` directly; inspection is stdout-only and rejects `--output`, `--new-session`, and `--close-session`. To create or close a session, use the normal explicit session commands without `--inspect-session`. Other self-check producers may still write their configured derived reports.
 17. Run `naos audit-log --profile <profile>` or `make -f Makefile.naos naos-audit-log` to summarize append-only audit event files under `naos/audit_log/YYYY-MM-DD/`. Audit events record what happened over time; they are not approval, non-repudiation, cryptographic signing, tamper-proof storage, task locking, evidence conflict detection, compliance approval, or source of truth.
 17. Run `naos evidence-conflicts --profile <profile>` or `make -f Makefile.naos naos-evidence-conflicts` to flag deterministic evidence/review conflicts, stale attestations, duplicate attestations, missing reviewer/operator metadata, and unrouted conflicts. It detects review findings only; it does not resolve conflicts, adjudicate evidence correctness, prove separation of duties, approve work, lock tasks, or prove compliance.
 17. Run `naos task-claim --task <TASK-ID> --profile <profile>` or `make -f Makefile.naos naos-task-claim TASK=T-123` to record local task-claim coordination, `naos task-release --task <TASK-ID>` or `make -f Makefile.naos naos-task-release TASK=T-123` to release it, and `naos task-claims --profile <profile>` or `make -f Makefile.naos naos-task-claims` to summarize active/released/stale/conflicting claims. Claims are coordination metadata only: they do not authorize work, approve tasks, prove task ownership or separation of duties, mark completion, create exclusive access, resolve evidence conflicts, or prove compliance. Conflicts and stale claims require human review.
@@ -253,7 +260,7 @@ the native build and test commands that will be rerun after onboarding.
 
 Recommended path:
 
-1. Run `naos repository-intelligence plan . --profile <profile> --component-mode baseline --output <external-plan.json>`. Review the source-bound plan. When enrollment is required, confirm that exact digest with `repository-intelligence enroll`, create a fresh plan, apply that exact digest, and run `repository-intelligence validate`.
+1. Run `naos repository-intelligence plan . --profile <profile> --component-mode baseline --output <external-plan.json>`. Review the source-bound plan. When enrollment is required, confirm that exact digest with `repository-intelligence enroll`, create a fresh plan, apply that exact digest, and run `repository-intelligence validate`. Diagnostic plans (`not_applicable` or `blocked_prerequisite`) retain inventory and findings but create no source-content bundle; their bundle and generation fields are null and they cannot authorize enrollment or apply. Actionable plans retain an external bundle at the reported `bundle.path`: keep it with the plan until the operation and any recovery are complete. These files can contain indexed source text; use a private local evidence directory. An explicit output path must be absent. Old diagnostic plans containing bundles remain readable but do not authorize mutation.
 2. Run `naos-governance init . --tier <profile> --dry-run`, inspect the complete generated surface, and use a separate `--activate` invocation only after review. Activation is one provenance-bound create-only transaction: any unproven existing destination refuses the whole operation.
 3. If an observed host test recursively consumes its own `scripts/` Python collection, review the deterministic `scripts/` to `naos_tools/` preview remap. When bounded host automation literally runs repository-root Ruff discovery, also review the managed nested `.ruff.toml` markers in generated roots proved to contain no pre-existing adopter Python. The `naos_tools/` marker is kit-owned; the `.github/autoresearch/` marker follows that seed's create-once adopter ownership, and no pre-existing adopter Ruff file is modified. Mixed Python roots and detected `--config`/`--isolated` bypass postures refuse activation. Later manual Python inside a reserved excluded root, explicit-file invocations, aliases, wrappers, and non-Ruff lint engines remain review-required. Other blocking collection collisions still refuse activation.
 4. Run `naos adopt . --mode brownfield --profile <profile> --no-prompt` and inspect the inventories, baseline, candidate requirements, traceability gaps, and decision record.
@@ -270,6 +277,15 @@ Brownfield projects should expect more `missing`, `not_configured`, and `advisor
 
 The deterministic repository-intelligence baseline requires a host SQLite
 build with FTS5; activation and query fail closed when it is unavailable.
+Native baseline enrollment/apply/query/recovery is qualified on macOS ARM64
+and Ubuntu x86_64 with CPython 3.11–3.13. Windows 11 x64/NTFS planning and
+explicit enrollment have native source-candidate evidence on those Python minors.
+Windows enrollment reports `enrolled_without_activation`: prepare a new plan
+after enrollment, then review and confirm that activation plan. Windows 11
+x64/NTFS uses the native baseline apply, validate, query, status and recover
+commands. Preserve any incomplete-bootstrap or pre-intent preparation refusal
+for reconciliation; an enrollment result alone never authorizes apply. See
+[platform evidence](PLATFORM_ADAPTERS.md) for test scope and limitations.
 Optional NetworkX/GraphML is selected only after executed
 relationship-utility evidence supports it; GraphML remains derived navigation
 evidence. `sqlite-vec`, embeddings, and provider calls remain inactive without
@@ -282,10 +298,11 @@ provenance-bound lifecycle.
 
 ## Installer and Module Polish
 
-The preferred public path is:
+First install a selected, checksum-verified artifact using the
+[acquisition instructions](../INSTALLATION_MANUAL.md#artifact-acquisition).
+Then, on a host supported for activation:
 
 ```bash
-pip install naos-governance
 naos-governance init /path/to/project --tier quickstart --activate
 cd /path/to/project
 naos-governance setup-recommendations --profile quickstart
@@ -313,6 +330,12 @@ plan with `--plan-out`, then apply that exact digest through
 Adopter-owned or modified paths are preserved, and blanket `--force` remains
 unavailable. Optional integrations remain optional.
 
+A completed add/setup dry-run is a review result, not installation authority.
+On Windows, an add/setup dry-run before managed initialization reports
+`PLAN-BLOCKED` after source validation. That blocked review creates no plan or
+managed content; mutation and `--plan-out` still require managed initialization.
+The surrounding `first-run` workflow continues to write its review reports.
+
 ## Non-Developer Intake
 
 NAOS should support structured intake before AI implementation, especially where business owners, compliance owners, or product managers bring requirements to an AI-assisted engineering workflow.
@@ -335,6 +358,26 @@ reports through `naos intake`, `naos install-plan`, `naos adopt`,
 `naos install-decision-record`. These commands support answer-file and
 interactive use where appropriate, preserve unknowns instead of guessing, and
 write review artifacts under `naos/reports/`.
+
+Reconstruction uses explicit word/identifier boundaries for NFR hints, so ordinary
+words such as `special`, `author` and `monkey` do not imply CI, authentication or
+key management. These are review hints, not verified requirements.
+
+The candidate report's `reconstruction_coverage` records deterministic local
+path selection: at most 5,000 files and 100,000 directory entries, followed by
+category caps of 50 documents, 80 source files, 50 tests and 30 workflows.
+After generated-content filtering, it selects up to 12 documents, 12 source
+files and 12 **combined tests/workflows**; each cap becomes 100 when repository
+intelligence candidates are supplied. Revalidated retrieval evidence can add
+paths outside those prefixes and retain its review priority. It does not make
+the local scan complete. Known generated NAOS content is filtered before evidence
+selection. Counts describe observed paths, never an invented
+repository total after truncation. Linked/reparse paths and inspection errors
+make local discovery incomplete. Content samples are separately limited and
+content-read completeness is not verified. These are character-prefix limits,
+not file-I/O bounds: the current reader loads text before slicing. Even complete local path selection
+is not complete requirements reconstruction. Agent-loop detection uses the
+same discovered paths and keeps its existing review-only rules.
 
 Brownfield reconstruction remains bounded: candidate FRs and NFRs are generated
 only from controlled local evidence such as existing specs, docs, source, tests,
@@ -517,6 +560,85 @@ runtimes, model-backed grading, autonomous learning, and provider execution
 remain future or separately project-configured candidates; readiness metadata
 does not make them current runtime behavior.
 
+AI artifact lifecycle keywords such as `legacy`, `deprecated` or `archive` are
+review context, not proof that the instruction file itself is obsolete. The
+inventory records `deprecation_evidence` with the observed marker and whether
+it occurred in the path or sampled content; `verified` remains false. Such
+artifacts receive `review_required`, including when they also mention NAOS.
+Reconciliation uses that review default and retains the context in decisions.
+This heuristic does not automatically recommend quarantine, even for a textual
+self-deprecation claim: there is no trusted deprecation-declaration syntax in
+this classifier. A human can explicitly select quarantine; the command records
+the choice and performs no artifact mutation. Existing `stale` schema values
+remain readable for historical reports.
+
 Inventories separate existing resources, AI artifacts, memory/Engram posture, and MCP declarations. Reconciliation commands record `keep`, `merge`, `replace`, `quarantine`, `create`, or `review_required` decisions without silently overwriting active files. Candidate FR/NFRs use confidence classes such as `confirmed_by_existing_spec`, `supported_by_docs`, `inferred_from_code`, `inferred_from_tests`, and `hypothesized_requires_review`.
 
 The adoption engine is review evidence. It does not approve work, choose profile authority for the user, promote candidates to requirements, write memory, activate providers, prove runtime safety, or prove legal or regulatory compliance.
+
+## Existing-resource inventory scope
+
+`existing-resource-inventory` reads `existing_resource_inventory_rules.yaml` under
+the configured governance directory, including a remapped directory. The policy
+artifact key `existing_resource_inventory_rules` may select a relative rules file
+within that directory. Missing rules use the documented defaults; malformed or
+unsafe rules produce `invalid_config` without a fallback scan.
+
+`scan_categories` selects `docs`, `specs`, `tests`, `source`, `workflows` and
+`naos_artifacts`. Specs are reported separately from ordinary documentation;
+`naos_artifacts` selects the existing `naos_artifact` report category under the
+configured governance directory. `ignored_parts` adds literal path components
+to the mandatory exclusions (including `.git`, virtual environments, dependency
+and build directories). It cannot remove those exclusions. These options affect
+this advisory inventory only; they do not disable gates or grant approval.
+
+One sorted local traversal inspects at most `scan_limits.max_files` regular file
+paths (1–5000, default 5000), including files outside selected categories. The
+scan also has a fixed visited-entry bound. `scan_scope` records the effective
+configuration, observed file count, issues, truncation and completeness. Linked,
+reparse, unreadable or truncated paths make the report `review_required`; results
+are never evidence of complete discovery in that case. Discovery does not follow
+static links and is not a concurrent-filesystem security sandbox.
+
+## Adoption reference contracts and candidate traceability
+
+The challenge, install-plan, install-decision-record and traceability-gap-register
+rule seeds are descriptive references (`runtime_configurable: false`). Their
+producer-owned evidence collection and safety boundaries are not editable policy
+switches. Changing these reference files cannot enable activation, providers,
+memory writes or automatic approval. This differs from the effective inventory
+configuration described above.
+
+`naos traceability-gap-register` registers an open `candidate_requires_review`
+obligation for candidates not marked `confirmed_by_existing_spec`. When no such
+obligation is produced, it emits an open `baseline_review` requiring manual
+review. A candidate label is not independent verification of its truth. The
+report's `analysis_scope` explicitly states that source/test/ownership links and
+gap closure were not evaluated and that authority effect is `none`. The seed's
+`manual_review_topics` retain broader traceability questions for human review;
+they are not automatically detected defects. Existing source/test traceability
+controls elsewhere must be evaluated on their own evidence.
+
+## Incomplete Git inspection
+
+Preflight reports a working tree as `clean` or `dirty` only when Git status
+finishes successfully and its published output is not truncated. Timeouts,
+nonzero exits, unavailable Git and invalid timeout settings produce `unknown`
+and a review obligation. A successful repository-detection command remains
+evidence of presence even if the later status command fails. Verified paths
+outside a Git working tree are reported separately; failed detection is not
+proof of absence. Downstream decision records retain unknown detection as
+missing information, including historical false values without supporting state.
+
+`NAOS_GIT_TIMEOUT` configures this inspection timeout on all three OSs: integer
+seconds from 1 to 300, default 30. Status explicitly includes normal untracked
+file reporting. Increasing the timeout may help large repositories; an incomplete
+result still requires review. The two commands are observations, not an atomic
+repository snapshot or approval for mutation.
+
+`git_observations` records command outcome, return code, timeout and partial
+diagnostics. Published stdout/stderr are limited to 4,096 characters each after
+selected credential-pattern filtering; invalid UTF-8 bytes are shown as escapes.
+Partial output is diagnostic evidence, not a complete changed-file inventory.
+The publication bound is not a subprocess capture-memory limit, and the selected
+credential filter is not a general secret-detection guarantee.

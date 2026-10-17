@@ -8,7 +8,6 @@ import json
 import os
 import sys
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +18,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    controlled_utc_now_text,
     default_naos_root,
     exit_code_for_summary,
     finding_counts,
@@ -85,10 +85,7 @@ LIMITATIONS = [
 
 
 def utc_now() -> str:
-    fixed = os.environ.get("NAOS_FIXED_TIME")
-    if fixed:
-        return fixed
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return controlled_utc_now_text()
 
 
 def as_mapping(value: Any) -> dict[str, Any]:

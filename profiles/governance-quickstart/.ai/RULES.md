@@ -13,14 +13,16 @@
 
 ---
 
+> **H: Human-review obligation**: Each `[H]` table row/heading binds the full rule and its `Review Rn [H]` evidence. Human reviewers must verify all applicable rule requirements and listed evidence, withholding approval until verified; waivers require existing project-policy authority. Deterministic triggers/refusals remain; passing checks does not prove full rule satisfaction.
+
 ## Quick Reference
 
 | Rule | Summary | Rule posture |
 |------|---------|:-----------:|
-| 1 | Update existing files, never create new ones | 🔴 blocking |
-| 2 | No archive folders (use `git rm`) | 🔴 blocking |
+| 1 | Update existing files, never create new ones | 🔴 blocking [H] |
+| 2 | No archive folders (use `git rm`) | 🔴 blocking [H] |
 | 7 | **Evidence-First Analysis** — Verify before assuming, search before creating | 🟡 advisory |
-| 10 | **License Review** — copyleft-risk dependencies require explicit project approval | 🔴 blocking |
+| 10 | **License Review** — copyleft-risk dependencies require explicit project approval | 🔴 blocking [H] |
 | 11 | **Anti-Duplication** — Search before creating any new function or file | 🟡 advisory |
 
 > **Quickstart = 3 blocking-posture + 2 advisory rules.** Labels are policy posture,
@@ -31,7 +33,9 @@
 
 ---
 
-## Rule 1: Update Existing Files 🔴 blocking
+## Rule 1: Update Existing Files 🔴 blocking [H]
+
+> **Review R1 [H]**: Document searches; new-file justification/index; stated exceptions.
 
 ```
 FORBIDDEN: docs/analysis_2025-XX-XX.md, notes/session_summary.md, draft_*.md
@@ -50,16 +54,21 @@ is allowed to support the governed workflow.
 
 ---
 
-## Rule 2: No Archive Folders 🔴 blocking
+## Rule 2: No Archive Folders 🔴 blocking [H]
 
-```
-FORBIDDEN: */archive/
-REQUIRED: git rm path/to/obsolete_file.md
-```
+> **Review R2 [H]**: Changed paths; obsolete-file removal through Git.
 
-Git history IS the archive. Never create `archive/`, `old/`, or `backup/` directories.
+Do not retain obsolete files in shadow history folders; use normal Git removal
+and review instead. Legitimate archive/backup domain code is allowed, including
+`src/archive/domain.py` and `db_backup.py`.
+
+**Generated-hook scope**: blocks top-level `archive/`, `docs/archive/`, and
+`<NAOS_ROOT>/archive/` (default `naos/archive/`), plus `.bak`/`.backup` file
+extensions. Other obsolete copies remain subject to Review R2; a passing
+filename check does not establish their absence.
 
 ---
+
 
 ## Rule 7: Evidence-First Analysis 🟡 advisory
 
@@ -92,7 +101,9 @@ of the full Deep Analysis Protocol (available in Governance Lite and above).
 
 ---
 
-## Rule 10: License Review — Copyleft-Risk Approval 🔴 blocking posture
+## Rule 10: License Review — Copyleft-Risk Approval 🔴 blocking posture [H]
+
+> **Review R10 [H]**: Licence verification at source; copyleft-risk/unknown/custom human sign-off.
 
 Copyleft-risk dependencies require source verification and explicit project approval;
 obligations depend on use and legal context. This is not legal advice.
@@ -174,11 +185,13 @@ ONLY IF truly novel: Create a new function with a clear, non-overlapping name.
 | Truth validation | Assured | Requires governance truth table + canonical metrics |
 
 **Rule 26 / PAUL context brackets.** Quickstart does not enforce cognitive
-checkpoints. In Lite and higher, Rule 26 asks agents to pre-declare the active
-PAUL bracket for each checkpoint: FRESH (>75% headroom), MODERATE (35-75%),
-DEEP (25-35%), or CRITICAL (<25%). DEEP requires compacting before new
-sub-tasks; CRITICAL requires stopping, saving a full checkpoint, and handing off
-via `strategic-compact` before continuing.
+checkpoints. In Lite and higher, use the normative PAUL bracket table in the
+installed `cognitive-checkpoint` skill; it defines remaining headroom and the
+equivalent used percentage. Attribute caller or host-display estimates;
+absent or unusable percentages are UNKNOWN, not FRESH. Follow the manual
+checkpoint protocol if the skill is not installed. DEEP requires compacting
+before new sub-tasks; CRITICAL requires stopping, saving a full checkpoint,
+and handing off via `strategic-compact` before continuing.
 
 **Existing-project comparisons (existence-only; no apply)**:
 ```bash

@@ -22,6 +22,8 @@ The effective data directory is selected in this order:
 
 The database path is always derived as `data_dir/engram.db`; do not pass a database file as `data_dir`. NAOS checks directory and database-file metadata only and never reads the database payload.
 
+Provider-data exclusions apply only after native path resolution establishes project containment, using the resolved project-relative path. Existing ancestor filesystem identity recognizes case aliases on filesystems that treat them as the same directory; case-sensitive filesystems retain distinct paths. An external database remains prohibited as an index or payload input, but is not prohibited storage. A detected external database produces an advisory metadata finding only when the provider is actively configured; it does not block an otherwise unconfigured project. Configured access remains unverified at the selected profile severity. A directory or database resolving inside the project, including through a symlink configured outside it, still requires review at that severity.
+
 `~/engram-memories` is not an Engram data directory or a synchronization repository. On machines where it exists, it is a separate project-registry and adapter toolkit. Do not point `data_dir` or legacy `store_path` at it.
 
 The supported replication profile is `local`. A pre-existing non-local value is preserved as evidence, reported as unsafe/review-required, and never normalized to `local` by setup. This onboarding flow does not configure Git-based memory synchronization, cloud synchronization, provider-data imports, provider-data migrations, or upgrades.
@@ -106,6 +108,12 @@ memory:
 ```
 
 Other existing memory fields, top-level fields, `mcp_project`, `mcp_namespace`, and notes are preserved. The unused `strict_required` and `last_check` fields are removed by a reviewed setup write: readiness strictness uses the explicit `--strict-memory` command option, and read-only checks never mutate configuration or invent a timestamp. Setup refuses unsafe destinations, invalid YAML, conflicting migration metadata, and `--store-path` combined with `--write`. Use `--data-dir` for the directory containing `engram.db`.
+
+### Configuration file permissions
+
+On macOS and Ubuntu, a new configuration file has mode `0600`; updating an existing file preserves its permission mode. On Windows, setup uses the native writer with a held parent directory: a new configuration file is private to the current user, and an update preserves the existing owner, group, access-control list and inheritance protection. Linked or hard-linked destinations are refused rather than followed. These writes publish one file; they do not constitute a multi-file transaction or guarantee recovery from every system crash.
+
+If Windows refuses a new staging file during its initial permission verification, an empty private staging file can remain. No configuration content has been written to that file, and the original configuration remains unchanged. Retain the error when investigating; the presence of an empty staging file does not indicate that setup completed.
 
 ## Pending to Configured Evidence Boundary
 

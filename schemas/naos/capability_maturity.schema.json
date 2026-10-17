@@ -7,6 +7,12 @@
   "required": ["version", "levels", "profiles"],
   "properties": {
     "version": {"type": "string"},
+    "description": {"type": "string"},
+    "status_values": {
+      "type": "object",
+      "additionalProperties": {"type": "string"},
+      "propertyNames": {"type": "string", "minLength": 1}
+    },
     "levels": {
       "type": "array",
       "minItems": 6,

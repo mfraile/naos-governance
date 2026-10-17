@@ -6,7 +6,8 @@
   "core_dependency": false,
   "activation": "manual_review_required",
   "reads": [
-    ".specify/specs/*.md"
+    "specs/**/*.md",
+    ".specify/specs/**/*.md"
   ],
   "writes_by_default": [],
   "write_targets_if_explicit": [
@@ -17,6 +18,7 @@
   ],
   "dependencies": [],
   "security_boundaries": [
+    "Only the selected root is scanned recursively: specs when present, historical .specify/specs only when specs is absent, or the explicit --specs-root. Roots are not merged.",
     "No dependencies are installed silently.",
     "No files under .specify/ are mutated by default.",
     "No provider, model, API, MCP, Engram, or memory runtime is called.",

@@ -27,6 +27,7 @@ from naos_policy import (  # noqa: E402
 )
 from naos_session_identity import (  # noqa: E402
     ensure_session_context,
+    inspect_session_context,
     path_text,
     record_session_report_reference,
 )
@@ -37,7 +38,9 @@ REPORT_SCHEMA = "naos.operator_attribution.v1"
 LIMITATIONS = [
     "Operator attribution answers who initiated a NAOS command/session using local signals only.",
     "It does not prove identity, authenticate a user, authorize work, assign task ownership, lock tasks, satisfy separation of duties, provide non-repudiation, approve work, or create an append-only audit log.",
-    "Git identity is read from local git config only; no network identity provider, GitHub/GitLab API, provider SDK, token, or credential is consulted.",
+    "Git identity is read from repository-local git config only; effective/global identity is intentionally excluded and no network identity provider, GitHub/GitLab API, provider SDK, token, or credential is consulted.",
+    "Explicit NAOS_OPERATOR_ID keeps its strict ASCII grammar; bounded local Git/OS names may contain Unicode letters, numbers, combining marks and spaces, and Git email may contain bot brackets.",
+    "Invalid higher-priority signals that force fallback require review; unused lower-priority signals do not create invalid-identifier findings.",
 ]
 NOT_CLAIMED = [
     "identity proof",
@@ -111,8 +114,15 @@ def build_report(
         status = "review_required"
     if session_context.get("status") == "not_configured":
         status = "not_configured" if status != "unknown_operator" else "advisory"
+    if session_context.get("inspection_only"):
+        if session_context.get("status") == "blocked":
+            status = "blocked"
+        elif session_context.get("status") == "advisory" and status == "ready":
+            status = "advisory"
 
     findings: list[dict[str, Any]] = []
+    if session_context.get("inspection_only"):
+        findings.extend(session_context.get("findings") or [])
     for invalid in operator.get("invalid_operator_findings") or []:
         source = invalid.get("source") or "unknown"
         findings.append(
@@ -125,15 +135,24 @@ def build_report(
             )
         )
     if not operator.get("env_operator_id_detected"):
-        findings.append(
-            finding(
-                "operator_attribution.env_operator_missing",
-                "advisory",
-                "recommendation",
-                "NAOS_OPERATOR_ID is not set; attribution used the next available local signal.",
-                ["Set NAOS_OPERATOR_ID to a project-approved operator identifier if deterministic attribution is required."],
-            )
+        env_finding = finding(
+            "operator_attribution.env_operator_missing",
+            "advisory",
+            "recommendation",
+            "NAOS_OPERATOR_ID is not set; attribution used the next available local signal.",
+            ["Set NAOS_OPERATOR_ID to a project-approved operator identifier if deterministic attribution is required."],
         )
+        if not os.environ.get("NAOS_OPERATOR_ID") and not any(
+            item.get("source") == "env" for item in operator.get("invalid_operator_findings") or []
+        ):
+            env_finding.update(
+                evidence_classification="confirmed",
+                classification_scope="invocation_environment_operator_id_absent",
+                reasoning_summary="No valid environment operator ID was supplied, and attribution resolution continued to local signals; this does not verify the resolved person's identity.",
+                source_path=str(Path(__file__).resolve()),
+                human_review_required=True,
+            )
+        findings.append(env_finding)
     if operator.get("operator_attribution_status") != "resolved":
         findings.append(
             finding(
@@ -187,7 +206,7 @@ def build_report(
             "operator_resolved": operator.get("operator_attribution_status") == "resolved",
             "operator_source": operator.get("operator_source"),
             "session_id": session_id,
-            "session_copy_written": bool(session_id),
+            "session_copy_written": bool(session_id) and not session_context.get("inspection_only"),
             "network_lookup_performed": False,
             "identity_provider_lookup_performed": False,
         },
@@ -202,6 +221,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--session-id", help="Use an existing filesystem-safe session id.")
     parser.add_argument("--new-session", action="store_true", help="Create a new session id instead of reusing the latest active session.")
     parser.add_argument("--close-session", action="store_true", help="Mark the selected session as closed after attribution.")
+    parser.add_argument("--inspect-session", action="store_true", help="Read existing session context without creating or updating sessions, reports, or audit events.")
     parser.add_argument("--output", help="Optional JSON report output path.")
     parser.add_argument("--json", action="store_true", help="Print JSON report.")
     parser.add_argument("--strict", action="store_true", help="Accepted for Makefile consistency; operator attribution remains advisory.")
@@ -210,27 +230,44 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.inspect_session and (args.new_session or args.close_session or args.output):
+        print("ERROR: --inspect-session is stdout-only and cannot create, close, or write a report", file=sys.stderr)
+        return 2
     try:
         root = Path.cwd()
         policy = load_policy(args.policy, args.naos_root, root)
         naos_root = args.naos_root or default_naos_root(policy)
         profile = normalize_profile(args.profile, policy)
-        session_context = ensure_session_context(
-            root=root,
-            naos_root=naos_root,
-            policy=policy,
-            profile=profile,
-            requested_session_id=args.session_id,
-            new_session=args.new_session,
-            close_session=args.close_session,
-            task_id=None,
+        session_context = (
+            inspect_session_context(root, naos_root, policy, args.session_id)
+            if args.inspect_session else
+            ensure_session_context(
+                root=root,
+                naos_root=naos_root,
+                policy=policy,
+                profile=profile,
+                requested_session_id=args.session_id,
+                new_session=args.new_session,
+                close_session=args.close_session,
+                task_id=None,
+            )
         )
         report = build_report(root, naos_root, profile, session_context)
+        if args.inspect_session:
+            report["inspection_only"] = True
     except Exception as exc:  # pragma: no cover - defensive CLI boundary
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
     latest_path = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "operator_attribution_report")
+    if args.inspect_session:
+        if args.json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print(f"NAOS operator inspection ({profile}): {report['status']}")
+            print(f"session_id: {report.get('session_id')}")
+            print("report: stdout only")
+        return 0 if report["status"] != "blocked" else 2
     session_path = None
     if report.get("session_id") and args.output is None:
         session_path = session_report_default_path(root, naos_root, policy, str(report["session_id"]), "operator_attribution_report")

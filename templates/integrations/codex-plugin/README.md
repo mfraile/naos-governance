@@ -36,10 +36,13 @@ For a valid already managed project, `naos upgrade --plan-out` is target-read-on
 apply requires a separate `--apply-plan ... --expect-plan-digest ...`
 invocation. Legacy `--force` requests refuse.
 
-Portable preview generation is exercised on Linux with Python 3.11. Managed
-`init --activate` mutation is currently supported only on Darwin ARM64 with
-CPython 3.11–3.13; unsupported tuples refuse before target mutation. Use an
-absent external `--preview-dir` for review when the active host is unsupported.
+Managed activation targets native macOS, Ubuntu and Windows 11 with CPython
+3.11–3.13. Implementation and qualification are separate. Use the exact
+operation/candidate evidence in the platform manual; no blanket qualification
+of subsequent source changes follows. Preview generation and package
+installation do not qualify filesystem recovery. Use an absent external
+`--preview-dir` for review. Consult `INSTALLATION_MANUAL.md` and
+`docs/PLATFORM_ADAPTERS.md` for current platform limits.
 
 From the project root, use visible NAOS commands:
 

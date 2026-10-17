@@ -1,7 +1,8 @@
 ---
-name: "naos-adapter-coexistence"
-description: "Review coexistence between NAOS core and Codex, Claude Code, Cursor, VS Code, Gemini CLI, MCP, and future adapters."
-parameters: []
+name: naos-adapter-coexistence
+description: Review coexistence between NAOS core and Codex, Claude Code, Cursor, VS Code, Gemini CLI, MCP, and future adapters.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # NAOS Adapter Coexistence

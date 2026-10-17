@@ -15,6 +15,8 @@ import yaml
 
 from .canonical import canonical_sha256
 from .security import (
+    supported_metadata_flags,
+    supported_source_xattrs,
     managed_creation_identity,
     metadata_preservation_matches,
     observe_absent_leaf,
@@ -178,14 +180,15 @@ def require_supported_source_metadata(
     metadata: dict[str, object],
 ) -> None:
     if (
-        metadata.get("flags") != 0
+        not supported_metadata_flags(metadata)
+        or not supported_source_xattrs(metadata)
         or metadata.get("acl_entries") != []
         or metadata.get("uid") != os.getuid()
         or int(metadata.get("mode") or 0) & ~0o777
     ):
         raise ContentPlanningError(
-            "UNSUPPORTED_METADATA: source flags, ACL, owner, or special "
-            f"mode is outside the executed Darwin create-only adapter: {path}"
+            "UNSUPPORTED_METADATA: source flags, xattr namespace, ACL, owner, or special "
+            f"mode is outside the selected POSIX create-only adapter: {path}"
         )
 
 
@@ -455,6 +458,13 @@ def load_source_policy_snapshot(
         value = yaml.safe_load(raw.decode("utf-8")) or {}
     except (UnicodeDecodeError, yaml.YAMLError) as exc:
         raise ContentPlanningError("Managed-content source policy is invalid YAML.") from exc
+    return _source_policy_snapshot_from_value(value, raw, expected_sha256=expected_sha256)
+
+
+def _source_policy_snapshot_from_value(
+    value: Any, raw: bytes, *, expected_sha256: str | None = None,
+) -> SourcePolicySnapshot:
+    """Resolve a decoded policy without reading a live filesystem path."""
     if isinstance(value, dict) and value.get("version") == 1:
         digest = hashlib.sha256(raw).hexdigest()
         if expected_sha256 is not None and expected_sha256 != digest:
@@ -756,7 +766,15 @@ def validate_create_only_plan(
     project_root: Path,
 ) -> None:
     """Validate the complete create-only plan before it can authorize mutation."""
+    _validate_create_only_plan_record(
+        plan, root_binding=str(project_root.resolve(strict=True))
+    )
 
+
+def _validate_create_only_plan_record(
+    plan: dict[str, Any], *, root_binding: str,
+) -> None:
+    """Pure record validation; root text is evidence, never live authority."""
     schema = plan.get("schema") if isinstance(plan, dict) else None
     expected_keys = {
         "schema",
@@ -783,10 +801,9 @@ def validate_create_only_plan(
         or set(plan) != expected_keys
     ):
         raise ContentPlanningError("Managed-content plan shape is invalid.")
-    root = project_root.resolve(strict=True)
     if plan.get("status") not in {"ready_create_only", "blocked_collision"}:
         raise ContentPlanningError("Managed-content plan status is invalid.")
-    if plan.get("project_root_binding") != str(root):
+    if plan.get("project_root_binding") != root_binding:
         raise ContentPlanningError("Managed-content plan is bound to another project root.")
     if (
         not isinstance(plan.get("operation"), str)
@@ -1097,10 +1114,13 @@ def _normalized_metadata_sha256(
             }
         )
     schema = metadata.get("schema")
-    if schema == "naos.metadata.darwin_source.v1":
+    if schema in {"naos.metadata.darwin_source.v1", "naos.metadata.linux_source.v1"}:
         validate_source_metadata_contract(metadata)
         normalized = copy.deepcopy(metadata)
-    elif schema == "naos.metadata.darwin_create_only.v1":
+    elif schema in {
+        "naos.metadata.darwin_create_only.v1",
+        "naos.metadata.linux_create_only.v1",
+    }:
         validate_created_metadata_identity(metadata, expected_type="regular_file")
         normalized = source_metadata_contract(metadata)
     else:
@@ -1249,15 +1269,15 @@ def _observe_current_content(
     )
     reason = None
     if (
-        metadata.get("platform") != "Darwin"
-        or metadata.get("flags") != 0
+        metadata.get("platform") not in {"Darwin", "Linux"}
+        or not supported_metadata_flags(metadata)
         or metadata.get("acl_entries") != []
         or metadata.get("uid") != os.getuid()
         or int(metadata.get("mode") or 0) & ~0o777
     ):
         reason = (
             "UNSUPPORTED_METADATA: current file is outside the executed "
-            "Darwin regular-file tuple"
+            "selected POSIX regular-file tuple"
         )
     return current, metadata, descriptor_ancestors, reason
 
@@ -1455,6 +1475,25 @@ def _normalized_fixed_checks(
     if len(set(observed_ids)) != len(observed_ids):
         raise ContentPlanningError("Content-aware fixed checks are duplicated.")
     return sorted(checks, key=lambda check: str(check["check_id"]))
+
+
+# Current-operation guard only: historical plan/receipt replay keeps its grammar.
+_KIT_DRIFT_ACTIONS = frozenset({
+    "PRESERVE_ADOPTER_MODIFICATION", "CONFLICT_PRESERVE",
+    "REMOVAL_CONFLICT_PRESERVE", "PRESERVE_ABSENCE",
+    "PRESERVE_CURRENT_MODE_DRIFT", "PRESERVE_MODE_INTENT_CONFLICT",
+    "PRESERVE_METADATA_DRIFT", "REFUSE_UNSAFE_NATIVE_OBJECT",
+})
+
+
+def kit_owned_drift(ownership: str | None, action: str) -> bool:
+    """Whether a selected preserved row needs explicit governance review."""
+    return ownership == "kit_owned_derived" and action in _KIT_DRIFT_ACTIONS
+
+
+def content_aware_drift_paths(paths: list[dict[str, Any]]) -> list[str]:
+    return sorted(item["path"] for item in paths
+                  if kit_owned_drift(item["ownership"]["before"], item["action"]))
 
 
 def _content_aware_status(
@@ -1746,6 +1785,14 @@ def build_content_aware_plan(
         )
 
     normalized_checks = _normalized_fixed_checks(fixed_checks)
+    drift_paths = content_aware_drift_paths(paths)
+    if drift_paths:
+        if any(check["check_id"] == "kit_owned_drift" for check in normalized_checks):
+            raise ContentPlanningError("kit_owned_drift is a reserved current-state check.")
+        normalized_checks = _normalized_fixed_checks([*normalized_checks, {
+            "check_id": "kit_owned_drift", "status": "blocking",
+            "evidence_sha256": canonical_sha256({"paths": drift_paths}),
+        }])
     status = _content_aware_status(paths, input_conflicts, normalized_checks)
     manifest_control = {
         "status": (
@@ -1825,6 +1872,16 @@ def validate_content_aware_plan(
     *,
     project_root: Path,
 ) -> None:
+    """Validate a content-aware plan against the current native root."""
+    _validate_content_aware_plan_record(
+        plan, root_binding=str(project_root.resolve(strict=True))
+    )
+
+
+def _validate_content_aware_plan_record(
+    plan: dict[str, Any], *, root_binding: str,
+) -> None:
+    """Pure record validation; root text is evidence, never live authority."""
     if not isinstance(plan, dict):
         raise ContentPlanningError("Content-aware plan shape is invalid.")
     legacy_base_keys = {
@@ -1874,7 +1931,7 @@ def validate_content_aware_plan(
                 if key != "plan_sha256"
             }
         )
-        validate_content_aware_plan(normalized, project_root=project_root)
+        _validate_content_aware_plan_record(normalized, root_binding=root_binding)
         return
     expected_keys = {
         "schema",
@@ -1906,13 +1963,12 @@ def validate_content_aware_plan(
         or not str(plan["operation"]).strip()
     ):
         raise ContentPlanningError("Content-aware plan control is invalid.")
-    root = project_root.resolve(strict=True)
     project = plan.get("project")
     if (
         not isinstance(project, dict)
         or set(project)
         != {"root_binding", "project_id", "scope_integrity_sha3_512"}
-        or project.get("root_binding") != str(root)
+        or project.get("root_binding") != root_binding
         or (
             project.get("project_id") is not None
             and not isinstance(project.get("project_id"), str)

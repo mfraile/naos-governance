@@ -10,8 +10,9 @@ readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.11"
 dependencies = [
-    "PyYAML>=6.0",
-    "jsonschema>=4.0",
+    "PyYAML>=6.0.3",
+    "jsonschema>=4.19.2",
+    "referencing>=0.37.0",
     "rfc8785==0.1.4",
 ]
 authors = [
@@ -83,9 +84,12 @@ naos_governance = [
     "templates/**/.githooks/*",
     "templates/**/.github/**/*",
     "templates/**/.cursor/**/*",
+    "templates/**/.claude/**/*",
     "templates/**/.*",
-    # Repo-versioned Codex plugin source
+    # Repo-versioned plugin sources; recursive globs skip hidden manifests.
     "plugins/**/*",
+    "plugins/naos-governance/.codex-plugin/plugin.json",
+    "plugins/naos-governance-claude-code/.claude-plugin/plugin.json",
     # Profiles — RULES.md lives in .ai/ subdirs
     "profiles/**/*",
     "profiles/**/.ai/*",
@@ -106,9 +110,28 @@ naos_governance = [
     "configs/profile_generated_surface_contract.json",
     "configs/profile_rules_source.yaml",
     "configs/upgrade_source_policy.yaml",
+    "configs/source_modes.json",
+    "configs/generated_source_recipes.json",
     "configs/secure_coding_control_register.yaml",
     "configs/secure_coding_control_register.sample.yaml",
     "configs/secure_coding_control_render_manifest.yaml",
+    "INSTALLATION_MANUAL.md",
+    "NAOS_CATALOG.md",
+    "README.md",
+    "ROADMAP.md",
+    "docs/ASI_AICM_MAPPING.md",
+    "docs/CI_DECLARATION_POSTURE.md",
+    "docs/CONFIGURATION_POSTURE_REVIEW.md",
+    "docs/CROSS_HARNESS_REVIEW_READINESS.md",
+    "docs/INDEX.md",
+    "docs/HOOK_ACTIVATION.md",
+    "docs/HOST_CONTEXT_BUDGET.md",
+    "docs/SYSTEMIC_CAPABILITY_WIRING.md",
+    "docs/TOOL_NEUTRAL_USAGE.md",
+    "docs/decisions/ADR-0010-control-plane-advisory-boundaries.md",
+    "docs/tutorials/README.md",
+    "docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md",
+    "docs/tutorials/PROFESSIONAL_ADOPTION_ENGINE.md",
     "KNOWN_LIMITATIONS.md",
     "docs/COMPLIANCE_MAPPING.md",
     "docs/CONTROL_PLANE.md",
@@ -116,6 +139,7 @@ naos_governance = [
     "docs/SECURE_CODING_CONTROL_MODEL.md",
     "docs/SECURE_CODING_P3_REPORTING.md",
     "docs/CLAIMS_AND_LIMITATIONS.md",
+    "docs/PLATFORM_ADAPTERS.md",
     "docs/ADOPTION_GUIDE.md",
     "docs/AUDIT_PLAYBOOK.md",
     "docs/ASSURED_PROFILE_ACTIVATION.md",

@@ -4,6 +4,18 @@ Use visible local commands. Prefer `naos ...` when the package entrypoint is
 available and `make -f Makefile.naos ...` when working in an adopter project
 with the generated Makefile.
 
+## Generated project host routes
+
+Read the selected-profile root `AGENTS.md` for installed routes and manual
+fallbacks. Lite and higher generate `naos-portable-*` and `naos-workflow-*`
+adapters under `.agents/skills`; select one supported legacy or portable route,
+or read the referenced file when invocation is unavailable. Shared adapters
+disable implicit Codex invocation in `agents/openai.yaml`. They do not translate
+model selection, tools or permissions, or qualify installed host discovery and
+execution. Follow `docs/TOOL_NEUTRAL_USAGE.md#generated-project-host-routes`.
+
+## Local commands
+
 | Intent | Command |
 | --- | --- |
 | Confirm kit posture | `naos self-check --profile <profile>` |
@@ -55,3 +67,15 @@ and composed structural links do not prove semantic correctness.
 Agent-orchestration output is a local proposal only; it does not launch agents
 or clients, write client configuration, mutate tasks or claims, or authorize
 dispatch.
+
+## Complete local readiness
+
+Use `naos ci-readiness --profile standard --task TASK_ID --query QUERY --graph-path SOURCE_PATH` with actual project inputs. Exit success and semantic
+gate readiness are separate. The opt-in `--finalize-dependencies` mode retains
+initial diagnostics and verifies a new full self-check before final gate
+evaluation; it supports Lite, Standard and Assured with current L0–L2 and targets
+through L3. Lite's enabled L0 behavioral capability permits inert inspection
+only; its missing-conformance warning and `not_ready` remain visible. Integrated/
+native and installed-artifact qualification remain pending. It creates no missing evidence or approvals;
+default readiness is unchanged. Follow `INSTALLATION_MANUAL.md` and the
+project's `NAOS_QUICK_REFERENCE.md` for the current contract.

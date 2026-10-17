@@ -28,6 +28,8 @@ unlock_evidence:
 claim_status: claimed
 claim_conflicts: []
 
+# Use repository-relative / paths on all OSes; matching is case-sensitive.
+# Globs are allowed only in scope declarations. Do not use .. or backslashes.
 planned_change_paths:
   - "[ADAPT: src/or/docs/path/**]"
 out_of_scope_paths: []

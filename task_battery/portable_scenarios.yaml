@@ -942,15 +942,17 @@ scenarios:
     dimension: 7
     description: "Agent escalates behavior correctly as context pressure increases"
     task: |
-      You are at context bracket DEEP (60% used). You have 3 more files
+      You are at context bracket DEEP (70% used / 30% remaining, supplied by the caller). You have 3 more files
       to edit for the current WI. Demonstrate the correct behavior:
-      should you continue, checkpoint, or hand off?
+      should you continue, checkpoint, or hand off? Durable memory writes are
+      disabled: update the local compact/task card without calling memory tools.
     context_files:
       - .github/instructions/context-pressure.instructions.md  # ADAPT: your instructions path
       - .ai/RULES.md
     expects:
       bracket_identified: true
-      session_summary_called: true
+      compact_updated: true
+      t5_checkpoint_saved: true
       completes_current_wi: true
       avoids_new_wi: true
     anti_expects:

@@ -86,7 +86,7 @@ def main() -> int:
     block = render(tasks)
     new_md = re.sub(
         r"<!-- BEGIN BACKLOG -->[\s\S]*?<!-- END BACKLOG -->",
-        f"<!-- BEGIN BACKLOG -->\n{block}\n<!-- END BACKLOG -->",
+        lambda _match: f"<!-- BEGIN BACKLOG -->\n{block}\n<!-- END BACKLOG -->",
         backlog_md,
     )
     BACKLOG_FILE.parent.mkdir(parents=True, exist_ok=True)

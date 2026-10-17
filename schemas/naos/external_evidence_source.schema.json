@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:external_evidence_source:v1",
+  "title": "NAOS Local External Evidence Source Declaration",
+  "description": "One explicitly selected project-contained local SARIF source, or null for not configured. No source discovery, scanner execution, verification or approval. The producer additionally requires canonical POSIX relative paths without aliases, parent traversal, globs or expressions; duplicate keys and declarations over 16 KiB are rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "source"],
+  "properties": {
+    "schema": {"const": "naos.external_evidence_source.v1"},
+    "source": {"type": ["string", "null"], "minLength": 1}
+  }
+}

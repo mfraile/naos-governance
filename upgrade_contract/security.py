@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import ctypes
 import errno
@@ -12,16 +13,108 @@ import re
 import stat
 import sys
 import unicodedata
+import threading
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
+
+from . import linux_primitives
 
 
 class ContentPathError(ValueError):
     """Raised when a managed-content source or destination is unsafe."""
 
 
+class _DescriptorMetadataChanged(ContentPathError):
+    """Typed failed observation; no metadata witness was established."""
+
+    def __init__(self, before, after, changed_fields):
+        super().__init__("UNSUPPORTED_METADATA: descriptor changed during observation")
+        self.before = before
+        self.after = after
+        self.changed_fields = changed_fields
+
+
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
+
+
+def _metadata_binding_owner():
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:
+        task = None
+    return threading.get_ident(), task
+
+
+class _DarwinMetadataBindings:
+    def __init__(self):
+        self.active = True
+        self.owner = _metadata_binding_owner()
+        self.factory = ctypes.CDLL
+        self.library = None
+        self.groups = {}
+
+    def functions(self, group):
+        if ctypes.CDLL is not self.factory:
+            raise ContentPathError(
+                "UNSUPPORTED_METADATA: native ABI factory changed during read session"
+            )
+        if self.library is None:
+            self.library = self.factory(None, use_errno=True)
+        if group not in self.groups:
+            self.groups[group] = _configure_darwin_functions(self.library, group)
+        return self.groups[group]
+
+
+_DARWIN_METADATA_BINDINGS = ContextVar("naos_darwin_metadata_bindings", default=None)
+
+
+@contextmanager
+def _native_metadata_binding_scope():
+    """Reuse ABI setup only during one native read lane; never observations."""
+    holder = _DarwinMetadataBindings()
+    token = _DARWIN_METADATA_BINDINGS.set(holder)
+    try:
+        yield
+    finally:
+        holder.active = False
+        _DARWIN_METADATA_BINDINGS.reset(token)
+
+
+def _configure_darwin_functions(libc, group):
+    if group == "xattrs":
+        list_values = libc.flistxattr
+        list_values.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+        list_values.restype = ctypes.c_ssize_t
+        get_value = libc.fgetxattr
+        get_value.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_void_p,
+                             ctypes.c_size_t, ctypes.c_uint32, ctypes.c_int]
+        get_value.restype = ctypes.c_ssize_t
+        return list_values, get_value
+    if group == "acl_path":
+        acl_get = libc.acl_get_link_np
+        acl_get.argtypes = [ctypes.c_char_p, ctypes.c_int]
+    else:
+        acl_get = libc.acl_get_fd_np
+        acl_get.argtypes = [ctypes.c_int, ctypes.c_int]
+    acl_get.restype = ctypes.c_void_p
+    acl_to_text = libc.acl_to_text
+    acl_to_text.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ssize_t)]
+    acl_to_text.restype = ctypes.c_void_p
+    acl_free = libc.acl_free
+    acl_free.argtypes = [ctypes.c_void_p]
+    acl_free.restype = ctypes.c_int
+    return acl_get, acl_to_text, acl_free
+
+
+def _darwin_functions(group):
+    session = _DARWIN_METADATA_BINDINGS.get()
+    if session is not None and session.active and session.owner == _metadata_binding_owner():
+        return session.functions(group)
+    # Contexts copied into another thread/task do not inherit ABI reuse.
+    return _configure_darwin_functions(ctypes.CDLL(None, use_errno=True), group)
 
 def _darwin_xattrs(path: Path) -> list[dict[str, object]]:
     libc = ctypes.CDLL(None, use_errno=True)
@@ -96,20 +189,7 @@ def _darwin_xattrs(path: Path) -> list[dict[str, object]]:
 
 
 def _darwin_xattrs_fd(descriptor: int) -> list[dict[str, object]]:
-    libc = ctypes.CDLL(None, use_errno=True)
-    flistxattr = libc.flistxattr
-    flistxattr.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
-    flistxattr.restype = ctypes.c_ssize_t
-    fgetxattr = libc.fgetxattr
-    fgetxattr.argtypes = [
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_void_p,
-        ctypes.c_size_t,
-        ctypes.c_uint32,
-        ctypes.c_int,
-    ]
-    fgetxattr.restype = ctypes.c_ssize_t
+    flistxattr, fgetxattr = _darwin_functions("xattrs")
     size = flistxattr(descriptor, None, 0, 0)
     if size < 0:
         error_number = ctypes.get_errno()
@@ -165,20 +245,9 @@ def _darwin_acl_entries_from_handle(
     encoded_path: bytes | None = None,
     descriptor: int | None = None,
 ) -> list[str]:
-    libc = ctypes.CDLL(None, use_errno=True)
-    if descriptor is None:
-        acl_get = libc.acl_get_link_np
-        acl_get.argtypes = [ctypes.c_char_p, ctypes.c_int]
-    else:
-        acl_get = libc.acl_get_fd_np
-        acl_get.argtypes = [ctypes.c_int, ctypes.c_int]
-    acl_get.restype = ctypes.c_void_p
-    acl_to_text = libc.acl_to_text
-    acl_to_text.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ssize_t)]
-    acl_to_text.restype = ctypes.c_void_p
-    acl_free = libc.acl_free
-    acl_free.argtypes = [ctypes.c_void_p]
-    acl_free.restype = ctypes.c_int
+    acl_get, acl_to_text, acl_free = _darwin_functions(
+        "acl_path" if descriptor is None else "acl_fd"
+    )
 
     ctypes.set_errno(0)
     if descriptor is None:
@@ -231,16 +300,39 @@ def _metadata_adapter_tuple() -> tuple[str, str, tuple[int, int]]:
     system = platform.system()
     machine = platform.machine().lower()
     python_minor = (sys.version_info.major, sys.version_info.minor)
-    if (
-        system != "Darwin"
-        or machine not in {"arm64", "aarch64"}
-        or python_minor not in {(3, 11), (3, 12), (3, 13)}
-    ):
+    machines = {"Darwin": {"arm64", "aarch64"}, "Linux": {"x86_64", "aarch64"}}
+    if machine not in machines.get(system, set()) or python_minor not in {
+        (3, 11),
+        (3, 12),
+        (3, 13),
+    }:
         raise ContentPathError(
-            "UNSUPPORTED_METADATA: create-only adapter requires "
-            "Darwin arm64 and Python 3.11-3.13"
+            "UNSUPPORTED_METADATA: adapter requires Darwin arm64 or Linux x86_64/aarch64 "
+            "and Python 3.11-3.13"
         )
     return system, machine, python_minor
+
+
+def supported_metadata_flags(metadata: dict[str, object]) -> bool:
+    flags = metadata.get("flags")
+    if isinstance(flags, bool) or not isinstance(flags, int) or flags < 0:
+        return False
+    if metadata.get("platform") == "Darwin":
+        return flags == 0
+    if metadata.get("platform") == "Linux":
+        return flags & ~linux_primitives.SUPPORTED_INODE_FLAGS == 0
+    return False
+
+
+def _created_metadata_schema(system: str) -> str:
+    names = {"Darwin": "darwin", "Linux": "linux"}
+    if system not in names:
+        raise ContentPathError("Unsupported managed-content metadata platform")
+    return f"naos.metadata.{names[system]}_create_only.v1"
+
+
+def _source_metadata_schema(system: str) -> str:
+    return _created_metadata_schema(system).replace("_create_only.", "_source.")
 
 
 def _metadata_value(
@@ -249,24 +341,21 @@ def _metadata_value(
     expected_type: str,
     acl_entries: list[str],
     xattrs: list[dict[str, object]],
+    flags: int | None = None,
 ) -> dict[str, object]:
-    _system, machine, python_minor = _metadata_adapter_tuple()
+    system, machine, python_minor = _metadata_adapter_tuple()
     type_matches = (
         stat.S_ISREG(metadata.st_mode)
         if expected_type == "regular_file"
         else stat.S_ISDIR(metadata.st_mode)
     )
     if not type_matches or metadata.st_nlink < 1:
-        raise ContentPathError(
-            f"UNSUPPORTED_METADATA: expected {expected_type}"
-        )
+        raise ContentPathError(f"UNSUPPORTED_METADATA: expected {expected_type}")
     if expected_type == "regular_file" and metadata.st_nlink != 1:
-        raise ContentPathError(
-            "UNSUPPORTED_METADATA: expected a unique regular file"
-        )
+        raise ContentPathError("UNSUPPORTED_METADATA: expected a unique regular file")
     return {
-        "schema": "naos.metadata.darwin_create_only.v1",
-        "platform": "Darwin",
+        "schema": _created_metadata_schema(system),
+        "platform": system,
         "machine": machine,
         "python_minor": f"{python_minor[0]}.{python_minor[1]}",
         "file_type": expected_type,
@@ -275,7 +364,7 @@ def _metadata_value(
         "mode": stat.S_IMODE(metadata.st_mode),
         "uid": metadata.st_uid,
         "gid": metadata.st_gid,
-        "flags": int(getattr(metadata, "st_flags", 0)),
+        "flags": int(getattr(metadata, "st_flags", 0)) if flags is None else flags,
         "acl_entries": acl_entries,
         "xattrs": xattrs,
     }
@@ -291,7 +380,27 @@ def _observe_created_path_metadata(
     # Refuse unsupported hosts before resolving Darwin-only libc symbols.
     # Without this ordering, Linux raises AttributeError from acl_get_link_np
     # instead of the controlled ContentPathError promised by the adapter.
-    _metadata_adapter_tuple()
+    system, _machine, _python = _metadata_adapter_tuple()
+    if system == "Linux":
+        open_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+        if expected_type == "directory":
+            open_flags |= os.O_DIRECTORY
+        descriptor = os.open(path, open_flags)
+        try:
+            observed = _observe_created_descriptor_metadata(
+                descriptor, expected_type=expected_type
+            )
+            current = os.lstat(path)
+            if (current.st_dev, current.st_ino) != (
+                observed["device"],
+                observed["inode"],
+            ):
+                raise ContentPathError(
+                    "UNSUPPORTED_METADATA: path changed during observation"
+                )
+            return observed
+        finally:
+            os.close(descriptor)
     metadata = os.lstat(path)
     return _metadata_value(
         metadata,
@@ -307,8 +416,36 @@ def _observe_created_descriptor_metadata(
     expected_type: str,
 ) -> dict[str, object]:
     # Keep the platform boundary ahead of Darwin-only descriptor APIs too.
-    _metadata_adapter_tuple()
+    system, _machine, _python = _metadata_adapter_tuple()
     metadata = os.fstat(descriptor)
+    if system == "Linux":
+        try:
+            flags, acl, xattrs = linux_primitives.metadata_inventory(descriptor)
+        except OSError as exc:
+            raise ContentPathError(
+                f"UNSUPPORTED_METADATA: Linux metadata observation failed: {exc}"
+            ) from exc
+        after = os.fstat(descriptor)
+        fields = (
+            "st_dev",
+            "st_ino",
+            "st_mode",
+            "st_nlink",
+            "st_uid",
+            "st_gid",
+            "st_ctime_ns",
+        )
+        changed_fields = tuple(key for key in fields
+                               if getattr(metadata, key) != getattr(after, key))
+        if changed_fields:
+            raise _DescriptorMetadataChanged(metadata, after, changed_fields)
+        return _metadata_value(
+            metadata,
+            expected_type=expected_type,
+            acl_entries=acl,
+            xattrs=xattrs,
+            flags=flags,
+        )
     return _metadata_value(
         metadata,
         expected_type=expected_type,
@@ -362,9 +499,15 @@ def validate_created_metadata_identity(
     if not isinstance(value, dict) or set(value) != expected_keys:
         raise ContentPathError("Managed-content metadata identity is invalid.")
     if (
-        value.get("schema") != "naos.metadata.darwin_create_only.v1"
-        or value.get("platform") != "Darwin"
-        or value.get("machine") not in {"arm64", "aarch64"}
+        not isinstance(value.get("platform"), str)
+        or value.get("platform") not in {"Darwin", "Linux"}
+        or value.get("schema") != _created_metadata_schema(str(value.get("platform")))
+        or not isinstance(value.get("machine"), str)
+        or value.get("machine")
+        not in {"Darwin": {"arm64", "aarch64"}, "Linux": {"x86_64", "aarch64"}}.get(
+            str(value.get("platform")), set()
+        )
+        or not isinstance(value.get("python_minor"), str)
         or value.get("python_minor") not in {"3.11", "3.12", "3.13"}
         or value.get("file_type") != expected_type
     ):
@@ -396,9 +539,7 @@ def validate_created_metadata_identity(
         digest = item.get("sha256")
         try:
             decoded_name = (
-                base64.b64decode(name, validate=True)
-                if isinstance(name, str)
-                else b""
+                base64.b64decode(name, validate=True) if isinstance(name, str) else b""
             )
         except (ValueError, TypeError):
             decoded_name = b""
@@ -416,6 +557,40 @@ def validate_created_metadata_identity(
         previous_name = decoded_name
 
 
+def created_metadata_identity_matches(
+    observed: dict[str, object],
+    expected: dict[str, object],
+    *,
+    expected_type: str,
+) -> bool:
+    """Compare a held object with a bound identity without rewriting that identity.
+
+    Linux filesystems may assign extent/index layout bits during allocation or
+    directory growth. These are the *only* flags the adapter already permits;
+    all other metadata, including device and inode, remains an exact guard.
+    """
+
+    try:
+        validate_created_metadata_identity(observed, expected_type=expected_type)
+        validate_created_metadata_identity(expected, expected_type=expected_type)
+    except ContentPathError:
+        return False
+    if (
+        not supported_metadata_flags(observed)
+        or not supported_metadata_flags(expected)
+        or observed["acl_entries"] != []
+        or expected["acl_entries"] != []
+    ):
+        return False
+    observed_value = dict(observed)
+    expected_value = dict(expected)
+    if observed["platform"] == expected["platform"] == "Linux":
+        mask = ~linux_primitives.KERNEL_LAYOUT_FLAGS
+        observed_value["flags"] = int(observed["flags"]) & mask
+        expected_value["flags"] = int(expected["flags"]) & mask
+    return observed_value == expected_value
+
+
 def source_metadata_contract(
     observed: dict[str, object],
 ) -> dict[str, object]:
@@ -423,7 +598,7 @@ def source_metadata_contract(
 
     validate_created_metadata_identity(observed, expected_type="regular_file")
     return {
-        "schema": "naos.metadata.darwin_source.v1",
+        "schema": _source_metadata_schema(str(observed.get("platform"))),
         **{
             key: value
             for key, value in observed.items()
@@ -437,13 +612,33 @@ def validate_source_metadata_contract(value: object) -> None:
         raise ContentPathError("Managed-content source metadata is invalid.")
     expanded = {
         **value,
-        "schema": "naos.metadata.darwin_create_only.v1",
+        "schema": _created_metadata_schema(str(value.get("platform"))),
         "device": 0,
         "inode": 0,
     }
     validate_created_metadata_identity(expanded, expected_type="regular_file")
-    if value.get("schema") != "naos.metadata.darwin_source.v1":
+    if value.get("schema") != _source_metadata_schema(str(value.get("platform"))):
         raise ContentPathError("Managed-content source metadata schema is invalid.")
+
+
+def supported_source_xattrs(metadata: dict[str, object]) -> bool:
+    """Apply Linux transport policy without narrowing historical record schemas.
+
+    Observation and historical validation retain every visible namespace.
+    Darwin transport behavior is unchanged.
+    """
+    if metadata.get("platform") != "Linux":
+        return True
+    try:
+        validate_source_metadata_contract(metadata)
+    except ContentPathError:
+        return False
+    return all(
+        linux_primitives.supported_source_xattr_name(
+            base64.b64decode(item["name_base64"], validate=True)
+        )
+        for item in metadata["xattrs"]
+    )
 
 
 def managed_creation_identity() -> dict[str, object]:
@@ -497,7 +692,19 @@ def metadata_preservation_matches(
     expected = dict(source)
     expected["uid"] = creation_identity["uid"]
     expected["gid"] = creation_identity["gid"]
-    return expected == source_metadata_contract(destination)
+    actual = source_metadata_contract(destination)
+    if (
+        not supported_metadata_flags(source)
+        or not supported_metadata_flags(destination)
+        or source["acl_entries"] != []
+        or destination["acl_entries"] != []
+    ):
+        return False
+    if source["platform"] == destination["platform"] == "Linux":
+        mask = ~linux_primitives.KERNEL_LAYOUT_FLAGS
+        expected["flags"] = int(expected["flags"]) & mask
+        actual["flags"] = int(actual["flags"]) & mask
+    return expected == actual
 
 
 def source_metadata_creation_equivalent(
@@ -534,7 +741,9 @@ def created_file_metadata_matches(
     expected: dict[str, object],
 ) -> bool:
     try:
-        return observe_created_file_metadata(path) == expected
+        return created_metadata_identity_matches(
+            observe_created_file_metadata(path), expected, expected_type="regular_file"
+        )
     except (OSError, ContentPathError):
         return False
 
@@ -544,7 +753,9 @@ def created_directory_metadata_matches(
     expected: dict[str, object],
 ) -> bool:
     try:
-        return observe_created_directory_metadata(path) == expected
+        return created_metadata_identity_matches(
+            observe_created_directory_metadata(path), expected, expected_type="directory"
+        )
     except (OSError, ContentPathError):
         return False
 

@@ -36,7 +36,7 @@
     "schema": {"const": "naos.cross_harness_review_readiness_report.v1"},
     "generated_at": {"type": "string"},
     "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"enum": ["ready", "advisory", "review_required", "missing_config", "invalid_config", "unsafe_runtime_enabled", "signing_enabled_in_core", "provider_api_enabled", "missing_requirements", "unknown"]},
+    "status": {"enum": ["ready", "disabled", "advisory", "review_required", "missing_config", "invalid_config", "unsafe_runtime_enabled", "signing_enabled_in_core", "provider_api_enabled", "missing_requirements", "unknown"]},
     "naos_root": {"type": "string"},
     "config_path": {"type": "string"},
     "config_present": {"type": "boolean"},

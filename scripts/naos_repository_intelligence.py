@@ -12,6 +12,8 @@ from __future__ import annotations
 import argparse
 import ast
 import copy
+from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass
 import hashlib
 import importlib.metadata
 import io
@@ -39,6 +41,10 @@ for import_root in (SCRIPT_DIR, KIT_DIR):
         sys.path.insert(0, str(import_root))
 
 try:  # Installed package or source-checkout shim.
+    from naos_governance.upgrade_contract import repository_intelligence_windows as ri_windows_storage
+    from naos_governance.upgrade_contract import repository_intelligence_windows_enrollment as ri_windows_enrollment
+    from naos_governance.upgrade_contract import repository_intelligence_windows_runtime as ri_windows_runtime
+    from naos_governance.upgrade_contract.windows_runtime import WindowsRuntime
     from naos_governance.upgrade_contract.canonical import (
         CanonicalizationError,
         CanonicalizationUnavailable,
@@ -68,6 +74,10 @@ try:  # Installed package or source-checkout shim.
         rename_no_replace,
     )
 except ImportError:  # Generated standalone adopter surface.
+    from upgrade_contract import repository_intelligence_windows as ri_windows_storage
+    from upgrade_contract import repository_intelligence_windows_enrollment as ri_windows_enrollment
+    from upgrade_contract import repository_intelligence_windows_runtime as ri_windows_runtime
+    from upgrade_contract.windows_runtime import WindowsRuntime
     from upgrade_contract.canonical import (  # type: ignore[no-redef]
         CanonicalizationError,
         CanonicalizationUnavailable,
@@ -135,8 +145,10 @@ CAPABILITY_ID = "CAP-LOCAL-CONTEXT-INDEX"
 RFC8785_VERSION = "0.1.4"
 NETWORKX_VERSION = "3.6.1"
 SUPPORTED_PYTHON_MINORS = {(3, 11), (3, 12), (3, 13)}
-SUPPORTED_SYSTEM = "Darwin"
-SUPPORTED_MACHINES = {"arm64", "aarch64"}
+SUPPORTED_POSIX_MACHINES = {
+    "Darwin": {"arm64", "aarch64"},
+    "Linux": {"x86_64", "aarch64"},
+}
 COMPONENT_MODES = ("auto", "baseline", "graph")
 REVIEWER_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@:/+\-]{1,127}$")
 TRANSACTION_ID_RE = re.compile(r"^RIT-[0-9a-f]{24}$")
@@ -205,6 +217,9 @@ def package_version(name: str) -> str | None:
 
 
 SCHEMA_FILES = {
+    "naos.repository_intelligence_context.v2": "repository_intelligence_context_v2.schema.json",
+    "naos.repository_intelligence.apply_result.v2": "repository_intelligence_apply_result_v2.schema.json",
+    "naos.repository_intelligence.windows_authorization.v1": "repository_intelligence_windows_authorization.schema.json",
     PLAN_SCHEMA: "repository_intelligence_plan.schema.json",
     MANIFEST_SCHEMA: "repository_intelligence_manifest.schema.json",
     RECEIPT_SCHEMA: "repository_intelligence_validation.schema.json",
@@ -218,6 +233,7 @@ SCHEMA_FILES = {
     ENROLLMENT_RESULT_SCHEMA: "repository_intelligence_enrollment_result.schema.json",
     STATUS_SCHEMA: "repository_intelligence_status.schema.json",
     RECOVERY_RESULT_SCHEMA: "repository_intelligence_recovery_result.schema.json",
+    "naos.repository_intelligence.enrollment_result.v2": "repository_intelligence_enrollment_result_v2.schema.json",
 }
 
 GENERATED_SCRIPT_MARKER = b"# AUTO-GENERATED: Copied by naos init from the NAOS kit.\n"
@@ -262,12 +278,84 @@ def _implementation_source_sha256(path: Path) -> str:
     return sha256_bytes(source)
 
 
+def _windows_enrollment_supported() -> bool:
+    return (os.name == "nt" and platform.machine().lower() in {"amd64", "x86_64"}
+            and platform.python_implementation() == "CPython"
+            and sys.version_info[:2] in SUPPORTED_PYTHON_MINORS)
+
+
+@dataclass(frozen=True)
+class _WindowsScopeGate:
+    gate: dict[str, Any]
+
+    @property
+    def status(self) -> str:
+        return str(self.gate["status"])
+
+    @property
+    def activation_eligible(self) -> bool:
+        return self.gate.get("activation_eligible") is True
+
+    @property
+    def refusal(self) -> str | None:
+        return self.gate.get("refusal")
+
+    def plan_gate(self) -> dict[str, Any]:
+        return copy.deepcopy(self.gate)
+
+
+def _inspect_ri_scope(root: Path, *, governed_root: str,
+                      source_authorization: str | None = None):
+    if os.name != "nt":
+        return inspect_scope(root, governed_root=governed_root)
+    gate = {"status": "refused", "activation_eligible": False,
+            "backend": "windows-ri-enrollment.v1", "governed_root": governed_root,
+            "record_path": ri_windows_enrollment.RECORD_PATH,
+            "ownership_inference": "forbidden", "refusal": None,
+            "native_enrollment_plan": None, "enrollment": None}
+    try:
+        if governed_root != ri_windows_enrollment.GOVERNED_ROOT:
+            raise RepositoryIntelligenceError("Windows RI governed root is not canonical")
+        with ri_windows_storage.WindowsRIStorage(str(root)) as storage:
+            api = ri_windows_enrollment.WindowsRIEnrollment(storage)
+            current = api._inspect_record()
+            if current is not None:
+                if storage.identity_if_present(ri_windows_runtime.BOOTSTRAP, kind="file") is not None:
+                    with ri_windows_runtime.WindowsRIRuntime(storage).bootstrap_pins():
+                        pass
+                else:
+                    api._require_absent_generated_root()
+            if current is None:
+                native_plan = api.plan(source_authorization_sha256=source_authorization or "0" * 64)
+                gate.update(status="enrollment_required", native_enrollment_plan=native_plan)
+            else:
+                gate.update(status="valid", activation_eligible=_windows_enrollment_supported(), enrollment={
+                    "project_id": current.project_id,
+                    "native_plan_sha256": current.enrollment_plan_sha256,
+                    "record_bytes_sha256": current.record_sha256,
+                    "record_identity": current.record_identity.record()})
+    except (OSError, ValueError) as exc:
+        gate["refusal"] = str(exc)
+    return _WindowsScopeGate(gate)
+
+
+def _windows_source_authorization(root: Path, inspection: dict[str, Any], *,
+        profile: str, naos_root: str, purpose: str, component_mode: str) -> str:
+    return canonical_sha256({"project_root": str(root), "profile": profile,
+        "profile_gate": _profile_gate(profile), "naos_root": naos_root,
+        "purpose": purpose, "component_mode": component_mode,
+        "rules_sha256": inspection["rules"]["sha256"],
+        "effective_source_sha256": inspection["effective_source_sha256"],
+        "runtime": inspection["runtime"], "components": inspection["components"],
+        "implementation": _implementation_identity()})
+
+
 def _implementation_identity() -> dict[str, Any]:
     engine_path = Path(__file__).resolve()
     index_path = Path(local_context_index_module.__file__).resolve()
     canonical_module = sys.modules[canonical_sha256.__module__]
     canonical_path = Path(str(canonical_module.__file__)).resolve()
-    return {
+    identity = {
         "contract_version": 1,
         "engine_sha256": _implementation_source_sha256(engine_path),
         "local_context_index_sha256": _implementation_source_sha256(index_path),
@@ -275,6 +363,11 @@ def _implementation_identity() -> dict[str, Any]:
         "graphml_writer": "networkx.write_graphml_xml",
         "sqlite_serializer": "python_stdlib_sqlite3",
     }
+    if os.name == "nt":
+        identity["windows_ri_enrollment"] = ri_windows_enrollment._implementation()
+        identity["windows_ri_runtime"] = ri_windows_runtime._implementation()
+        identity["windows_ri_public"] = _implementation_source_sha256(SCRIPT_DIR / "naos_repository_intelligence_windows.py")
+    return identity
 
 
 def _validate_rules(rules: dict[str, Any]) -> None:
@@ -372,8 +465,7 @@ def runtime_probe() -> dict[str, Any]:
     python_minor = (sys.version_info.major, sys.version_info.minor)
     implementation = platform.python_implementation()
     supported = (
-        system == SUPPORTED_SYSTEM
-        and machine in SUPPORTED_MACHINES
+        (machine in SUPPORTED_POSIX_MACHINES.get(system, set()) or _windows_enrollment_supported())
         and python_minor in SUPPORTED_PYTHON_MINORS
         and implementation == "CPython"
     )
@@ -404,7 +496,14 @@ def runtime_probe() -> dict[str, Any]:
             "python": platform.python_version(),
             "implementation": implementation,
             "supported_for_apply": supported,
-            "supported_tuple": "macos_arm64_cpython_3_11_to_3_13_binary_wheels",
+            "supported_tuple": (
+                "macos_arm64_cpython_3_11_to_3_13_binary_wheels"
+                if system == "Darwin"
+                else f"linux_{machine}_cpython_3_11_to_3_13_binary_wheels"
+                if system == "Linux" and machine in SUPPORTED_POSIX_MACHINES["Linux"]
+                else "windows_x86_64_cpython_3_11_to_3_13_native_handles"
+                if _windows_enrollment_supported() else "unavailable"
+            ),
         },
         "rfc8785": {
             "required_version": RFC8785_VERSION,
@@ -889,6 +988,14 @@ def build_relationships(
                 }
             )
             continue
+        # Keep the coherent private snapshot guard; metadata-only source does
+        # not authorize raw-body relationship extraction or persistence.
+        if artifact.get("include_policy") == "path_language_size_hash_only":
+            if len(data) != artifact.get("size_bytes"):
+                findings.append({"id": "repository_intelligence.source_changed_during_inventory",
+                                 "severity": "blocking", "status": "stale", "path": path,
+                                 "message": "Source size differs from its coherent metadata snapshot."})
+            continue
         text = data.decode("utf-8", errors="replace")
         references: list[tuple[str, str, int | None]] = []
         if Path(path).suffix.lower() == ".py":
@@ -1075,8 +1182,16 @@ def inspect_repository(
     component_mode: str = "auto",
     purpose: str = "brownfield-onboarding",
     allowed_inflight_transaction_id: str | None = None,
+    rules_bytes: bytes | None = None,
 ) -> dict[str, Any]:
-    rules = load_yaml_mapping(rules_path)
+    if rules_bytes is None:
+        rules = load_yaml_mapping(rules_path)
+    else:
+        if os.name != "nt" or not isinstance(rules_bytes, bytes):
+            raise RepositoryIntelligenceError("Native rules bytes require Windows")
+        rules = yaml.safe_load(rules_bytes.decode("utf-8")) or {}
+        if not isinstance(rules, dict):
+            raise RepositoryIntelligenceError("Native rules must be a YAML mapping")
     _validate_rules(rules)
     if not rules.get("enabled", True):
         raise RepositoryIntelligenceError("Repository-intelligence rules are disabled.")
@@ -1085,33 +1200,39 @@ def inspect_repository(
     if purpose not in PURPOSE_QUESTIONS:
         raise RepositoryIntelligenceError(f"Unsupported repository-intelligence purpose: {purpose!r}.")
     generated_at = utc_now_text()
-    managed_scope = inspect_managed_content_scope(root)
-    managed_manifest_path = root / MANAGED_CONTENT_MANIFEST_RELATIVE
-    if managed_scope.status == "valid":
-        if (
-            not managed_scope.project_id
-            or not managed_scope.scope_integrity
-            or not managed_scope.source_policy_sha256
-        ):
-            raise RepositoryIntelligenceError(
-                "Managed-content provenance binding is incomplete."
-            )
-        managed_paths = current_managed_content_paths(
-            root,
-            manifest_path=managed_manifest_path,
-            bases_root=root / MANAGED_CONTENT_BASES_RELATIVE,
-            receipts_root=root / MANAGED_CONTENT_RECEIPTS_RELATIVE,
-            project_id=managed_scope.project_id,
-            scope_integrity_sha3_512=managed_scope.scope_integrity,
-            source_policy_sha256=managed_scope.source_policy_sha256,
-        )
-    elif managed_manifest_path.exists():
-        raise RepositoryIntelligenceError(
-            "Managed-content state exists without valid provenance; repository "
-            "intelligence will not use it as an exclusion authority."
-        )
+    if os.name == "nt":
+        runtime_adapter = WindowsRuntime.native(str(root), str(kit_root() / "configs" / "upgrade_source_policy.yaml"))
+        managed_paths = {p.replace("\\", "/") for p in runtime_adapter.current_paths()}
+        if not managed_paths and (root / MANAGED_CONTENT_MANIFEST_RELATIVE).exists():
+            raise RepositoryIntelligenceError("POSIX managed state cannot authorize Windows exclusions")
     else:
-        managed_paths = set()
+        managed_scope = inspect_managed_content_scope(root)
+        managed_manifest_path = root / MANAGED_CONTENT_MANIFEST_RELATIVE
+        if managed_scope.status == "valid":
+            if (
+                not managed_scope.project_id
+                or not managed_scope.scope_integrity
+                or not managed_scope.source_policy_sha256
+            ):
+                raise RepositoryIntelligenceError(
+                    "Managed-content provenance binding is incomplete."
+                )
+            managed_paths = current_managed_content_paths(
+                root,
+                manifest_path=managed_manifest_path,
+                bases_root=root / MANAGED_CONTENT_BASES_RELATIVE,
+                receipts_root=root / MANAGED_CONTENT_RECEIPTS_RELATIVE,
+                project_id=managed_scope.project_id,
+                scope_integrity_sha3_512=managed_scope.scope_integrity,
+                source_policy_sha256=managed_scope.source_policy_sha256,
+            )
+        elif managed_manifest_path.exists():
+            raise RepositoryIntelligenceError(
+                "Managed-content state exists without valid provenance; repository "
+                "intelligence will not use it as an exclusion authority."
+            )
+        else:
+            managed_paths = set()
     managed_exclusions = {
         path: {
             "reason": "current_managed_content_excluded",
@@ -1229,11 +1350,11 @@ def inspect_repository(
     }
     findings = [*relationship_findings]
     context_path = _context_index_root(root, naos_root)
-    scope_inspection = inspect_scope(
+    scope_inspection = _inspect_ri_scope(
         root,
         governed_root=context_path.relative_to(root).as_posix(),
     )
-    if scope_inspection.activation_eligible and context_path.exists():
+    if os.name != "nt" and scope_inspection.activation_eligible and context_path.exists():
         try:
             _assert_context_entries(context_path)
             inactive_owned = (
@@ -1314,7 +1435,7 @@ def inspect_repository(
                 "id": "repository_intelligence.unsupported_platform_tuple",
                 "severity": "blocking",
                 "status": "unsupported_metadata",
-                "message": "Apply is enabled only for the executed macOS ARM64 CPython 3.11-3.13 tuple.",
+                "message": "Apply requires a supported native macOS ARM64, Linux x86_64/aarch64 or Windows x86_64 CPython 3.11-3.13 adapter.",
             }
         )
     if runtime["rfc8785"]["status"] != "ready":
@@ -1380,7 +1501,7 @@ def inspect_repository(
         "rules": {
             "path": str(rules_path),
             "source": rules_source,
-            "sha256": safe_digest(rules_path),
+            "sha256": safe_digest(rules_path) if rules_bytes is None else sha256_bytes(rules_bytes),
         },
         "runtime": runtime,
         "maturity": maturity,
@@ -1472,6 +1593,18 @@ def _private_file(path: Path) -> None:
     _fsync_file(path)
 
 
+@contextmanager
+def _bundle_sqlite_connection(native_storage: Any):
+    if native_storage is None:
+        yield None
+    else:
+        connection = sqlite3.connect(":memory:")
+        try:
+            yield connection
+        finally:
+            connection.close()
+
+
 def _build_plan_bundle(
     root: Path,
     inspection: dict[str, Any],
@@ -1483,7 +1616,45 @@ def _build_plan_bundle(
     bundle_dir: Path,
     provenance_gate: dict[str, Any],
 ) -> dict[str, Any]:
-    _make_private_directory(bundle_dir)
+    if os.name != "nt":
+        return _build_plan_bundle_contents(root, inspection, profile=profile, purpose=purpose,
+            component_mode=component_mode, rules_path=rules_path, bundle_dir=bundle_dir,
+            provenance_gate=provenance_gate)
+    # The external output parent is caller-selected. The bundle itself is an
+    # exclusively created, private directory pinned throughout generation.
+    with ri_windows_storage.WindowsRIStorage(str(bundle_dir.parent)) as storage:
+        identity = storage.create_directory(bundle_dir.name)
+        with storage.pin_directories({bundle_dir.name: identity}):
+            return _build_plan_bundle_contents(root, inspection, profile=profile, purpose=purpose,
+                component_mode=component_mode, rules_path=rules_path, bundle_dir=bundle_dir,
+                provenance_gate=provenance_gate, native_storage=storage)
+
+
+def _build_plan_bundle_contents(
+    root: Path,
+    inspection: dict[str, Any],
+    *,
+    profile: str,
+    purpose: str,
+    component_mode: str,
+    rules_path: Path,
+    bundle_dir: Path,
+    provenance_gate: dict[str, Any],
+    native_storage: Any = None,
+) -> dict[str, Any]:
+    if native_storage is None:
+        _make_private_directory(bundle_dir)
+    def write_bytes(path: Path, data: bytes) -> None:
+        if native_storage is None:
+            _write_new_bytes(path, data)
+        else:
+            native_storage.write_new(bundle_dir.name + "/" + path.name, data)
+    def write_json(path: Path, value: dict[str, Any]) -> None:
+        if native_storage is None:
+            _write_json(path, value)
+            _private_file(path)
+        else:
+            write_bytes(path, _json_report_bytes(value))
     try:
         graph_model = {
             "directed": True,
@@ -1534,10 +1705,9 @@ def _build_plan_bundle(
             "not_claimed": list(load_yaml_mapping(rules_path).get("not_claimed") or []),
         }
         inventory_path = bundle_dir / "inventory.json"
-        _write_json(inventory_path, inventory_report)
-        _private_file(inventory_path)
+        write_json(inventory_path, inventory_report)
         rules_snapshot_path = bundle_dir / "repository_intelligence_rules.yaml"
-        _write_new_bytes(rules_snapshot_path, secure_regular_file_bytes(rules_path))
+        write_bytes(rules_snapshot_path, secure_regular_file_bytes(rules_path))
 
         sqlite_validation: dict[str, Any]
         sqlite_path: Path | None = None
@@ -1552,27 +1722,33 @@ def _build_plan_bundle(
                 "status": "validated",
                 "limitations": inventory_report["limitations"],
             }
-            fts_available, sqlite_findings = populate_sqlite_database(
-                sqlite_path,
-                provisional,
-                inspection["artifacts"],
-                inspection["chunks"],
-                inspection["links"],
-            )
-            if not fts_available or any(item.get("severity") == "blocking" for item in sqlite_findings):
-                raise RepositoryIntelligenceError("SQLite/FTS plan bundle did not validate.")
-            _populate_relationship_tables(
-                sqlite_path,
-                inspection["relationships"],
-                {
-                    "effective_source_sha256": inspection["effective_source_sha256"],
-                    "generation_content_sha256": generation_content_sha256,
-                    "graph_model_sha256": graph_model_sha256,
-                    "ongoing_use_scope": content_identity_control["ongoing_use_scope"],
-                    "sqlite_content_binding": sqlite_content_binding,
-                },
-            )
-            _private_file(sqlite_path)
+            with _bundle_sqlite_connection(native_storage) as connection:
+                fts_available, sqlite_findings = populate_sqlite_database(
+                    sqlite_path if connection is None else None,
+                    provisional,
+                    inspection["artifacts"],
+                    inspection["chunks"],
+                    inspection["links"],
+                    connection=connection,
+                )
+                if not fts_available or any(item.get("severity") == "blocking" for item in sqlite_findings):
+                    raise RepositoryIntelligenceError("SQLite/FTS plan bundle did not validate.")
+                _populate_relationship_tables(
+                    sqlite_path if connection is None else None,
+                    inspection["relationships"],
+                    {
+                        "effective_source_sha256": inspection["effective_source_sha256"],
+                        "generation_content_sha256": generation_content_sha256,
+                        "graph_model_sha256": graph_model_sha256,
+                        "ongoing_use_scope": content_identity_control["ongoing_use_scope"],
+                        "sqlite_content_binding": sqlite_content_binding,
+                    },
+                    connection=connection,
+                )
+                if connection is None:
+                    _private_file(sqlite_path)
+                else:
+                    write_bytes(sqlite_path, connection.serialize())
             sqlite_validation = _validate_sqlite(
                 sqlite_path,
                 inspection["effective_source_sha256"],
@@ -1594,6 +1770,7 @@ def _build_plan_bundle(
                 inspection["relationships"],
                 source_sha256=inspection["effective_source_sha256"],
                 model_sha256=graph_model_sha256,
+                native_write=write_bytes if native_storage is not None else None,
             )
         else:
             graph_validation = {
@@ -1653,8 +1830,7 @@ def _build_plan_bundle(
             "not_claimed": ["source authority", "reviewer authentication", "complete graph coverage"],
         }
         validation_path = bundle_dir / "validation_receipt.json"
-        _write_json(validation_path, validation_receipt)
-        _private_file(validation_path)
+        write_json(validation_path, validation_receipt)
 
         content_paths = [inventory_path, rules_snapshot_path, validation_path]
         if sqlite_path is not None:
@@ -1701,9 +1877,9 @@ def _build_plan_bundle(
             "not_claimed": inventory_report["not_claimed"],
         }
         manifest_path = bundle_dir / "manifest.json"
-        _write_json(manifest_path, manifest)
-        _private_file(manifest_path)
-        _fsync_directory(bundle_dir)
+        write_json(manifest_path, manifest)
+        if native_storage is None:
+            _fsync_directory(bundle_dir)
 
         bundle_files = sorted(
             (_file_record(path) for path in [*content_paths, manifest_path]),
@@ -1728,7 +1904,7 @@ def _build_plan_bundle(
         bundle["bundle_sha256"] = canonical_sha256(_bundle_digest_payload(bundle))
         return bundle
     except Exception:
-        if bundle_dir.exists() and bundle_dir.is_dir() and not bundle_dir.is_symlink():
+        if native_storage is None and bundle_dir.exists() and bundle_dir.is_dir() and not bundle_dir.is_symlink():
             shutil.rmtree(bundle_dir)
         raise
 
@@ -1758,7 +1934,11 @@ def build_plan(
     blocking = [item for item in inspection["findings"] if item.get("severity") == "blocking"]
     context_path = _context_index_root(root, naos_root)
     governed_root = context_path.relative_to(root).as_posix()
-    scope_inspection = inspect_scope(root, governed_root=governed_root)
+    source_authorization = (_windows_source_authorization(root, inspection,
+        profile=profile, naos_root=naos_root, purpose=purpose, component_mode=component_mode)
+        if os.name == "nt" else None)
+    scope_inspection = _inspect_ri_scope(root, governed_root=governed_root,
+                                        source_authorization=source_authorization)
     provenance_gate = scope_inspection.plan_gate()
     if (
         not inspection["repository_intelligence_candidate"]
@@ -1766,13 +1946,15 @@ def build_plan(
         in {"enrollment_required", "scope_enrollment_required"}
     ):
         # A diagnostic not-applicable decision authorizes no enrollment or
-        # mutation.  Do not let a one-use enrollment UUID make that decision
-        # non-deterministic; a later applicable plan will allocate its own
-        # exact enrollment identity.
+        # mutation. Prospective enrollment UUIDs and native parent observations
+        # are not decision authority: managed preparation can create those
+        # private parents. An applicable plan retains exact enrollment bindings.
         provenance_gate = {
             **provenance_gate,
             "enrollment_project_id": None,
         }
+        if "native_enrollment_plan" in provenance_gate:
+            provenance_gate["native_enrollment_plan"] = None
     apply_allowed = bool(
         inspection["repository_intelligence_candidate"]
         and not blocking
@@ -1784,20 +1966,29 @@ def build_plan(
         "nodes": inspection["nodes"],
         "relationships": inspection["relationships"],
     }
-    if bundle_dir is None:
-        bundle_dir = Path(tempfile.mkdtemp(prefix="naos-repository-intelligence-bundle-parent-")).resolve() / "bundle"
-    else:
-        bundle_dir = bundle_dir.expanduser().resolve(strict=False)
-    bundle = _build_plan_bundle(
-        root,
-        inspection,
-        profile=profile,
-        purpose=purpose,
-        component_mode=component_mode,
-        rules_path=rules_path,
-        bundle_dir=bundle_dir,
-        provenance_gate=provenance_gate,
+    # Only actionable enrollment/activation plans need persistent source bytes.
+    # Diagnostics retain inventory and findings without creating a content index.
+    bundle = None
+    needs_bundle = bool(
+        inspection["repository_intelligence_candidate"]
+        and not blocking
+        and scope_inspection.status in {"valid", "enrollment_required", "scope_enrollment_required"}
     )
+    if needs_bundle:
+        if bundle_dir is None:
+            bundle_dir = Path(tempfile.mkdtemp(prefix="naos-repository-intelligence-bundle-parent-")).resolve() / "bundle"
+        else:
+            bundle_dir = bundle_dir.expanduser().resolve(strict=False)
+        bundle = _build_plan_bundle(
+            root,
+            inspection,
+            profile=profile,
+            purpose=purpose,
+            component_mode=component_mode,
+            rules_path=rules_path,
+            bundle_dir=bundle_dir,
+            provenance_gate=provenance_gate,
+        )
     implementation = _implementation_identity()
     control = {
         "capability_id": CAPABILITY_ID,
@@ -1812,13 +2003,14 @@ def build_plan(
         "rules": inspection["rules"],
         "runtime": runtime,
         "implementation": implementation,
+        "refresh_base": _capture_refresh_base(root, naos_root, implementation) if apply_allowed else None,
         "provenance_gate": provenance_gate,
         "maturity": inspection["maturity"],
         "components": components,
         "graph_model_sha256": canonical_sha256(graph_model),
-        "generation_id": bundle["generation_id"],
-        "generation_content_sha256": bundle["generation_content_sha256"],
-        "bundle_sha256": bundle["bundle_sha256"],
+        "generation_id": bundle["generation_id"] if bundle is not None else None,
+        "generation_content_sha256": bundle["generation_content_sha256"] if bundle is not None else None,
+        "bundle_sha256": bundle["bundle_sha256"] if bundle is not None else None,
         "coverage": {
             "indexed_artifacts": len(inspection["inventory"]),
             "excluded_artifacts": len(inspection["excluded_artifacts"]),
@@ -1950,13 +2142,65 @@ def _strict_bundle_directory(root: Path, bundle: dict[str, Any]) -> Path:
         raise RepositoryIntelligenceError(f"Plan bundle is unavailable: {path}") from exc
     if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
         raise RepositoryIntelligenceError(f"Refusing unsafe plan-bundle directory: {path}")
+    if os.name == "nt":
+        with ri_windows_storage.WindowsRIStorage(str(path.parent)) as storage:
+            storage.directory_identity(path.name)
     resolved = path.resolve(strict=True)
     if resolved == root or root in resolved.parents:
         raise RepositoryIntelligenceError("Plan bundle must remain outside the target repository.")
     return resolved
 
 
+@contextmanager
+def _native_bundle_pins(root: Path, plan: dict[str, Any]):
+    bundle = plan.get("bundle")
+    if not isinstance(bundle, dict) or not isinstance(bundle.get("path"), str):
+        raise RepositoryIntelligenceError("Native plan bundle path is missing")
+    path = Path(bundle["path"])
+    if not path.is_absolute():
+        raise RepositoryIntelligenceError("Native plan bundle path must be absolute")
+    records = bundle.get("files")
+    if not isinstance(records, list) or not records:
+        raise RepositoryIntelligenceError("Native plan bundle inventory is missing")
+    expected = {}
+    for record in records:
+        if not isinstance(record, dict) or not isinstance(record.get("path"), str):
+            raise RepositoryIntelligenceError("Native plan bundle record is malformed")
+        name = record["path"]
+        if name not in {"inventory.json", "repository_intelligence_rules.yaml",
+                "local_context_index.sqlite", "context.graphml", "validation_receipt.json", "manifest.json"}:
+            raise RepositoryIntelligenceError("Native plan bundle member is unsupported")
+        if name in expected:
+            raise RepositoryIntelligenceError("Native plan bundle member is duplicated")
+        expected[name] = record.get("sha256")
+    try:
+        with ri_windows_storage.WindowsRIStorage(str(path.parent)) as storage:
+            identity = storage.directory_identity(path.name)
+            with storage.pin_directories({path.name: identity}):
+                _strict_bundle_directory(root, bundle)
+                if sorted(storage.children(path.name)) != sorted(expected):
+                    raise RepositoryIntelligenceError("Plan bundle contains unrecorded or missing files")
+                with storage.pin_files({path.name+"/"+name: digest for name, digest in expected.items()}):
+                    yield
+    except (OSError, ValueError) as exc:
+        if isinstance(exc, RepositoryIntelligenceError):
+            raise
+        raise RepositoryIntelligenceError(f"Native plan bundle is unsafe: {exc}") from exc
+
+
 def _validate_plan_bundle(
+    root: Path,
+    plan: dict[str, Any],
+    *,
+    require_activation: bool,
+) -> tuple[dict[str, Any], Path, dict[str, Any]]:
+    if os.name == "nt":
+        with _native_bundle_pins(root, plan):
+            return _validate_plan_bundle_contents(root, plan, require_activation=require_activation)
+    return _validate_plan_bundle_contents(root, plan, require_activation=require_activation)
+
+
+def _validate_plan_bundle_contents(
     root: Path,
     plan: dict[str, Any],
     *,
@@ -1993,11 +2237,15 @@ def _validate_plan_bundle(
     record_names = [str(item.get("path") or "") for item in records if isinstance(item, dict)]
     if len(record_names) != len(records) or len(record_names) != len(set(record_names)):
         raise RepositoryIntelligenceError("Plan bundle contains invalid or duplicate file records.")
-    actual_names = sorted(
-        child.name
-        for child in bundle_dir.iterdir()
-        if child.is_file() and not child.is_symlink()
-    )
+    if os.name == "nt":
+        with ri_windows_storage.WindowsRIStorage(str(bundle_dir.parent)) as storage:
+            actual_names = sorted(storage.children(bundle_dir.name))
+    else:
+        actual_names = sorted(
+            child.name
+            for child in bundle_dir.iterdir()
+            if child.is_file() and not child.is_symlink()
+        )
     if actual_names != sorted(record_names):
         raise RepositoryIntelligenceError("Plan bundle contains unrecorded or missing files.")
 
@@ -2111,6 +2359,9 @@ def _verify_plan_integrity(
         raise RepositoryIntelligenceError("Plan identity does not match its content digest.")
     if confirmed_digest != declared:
         raise RepositoryIntelligenceError("Confirmation digest does not match the plan digest.")
+    refresh_base = control.get("refresh_base")
+    if refresh_base is not None and refresh_base["bindings"]["contract_schema_sha256"] != _refresh_contract_schemas():
+        raise RepositoryIntelligenceError("Reviewed refresh schema contracts changed; prepare a new plan")
     profile = str(control.get("profile") or "")
     if profile not in {"quickstart", "lite", "standard", "assured"}:
         raise RepositoryIntelligenceError("Plan profile is unsupported.")
@@ -2167,6 +2418,29 @@ def enroll_capability_scope(
     requested_profile: str | None = None,
     requested_naos_root: str | None = None,
 ) -> dict[str, Any]:
+    if os.name == "nt":
+        # Validate before entering the longer-lived native bundle pins. The
+        # common enrollment path revalidates all authority/source fields while
+        # these exact bundle parents and leaves cannot be replaced or written.
+        verify_enrollment_plan(plan, confirmed_digest)
+        with _native_bundle_pins(root, plan):
+            return _enroll_capability_scope_bound(root, plan, confirmed_digest=confirmed_digest,
+                reviewer_id=reviewer_id, requested_profile=requested_profile,
+                requested_naos_root=requested_naos_root)
+    return _enroll_capability_scope_bound(root, plan, confirmed_digest=confirmed_digest,
+        reviewer_id=reviewer_id, requested_profile=requested_profile,
+        requested_naos_root=requested_naos_root)
+
+
+def _enroll_capability_scope_bound(
+    root: Path,
+    plan: dict[str, Any],
+    *,
+    confirmed_digest: str,
+    reviewer_id: str | None,
+    requested_profile: str | None = None,
+    requested_naos_root: str | None = None,
+) -> dict[str, Any]:
     control = verify_enrollment_plan(plan, confirmed_digest)
     if str(control.get("project_root")) != str(root):
         raise RepositoryIntelligenceError("Enrollment plan project root does not match the requested project.")
@@ -2178,23 +2452,24 @@ def enroll_capability_scope(
     if requested_naos_root is not None and requested_naos_root != naos_root:
         raise RepositoryIntelligenceError("CLI NAOS root does not match the enrollment plan.")
     governed_root = _context_index_root(root, naos_root).relative_to(root).as_posix()
-    current = inspect_scope(root, governed_root=governed_root)
-    planned_gate = control.get("provenance_gate")
-    if not isinstance(planned_gate, dict):
-        raise RepositoryIntelligenceError("Enrollment provenance gate is missing.")
-    current_gate = current.plan_gate()
-    stable_gate_fields = set(current_gate) - {"enrollment_project_id"}
-    if any(current_gate.get(field) != planned_gate.get(field) for field in stable_gate_fields):
-        raise RepositoryIntelligenceError("Capability provenance changed after planning; prepare a new plan.")
-    current = ScopeInspection(
-        status=current.status,
-        project_id=current.project_id,
-        owner_integrity=current.owner_integrity,
-        scope_integrity=current.scope_integrity,
-        governed_root=current.governed_root,
-        enrollment_project_id=str(planned_gate.get("enrollment_project_id") or "") or None,
-        refusal=current.refusal,
-    )
+    if os.name != "nt":
+        current = inspect_scope(root, governed_root=governed_root)
+        planned_gate = control.get("provenance_gate")
+        if not isinstance(planned_gate, dict):
+            raise RepositoryIntelligenceError("Enrollment provenance gate is missing.")
+        current_gate = current.plan_gate()
+        stable_gate_fields = set(current_gate) - {"enrollment_project_id"}
+        if any(current_gate.get(field) != planned_gate.get(field) for field in stable_gate_fields):
+            raise RepositoryIntelligenceError("Capability provenance changed after planning; prepare a new plan.")
+        current = ScopeInspection(
+            status=current.status,
+            project_id=current.project_id,
+            owner_integrity=current.owner_integrity,
+            scope_integrity=current.scope_integrity,
+            governed_root=current.governed_root,
+            enrollment_project_id=str(planned_gate.get("enrollment_project_id") or "") or None,
+            refusal=current.refusal,
+        )
 
     _bundle, bundle_dir, _manifest = _validate_plan_bundle(
         root,
@@ -2228,6 +2503,47 @@ def enroll_capability_scope(
             raise RepositoryIntelligenceError(
                 f"Enrollment prerequisite {field} changed after planning; prepare a new plan."
             )
+    if os.name == "nt":
+        if not _windows_enrollment_supported():
+            raise RepositoryIntelligenceError("Windows RI enrollment runtime is unsupported")
+        source_authorization = _windows_source_authorization(root, inspection,
+            profile=profile, naos_root=naos_root, purpose=str(control["purpose"]),
+            component_mode=str(control["component_mode"]))
+        planned_gate = control.get("provenance_gate")
+        current_gate = _inspect_ri_scope(root, governed_root=governed_root,
+                                        source_authorization=source_authorization).plan_gate()
+        native_plan = planned_gate.get("native_enrollment_plan") if isinstance(planned_gate, dict) else None
+        if (not isinstance(native_plan, dict)
+                or native_plan.get("source_authorization_sha256") != source_authorization):
+            raise RepositoryIntelligenceError("Native RI enrollment authorization or provenance changed")
+        if planned_gate != current_gate:
+            # A completed exact retry must reach the native commit validator.
+            # It checks the complete recorded plan and parent/root identities;
+            # an enrolled status alone is never sufficient.
+            completed = current_gate.get("enrollment") or {}
+            if (current_gate.get("status") != "valid"
+                    or completed.get("native_plan_sha256") != canonical_sha256(native_plan)):
+                raise RepositoryIntelligenceError("Native RI enrollment authorization or provenance changed")
+        with ri_windows_storage.WindowsRIStorage(str(root)) as storage:
+            enrolled = ri_windows_enrollment.WindowsRIEnrollment(storage).commit(native_plan,
+                confirmed_digest=canonical_sha256(native_plan))
+        result = {"schema": "naos.repository_intelligence.enrollment_result.v2",
+            "status": "enrolled_without_activation", "project_root": str(root),
+            "project_id": enrolled.project_id, "root_identity": native_plan["root_identity"],
+            "record_path": ri_windows_enrollment.RECORD_PATH,
+            "record_identity": enrolled.record_identity.record(),
+            "record_bytes_sha256": enrolled.record_sha256,
+            "native_plan_sha256": enrolled.enrollment_plan_sha256,
+            "governed_root": governed_root, "authorization_plan_sha256": confirmed_digest,
+            "reviewer": {"required": _profile_gate(profile)["named_review_required"],
+                "reviewer_id": reviewer_id,
+                "identity_status": "declared_attribution" if reviewer_id else "not_required",
+                "authentication_status": "not_claimed"},
+            "activation_eligible": False, "ownership_inference_used": False,
+            "source_artifacts_modified": [],
+            "next_action": "Prepare a new activation plan and confirm its exact digest; enrollment alone does not authorize apply."}
+        _validate_schema(result, result["schema"])
+        return result
     owner, scope = build_enrollment_objects(
         current,
         plan_sha256=confirmed_digest,
@@ -2293,8 +2609,15 @@ def _release_lock(lock: StableFileLock) -> None:
     lock.release()
 
 
-def _populate_relationship_tables(path: Path, relationships: list[dict[str, Any]], metadata: dict[str, Any]) -> None:
-    connection = sqlite3.connect(path)
+def _populate_relationship_tables(path: Path | None, relationships: list[dict[str, Any]], metadata: dict[str, Any], *, connection: sqlite3.Connection | None = None) -> None:
+    owned_connection = connection is None
+    if owned_connection:
+        if path is None:
+            raise RepositoryIntelligenceError("SQLite path is missing")
+        connection = sqlite3.connect(path)
+    elif path is not None:
+        raise RepositoryIntelligenceError("Specify a SQLite path or connection, not both")
+    assert connection is not None
     try:
         with connection:
             connection.execute(
@@ -2351,7 +2674,8 @@ def _populate_relationship_tables(path: Path, relationships: list[dict[str, Any]
                     (key, json.dumps(value, sort_keys=True)),
                 )
     finally:
-        connection.close()
+        if owned_connection:
+            connection.close()
 
 
 def _graph_scalar(value: Any) -> str | int | float | bool:
@@ -2409,6 +2733,7 @@ def _write_graphml(
     *,
     source_sha256: str,
     model_sha256: str,
+    native_write: Any = None,
 ) -> dict[str, Any]:
     try:
         import networkx as nx
@@ -2448,47 +2773,62 @@ def _write_graphml(
         raise RepositoryIntelligenceError(
             f"GraphML model exceeds limits: nodes={graph.number_of_nodes()}, edges={graph.number_of_edges()}."
         )
-    nx.write_graphml_xml(
-        graph,
-        path,
-        encoding="utf-8",
-        prettyprint=True,
-        infer_numeric_types=True,
-        named_key_ids=False,
-        edge_id_from_attribute="relationship_id",
-    )
-    os.chmod(path, 0o600)
-    _fsync_file(path)
-    repeat_path = path.with_name(f".{path.name}.determinism-probe")
-    try:
+    if native_write is not None:
+        buffers = [io.BytesIO(), io.BytesIO()]
+        for buffer in buffers:
+            nx.write_graphml_xml(graph, buffer, encoding="utf-8", prettyprint=True,
+                infer_numeric_types=True, named_key_ids=False, edge_id_from_attribute="relationship_id")
+        first, second = [buffer.getvalue() for buffer in buffers]
+        if first != second or len(first) > MAX_GRAPHML_BYTES:
+            raise RepositoryIntelligenceError("GraphML bytes are nondeterministic or oversized")
+        if b"<!DOCTYPE" in first.upper() or b"<!ENTITY" in first.upper():
+            raise RepositoryIntelligenceError("GraphML contains prohibited declarations")
+        key_ids = re.findall(rb'<key\s+[^>]*id="([^"]+)"', first)
+        if len(key_ids) != len(set(key_ids)):
+            raise RepositoryIntelligenceError("GraphML contains duplicate key identifiers")
+        native_write(path, first)
+    else:
         nx.write_graphml_xml(
             graph,
-            repeat_path,
+            path,
             encoding="utf-8",
             prettyprint=True,
             infer_numeric_types=True,
             named_key_ids=False,
             edge_id_from_attribute="relationship_id",
         )
-        first = secure_regular_file_bytes(path)
-        second = secure_regular_file_bytes(repeat_path)
-        if first != second:
-            raise RepositoryIntelligenceError("GraphML serialization was not byte-deterministic across repeat writes.")
-        upper = first.upper()
-        if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
-            raise RepositoryIntelligenceError("Generated GraphML contains a prohibited DTD or entity declaration.")
-        if len(first) > MAX_GRAPHML_BYTES:
-            raise RepositoryIntelligenceError(
-                f"Generated GraphML exceeds the {MAX_GRAPHML_BYTES}-byte limit."
-            )
-        key_ids = re.findall(rb"<key\s+[^>]*id=\"([^\"]+)\"", first)
-        if len(key_ids) != len(set(key_ids)):
-            raise RepositoryIntelligenceError("Generated GraphML contains duplicate global key identifiers.")
-    finally:
+        os.chmod(path, 0o600)
+        _fsync_file(path)
+        repeat_path = path.with_name(f".{path.name}.determinism-probe")
         try:
-            repeat_path.unlink()
-        except FileNotFoundError:
-            pass
+            nx.write_graphml_xml(
+                graph,
+                repeat_path,
+                encoding="utf-8",
+                prettyprint=True,
+                infer_numeric_types=True,
+                named_key_ids=False,
+                edge_id_from_attribute="relationship_id",
+            )
+            first = secure_regular_file_bytes(path)
+            second = secure_regular_file_bytes(repeat_path)
+            if first != second:
+                raise RepositoryIntelligenceError("GraphML serialization was not byte-deterministic across repeat writes.")
+            upper = first.upper()
+            if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
+                raise RepositoryIntelligenceError("Generated GraphML contains a prohibited DTD or entity declaration.")
+            if len(first) > MAX_GRAPHML_BYTES:
+                raise RepositoryIntelligenceError(
+                    f"Generated GraphML exceeds the {MAX_GRAPHML_BYTES}-byte limit."
+                )
+            key_ids = re.findall(rb"<key\s+[^>]*id=\"([^\"]+)\"", first)
+            if len(key_ids) != len(set(key_ids)):
+                raise RepositoryIntelligenceError("Generated GraphML contains duplicate global key identifiers.")
+        finally:
+            try:
+                repeat_path.unlink()
+            except FileNotFoundError:
+                pass
     loaded = nx.read_graphml(io.BytesIO(first), force_multigraph=True)
     if _graph_projection(loaded) != _graph_projection(graph):
         raise RepositoryIntelligenceError("Generated GraphML failed full semantic round-trip validation.")
@@ -2510,6 +2850,7 @@ def _validate_graphml_file(
     *,
     expected_source_sha256: str,
     expected_model_sha256: str,
+    data: bytes | None = None,
 ) -> dict[str, Any]:
     try:
         import networkx as nx
@@ -2517,7 +2858,10 @@ def _validate_graphml_file(
         raise RepositoryIntelligenceError("Exact NetworkX runtime is unavailable.") from exc
     if package_version("networkx") != NETWORKX_VERSION:
         raise RepositoryIntelligenceError(f"NetworkX {NETWORKX_VERSION} is required for GraphML validation.")
-    data = secure_regular_file_bytes(path)
+    if data is None:
+        data = secure_regular_file_bytes(path)
+    elif os.name != "nt" or not isinstance(data, bytes):
+        raise RepositoryIntelligenceError("Native GraphML bytes require Windows")
     if len(data) > MAX_GRAPHML_BYTES:
         raise RepositoryIntelligenceError(f"GraphML exceeds the {MAX_GRAPHML_BYTES}-byte limit.")
     upper = data.upper()
@@ -2557,16 +2901,40 @@ def _validate_graphml_file(
     }
 
 
+def _generation_sqlite_connection(path: Path, generation_reader=None):
+    """Open POSIX immutable files or bounded Windows native generation bytes."""
+    if generation_reader is None:
+        return sqlite3.connect(path.resolve(strict=True).as_uri() + "?mode=ro&immutable=1", uri=True)
+    if os.name != "nt":
+        raise RepositoryIntelligenceError("Native generation reader requires Windows")
+    data = generation_reader("local_context_index.sqlite")
+    if not isinstance(data, bytes) or not 0 < len(data) <= ri_windows_storage.MAX_FILE_BYTES:
+        raise RepositoryIntelligenceError("Native SQLite image is invalid or exceeds its bound")
+    connection = sqlite3.connect(":memory:")
+    try:
+        if not callable(getattr(connection, "deserialize", None)):
+            raise RepositoryIntelligenceError("Native SQLite deserialize is unavailable")
+        connection.deserialize(data)
+        connection.execute("PRAGMA query_only=ON")
+        if connection.execute("PRAGMA query_only").fetchone() != (1,):
+            raise RepositoryIntelligenceError("Native SQLite query-only mode is unavailable")
+        return connection
+    except BaseException:
+        connection.close()
+        raise
+
+
 def _validate_sqlite(
     path: Path,
     expected_source_sha256: str,
     expected_content_binding: dict[str, Any],
+    *,
+    generation_reader=None,
 ) -> dict[str, Any]:
     try:
-        uri = path.resolve(strict=True).as_uri() + "?mode=ro&immutable=1"
+        connection = _generation_sqlite_connection(path, generation_reader)
     except OSError as exc:
         raise RepositoryIntelligenceError(f"SQLite generation is unavailable: {path}") from exc
-    connection = sqlite3.connect(uri, uri=True)
     try:
         integrity = connection.execute("PRAGMA integrity_check").fetchone()
         tables = {
@@ -3533,6 +3901,266 @@ def _assert_context_entries(context_root: Path) -> None:
             )
 
 
+REFRESH_BASE_SCHEMA = "naos.repository_intelligence.refresh_base.v1"
+
+
+def _supported_refresh_implementation(prior, target):
+    """Only engine/public-reader hashes may differ; native custody stays exact."""
+    if not isinstance(prior, dict) or not isinstance(target, dict) or set(prior) != set(target):
+        raise RepositoryIntelligenceError("Prior implementation contract differs")
+    permitted = {"engine_sha256", "windows_ri_public"}
+    for key in prior:
+        if key in permitted:
+            if any(not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None
+                   for value in (prior[key], target[key])):
+                raise RepositoryIntelligenceError("Prior engine/reader digest is invalid")
+        elif prior[key] != target[key]:
+            raise RepositoryIntelligenceError("Unsupported prior custody/runtime implementation change: " + key)
+
+
+def _refresh_contract_schemas():
+    # Bind current strict v1/v2 contracts against plan/apply drift. Historical
+    # manifests carry schema IDs, not historical schema-file digests.
+    names = sorted(set(SCHEMA_FILES.values()) | {"repository_intelligence_rules.schema.json"})
+    return {name: sha256_bytes(secure_regular_file_bytes(_schema_path(name))) for name in names}
+
+
+def _refresh_manifest_bindings(control):
+    return {key: copy.deepcopy(control[key]) for key in (
+        "implementation", "runtime", "components", "provenance_gate",
+        "generation_content_sha256", "effective_source_sha256", "graph_model_sha256") } | {
+            "rules_sha256": control["rules"]["sha256"],
+            "contract_schema_sha256": _refresh_contract_schemas()}
+
+
+@contextmanager
+def _posix_refresh_lease(root, naos_root, target_implementation, *, publisher_entries=None):
+    """Pin immutable prior descriptors, not the intentionally replaceable pointer.
+
+    Existing native no-follow/witness primitives perform all reads. Directory
+    membership is checked only for immutable generation/transaction directories;
+    mutable parents are identity-bound without freezing new sibling publication.
+    """
+    from upgrade_contract.working_tree_capture_posix import _Reader
+    from upgrade_contract.portable_provenance_posix import _witness, _same_namespace
+    context = _context_index_root(root, naos_root)
+    pointer_path = context / "active.json"
+    if not pointer_path.exists():
+        yield None, lambda: _require_refresh_pointer_absent(pointer_path)
+        return
+    with ExitStack() as stack:
+        reader = stack.enter_context(_Reader(root))
+        directory_pins, file_pins, memberships = {}, {}, {}
+        publisher_entries = {} if publisher_entries is None else publisher_entries
+        mutable_parents = {(context / "generations").relative_to(root).as_posix(), TRANSACTIONS_RELATIVE.as_posix()}
+        cumulative_bytes = 0
+
+        def native_value(witness):
+            return {"stat_fields_decimal": [str(x) for x in witness.stat_fields],
+                    "metadata": copy.deepcopy(witness.metadata)}
+
+        def directory(relative):
+            if relative and (relative.startswith("/") or any(part in {"", ".", ".."} for part in relative.split("/"))):
+                raise RepositoryIntelligenceError("Invalid prior relative path")
+            if relative in directory_pins:
+                return directory_pins[relative][0]
+            # Close traversal checks before our publisher changes sibling counts;
+            # retain a duplicate immutable-object descriptor for the lease.
+            with ExitStack() as traversal:
+                current_fd = reader._walk(relative, traversal)
+                if current_fd is None:
+                    raise RepositoryIntelligenceError("Prior directory disappeared")
+                fd = os.dup(current_fd)
+                stack.callback(os.close, fd)
+                directory_pins[relative] = (fd, _witness(fd, leaf=False, label=relative))
+            return fd
+
+        def read_leaf(relative, *, retain):
+            nonlocal cumulative_bytes
+            parent_path, _, name = relative.rpartition("/")
+            parent = directory(parent_path)
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+            try:
+                before = _witness(fd, leaf=True, label=relative)
+                _same_namespace(parent, name, before, leaf=True, label=relative)
+                if stat.S_IMODE(os.fstat(fd).st_mode) != 0o600:
+                    raise RepositoryIntelligenceError("Prior file is not private")
+                raw = bytearray()
+                while True:
+                    chunk = os.read(fd, min(1024 * 1024, 64 * 1024 * 1024 - len(raw) + 1))
+                    if not chunk:
+                        break
+                    raw.extend(chunk)
+                    if len(raw) > 64 * 1024 * 1024:
+                        raise RepositoryIntelligenceError("Prior member exceeds byte limit")
+                if _witness(fd, leaf=True, label=relative) != before:
+                    raise RepositoryIntelligenceError("Prior member changed during read")
+                _same_namespace(parent, name, before, leaf=True, label=relative)
+                cumulative_bytes += len(raw)
+                if cumulative_bytes > 256 * 1024 * 1024 or len(file_pins) >= 4096:
+                    raise RepositoryIntelligenceError("Prior witness exceeds cumulative capture bound")
+                value = {"sha256": sha256_bytes(bytes(raw)), "native_identity": native_value(before)}
+                if retain:
+                    file_pins[relative] = (parent, name, fd, before, value)
+                    stack.callback(os.close, fd)
+                    fd = None
+                return bytes(raw), value
+            finally:
+                if fd is not None:
+                    os.close(fd)
+
+        pointer_relative = pointer_path.relative_to(root).as_posix()
+        pointer_raw, pointer_witness = read_leaf(pointer_relative, retain=False)
+        pointer = loads_strict_json(pointer_raw)
+        _validate_schema(pointer, ACTIVE_SCHEMA)
+        pc = pointer["control"]
+        expected_manifest = (context / "generations" / pc["generation_id"] / "manifest.json").relative_to(root).as_posix()
+        if pc["manifest_path"] != expected_manifest or not TRANSACTION_ID_RE.fullmatch(pc["transaction_id"]):
+            raise RepositoryIntelligenceError("Prior pointer path/transaction binding differs")
+        manifest_raw, _ = read_leaf(pc["manifest_path"], retain=True)
+        manifest = loads_strict_json(manifest_raw)
+        mc = manifest["control"]
+        _supported_refresh_implementation(mc["implementation"], target_implementation)
+        generation = context / "generations" / pc["generation_id"]
+        transaction = root / TRANSACTIONS_RELATIVE / pc["transaction_id"]
+        for folder in (generation, transaction):
+            relative = folder.relative_to(root).as_posix()
+            fd = directory(relative)
+            if stat.S_IMODE(os.fstat(fd).st_mode) != 0o700:
+                raise RepositoryIntelligenceError("Prior immutable directory is not private")
+            names = sorted(os.listdir(fd))
+            memberships[relative] = names
+            for name in names:
+                # Committed RI transaction records and generation members are immutable.
+                read_leaf(relative + "/" + name, retain=True)
+        # Bind every ancestry identity/security witness. Only the two existing
+        # publisher parents may gain exactly the explicitly registered owned
+        # sibling; no directory link-count normalization is used.
+        for relative in list(reader.directories):
+            directory(relative)
+        for relative in mutable_parents:
+            fd = directory(relative)
+            memberships[relative] = sorted(os.listdir(fd))
+
+        validation = _validate_posix_active_generation(root, naos_root=naos_root,
+            require_current_source=False, prior_implementation=mc["implementation"])
+        if validation["status"] != "validated":
+            raise RepositoryIntelligenceError("Prior generation custody was not validated")
+        witness = {"schema": REFRESH_BASE_SCHEMA, "backend": "posix",
+            "generation_id": pc["generation_id"], "operation_id": pc["transaction_id"],
+            "pointer": {"path": pointer_relative, **pointer_witness},
+            "manifest_file_sha256": sha256_bytes(manifest_raw),
+            "manifest_sha256": manifest["manifest_sha256"],
+            "bindings": _refresh_manifest_bindings(mc),
+            "files": {path: value[4] for path, value in sorted(file_pins.items())},
+            "directories": {path: native_value(value[1]) for path, value in sorted(directory_pins.items())},
+            "memberships": memberships}
+
+        def check(*, pointer=True):
+            if witness["bindings"]["contract_schema_sha256"] != _refresh_contract_schemas():
+                raise RepositoryIntelligenceError("Reviewed refresh schema contracts changed")
+            reader._check_root()
+            # Fresh namespace walks permit owned sibling creation, while still
+            # checking every retained ancestor's exact identity and metadata.
+            with _Reader(root) as current_reader, ExitStack() as current_stack:
+                for path, (fd, expected) in directory_pins.items():
+                    current_fd = current_reader._walk(path, current_stack)
+                    adjusted = expected
+                    if path in mutable_parents:
+                        present_additions = set(os.listdir(fd)) - set(memberships[path])
+                        allowed = publisher_entries.get(path, {})
+                        if not present_additions <= set(allowed):
+                            raise RepositoryIntelligenceError("Unreviewed publisher-parent member appeared")
+                        for name in present_additions:
+                            owned_fd = current_reader._walk(path + "/" + name, current_stack)
+                            if owned_fd is None:
+                                raise RepositoryIntelligenceError("Owned publisher sibling disappeared")
+                            owned = _witness(owned_fd, leaf=False, label=name)
+                            # Newly allocated publisher directories receive
+                            # journal/receipt children during this operation.
+                            # Bind their existing created-directory native
+                            # metadata contract exactly (includes ID/mode/ACL/
+                            # xattrs/flags), rather than their initial child count.
+                            # All prior immutable directory witnesses remain full.
+                            if owned.metadata != allowed[name].metadata:
+                                raise RepositoryIntelligenceError("Owned publisher sibling identity changed")
+                        fields = list(expected.stat_fields)
+                        fields[3] += len(present_additions)
+                        adjusted = type(expected)(tuple(fields), expected.metadata)
+                    if (current_fd is None or _witness(current_fd, leaf=False, label=path) != adjusted
+                            or _witness(fd, leaf=False, label=path) != adjusted):
+                        raise RepositoryIntelligenceError("Pinned prior directory changed")
+            for path, (parent, name, fd, expected, value) in file_pins.items():
+                if _witness(fd, leaf=True, label=path) != expected:
+                    raise RepositoryIntelligenceError("Pinned prior member changed")
+                _same_namespace(parent, name, expected, leaf=True, label=path)
+                os.lseek(fd, 0, os.SEEK_SET)
+                digest = hashlib.sha256()
+                for chunk in iter(lambda: os.read(fd, 1024 * 1024), b""):
+                    digest.update(chunk)
+                if digest.hexdigest() != value["sha256"] or _witness(fd, leaf=True, label=path) != expected:
+                    raise RepositoryIntelligenceError("Pinned prior bytes changed")
+            for path, names in memberships.items():
+                current_names = set(os.listdir(directory_pins[path][0]))
+                additions = set(publisher_entries.get(path, {})) if path in mutable_parents else set()
+                if not (set(names) <= current_names <= set(names) | additions):
+                    raise RepositoryIntelligenceError("Prior receipt/member inventory changed")
+            if pointer:
+                # A fresh read avoids stale namespace caches across our own writes.
+                with _posix_pointer_witness(root, pointer_relative) as observed:
+                    if observed != pointer_witness:
+                        raise RepositoryIntelligenceError("Approved prior pointer changed")
+            reader._check_root()
+
+        check()
+        try:
+            yield witness, check
+        finally:
+            check(pointer=False)
+
+
+def _require_refresh_pointer_absent(path):
+    if path.exists() or path.is_symlink():
+        raise RepositoryIntelligenceError("Unreviewed active pointer appeared")
+
+
+@contextmanager
+def _posix_pointer_witness(root, relative):
+    from upgrade_contract.working_tree_capture_posix import _Reader
+    with _Reader(root) as reader:
+        value = reader.leaf(relative)
+        # Match the retained full file witness, including represented timestamps.
+        parent, _, name = relative.rpartition("/")
+        from upgrade_contract.portable_provenance_posix import _witness
+        with ExitStack() as stack:
+            fd_parent = reader._walk(parent, stack)
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd_parent)
+            stack.callback(os.close, fd)
+            observed = _witness(fd, leaf=True, label=relative)
+            result = {"sha256": value["content"]["sha256"], "native_identity": {
+                "stat_fields_decimal": [str(x) for x in observed.stat_fields],
+                "metadata": copy.deepcopy(observed.metadata)}}
+            yield result
+            if reader.leaf(relative, final=True) != value:
+                raise RepositoryIntelligenceError("Prior pointer changed during witness read")
+
+
+def _capture_refresh_base(root, naos_root, target):
+    if os.name == "nt":
+        return _windows_api(root).capture_refresh_base(naos_root, target)
+    lock = _acquire_lock(root / LOCK_RELATIVE, "0" * 64)
+    try:
+        with _posix_refresh_lease(root, naos_root, target) as (witness, _check):
+            return witness
+    finally:
+        _release_lock(lock)
+
+
+def _windows_api(root: Path):
+    from naos_repository_intelligence_windows import WindowsRepositoryIntelligencePublic
+    return WindowsRepositoryIntelligencePublic(root, sys.modules[__name__])
+
+
 def apply_plan(
     root: Path,
     plan: dict[str, Any],
@@ -3543,6 +4171,10 @@ def apply_plan(
     requested_profile: str | None = None,
     requested_naos_root: str | None = None,
 ) -> dict[str, Any]:
+    if os.name == "nt":
+        return _windows_api(root).apply(plan, confirmed_digest=confirmed_digest,
+            reviewer_id=reviewer_id, rules_override=rules_override,
+            requested_profile=requested_profile, requested_naos_root=requested_naos_root)
     if rules_override is not None:
         raise RepositoryIntelligenceError("Apply does not accept a rules override; rules are bound by the plan.")
     control = verify_plan(plan, confirmed_digest)
@@ -3606,6 +4238,10 @@ def apply_plan(
     journal_path: Path | None = None
     staging_dir: Path | None = None
     proposed_pointer: dict[str, Any] | None = None
+    refresh_stack = ExitStack()
+    publisher_entries = {}
+    def refresh_check():
+        return None
     try:
         locked_scope = inspect_scope(root, governed_root=governed_root)
         if locked_scope.plan_gate() != control.get("provenance_gate") or not locked_scope.activation_eligible:
@@ -3650,11 +4286,19 @@ def apply_plan(
                 active_before_bytes = None
                 active_before_file_sha256 = None
             else:
-                prior_validation = validate_active_generation(
-                    root,
-                    naos_root=naos_root,
-                    require_current_source=False,
-                )
+                active_candidate = _strict_json_file(active_path)
+                exact_retry = (active_candidate["control"]["plan_sha256"] == confirmed_digest
+                    and active_candidate["control"]["bundle_sha256"] == bundle["bundle_sha256"])
+                if "refresh_base" in control and not exact_retry:
+                    observed_base, refresh_check = refresh_stack.enter_context(
+                        _posix_refresh_lease(root, naos_root, control["implementation"], publisher_entries=publisher_entries))
+                    if observed_base != control["refresh_base"]:
+                        raise RepositoryIntelligenceError("Approved refresh base changed; prepare a new plan")
+                    prior_validation = {"status": "validated"}
+                else:
+                    # Legacy plans retain original same-engine semantics only.
+                    prior_validation = validate_active_generation(root,
+                        naos_root=naos_root, require_current_source=False)
                 if prior_validation.get("status") != "validated":
                     raise RepositoryIntelligenceError(
                         "Existing active state is not a valid rollback base."
@@ -3691,6 +4335,13 @@ def apply_plan(
             }
             _validate_schema(result, APPLY_RESULT_SCHEMA)
             return result
+
+        if "refresh_base" in control and active_before is None and control["refresh_base"] is not None:
+            raise RepositoryIntelligenceError("Approved refresh base disappeared")
+        if "refresh_base" in control and active_before is None:
+            def refresh_check():
+                _require_refresh_pointer_absent(active_path)
+        refresh_check()
 
         transaction_seed = {
             "plan_sha256": confirmed_digest,
@@ -3758,6 +4409,15 @@ def apply_plan(
             transaction_dir,
             journal,
         )
+
+        if "refresh_base" in control and active_before is not None:
+            from upgrade_contract.portable_provenance_posix import _witness
+            descriptor = os.open(transaction_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                publisher_entries[TRANSACTIONS_RELATIVE.as_posix()] = {
+                    transaction_id: _witness(descriptor, leaf=False, label=transaction_id)}
+            finally:
+                os.close(descriptor)
 
         reused_existing = final_dir.exists()
         if reused_existing:
@@ -3847,6 +4507,14 @@ def apply_plan(
 
         manifest = promoted["manifest"]
         manifest_path = final_dir / "manifest.json"
+        if "refresh_base" in control and active_before is not None and not reused_existing:
+            descriptor = os.open(final_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                publisher_entries[generations_root.relative_to(root).as_posix()] = {
+                    generation_id: _witness(descriptor, leaf=False, label=generation_id)}
+            finally:
+                os.close(descriptor)
+
         validation_receipt_path = final_dir / "validation_receipt.json"
         previous_generation_id = (
             active_before.get("control", {}).get("generation_id")
@@ -3935,6 +4603,9 @@ def apply_plan(
         journal["proposed_active_sha256"] = proposed_pointer["active_sha256"]
         journal["proposed_active_file_sha256"] = sha256_bytes(proposed_pointer_bytes)
         journal = _write_journal(journal_path, journal, state="VALIDATING")
+        if control["implementation"] != _implementation_identity() or control["runtime"] != runtime_probe():
+            raise RepositoryIntelligenceError("Target implementation/runtime changed before publication")
+        refresh_check()
         _atomic_write_bytes(active_path, proposed_pointer_bytes)
         journal["completed_action_index"] = 3
         journal = _write_journal(journal_path, journal, state="VALIDATING")
@@ -4011,7 +4682,10 @@ def apply_plan(
                 ) from exc
         raise
     finally:
-        _release_lock(lock)
+        try:
+            refresh_stack.close()
+        finally:
+            _release_lock(lock)
 
 
 def _lock_observation(lock_path: Path) -> dict[str, Any]:
@@ -4019,6 +4693,8 @@ def _lock_observation(lock_path: Path) -> dict[str, Any]:
 
 
 def repository_intelligence_status(root: Path, *, naos_root: str) -> dict[str, Any]:
+    if os.name == "nt":
+        return _windows_api(root).status(naos_root=naos_root)
     context_root = _context_index_root(root, naos_root)
     governed_root = context_root.relative_to(root).as_posix()
     scope = inspect_scope(root, governed_root=governed_root)
@@ -4089,7 +4765,8 @@ def repository_intelligence_status(root: Path, *, naos_root: str) -> dict[str, A
         }
     else:
         try:
-            active_status = validate_active_generation(root, naos_root=naos_root, require_current_source=True)
+            active_status = validate_active_generation(root, naos_root=naos_root, require_current_source=True,
+                classify_identity_drift=True)
         except (RepositoryIntelligenceError, ProvenanceError, OSError, ValueError) as exc:
             active_status = {"status": "invalid", "error": str(exc)}
     overall = "recovery_required" if unresolved_count else str(active_status.get("status") or "invalid")
@@ -4109,6 +4786,8 @@ def repository_intelligence_status(root: Path, *, naos_root: str) -> dict[str, A
 
 
 def recover_repository_intelligence(root: Path, *, naos_root: str) -> dict[str, Any]:
+    if os.name == "nt":
+        return _windows_api(root).recover(naos_root=naos_root)
     context_root = _context_index_root(root, naos_root)
     governed_root = context_root.relative_to(root).as_posix()
     scope = inspect_scope(root, governed_root=governed_root)
@@ -4216,7 +4895,7 @@ def recover_repository_intelligence(root: Path, *, naos_root: str) -> dict[str, 
         _release_lock(lock)
 
 
-def _validate_file_records(generation_dir: Path, records: Iterable[dict[str, Any]]) -> None:
+def _validate_file_records(generation_dir: Path, records: Iterable[dict[str, Any]], *, generation_reader=None) -> None:
     allowed = {
         "inventory.json",
         "repository_intelligence_rules.yaml",
@@ -4235,17 +4914,58 @@ def _validate_file_records(generation_dir: Path, records: Iterable[dict[str, Any
             raise RepositoryIntelligenceError(f"Generation contains an invalid file record: {name!r}")
         seen.add(name)
         path = generation_dir / name
-        observed = _file_record(path)
+        if generation_reader is None:
+            observed = _file_record(path)
+        else:
+            if os.name != "nt":
+                raise RepositoryIntelligenceError("Native generation reader requires Windows")
+            data = generation_reader(name)
+            observed = {"sha256": sha256_bytes(data), "size_bytes": len(data)}
         if observed.get("sha256") != record.get("sha256") or observed.get("size_bytes") != record.get("size_bytes"):
             raise RepositoryIntelligenceError(f"Generation file integrity mismatch: {path}")
 
 
-def validate_active_generation(
+def _identity_drift_finding(fields: list[str]) -> str:
+    return (
+        "Active repository intelligence has exact identity drift: " + ", ".join(fields)
+        + ". Already-supported engine/public-reader-only changes may use the existing "
+        "explicitly reviewed refresh. Otherwise restore the bound environment, or use a "
+        "separately qualified, explicitly approved migration/rebind. "
+        "Existing refresh leases retain their exact runtime, "
+        "component and custody restrictions; no automatic migration or continuation is authorized."
+    )
+
+
+def _identity_drift_report(root, control, schema, fields):
+    report = {"schema": schema, "status": "stale", "project_root": str(root),
+              "generation_id": control["generation_id"],
+              "effective_source_sha256": control["effective_source_sha256"],
+              "identity_drift_fields": fields, "candidate_references": [],
+              "finding": _identity_drift_finding(fields)}
+    _validate_schema(report, schema)
+    return report
+
+
+def validate_active_generation(root: Path, *, naos_root: str, require_current_source: bool,
+        allow_validating_transaction_id: str | None = None,
+        classify_identity_drift: bool = False) -> dict[str, Any]:
+    if os.name == "nt":
+        return _windows_api(root).validate(naos_root=naos_root, require_current_source=require_current_source,
+            **({"classify_identity_drift": True} if classify_identity_drift else {}))
+    return _validate_posix_active_generation(root, naos_root=naos_root,
+        require_current_source=require_current_source,
+        allow_validating_transaction_id=allow_validating_transaction_id,
+        classify_identity_drift=classify_identity_drift)
+
+
+def _validate_posix_active_generation(
     root: Path,
     *,
     naos_root: str,
     require_current_source: bool,
     allow_validating_transaction_id: str | None = None,
+    prior_implementation: dict[str, Any] | None = None,
+    classify_identity_drift: bool = False,
 ) -> dict[str, Any]:
     context_root = _context_index_root(root, naos_root)
     active_path = context_root / "active.json"
@@ -4262,7 +4982,10 @@ def validate_active_generation(
     governed_root = context_root.relative_to(root).as_posix()
     scope = inspect_scope(root, governed_root=governed_root)
     if not scope.activation_eligible:
-        raise RepositoryIntelligenceError(f"Active generation lacks valid capability provenance: {scope.refusal}")
+        raise RepositoryIntelligenceError(
+            f"Active generation lacks valid capability provenance: {scope.refusal}. "
+            "A relocated root requires restoration of its bound location or a separately "
+            "qualified, explicitly approved provenance rebind; automatic relocation is forbidden.")
     provenance_expected = {
         "provenance_project_id": scope.project_id,
         "provenance_owner_sha3_512": scope.owner_integrity,
@@ -4304,11 +5027,21 @@ def validate_active_generation(
     if manifest.get("manifest_sha256") != pointer_control.get("manifest_sha256"):
         raise RepositoryIntelligenceError("Active manifest content digest is not pointer-bound.")
     if manifest_control.get("project_root") != str(root):
-        raise RepositoryIntelligenceError("Active manifest project root is invalid.")
+        raise RepositoryIntelligenceError(
+            "Active manifest project root differs; restore its bound location or use a "
+            "separately qualified, explicitly approved provenance rebind before refresh.")
+    identity_drift_fields = []
     if manifest_control.get("runtime") != runtime_probe():
-        raise RepositoryIntelligenceError("Active generation runtime tuple or exact component identity changed.")
+        identity_drift_fields.append("runtime")
     if manifest_control.get("implementation") != _implementation_identity():
-        raise RepositoryIntelligenceError("Active generation implementation identity changed.")
+        if prior_implementation is None or manifest_control.get("implementation") != prior_implementation:
+            identity_drift_fields.append("implementation")
+        else:
+            _supported_refresh_implementation(prior_implementation, _implementation_identity())
+    # Strict consumers retain the original early identity refusal. Only the
+    # status diagnostic may defer it until all stored integrity checks finish.
+    if identity_drift_fields and (not classify_identity_drift or prior_implementation is not None):
+        raise RepositoryIntelligenceError(_identity_drift_finding(identity_drift_fields))
     expected_gate = scope.plan_gate()
     if manifest_control.get("provenance_gate") != expected_gate:
         raise RepositoryIntelligenceError("Active manifest provenance binding is invalid.")
@@ -4426,6 +5159,12 @@ def validate_active_generation(
         if (generation_dir / "context.graphml").exists():
             raise RepositoryIntelligenceError("Unselected GraphML is present in the active generation.")
         graph_validation = {"status": "not_selected"}
+    # Integrity/provenance/receipts and SQLite/GraphML must win over drift.
+    # Only status opts into this diagnostic; strict validators/refresh leases refuse.
+    if identity_drift_fields:
+        if classify_identity_drift and prior_implementation is None:
+            return _identity_drift_report(root, manifest_control, CONTEXT_SCHEMA, identity_drift_fields)
+        raise RepositoryIntelligenceError(_identity_drift_finding(identity_drift_fields))
     source_status = "not_checked"
     if require_current_source:
         rules_path = generation_dir / str(
@@ -4531,6 +5270,8 @@ def validate_active_generation(
 
 
 def _active_generation_paths(root: Path, naos_root: str) -> tuple[dict[str, Any], Path, dict[str, Any]]:
+    if os.name == "nt":
+        raise RepositoryIntelligenceError("Windows generation paths require a retained native reader lease.")
     context = validate_active_generation(root, naos_root=naos_root, require_current_source=True)
     if context.get("status") != "validated_current":
         raise RepositoryIntelligenceError(
@@ -4571,6 +5312,8 @@ def repository_intelligence_binding(context: dict[str, Any]) -> dict[str, Any]:
     binding = {field: generation.get(field) for field in ACTIVE_GENERATION_BINDING_FIELDS}
     if any(value in {None, ""} for value in binding.values()):
         raise RepositoryIntelligenceError("Validated repository intelligence has an incomplete generation binding.")
+    if "native_binding" in generation:
+        binding["native_binding"] = copy.deepcopy(generation["native_binding"])
     return binding
 
 
@@ -4580,14 +5323,28 @@ def assert_repository_intelligence_binding_unchanged(
 ) -> None:
     """Refuse consumption when any immutable active-generation binding changed."""
 
-    for field in ACTIVE_GENERATION_BINDING_FIELDS:
+    for field in (*ACTIVE_GENERATION_BINDING_FIELDS, "native_binding"):
         if opening.get(field) != closing.get(field):
             raise RepositoryIntelligenceError(
                 f"Active repository-intelligence binding changed during consumption: {field}."
             )
 
 
-def read_active_repository_intelligence_snapshot(
+def read_active_repository_intelligence_snapshot(root: Path, *, naos_root: str,
+        required_usage_scopes: list[str] | tuple[str, ...] = (),
+        evidence_paths: list[str] | tuple[str, ...] = (),
+        families: list[str] | tuple[str, ...] = (),
+        retrieval_queries: list[str] | tuple[str, ...] = (), limit: int = 500) -> dict[str, Any]:
+    args = dict(naos_root=naos_root, required_usage_scopes=required_usage_scopes,
+                evidence_paths=evidence_paths, families=families,
+                retrieval_queries=retrieval_queries, limit=limit)
+    if os.name == "nt":
+        with _windows_api(root).lease(naos_root=naos_root) as leased:
+            return _read_active_repository_intelligence_snapshot_bound(root, **args, leased=leased)
+    return _read_active_repository_intelligence_snapshot_bound(root, **args)
+
+
+def _read_active_repository_intelligence_snapshot_bound(
     root: Path,
     *,
     naos_root: str,
@@ -4596,6 +5353,7 @@ def read_active_repository_intelligence_snapshot(
     families: list[str] | tuple[str, ...] = (),
     retrieval_queries: list[str] | tuple[str, ...] = (),
     limit: int = 500,
+    leased=None,
 ) -> dict[str, Any]:
     """Read a bounded, source-revalidated snapshot for deterministic consumers.
 
@@ -4616,13 +5374,13 @@ def read_active_repository_intelligence_snapshot(
         raise RepositoryIntelligenceError(
             "Repository-intelligence onboarding retrieval accepts at most 12 queries."
         )
-    status_report = repository_intelligence_status(root, naos_root=naos_root)
-    if status_report.get("status") != "validated_current":
-        raise RepositoryIntelligenceError(
-            "A validated current repository-intelligence generation is required; "
-            f"status={status_report.get('status')}."
-        )
-    context, generation_dir, _manifest = _active_generation_paths(root, naos_root)
+    if leased is not None:
+        context, generation_dir, _manifest = leased[:3]
+    else:
+        status_report = repository_intelligence_status(root, naos_root=naos_root)
+        if status_report.get("status") != "validated_current":
+            raise RepositoryIntelligenceError("A validated current repository-intelligence generation is required.")
+        context, generation_dir, _manifest = _active_generation_paths(root, naos_root)
     opening_binding = repository_intelligence_binding(context)
     authorized_scopes = {
         str(item) for item in (context.get("usage_scope") or []) if str(item).strip()
@@ -4635,7 +5393,8 @@ def read_active_repository_intelligence_snapshot(
             + ", ".join(missing_scopes)
         )
 
-    inventory = _strict_json_file(generation_dir / "inventory.json")
+    generation_reader = leased[4] if leased is not None else None
+    inventory = generation_reader.json("inventory.json") if generation_reader is not None else _strict_json_file(generation_dir / "inventory.json")
     _validate_schema(inventory, INVENTORY_SCHEMA)
     normalized_paths = {
         Path(str(item).removeprefix("./")).as_posix()
@@ -4697,6 +5456,7 @@ def read_active_repository_intelligence_snapshot(
         normalized_queries,
         source_inventory,
         limit=min(limit, 100),
+        generation_reader=generation_reader,
     )
     retrieval_candidates = retrieval["candidates"]
     source_revalidation = _revalidate_candidate_sources(
@@ -4704,11 +5464,8 @@ def read_active_repository_intelligence_snapshot(
         [*candidates, *retrieval_candidates],
     )
 
-    closing_context = validate_active_generation(
-        root,
-        naos_root=naos_root,
-        require_current_source=True,
-    )
+    closing_context = leased[3]() if leased is not None else validate_active_generation(
+        root, naos_root=naos_root, require_current_source=True)
     closing_binding = repository_intelligence_binding(closing_context)
     assert_repository_intelligence_binding_unchanged(opening_binding, closing_binding)
     return {
@@ -4856,24 +5613,29 @@ def _load_validated_graph(
     generation_dir: Path,
     manifest: dict[str, Any],
     connection: sqlite3.Connection,
+    *,
+    generation_reader=None,
 ) -> Any | None:
     manifest_control = manifest.get("control") if isinstance(manifest.get("control"), dict) else {}
     selected = bool((manifest_control.get("components") or {}).get("networkx_graphml", {}).get("selected"))
     graph_path = generation_dir / "context.graphml"
     if not selected:
-        if graph_path.exists():
+        graph_present = "context.graphml" in generation_reader.members if generation_reader is not None else graph_path.exists()
+        if graph_present:
             raise RepositoryIntelligenceError("Active generation contains unselected GraphML.")
         return None
+    graph_bytes = generation_reader("context.graphml") if generation_reader is not None else None
     _validate_graphml_file(
         graph_path,
         expected_source_sha256=str(manifest_control.get("effective_source_sha256") or ""),
         expected_model_sha256=str(manifest_control.get("graph_model_sha256") or ""),
+        data=graph_bytes,
     )
     try:
         import networkx as nx
     except ImportError as exc:
         raise RepositoryIntelligenceError("NetworkX is required to query selected GraphML.") from exc
-    graph = nx.read_graphml(io.BytesIO(secure_regular_file_bytes(graph_path)), force_multigraph=True)
+    graph = nx.read_graphml(io.BytesIO(graph_bytes if graph_bytes is not None else secure_regular_file_bytes(graph_path)), force_multigraph=True)
     database_edges = {
         str(row[0]): {
             "source_node": row[1],
@@ -5063,6 +5825,7 @@ def _bounded_onboarding_retrieval(
     source_inventory: list[dict[str, Any]],
     *,
     limit: int,
+    generation_reader=None,
 ) -> dict[str, Any]:
     """Return deterministic FTS seeds plus supported two-hop graph additions."""
 
@@ -5079,10 +5842,7 @@ def _bounded_onboarding_retrieval(
             },
         }
     sqlite_path = generation_dir / "local_context_index.sqlite"
-    connection = sqlite3.connect(
-        sqlite_path.resolve(strict=True).as_uri() + "?mode=ro&immutable=1",
-        uri=True,
-    )
+    connection = _generation_sqlite_connection(sqlite_path, generation_reader)
     try:
         ranked_fts: list[dict[str, Any]] = []
         seen_fts_paths: set[str] = set()
@@ -5105,7 +5865,7 @@ def _bounded_onboarding_retrieval(
             if len(ranked_fts) >= limit:
                 break
 
-        graph_model = _load_validated_graph(generation_dir, manifest, connection)
+        graph_model = _load_validated_graph(generation_dir, manifest, connection, generation_reader=generation_reader)
         family_by_path = {
             str(item.get("path") or ""): str(item.get("family_id") or "")
             for item in source_inventory
@@ -5244,7 +6004,18 @@ def _revalidate_candidate_sources(root: Path, candidates: list[dict[str, Any]]) 
     }
 
 
-def query_active_generation(
+def query_active_generation(root: Path, *, naos_root: str, text: str | None,
+        path: str | None, task: str | None, spec: str | None, capability: str | None,
+        depth: int, limit: int) -> dict[str, Any]:
+    args = dict(naos_root=naos_root, text=text, path=path, task=task, spec=spec,
+                capability=capability, depth=depth, limit=limit)
+    if os.name == "nt":
+        with _windows_api(root).lease(naos_root=naos_root) as leased:
+            return _query_active_generation_bound(root, **args, leased=leased)
+    return _query_active_generation_bound(root, **args)
+
+
+def _query_active_generation_bound(
     root: Path,
     *,
     naos_root: str,
@@ -5255,10 +6026,12 @@ def query_active_generation(
     capability: str | None,
     depth: int,
     limit: int,
+    leased=None,
 ) -> dict[str, Any]:
-    context, generation_dir, manifest = _active_generation_paths(root, naos_root)
+    context, generation_dir, manifest = leased[:3] if leased is not None else _active_generation_paths(root, naos_root)
+    generation_reader = leased[4] if leased is not None else None
     sqlite_path = generation_dir / "local_context_index.sqlite"
-    connection = sqlite3.connect(sqlite_path.resolve(strict=True).as_uri() + "?mode=ro&immutable=1", uri=True)
+    connection = _generation_sqlite_connection(sqlite_path, generation_reader)
     try:
         exact = _exact_candidate(connection, path) if path else []
         fts = _fts_candidates(connection, text, limit) if text else []
@@ -5269,7 +6042,7 @@ def query_active_generation(
             capability=capability,
             limit=limit,
         )
-        graph_model = _load_validated_graph(generation_dir, manifest, connection)
+        graph_model = _load_validated_graph(generation_dir, manifest, connection, generation_reader=generation_reader)
         graph = _graph_candidates(
             graph_model,
             path=path,
@@ -5283,7 +6056,7 @@ def query_active_generation(
         connection.close()
     candidates = [*exact, *reference, *fts, *graph]
     source_revalidation = _revalidate_candidate_sources(root, candidates)
-    closing_context = validate_active_generation(root, naos_root=naos_root, require_current_source=True)
+    closing_context = leased[3]() if leased is not None else validate_active_generation(root, naos_root=naos_root, require_current_source=True)
     opening_generation = context.get("generation") if isinstance(context.get("generation"), dict) else {}
     closing_generation = (
         closing_context.get("generation")
@@ -5362,6 +6135,15 @@ def _external_output_path(root: Path, value: str | None, default: Path | None = 
     assert output is not None
     if not output.is_absolute():
         output = Path.cwd() / output
+    # Resolve only after checking the requested leaf: resolving a dangling
+    # symlink would hide an existing object and redirect immutable output.
+    if output.is_symlink():
+        raise RepositoryIntelligenceError("Output path is a symbolic link and was preserved.")
+    for parent in output.parents:
+        if parent.is_symlink() and not parent.exists():
+            raise RepositoryIntelligenceError("Output parent is a dangling symbolic link.")
+        if parent.exists() and not parent.is_dir():
+            raise RepositoryIntelligenceError("Output parent is not a directory.")
     output = output.resolve(strict=False)
     if output == root or root in output.parents:
         raise RepositoryIntelligenceError("Repository-intelligence output must remain outside the target repository.")
@@ -5371,9 +6153,13 @@ def _external_output_path(root: Path, value: str | None, default: Path | None = 
 def _write_immutable_json(path: Path, report: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = (json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
-    _write_new_bytes(path, data)
-    os.chmod(path, 0o600)
-    _fsync_directory(path.parent)
+    if os.name == "nt":
+        with ri_windows_storage.WindowsRIStorage(str(path.parent)) as storage:
+            storage.write_new(path.name, data)
+    else:
+        _write_new_bytes(path, data)
+        os.chmod(path, 0o600)
+        _fsync_directory(path.parent)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -5453,6 +6239,11 @@ def main(argv: list[str] | None = None) -> int:
         naos_root = args.naos_root or default_naos_root(policy)
         profile = normalize_profile(args.profile, policy)
         if args.operation in {"plan", "refresh"}:
+            # Refuse an invalid requested destination before generating a source
+            # bundle, and allocate a default directory only when it is needed.
+            output = _external_output_path(root, args.output)
+            if output is not None and (output.exists() or output.is_symlink()):
+                raise RepositoryIntelligenceError("Plan output already exists and was preserved.")
             rules_path, rules_source = resolve_rules_path(root, naos_root, args.rules)
             report = build_plan(
                 root,
@@ -5463,7 +6254,8 @@ def main(argv: list[str] | None = None) -> int:
                 purpose=args.purpose,
                 component_mode=args.component_mode,
             )
-            output = _external_output_path(root, args.output, default_plan_output(report))
+            if output is None:
+                output = _external_output_path(root, None, default_plan_output(report))
             assert output is not None
             report["plan_file"] = str(output)
             _validate_schema(report, PLAN_SCHEMA)
@@ -5527,6 +6319,7 @@ def main(argv: list[str] | None = None) -> int:
             "stale",
             "not_configured",
             "recovery_required",
+            "recovery_incomplete",
             "invalid",
         } else 2
     except (

@@ -26,7 +26,7 @@ from naos_policy import (  # noqa: E402
     load_policy,
     normalize_profile,
     report_output_path,
-    severity_for_profile,
+    resolve_report_rule_severity,
     write_report,
 )
 from naos_mcp_config_registry import (  # noqa: E402
@@ -159,11 +159,17 @@ def dedupe(items: list[str]) -> list[str]:
     return list(dict.fromkeys(items))
 
 
+def rule_severity_resolution(root: Path, naos_root: str, profile: str, policy: dict[str, Any], rules: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+    return resolve_report_rule_severity(
+        profile, policy, (rules.get("profile_severity_behavior") or {}).get(profile) if isinstance(rules.get("profile_severity_behavior"), dict) else None,
+        advisory=is_kit_repository(root, naos_root),
+        preserve_lower_request=True,
+        allow_none=True,
+    )
+
+
 def rule_severity(root: Path, naos_root: str, profile: str, policy: dict[str, Any], rules: dict[str, Any]) -> str:
-    if is_kit_repository(root, naos_root):
-        return "advisory"
-    mapping = rules.get("profile_severity_behavior") if isinstance(rules.get("profile_severity_behavior"), dict) else {}
-    return str(mapping.get(profile) or severity_for_profile(profile, policy) or "advisory")
+    return rule_severity_resolution(root, naos_root, profile, policy, rules)[0]
 
 
 def finding(
@@ -587,13 +593,13 @@ def build_report(
     matrix_source: str,
     generated_at: str,
 ) -> dict[str, Any]:
-    severity = rule_severity(root, naos_root, profile, policy, rules)
+    severity, severity_downgrade = rule_severity_resolution(root, naos_root, profile, policy, rules)
     memory_config = load_memory_config(root)
     mcp_access = inspect_project_mcp_configs(root)
     project_identity = resolve_engram_project(memory_config, mcp_access.get("project_config_files") or [])
     mcp_access["project_identity"] = project_identity
     rules_enabled = bool(rules.get("enabled", True))
-    findings: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = [severity_downgrade] if severity_downgrade and rules_enabled else []
 
     provider_posture, provider_findings = evaluate_provider_posture(rules, memory_config, severity)
     memory_state = str(provider_posture.get("memory_config_state") or "not_configured")

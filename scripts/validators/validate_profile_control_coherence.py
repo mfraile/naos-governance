@@ -875,6 +875,20 @@ def check_consumed(root: Path) -> list[Finding]:
 
 def build_report(root: Path, policy_path: Path, capabilities_dir: Path, state_path: Path) -> dict[str, Any]:
     findings: list[Finding] = []
+    containment_root = root.resolve()
+    # Explicit relative paths retain CLI CWD semantics. Resolve before scanning
+    # so a selected directory outside the root cannot trigger external reads.
+    capability_paths: list[Path] = []
+    try:
+        capabilities_dir = capabilities_dir.resolve()
+        capabilities_dir.relative_to(containment_root)
+    except (OSError, RuntimeError, ValueError):
+        findings.append(finding(str(capabilities_dir), None, "error", "CTRLCOH_CAPABILITIES_OUTSIDE_ROOT",
+                                "Capabilities directory must resolve inside the selected root; not scanned.",
+                                "Select an in-root capabilities directory."))
+    else:
+        capability_paths = sorted(capabilities_dir.glob("*.yaml"))
+
     if policy_path.exists():
         policy = load_yaml(policy_path)
         policy_rel = policy_path.relative_to(root).as_posix() if policy_path.is_relative_to(root) else str(policy_path)
@@ -887,14 +901,21 @@ def build_report(root: Path, policy_path: Path, capabilities_dir: Path, state_pa
 
     gate_ids = load_gate_ids(root)
     contract_ids: set[str] = set()
-    for cap_path in sorted(capabilities_dir.glob("*.yaml")):
+    for cap_path in capability_paths:
         if cap_path.name.startswith("_"):
+            continue
+        try:
+            cap_path.resolve().relative_to(containment_root)
+        except (OSError, RuntimeError, ValueError):
+            findings.append(finding(str(cap_path), None, "error", "CTRLCOH_CAPABILITIES_OUTSIDE_ROOT",
+                                    "Capability file must resolve inside the selected root; not read.",
+                                    "Select an in-root capability file."))
             continue
         data = load_yaml(cap_path)
         if not isinstance(data, dict) or not data.get("id"):
             continue
         contract_ids.add(str(data["id"]))
-        rel = cap_path.relative_to(root).as_posix()
+        rel = cap_path.relative_to(containment_root).as_posix()
         findings += check_capability(cap_path, data, rel)
         findings += check_gatekeeper_refs(data, gate_ids, rel)
 

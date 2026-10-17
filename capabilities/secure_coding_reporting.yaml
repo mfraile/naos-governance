@@ -25,7 +25,7 @@ profiles:
   assured:
     target_maturity: L3
     enforcement: required
-    notes: "Require source provenance and human review; the report remains non-authoritative."
+    notes: "Require source provenance, human review, and declared G4/G6 maturity linkage; the report remains non-authoritative."
 authority:
   may_read:
     - naos/secure_coding_control_render_manifest.yaml
@@ -64,7 +64,9 @@ validators:
   - id: secure_coding_reporting
     script: scripts/naos_secure_coding_reporting.py
     status: available
-gatekeepers: []
+gatekeepers:
+  - G4
+  - G6
 dashboard_signals:
   - secure_coding_reporting.register_validity
   - secure_coding_reporting.reference_integrity
@@ -75,7 +77,7 @@ maturity_path:
   L0: "Schema, command, and capability contract exist."
   L1: "P1/P2 source reports can be consumed deterministically."
   L2: "Portable adopter manifests and existing-artifact projection are validated."
-  L3: "Source provenance and projection failures are review-routed."
+  L3: "Source provenance and projection failures are review-routed; declared capability maturity contributes to the ordinary G4/G6 severity ceiling."
   L4: "Dashboard and evidence pack expose all five dimensions without a composite score."
   L5: "Independent reviews periodically confirm source and projection boundaries."
 known_limitations:

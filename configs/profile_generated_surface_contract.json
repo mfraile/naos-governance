@@ -10,7 +10,16 @@
         "naos/research/RECORD_TEMPLATE.yaml",
         "schemas/naos/research_record.schema.json",
         "schemas/naos/research_record_validation.schema.json",
-        "schemas/naos/overlay_compatibility.schema.json"
+        "schemas/naos/overlay_compatibility.schema.json",
+        "AGENTS.md",
+        "GEMINI.md",
+        "CLAUDE.md",
+        ".github/copilot-instructions.md",
+        ".github/project-context.md",
+        ".github/naos-guidance/claude-reference.md",
+        ".github/naos-guidance/governance-reference.md",
+        ".claude/rules/security.md",
+        ".github/naos-guidance/security-reference.md"
       ],
       "prohibited_surfaces": [
         ".github/agents/naos-plan.agent.md",
@@ -30,7 +39,14 @@
         "scripts/naos_plan_coherence.py",
         "naos/PLANNING_BASELINES.yaml",
         "schemas/naos/planning_baselines.schema.json",
-        "schemas/naos/plan_coherence.schema.json"
+        "schemas/naos/plan_coherence.schema.json",
+        ".agents/skills/naos-workflow-design/SKILL.md",
+        ".claude/commands/naos-workflow-design.md",
+        ".agents/skills/naos-workflow-task-start/SKILL.md",
+        ".claude/commands/naos-workflow-task-start.md",
+        ".agents/skills/naos-workflow-task-complete/SKILL.md",
+        ".claude/commands/naos-workflow-task-complete.md",
+        ".github/agents/AGENTS.md"
       ],
       "commands": {
         "gov-refresh": {
@@ -44,12 +60,20 @@
         "research": {
           "applicability": "available",
           "surface": ".github/agents/naos-research.agent.md"
+        },
+        "design": {
+          "applicability": "not_applicable",
+          "alternative": "manual goal, source inspection and human review; reviewed Lite profile transition for lifecycle automation"
+        },
+        "task-start": {
+          "applicability": "not_applicable",
+          "alternative": "manual goal, source inspection and human review; reviewed Lite profile transition for lifecycle automation"
         }
       }
     },
     "lite": {
       "required_surfaces": [
-        ".github/agents/AGENTS.md",
+        ".github/NAOS_AGENTS.md",
         ".github/agents/_HANDOFF_TEMPLATE.yaml",
         ".github/agents/naos-plan.agent.md",
         ".github/agents/naos-implement.agent.md",
@@ -83,11 +107,34 @@
         "scripts/naos_task_lifecycle.py",
         "scripts/naos_research_record.py",
         "scripts/naos_composed_traceability.py",
-        "scripts/naos_plan_coherence.py"
+        "scripts/naos_plan_coherence.py",
+        "scripts/workflows/ai_code_provenance.baseline.yaml",
+        "scripts/workflows/compliance_posture.baseline.yaml",
+        "AGENTS.md",
+        "GEMINI.md",
+        "CLAUDE.md",
+        ".agents/skills/naos-workflow-design/SKILL.md",
+        ".claude/commands/naos-workflow-design.md",
+        ".agents/skills/naos-workflow-task-start/SKILL.md",
+        ".claude/commands/naos-workflow-task-start.md",
+        ".agents/skills/naos-workflow-task-complete/SKILL.md",
+        ".claude/commands/naos-workflow-task-complete.md",
+        ".github/copilot-instructions.md",
+        ".github/project-context.md",
+        ".github/naos-guidance/claude-reference.md",
+        ".github/naos-guidance/governance-reference.md",
+        ".github/naos-guidance/cursor-coding.md",
+        ".github/naos-guidance/cursor-governance.md",
+        ".claude/rules/security.md",
+        ".github/naos-guidance/security-reference.md",
+        ".github/instructions/security.instructions.md",
+        ".cursor/rules/naos-security-standards.mdc",
+        ".github/naos-guidance/cursor-security.md"
       ],
       "prohibited_surfaces": [
         ".github/agents/naos-conformance.agent.md",
-        ".github/agents/naos-triage.agent.md"
+        ".github/agents/naos-triage.agent.md",
+        ".github/agents/AGENTS.md"
       ],
       "commands": {
         "gov-refresh": {
@@ -108,12 +155,16 @@
         },
         "design": {
           "applicability": "available",
-          "surface": ".github/prompts/naos-design.prompt.md"
+          "surface": ".agents/skills/naos-workflow-design/SKILL.md"
         },
         "task-complete": {
           "applicability": "available",
-          "target": "naos-task-complete",
-          "surface": ".github/prompts/naos-task-complete.prompt.md"
+          "surface": ".agents/skills/naos-workflow-task-complete/SKILL.md",
+          "target": "naos-task-complete"
+        },
+        "task-start": {
+          "applicability": "available",
+          "surface": ".agents/skills/naos-workflow-task-start/SKILL.md"
         }
       }
     },
@@ -149,13 +200,58 @@
         "scripts/naos_task_lifecycle.py",
         "scripts/naos_research_record.py",
         "scripts/naos_composed_traceability.py",
-        "scripts/naos_plan_coherence.py"
+        "scripts/naos_plan_coherence.py",
+        "naos/external_evidence_source.json",
+        "schemas/naos/external_evidence_source.schema.json",
+        "scripts/workflows/ai_code_provenance.baseline.yaml",
+        "scripts/workflows/compliance_posture.baseline.yaml",
+        "AGENTS.md",
+        "GEMINI.md",
+        "CLAUDE.md",
+        ".agents/skills/naos-workflow-design/SKILL.md",
+        ".claude/commands/naos-workflow-design.md",
+        ".agents/skills/naos-workflow-task-start/SKILL.md",
+        ".claude/commands/naos-workflow-task-start.md",
+        ".agents/skills/naos-workflow-task-complete/SKILL.md",
+        ".claude/commands/naos-workflow-task-complete.md",
+        ".github/copilot-instructions.md",
+        ".github/project-context.md",
+        ".github/naos-guidance/claude-reference.md",
+        ".github/naos-guidance/governance-reference.md",
+        ".github/NAOS_AGENTS.md",
+        ".github/naos-guidance/cursor-coding.md",
+        ".github/naos-guidance/cursor-governance.md",
+        ".claude/rules/security.md",
+        ".github/naos-guidance/security-reference.md",
+        ".github/instructions/security.instructions.md",
+        ".cursor/rules/naos-security-standards.mdc",
+        ".github/naos-guidance/cursor-security.md"
       ],
-      "prohibited_surfaces": [],
+      "prohibited_surfaces": [
+        ".github/agents/AGENTS.md"
+      ],
       "commands": {
-        "gov-refresh": {"applicability": "available", "target": "gov-refresh"},
-        "naos-readiness": {"applicability": "available", "target": "naos-readiness"},
-        "task-complete": {"applicability": "available", "target": "naos-task-complete"}
+        "gov-refresh": {
+          "applicability": "available",
+          "target": "gov-refresh"
+        },
+        "naos-readiness": {
+          "applicability": "available",
+          "target": "naos-readiness"
+        },
+        "task-complete": {
+          "applicability": "available",
+          "surface": ".agents/skills/naos-workflow-task-complete/SKILL.md",
+          "target": "naos-task-complete"
+        },
+        "design": {
+          "applicability": "available",
+          "surface": ".agents/skills/naos-workflow-design/SKILL.md"
+        },
+        "task-start": {
+          "applicability": "available",
+          "surface": ".agents/skills/naos-workflow-task-start/SKILL.md"
+        }
       }
     },
     "assured": {
@@ -190,13 +286,58 @@
         "scripts/naos_task_lifecycle.py",
         "scripts/naos_research_record.py",
         "scripts/naos_composed_traceability.py",
-        "scripts/naos_plan_coherence.py"
+        "scripts/naos_plan_coherence.py",
+        "naos/external_evidence_source.json",
+        "schemas/naos/external_evidence_source.schema.json",
+        "scripts/workflows/ai_code_provenance.baseline.yaml",
+        "scripts/workflows/compliance_posture.baseline.yaml",
+        "AGENTS.md",
+        "GEMINI.md",
+        "CLAUDE.md",
+        ".agents/skills/naos-workflow-design/SKILL.md",
+        ".claude/commands/naos-workflow-design.md",
+        ".agents/skills/naos-workflow-task-start/SKILL.md",
+        ".claude/commands/naos-workflow-task-start.md",
+        ".agents/skills/naos-workflow-task-complete/SKILL.md",
+        ".claude/commands/naos-workflow-task-complete.md",
+        ".github/copilot-instructions.md",
+        ".github/project-context.md",
+        ".github/naos-guidance/claude-reference.md",
+        ".github/naos-guidance/governance-reference.md",
+        ".github/NAOS_AGENTS.md",
+        ".github/naos-guidance/cursor-coding.md",
+        ".github/naos-guidance/cursor-governance.md",
+        ".claude/rules/security.md",
+        ".github/naos-guidance/security-reference.md",
+        ".github/instructions/security.instructions.md",
+        ".cursor/rules/naos-security-standards.mdc",
+        ".github/naos-guidance/cursor-security.md"
       ],
-      "prohibited_surfaces": [],
+      "prohibited_surfaces": [
+        ".github/agents/AGENTS.md"
+      ],
       "commands": {
-        "gov-refresh": {"applicability": "available", "target": "gov-refresh"},
-        "naos-readiness": {"applicability": "available", "target": "naos-readiness"},
-        "task-complete": {"applicability": "available", "target": "naos-task-complete"}
+        "gov-refresh": {
+          "applicability": "available",
+          "target": "gov-refresh"
+        },
+        "naos-readiness": {
+          "applicability": "available",
+          "target": "naos-readiness"
+        },
+        "task-complete": {
+          "applicability": "available",
+          "surface": ".agents/skills/naos-workflow-task-complete/SKILL.md",
+          "target": "naos-task-complete"
+        },
+        "design": {
+          "applicability": "available",
+          "surface": ".agents/skills/naos-workflow-design/SKILL.md"
+        },
+        "task-start": {
+          "applicability": "available",
+          "surface": ".agents/skills/naos-workflow-task-start/SKILL.md"
+        }
       }
     }
   }

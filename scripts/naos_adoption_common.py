@@ -23,6 +23,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from naos_ai_surfaces import DEFAULT_SURFACES, INSTRUCTION_NAMES, MCP_CONFIGURATION_PATHS, MAX_ENTRIES, cursor_skill_path, discovered_surface_type, checked_path, literal_path, load_surface_rules, scan_files  # noqa: E402
+from naos_secret_patterns import redact_sensitive_text  # noqa: E402
+
 from naos_policy import (  # noqa: E402
     build_generated_by,
     default_naos_root,
@@ -498,7 +501,7 @@ def should_ignore(path: Path) -> bool:
 
 def relpath(root: Path, path: Path) -> str:
     try:
-        return str(path.resolve().relative_to(root.resolve()))
+        return path.resolve().relative_to(root.resolve()).as_posix()
     except (OSError, RuntimeError, ValueError):
         return str(path)
 
@@ -518,6 +521,11 @@ def run_git(root: Path, *args: str) -> tuple[int, str]:
         result = subprocess.run(
             ["git", *args],
             cwd=root,
+            # Preserve effective Git config; discard inherited output selectors.
+            env={key: value for key, value in os.environ.items()
+                 if key.upper() not in {"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR",
+                                        "GIT_INDEX_FILE", "GIT_PAGER", "GIT_FLUSH"}
+                 and not key.upper().startswith(("GIT_TRACE", "GIT_REDIRECT_"))},
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -527,6 +535,72 @@ def run_git(root: Path, *args: str) -> tuple[int, str]:
     except (OSError, subprocess.SubprocessError, UnicodeError):
         return 127, ""
     return result.returncode, result.stdout.strip()
+
+
+GIT_DIAGNOSTIC_LIMIT = 4096
+
+
+def _git_diagnostic(value: str | bytes | None) -> tuple[str, bool]:
+    """Bound published diagnostics; preserve undecodable bytes as visible escapes."""
+    text = value.decode("utf-8", errors="surrogateescape") if isinstance(value, bytes) else value or ""
+    text = text.encode("utf-8", errors="backslashreplace").decode("utf-8")
+    truncated = len(text) > GIT_DIAGNOSTIC_LIMIT
+    # Filter before shortening so a boundary cannot hide a recognized credential.
+    text = redact_sensitive_text(text)
+    text = "".join(ch if ch in "\r\n\t" or ord(ch) >= 32 else f"\\x{ord(ch):02x}" for ch in text)
+    return text[:GIT_DIAGNOSTIC_LIMIT], truncated or len(text) > GIT_DIAGNOSTIC_LIMIT
+
+
+def observe_git(root: Path, *args: str) -> dict[str, Any]:
+    """Observe a local Git command; unknown execution is never evidence of absence."""
+    observation: dict[str, Any] = {
+        "command": ["git", *args], "outcome": "unknown", "returncode": None,
+        "timeout_seconds": None, "execution_complete": False, "output_complete": True,
+        "stdout": "", "stderr": "", "diagnostic": "",
+        "stdout_truncated": False, "stderr_truncated": False,
+    }
+    configured = os.environ.get("NAOS_GIT_TIMEOUT", "30")
+    if not re.fullmatch(r"[0-9]{1,3}", configured) or not 1 <= int(configured) <= 300:
+        observation.update(outcome="invalid_config", diagnostic="NAOS_GIT_TIMEOUT must be an integer from 1 to 300 seconds")
+        return observation
+    observation["timeout_seconds"] = timeout = int(configured)
+    env = {key: value for key, value in os.environ.items()
+           if key.upper() not in {"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_PAGER", "GIT_FLUSH"}
+           and not key.upper().startswith(("GIT_TRACE", "GIT_REDIRECT_"))}
+    env["LC_ALL"] = "C"  # Recognize Git's specific non-worktree diagnostic consistently.
+    stdout: str | bytes | None = ""
+    stderr: str | bytes | None = ""
+    try:
+        result = subprocess.run(["git", *args], cwd=root, env=env, text=True,
+                                encoding="utf-8", errors="surrogateescape",
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                check=False, timeout=timeout)
+        stdout, stderr = result.stdout, result.stderr
+        observation.update(outcome="success" if result.returncode == 0 else "nonzero_exit",
+                           returncode=result.returncode, execution_complete=True)
+    except subprocess.TimeoutExpired as exc:
+        stdout, stderr = exc.output, exc.stderr
+        observation.update(outcome="timeout", diagnostic="Git inspection exceeded its configured timeout")
+    except FileNotFoundError:
+        observation.update(outcome="unavailable", diagnostic="Git executable or inspection directory is unavailable")
+    except (OSError, subprocess.SubprocessError, UnicodeError) as exc:
+        observation.update(outcome="execution_error", diagnostic=_git_diagnostic(f"{type(exc).__name__}: {exc}")[0])
+    for key, value in (("stdout", stdout), ("stderr", stderr)):
+        observation[key], observation[key + "_truncated"] = _git_diagnostic(value)
+    observation["output_complete"] = not (observation["stdout_truncated"] or observation["stderr_truncated"])
+    return observation
+
+
+def git_repository_state(observation: dict[str, Any]) -> str:
+    if not observation["execution_complete"] or not observation["output_complete"]:
+        return "unknown"
+    output = observation["stdout"].strip()
+    if observation["outcome"] == "success":
+        return {"true": "present", "false": "not_work_tree"}.get(output, "unknown")
+    if (observation["returncode"] == 128 and not output
+            and observation["stderr"].startswith("fatal: not a git repository (or any")):
+        return "not_work_tree"
+    return "unknown"
 
 
 def detect_project_signals(root: Path) -> dict[str, Any]:
@@ -551,10 +625,14 @@ def detect_project_signals(root: Path) -> dict[str, Any]:
     tests = sorted(item for item in files if item.startswith("tests/") or "/test_" in item or item.endswith("_test.py"))[:50]
     source = sorted(item for item in files if item.startswith(("src/", "app/", "lib/")) or item.endswith((".py", ".ts", ".tsx", ".js", ".go", ".java")))[:80]
     workflows = sorted(item for item in files if item.startswith((".github/workflows/", ".gitlab/")))[:30]
+    git_observation = observe_git(root, "rev-parse", "--is-inside-work-tree")
+    repository_state = git_repository_state(git_observation)
     return {
         "files_scanned": len(files),
         "frameworks": sorted(set(frameworks)),
-        "has_git": (root / ".git").exists(),
+        "has_git": {"present": True, "not_work_tree": False, "unknown": None}[repository_state],
+        "git_repository_state": repository_state,
+        "git_repository_observation": git_observation,
         "has_naos": (root / "naos").exists(),
         "has_docs": bool(docs),
         "has_tests": bool(tests),
@@ -687,16 +765,28 @@ def emit_report(spec_key: str, report: dict[str, Any], args: argparse.Namespace,
     if getattr(args, "json", False):
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
-        print_human_summary(REPORT_SPECS[spec_key]["title"], report, latest_path)
+        no_output_reason = None
+        if latest_path is None:
+            if not report.get("continuation_allowed", True) or not report.get("persistence_allowed", True):
+                no_output_reason = "blocked prerequisite; persistence is not allowed"
+            elif no_write_preview:
+                no_output_reason = "explicit --no-write-preview"
+            else:
+                no_output_reason = "kit repository without adopter NAOS root"
+        print_human_summary(REPORT_SPECS[spec_key]["title"], report, latest_path,
+                            no_output_reason=no_output_reason)
     return exit_code_for_summary(report["profile"], report["summary"], policy, bool(getattr(args, "strict", False)))
 
 
-def print_human_summary(title: str, report: dict[str, Any], path: Path | None) -> None:
+def print_human_summary(title: str, report: dict[str, Any], path: Path | None, *,
+                        no_output_reason: str | None = None) -> None:
     print(f"{title}: {report.get('status')}")
-    print(f"  report: {path if path is not None else '(not written: kit repository without adopter NAOS root)'}")
+    rendered_path = path if path is not None else f"(not written: {no_output_reason or 'no report output path'})"
+    print(f"  report: {rendered_path}")
     print(f"  mode: {report.get('mode')}")
     if report.get("dry_run"):
-        print("  dry-run preview: true (report artifacts may be written)")
+        detail = "report artifacts may be written" if path is not None else "no latest report written"
+        print(f"  dry-run preview: true ({detail})")
         for item in (report.get("dry_run_preview") or [])[:4]:
             print(f"  preview: {item}")
     print(f"  findings: {report.get('summary', {}).get('total_findings', 0)}")
@@ -735,16 +825,37 @@ def build_preflight(args: argparse.Namespace, root: Path, profile: str, policy: 
     signals = detect_project_signals(root)
     checks: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
-    git_code, git_status = run_git(root, "status", "--short")
-    checks.append({"id": "git_repository", "status": "present" if signals["has_git"] else "missing", "human_review_required": not signals["has_git"]})
-    checks.append({"id": "working_tree", "status": "dirty" if git_status else "clean", "details": git_status.splitlines()[:20]})
+    repository_state = signals.get("git_repository_state", "present" if signals.get("has_git") is True else "unknown")
+    status_observation = (
+        observe_git(root, "status", "--short", "--untracked-files=normal")
+        if repository_state == "present" else None
+    )
+    status_complete = bool(status_observation and status_observation["outcome"] == "success"
+                           and status_observation["output_complete"])
+    git_status = status_observation["stdout"].strip() if status_complete else ""
+    working_state = ("dirty" if git_status else "clean") if status_complete else (
+        "not_applicable" if repository_state == "not_work_tree" else "unknown")
+    checks.append({"id": "git_repository", "status": {"present": "present", "not_work_tree": "missing", "unknown": "unknown"}[repository_state], "human_review_required": repository_state != "present"})
+    checks.append({"id": "working_tree", "status": working_state, "details": git_status.splitlines()[:20], "human_review_required": working_state != "clean"})
     checks.append({"id": "naos_state", "status": "present" if signals["has_naos"] else "not_present"})
     checks.append({"id": "python", "status": "present", "version": sys.version.split()[0]})
     checks.append({"id": "write_scope", "status": "writable" if os.access(root, os.W_OK) else "blocked"})
-    if git_code != 0:
-        findings.append(finding("preflight.git_missing", "advisory", "advisory", "No local git repository was detected; adoption can continue, but review provenance is weaker."))
-    if git_status:
-        findings.append(finding("preflight.working_tree_dirty", "advisory", "review_required", "Working tree has local changes; review before activation or reconciliation.", changed_paths=git_status.splitlines()[:50]))
+    if repository_state == "not_work_tree":
+        findings.append(finding("preflight.git_missing", "advisory", "advisory", "Git inspection identified this path as outside a local working tree; adoption can continue, but review provenance is weaker."))
+    if repository_state == "unknown" or working_state == "unknown":
+        findings.append(finding("preflight.git_inspection_incomplete", "advisory", "review_required", "Git inspection is incomplete; do not infer a clean working tree or repository absence. Review diagnostics and retry before relying on its state."))
+    if working_state == "dirty":
+        findings.append(finding(
+            "preflight.working_tree_dirty", "advisory", "review_required",
+            "Working tree has local changes; review before activation or reconciliation.",
+            changed_paths=git_status.splitlines()[:50],
+            evidence_classification="confirmed",
+            classification_scope="observed_git_status_nonempty_only",
+            classification_reason=(
+                "git status --short --untracked-files=normal completed successfully with nonempty output; "
+                "the changed paths still require review before activation."
+            ),
+        ))
     if not os.access(root, os.W_OK):
         findings.append(finding("preflight.write_scope_blocked", severity, "blocked", "Project path is not writable."))
     return base_report(
@@ -757,6 +868,7 @@ def build_preflight(args: argparse.Namespace, root: Path, profile: str, policy: 
         {
             "checks": checks,
             "project_signals": signals,
+            "git_observations": {"repository": signals.get("git_repository_observation"), "working_tree": status_observation},
             "recovery_actions": [
                 "Commit or stash unrelated work before risky activation.",
                 "Run inventories before reconciliation in brownfield projects.",
@@ -793,143 +905,229 @@ def build_intake(args: argparse.Namespace, root: Path, profile: str, policy: dic
     )
 
 
-def resource_inventory(root: Path) -> list[dict[str, Any]]:
-    signals = detect_project_signals(root)
+RESOURCE_CATEGORIES = ("docs", "specs", "tests", "source", "workflows", "naos_artifacts")
+RESOURCE_MAX_FILES = 5000
+
+
+def resource_inventory_scope(root: Path, naos_root: str, policy: dict[str, Any]) -> dict[str, Any]:
+    """Read only this reporter's effective rules; exclusions cannot grant authority."""
+    scope: dict[str, Any] = {
+        "root": str(root), "naos_root": naos_root, "rules_source": "defaults",
+        "rules_path": None, "scan_categories": list(RESOURCE_CATEGORIES),
+        "ignored_parts": sorted(IGNORED_PARTS), "max_files": RESOURCE_MAX_FILES,
+        "file_count": 0, "complete": True, "truncated": False,
+        "invalid_config": False, "issues": [],
+    }
+    try:
+        governance = literal_path(naos_root)
+        artifacts = policy.get("artifacts", {})
+        if not isinstance(artifacts, dict):
+            raise ValueError("artifacts must be a mapping")
+        filename = literal_path(artifacts.get("existing_resource_inventory_rules", "existing_resource_inventory_rules.yaml"))
+        relative = governance + "/" + filename
+        scope["rules_path"] = relative
+        path = checked_path(root, relative)
+        if not path.exists():
+            return scope
+        scope["rules_source"] = "project"
+        with path.open("rb") as handle:
+            raw = handle.read(65537)
+        if len(raw) > 65536:
+            raise ValueError("inventory rules exceed 65536 bytes")
+        document = yaml.safe_load(raw.decode("utf-8"))
+        if not isinstance(document, dict):
+            raise ValueError("inventory rules must be a mapping")
+        if document.get("schema", "naos.existing_resource_inventory_rules.v1") != "naos.existing_resource_inventory_rules.v1":
+            raise ValueError("unsupported resource inventory rules schema")
+        categories = document.get("scan_categories", list(RESOURCE_CATEGORIES))
+        if (not isinstance(categories, list) or not categories or len(categories) > len(RESOURCE_CATEGORIES)
+                or any(not isinstance(c, str) or c not in RESOURCE_CATEGORIES for c in categories)):
+            raise ValueError("scan_categories must select known resource categories")
+        ignored = document.get("ignored_parts", [])
+        if not isinstance(ignored, list) or len(ignored) > 1000:
+            raise ValueError("ignored_parts must be a bounded list of literal names")
+        for name in ignored:
+            if "/" in literal_path(name):
+                raise ValueError("ignored_parts entries must be single path components")
+        limits = document.get("scan_limits", {})
+        if not isinstance(limits, dict) or set(limits) - {"max_files"}:
+            raise ValueError("scan_limits supports only max_files")
+        maximum = limits.get("max_files", RESOURCE_MAX_FILES)
+        if type(maximum) is not int or not 1 <= maximum <= RESOURCE_MAX_FILES:
+            raise ValueError("max_files must be an integer from 1 to 5000")
+        scope.update(scan_categories=list(dict.fromkeys(categories)),
+                     ignored_parts=sorted(IGNORED_PARTS | set(ignored)), max_files=maximum)
+    except (OSError, ValueError, TypeError, UnicodeError, yaml.YAMLError) as exc:
+        scope.update(invalid_config=True, complete=False)
+        scope["issues"].append({"path": scope["rules_path"], "reason": str(exc)})
+    return scope
+
+
+def resource_inventory(root: Path, scope: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Select paths once; update the supplied scope with observed coverage."""
+    if scope is None:
+        scope = resource_inventory_scope(root, "naos", {})
+    if scope["invalid_config"]:
+        return []
+    files, coverage = scan_files(root, None, scope["max_files"], ignored_parts=set(scope["ignored_parts"]))
+    scope.update({key: coverage[key] for key in ("complete", "truncated", "file_count")})
+    scope["issues"].extend(coverage["issues"])
     resources: list[dict[str, Any]] = []
-    categories = [
-        ("docs", signals["docs"]),
-        ("tests", signals["tests"]),
-        ("source", signals["source"]),
-        ("workflows", signals["workflows"]),
-    ]
-    for category, paths in categories:
-        for path in paths:
-            resources.append(
-                {
-                    "resource_id": safe_slug(path),
-                    "category": category,
-                    "path": path,
-                    "owner": "unknown",
-                    "source": "local_file",
-                    "status": "detected",
-                    "decision_state": "review_required",
-                    "human_review_required": True,
-                }
-            )
-    naos_paths = sorted(relpath(root, p) for p in (root / "naos").rglob("*") if p.is_file())[:100] if (root / "naos").exists() else []
-    for path in naos_paths:
-        resources.append(
-            {
+    selected = set(scope["scan_categories"])
+    governance = scope["naos_root"] + "/"
+    for file in files:
+        path = file.relative_to(root).as_posix()
+        text_document = path.lower().endswith((".md", ".rst", ".txt"))
+        categories = []
+        if text_document and (path.startswith("docs/") or path.lower() == "readme.md"):
+            categories.append("docs")
+        if text_document and path.startswith("specs/"):
+            categories.append("specs")
+        if path.startswith("tests/") or "/test_" in path or path.endswith("_test.py"):
+            categories.append("tests")
+        if path.startswith(("src/", "app/", "lib/")) or path.endswith((".py", ".ts", ".tsx", ".js", ".go", ".java")):
+            categories.append("source")
+        if path.startswith((".github/workflows/", ".gitlab/")):
+            categories.append("workflows")
+        if path.startswith(governance):
+            categories.append("naos_artifacts")
+        for category in categories:
+            if category not in selected:
+                continue
+            owned = category == "naos_artifacts"
+            resources.append({
                 "resource_id": safe_slug(path),
-                "category": "naos_artifact",
-                "path": path,
-                "owner": "NAOS/adopter",
-                "source": "local_file",
-                "status": "detected",
-                "decision_state": "keep",
-                "human_review_required": False,
-            }
-        )
+                "category": "naos_artifact" if owned else category,
+                "path": path, "owner": "NAOS/adopter" if owned else "unknown",
+                "source": "local_file", "status": "detected",
+                "decision_state": "keep" if owned else "review_required",
+                "human_review_required": not owned,
+            })
     return resources
 
 
 def build_existing_resource_inventory(args: argparse.Namespace, root: Path, profile: str, policy: dict[str, Any]) -> dict[str, Any]:
-    resources = resource_inventory(root)
+    scope = resource_inventory_scope(root, getattr(args, "naos_root", None) or default_naos_root(policy), policy)
+    resources = resource_inventory(root, scope)
     findings: list[dict[str, Any]] = []
-    if not resources:
+    if scope["invalid_config"]:
+        findings.append(finding("existing_resource_inventory.invalid_config", "required", "invalid_config", "Existing resource inventory rules are invalid; no fallback scan was performed."))
+    elif not scope["complete"]:
+        findings.append(finding("existing_resource_inventory.incomplete", "advisory", "review_required", "Resource discovery is incomplete; review the reported scan scope and issues."))
+    elif not resources:
         findings.append(finding("existing_resource_inventory.empty", "advisory", "advisory", "No project resources were detected in the configured scan scope."))
     return base_report(
-        "existing_resource_inventory",
-        args,
-        root,
-        profile,
-        policy,
-        findings,
-        {
-            "resources": resources,
-            "resources_by_category": count_by(resources, "category"),
-            "scan_scope": {"root": str(root), "ignored_parts": sorted(IGNORED_PARTS)},
-        },
+        "existing_resource_inventory", args, root, profile, policy, findings,
+        {"resources": resources, "resources_by_category": count_by(resources, "category"), "scan_scope": scope},
     )
 
 
-AI_ARTIFACT_PATTERNS = [
-    ("claude_context", "CLAUDE.md", "third-party"),
-    ("agents_context", "AGENTS.md", "third-party"),
-    ("copilot_instructions", ".github/copilot-instructions.md", "third-party"),
-    ("github_agents", ".github/agents", "third-party"),
-    ("github_prompts", ".github/prompts", "third-party"),
-    ("github_skills", ".github/skills", "third-party"),
-    ("github_instructions", ".github/instructions", "third-party"),
-    ("cursor_rules", ".cursor/rules", "third-party"),
-    ("claude_hooks", ".claude/settings.json", "third-party"),
-    ("codex_instructions", "AGENTS.md", "third-party"),
-    ("gemini_context", "GEMINI.md", "third-party"),
-    ("spec_kit", ".specify", "third-party"),
-    ("bmad", ".bmad", "third-party"),
-    ("gsd", ".gsd", "third-party"),
-]
+AI_ARTIFACT_PATTERNS = [(kind, path, "third-party") for kind, path in DEFAULT_SURFACES]
+
+
+def scan_ai_artifacts(root: Path, naos_root: str, policy: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    scope = load_surface_rules(root, naos_root, policy)
+    scope.update(paths=[], truncated=False, complete=not scope["invalid_config"])
+    artifacts: dict[str, dict[str, Any]] = {}
+    if scope["invalid_config"]:
+        return [], scope
+    types = {path: kind for kind, path in DEFAULT_SURFACES}
+
+    def consume(files: list[Path], meta: dict[str, Any], kind: str, owner: str) -> None:
+        scope["paths"].append(meta)
+        for child in files:
+            rel = child.relative_to(root).as_posix()
+            if rel in artifacts:
+                continue
+            try:
+                checked_path(root, rel)
+                artifact_type = MCP_CONFIGURATION_PATHS.get(rel) or INSTRUCTION_NAMES.get(child.name) or ("cursor_skills" if cursor_skill_path(rel) else kind)
+                artifacts[rel] = ai_artifact_entry(root, child, artifact_type, owner, "review_required")
+            except (OSError, ValueError) as exc:
+                meta["complete"] = False
+                meta["issues"].append({"path": rel, "reason": str(exc)})
+        scope["truncated"] |= meta["truncated"]
+        scope["complete"] &= meta["complete"]
+        scope["issues"].extend(meta["issues"])
+
+    for pattern in scope["effective_patterns"]:
+        files, meta = scan_files(root, pattern, scope["limits"]["max_files_per_path"])
+        kind = types.get(pattern, "custom_ai_artifact")
+        consume(files, meta, kind, "third-party" if pattern in types else "user-owned")
+    files, meta = scan_files(root, None, scope["limits"]["max_discovery_files"])
+    selected = [path for path in files if discovered_surface_type(path.relative_to(root).as_posix(), scope["effective_patterns"]) is not None or (any(token in path.relative_to(root).as_posix().lower() for token in ("prompt", "rule", "workflow")) and path.suffix.lower() in {".md", ".yaml", ".yml", ".json", ".txt"})]
+    consume(selected, meta, "custom_ai_artifact", "user-owned")
+    return sorted(artifacts.values(), key=lambda item: item["path"]), scope
 
 
 def ai_artifacts(root: Path) -> list[dict[str, Any]]:
-    artifacts: list[dict[str, Any]] = []
-    for artifact_type, pattern, owner in AI_ARTIFACT_PATTERNS:
-        path = root / pattern
-        if path.exists():
-            status = "compatible" if pattern.startswith("naos/") else "review_required"
-            if path.is_dir():
-                for child in sorted(p for p in path.rglob("*") if p.is_file())[:50]:
-                    artifacts.append(ai_artifact_entry(root, child, artifact_type, owner, status))
-            else:
-                artifacts.append(ai_artifact_entry(root, path, artifact_type, owner, status))
-    for path in list_files(root, max_files=5000):
-        rel = relpath(root, path)
-        lower = rel.lower()
-        if (
-            any(token in lower for token in ["prompt", "rule", "workflow"])
-            and rel not in {item["path"] for item in artifacts}
-            and lower.endswith((".md", ".yaml", ".yml", ".json", ".txt"))
-        ):
-            artifacts.append(ai_artifact_entry(root, path, "custom_ai_artifact", "user-owned", "review_required"))
-    return sorted(artifacts, key=lambda item: item["path"])
+    # Compatibility entry point; public builders pass their effective policy/root.
+    return scan_ai_artifacts(root, "naos", {})[0]
 
 
 def ai_artifact_entry(root: Path, path: Path, artifact_type: str, owner: str, status: str) -> dict[str, Any]:
-    rel = relpath(root, path)
+    rel = path.relative_to(root).as_posix()
     lower_rel = rel.lower()
-    try:
-        sample = path.read_text(encoding="utf-8", errors="ignore")[:12000].lower()
-    except OSError:
-        sample = ""
-    likely_naos = rel.startswith(("naos/", "templates/")) or "naos" in sample[:2000] or "NAOS" in path.name
-    stale_signal = any(token in lower_rel or token in sample for token in ["stale", "deprecated", "legacy", "archive", "old instructions"])
+    mcp_configuration = rel in MCP_CONFIGURATION_PATHS
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    # MCP files can contain literal credentials: inventory only path/role/hash,
+    # never sample text or infer ownership/compatibility from credential values.
+    sample = ""
+    if not mcp_configuration:
+        with path.open(encoding="utf-8", errors="ignore") as handle:
+            sample = handle.read(12000).lower()
+    likely_naos = not mcp_configuration and (rel.startswith(("naos/", "templates/")) or "naos" in sample[:2000] or "NAOS" in path.name)
+    marker_mentions = [
+        {"marker": token, "locations": [name for name, value in (("path", lower_rel), ("content", sample)) if token in value]}
+        for token in ["stale", "deprecated", "legacy", "archive", "old instructions"]
+        if token in lower_rel or token in sample
+    ]
+    deprecation_evidence = {
+        "verified": False,
+        "marker_mentions": marker_mentions,
+        "sample_character_limit": 0 if mcp_configuration else 12000,
+        "interpretation": "keyword_context_does_not_establish_artifact_deprecation",
+    }
     instruction_surface = artifact_type in {
         "claude_context",
         "agents_context",
+        "agents_override_context",
         "copilot_instructions",
         "github_agents",
         "github_prompts",
         "github_skills",
         "github_instructions",
         "cursor_rules",
+        "cursor_skills",
         "claude_hooks",
         "codex_instructions",
         "gemini_context",
+        "shared_rules",
     }
     workflow_surface = "workflow" in artifact_type or lower_rel.startswith(".github/workflows/")
     detected_owner = "NAOS-owned" if likely_naos else ("user-owned" if workflow_surface or artifact_type == "custom_ai_artifact" else owner)
-    if likely_naos:
+    if mcp_configuration:
+        detected_owner = "unknown"
+        status = "review_required"
+        conflict_category = "mcp_configuration_review"
+        conflict_reason = "Documented project MCP configuration path; contents are not sampled and ownership, trust, approval, connection and host loading remain unverified."
+        recommended_decision = "review_required"
+        profile_impact = "review_required"
+    elif marker_mentions:
+        status = "review_required"
+        conflict_category = "artifact_lifecycle_review"
+        conflict_reason = "Artifact path or content mentions lifecycle-related words; these may describe other resources and do not establish that this artifact is obsolete."
+        recommended_decision = "review_required"
+        profile_impact = "standard_and_assured_review_required"
+    elif likely_naos:
         status = "compatible"
         conflict_category = "none"
         conflict_reason = "Artifact appears NAOS-compatible or NAOS-owned based on path/content markers."
         recommended_decision = "keep"
         profile_impact = "low"
-    elif stale_signal:
-        status = "stale"
-        conflict_category = "stale_instruction_surface"
-        conflict_reason = "Artifact path or content contains stale/legacy/deprecated markers."
-        recommended_decision = "quarantine"
-        profile_impact = "standard_and_assured_review_required"
     elif instruction_surface:
         status = "conflicting"
         conflict_category = "instruction_surface_overlap"
@@ -953,26 +1151,31 @@ def ai_artifact_entry(root: Path, path: Path, artifact_type: str, owner: str, st
         "artifact_id": safe_slug(rel),
         "artifact_type": artifact_type,
         "path": rel,
+        "sha256": digest.hexdigest(),
+        "content_handling": "raw_hash_only_sensitive_configuration" if mcp_configuration else "bounded_text_sample",
         "classification": detected_owner,
         "classifications": classifications,
         "detected_owner": detected_owner,
         "detected_source": artifact_type,
         "status": status,
+        "deprecation_evidence": deprecation_evidence,
         "conflict_category": conflict_category,
         "conflict_reason": conflict_reason,
-        "compared_surface": "NAOS generated AI instruction and governance surfaces",
+        "compared_surface": "Project MCP configuration metadata only" if mcp_configuration else "NAOS generated AI instruction and governance surfaces",
         "profile_impact": profile_impact,
         "recommended_decision": recommended_decision,
         "decision_state": recommended_decision,
         "human_review_required": status != "compatible",
         "human_review_boundary": "Humans decide whether to keep, merge, replace, quarantine, create, or leave review-required; NAOS does not overwrite artifacts.",
-        "non_claims": AI_ARTIFACT_NON_CLAIMS,
+        "non_claims": AI_ARTIFACT_NON_CLAIMS + (["MCP path/hash inventory does not establish trust, approval, connection, server activation or actual host loading"] if mcp_configuration else []),
     }
 
 
 def build_ai_artifact_inventory(args: argparse.Namespace, root: Path, profile: str, policy: dict[str, Any]) -> dict[str, Any]:
-    artifacts = ai_artifacts(root)
+    artifacts, scope = scan_ai_artifacts(root, getattr(args, "naos_root", None) or default_naos_root(policy), policy)
     findings: list[dict[str, Any]] = []
+    if not scope["complete"]:
+        findings.append(finding("ai_artifact_inventory.incomplete_scan", "warning", "review_required", "AI artifact scan is incomplete; inspect configuration, issues and truncation before relying on coverage."))
     for item in artifacts:
         if item["status"] in {"conflicting", "stale", "unknown", "review_required"}:
             findings.append(
@@ -987,6 +1190,13 @@ def build_ai_artifact_inventory(args: argparse.Namespace, root: Path, profile: s
                     conflict_reason=item.get("conflict_reason"),
                     compared_surface=item.get("compared_surface"),
                     recommended_decision=item.get("recommended_decision"),
+                    evidence_classification="confirmed",
+                    classification_scope="generated_adoption_review_obligation_only",
+                    classification_reason=(
+                        "The inventory emitted a review obligation for a detected instruction surface; "
+                        "ownership, conflict, and disposition remain unverified."
+                    ),
+                    source_path=str(Path(__file__).resolve()),
                 )
             )
     return base_report(
@@ -998,6 +1208,8 @@ def build_ai_artifact_inventory(args: argparse.Namespace, root: Path, profile: s
         findings,
         {
             "artifacts": artifacts,
+            "scan_scope": scope,
+            "status": "invalid_config" if scope["invalid_config"] else None,
             "artifact_counts": count_by(artifacts, "artifact_type"),
             "classification_counts": count_by(artifacts, "classification"),
             "status_counts": count_by(artifacts, "status"),
@@ -1007,17 +1219,12 @@ def build_ai_artifact_inventory(args: argparse.Namespace, root: Path, profile: s
 
 
 def build_ai_artifact_reconcile(args: argparse.Namespace, root: Path, profile: str, policy: dict[str, Any]) -> dict[str, Any]:
-    inventory = read_report(
-        root,
-        getattr(args, "naos_root", None) or default_naos_root(policy),
-        "ai_artifact_inventory",
-        args,
-        policy,
-    )
-    artifacts = inventory.get("artifacts") if isinstance(inventory.get("artifacts"), list) else ai_artifacts(root)
+    # Reconcile current effective rules/content; an old report is not proof of current coverage.
+    inventory = build_ai_artifact_inventory(args, root, profile, policy)
+    artifacts = inventory["artifacts"]
     default_decision = getattr(args, "decision", None) or "review_required"
     decisions = []
-    findings: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = [item for item in inventory["findings"] if item["id"] == "ai_artifact_inventory.incomplete_scan"]
     for item in artifacts:
         recommended = item.get("recommended_decision") or item.get("decision_state") or "review_required"
         selected = item.get("decision_state") if item.get("status") == "compatible" else default_decision
@@ -1033,6 +1240,8 @@ def build_ai_artifact_reconcile(args: argparse.Namespace, root: Path, profile: s
             "artifact_id": item.get("artifact_id"),
             "path": item.get("path"),
             "artifact_path": item.get("path"),
+            "sha256": item.get("sha256"),
+            "content_handling": item.get("content_handling"),
             "detected_owner": item.get("detected_owner") or item.get("classification"),
             "detected_source": item.get("detected_source") or item.get("artifact_type"),
             "conflict_category": item.get("conflict_category"),
@@ -1040,6 +1249,7 @@ def build_ai_artifact_reconcile(args: argparse.Namespace, root: Path, profile: s
             "compared_surface": item.get("compared_surface"),
             "profile_impact": item.get("profile_impact"),
             "recommended_decision": recommended,
+            "deprecation_evidence": item.get("deprecation_evidence"),
             "selected_option": selected,
             "available_options": DECISION_STATES,
             "write_required": selected in {"merge", "replace", "quarantine", "create"},
@@ -1060,6 +1270,13 @@ def build_ai_artifact_reconcile(args: argparse.Namespace, root: Path, profile: s
                     artifact_path=item.get("path"),
                     conflict_category=item.get("conflict_category"),
                     recommended_decision=recommended,
+                    evidence_classification="confirmed",
+                    classification_scope="generated_adoption_review_obligation_only",
+                    classification_reason=(
+                        "The reconciliation recorded a pending human disposition for this artifact; "
+                        "no disposition, change, or approval is confirmed."
+                    ),
+                    source_path=str(Path(__file__).resolve()),
                 )
             )
     return base_report(
@@ -1071,6 +1288,8 @@ def build_ai_artifact_reconcile(args: argparse.Namespace, root: Path, profile: s
         findings,
         {
             "decisions": decisions,
+            "scan_scope": inventory["scan_scope"],
+            "status": "invalid_config" if inventory["status"] == "invalid_config" else None,
             "write_mode": "explicit_write" if getattr(args, "write", False) else "dry_run",
             "write_boundary": "This report records decisions only; no artifact is overwritten, merged, deleted, or quarantined by this command.",
             "decision_states": DECISION_STATES,
@@ -1561,7 +1780,19 @@ def memory_states(root: Path) -> list[dict[str, Any]]:
 def build_memory_resource_inventory(args: argparse.Namespace, root: Path, profile: str, policy: dict[str, Any]) -> dict[str, Any]:
     resources = memory_states(root)
     findings = [
-        finding(f"memory_resource_inventory.review.{item['resource_id']}", "advisory", "review_required", "Memory/Engram/MCP state requires human posture decision.", resource_id=item["resource_id"])
+        finding(
+            f"memory_resource_inventory.review.{item['resource_id']}",
+            "advisory", "review_required",
+            "Memory/Engram/MCP state requires human posture decision.",
+            resource_id=item["resource_id"],
+            evidence_classification="confirmed",
+            classification_scope="generated_adoption_review_obligation_only",
+            classification_reason=(
+                "A metadata-only resource observation triggered a posture review obligation; "
+                "resource authority, safe use, and adopter disposition remain unverified."
+            ),
+            source_path=str(Path(__file__).resolve()),
+        )
         for item in resources
         if item.get("human_review_required")
     ]
@@ -1813,6 +2044,13 @@ def build_memory_resource_reconcile(args: argparse.Namespace, root: Path, profil
             "review_required",
             "Memory/MCP disposition requires human review.",
             resource_id=item.get("resource_id"),
+            evidence_classification="confirmed",
+            classification_scope="generated_adoption_review_obligation_only",
+            classification_reason=(
+                "The metadata-only reconciliation left this resource disposition pending; "
+                "connection, reuse, activation, and approval are not confirmed."
+            ),
+            source_path=str(Path(__file__).resolve()),
         )
         for item in decisions
         if item.get("status") == "review_required"
@@ -2254,9 +2492,10 @@ def signal_entry(path: str, signal_type: str, strength: str, reason: str, trigge
     }
 
 
-def detect_agent_loop_signals(root: Path) -> dict[str, Any]:
+def detect_agent_loop_signals(root: Path, files: list[str] | None = None) -> dict[str, Any]:
     """Detect strong, review-only agent-loop declaration candidates from local files."""
-    files = sorted(relpath(root, item) for item in list_files(root, max_files=5000))
+    if files is None:
+        files = sorted(relpath(root, item) for item in list_files(root, max_files=5000))
     signals: list[dict[str, Any]] = []
     weak_signals: list[dict[str, Any]] = []
 
@@ -2345,26 +2584,42 @@ def detect_agent_loop_signals(root: Path) -> dict[str, Any]:
     }
 
 
+# Explicit alternatives preserve intended morphology without accepting arbitrary
+# substrings. Underscores delimit identifier words; other Unicode letters/digits
+# remain word characters (so e.g. "author" is never an "auth" signal).
+NFR_TITLE_GROUPS = (
+    (("auth", "authentication", "authorization", "authenticate", "authenticated", "authorize", "authorized"),
+     "Candidate security requirement for authentication and authorization review"),
+    (("privacy", "data class", "personal data", "pii"),
+     "Candidate privacy and data-handling requirement"),
+    (("secret", "secrets", "token", "tokens", "key", "keys", "crypto", "cryptography", "encrypt", "encrypted", "encryption"),
+     "Candidate secret, key-management, or encryption requirement"),
+    (("dependabot", "codeql", "semgrep", "bandit", "pip-audit", "trivy", "safety", "vulnerability", "vulnerabilities"),
+     "Candidate dependency and security-tooling requirement"),
+    (("ci", "workflow", "workflows", ".github/workflows"),
+     "Candidate CI evidence and review requirement"),
+    (("backup", "backups", "availability", "recovery"),
+     "Candidate availability and recovery requirement"),
+)
+
+
+def nfr_token_matches(value: str, token: str) -> bool:
+    return re.search(r"(?<![^\W_])" + re.escape(token) + r"(?![^\W_])", value, re.IGNORECASE) is not None
+
+
 def nfr_title_for(path: str, text: str) -> str:
-    lower = f"{path}\n{text}".lower()
-    if any(token in lower for token in ["auth", "authentication", "authorization"]):
-        return "Candidate security requirement for authentication and authorization review"
-    if any(token in lower for token in ["privacy", "data class", "personal data", "pii"]):
-        return "Candidate privacy and data-handling requirement"
-    if any(token in lower for token in ["secret", "token", "key", "crypto", "encrypt"]):
-        return "Candidate secret, key-management, or encryption requirement"
-    if any(token in lower for token in ["dependabot", "codeql", "semgrep", "bandit", "pip-audit", "trivy", "safety", "vulnerability"]):
-        return "Candidate dependency and security-tooling requirement"
-    if any(token in lower for token in ["ci", "workflow", ".github/workflows"]):
-        return "Candidate CI evidence and review requirement"
-    if any(token in lower for token in ["backup", "availability", "recovery"]):
-        return "Candidate availability and recovery requirement"
+    value = f"{path}\n{text}"
+    for tokens, title in NFR_TITLE_GROUPS:
+        if any(nfr_token_matches(value, token) for token in tokens):
+            return title
     return "Candidate non-functional requirement from controlled local evidence"
 
 
 def nfr_supported(path: str, text: str) -> bool:
-    lower = f"{path}\n{text}".lower()
-    return any(token in lower for token in NFR_PATH_TOKENS) or any(token in lower for token in NFR_CONTENT_TOKENS)
+    value = f"{path}\n{text}"
+    tokens = {*NFR_PATH_TOKENS, *NFR_CONTENT_TOKENS, "dependencies"}
+    tokens.update(token for group, _ in NFR_TITLE_GROUPS for token in group)
+    return any(nfr_token_matches(value, token) for token in tokens)
 
 
 def confidence_for_source(path: str, source_kind: str) -> str:
@@ -2418,9 +2673,36 @@ def project_evidence_paths(root: Path, paths: list[str]) -> list[str]:
     ]
 
 
+def reconstruction_discovery(root: Path, *, max_files: int = 5000) -> tuple[dict[str, list[str]], dict[str, Any], list[str]]:
+    """One deterministic local path scan; completeness is only within this scope."""
+    paths, discovery = scan_files(root, None, max_files, ignored_parts=IGNORED_PARTS)
+    files = sorted(path.relative_to(root).as_posix() for path in paths)
+    matches = {
+        "docs": [p for p in files if p.lower().endswith((".md", ".rst", ".txt")) and (p.startswith(("docs/", "specs/")) or p.lower() == "readme.md")],
+        "source": [p for p in files if p.startswith(("src/", "app/", "lib/")) or p.endswith((".py", ".ts", ".tsx", ".js", ".go", ".java"))],
+        "tests": [p for p in files if p.startswith("tests/") or "/test_" in p or p.endswith("_test.py")],
+        "workflows": [p for p in files if p.startswith((".github/workflows/", ".gitlab/"))],
+    }
+    limits = {"docs": 50, "source": 80, "tests": 50, "workflows": 30}
+    categories = {key: {"matched": len(values), "selected": min(len(values), limits[key]),
+                        "limit": limits[key], "truncated": len(values) > limits[key]}
+                  for key, values in matches.items()}
+    coverage = {
+        "scope": "bounded_local_path_selection_only",
+        "discovery": {**discovery, "max_files": max_files, "max_entries": MAX_ENTRIES},
+        "ignored_parts": sorted(IGNORED_PARTS),
+        "categories": categories,
+        "requirements_complete": False,
+        "content_read_completeness_verified": False,
+        "content_character_limits": {"candidate": 8000, "generated_doc_detection": 4000,
+                                     "generated_source_detection": 1200, "agent_loop": 12000},
+    }
+    return {key: values[:limits[key]] for key, values in matches.items()}, coverage, files
+
+
 def build_requirements_reconstruct(args: argparse.Namespace, root: Path, profile: str, policy: dict[str, Any]) -> dict[str, Any]:
-    signals = detect_project_signals(root)
-    agent_loop_discovery = detect_agent_loop_signals(root)
+    signals, coverage, scanned_files = reconstruction_discovery(root)
+    agent_loop_discovery = detect_agent_loop_signals(root, scanned_files)
     naos_root = getattr(args, "naos_root", None) or default_naos_root(policy)
     intake_report = read_report(root, naos_root, "intake", args, policy)
     intake = intake_report.get("intake") if isinstance(intake_report.get("intake"), dict) else {}
@@ -2495,6 +2777,19 @@ def build_requirements_reconstruct(args: argparse.Namespace, root: Path, profile
             )
         )
     evidence_limit = 100 if repository_candidates else 12
+    coverage["evidence_selection"] = {
+        key: {"available": len(paths), "selected": min(len(paths), evidence_limit),
+              "limit": evidence_limit, "truncated": len(paths) > evidence_limit}
+        for key, paths in {"docs": docs, "source": source, "tests_and_workflows": tests + workflows}.items()
+    }
+    coverage["local_path_selection_complete"] = (
+        coverage["discovery"]["complete"]
+        and not any(item["truncated"] for item in coverage["categories"].values())
+        and not any(item["truncated"] for item in coverage["evidence_selection"].values())
+    )
+    coverage["repository_retrieval"] = {"input_records": len(retrieval_candidates),
+                                         "may_add_paths_outside_local_prefix": True,
+                                         "completeness_claimed": False}
     candidates: list[dict[str, Any]] = []
     for index, path in enumerate(docs[:evidence_limit], start=1):
         confidence = confidence_for_source(path, "docs")
@@ -2778,6 +3073,14 @@ def build_requirements_reconstruct(args: argparse.Namespace, root: Path, profile
             candidate_id=item["candidate_id"],
             candidate_type=item["candidate_type"],
             confidence_class=item["confidence_class"],
+            evidence_classification="confirmed",
+            classification_scope="generated_candidate_review_obligation_only",
+            classification_reason=(
+                "This producer emitted a review obligation for its generated candidate; "
+                "the candidate requirement is not validated or promoted."
+            ),
+            source_path=str(Path(__file__).resolve()),
+            promoted_to_authority=False,
         )
         for item in candidates
         if item["confidence_class"] != "confirmed_by_existing_spec"
@@ -2794,6 +3097,7 @@ def build_requirements_reconstruct(args: argparse.Namespace, root: Path, profile
             "candidate_counts": count_candidate_types(candidates),
             "candidate_type_counts": count_candidate_types(candidates),
             "agent_loop_discovery": agent_loop_discovery,
+            "reconstruction_coverage": coverage,
             "confidence_classes": CONFIDENCE_CLASSES,
             "promotion_rule": "human_review_required",
             "non_claims": CANDIDATE_NON_CLAIMS,
@@ -2861,7 +3165,26 @@ def build_traceability_gap_register(args: argparse.Namespace, root: Path, profil
             )
     if not gaps:
         gaps.append({"gap_id": "GAP-BASELINE-001", "gap_type": "baseline_review", "evidence_refs": [], "owner": "unknown", "confidence": "unknown", "next_action": "Review traceability manually.", "closure_state": "open", "human_review_required": True})
-    findings = [finding(f"traceability_gap_register.{item['gap_id']}", severity_for_profile(profile, policy), "review_required", "Traceability gap requires owner decision.", gap_id=item["gap_id"]) for item in gaps]
+    findings = [
+        finding(
+            f"traceability_gap_register.{item['gap_id']}",
+            severity_for_profile(profile, policy),
+            "review_required",
+            "Traceability gap requires owner decision.",
+            gap_id=item["gap_id"],
+            **({
+                "evidence_classification": "confirmed",
+                "classification_scope": "generated_open_candidate_review_gap_only",
+                "classification_reason": (
+                    "This producer opened a review gap for a loaded candidate record; "
+                    "record validity, candidate truth, owner approval, and gap closure remain unverified."
+                ),
+                "source_path": str(Path(__file__).resolve()),
+                "closure_state": "open",
+            } if item["gap_type"] == "candidate_requires_review" else {}),
+        )
+        for item in gaps
+    ]
     return base_report(
         "traceability_gap_register",
         args,
@@ -2872,6 +3195,15 @@ def build_traceability_gap_register(args: argparse.Namespace, root: Path, profil
         {
             "gaps": gaps,
             "closure_rule": "explicit_evidence_or_human_decision_required",
+            "analysis_scope": {
+                "kind": "candidate_review_only",
+                "candidate_truth_verified": False,
+                "source_links_evaluated": False,
+                "test_links_evaluated": False,
+                "ownership_links_evaluated": False,
+                "closure_verified": False,
+                "authority_effect": "none",
+            },
             "repository_intelligence": _repository_intelligence_consumer_evidence(
                 args,
                 consumer="traceability_gap_register",
@@ -2938,7 +3270,6 @@ def build_install_decision_record(args: argparse.Namespace, root: Path, profile:
         for key in challenge_keys
     ]
     discovered_facts = [
-        {"fact_id": "project.has_git", "value": bool(project_signals.get("has_git")), "source": "preflight"},
         {"fact_id": "project.has_docs", "value": bool(project_signals.get("has_docs")), "source": "preflight"},
         {"fact_id": "project.has_tests", "value": bool(project_signals.get("has_tests")), "source": "preflight"},
         {"fact_id": "project.has_source", "value": bool(project_signals.get("has_source")), "source": "preflight"},
@@ -2957,6 +3288,10 @@ def build_install_decision_record(args: argparse.Namespace, root: Path, profile:
             "source": "mcp_resource_inventory",
         },
     ]
+    git_fact_known = project_signals.get("has_git") is True or (
+        project_signals.get("has_git") is False and project_signals.get("git_repository_state") == "not_work_tree")
+    if git_fact_known:
+        discovered_facts.insert(0, {"fact_id": "project.has_git", "value": project_signals["has_git"], "source": "preflight"})
     assumptions = []
     for report in reports.values():
         assumptions.extend(report.get("assumptions", []) if isinstance(report, dict) else [])
@@ -2964,6 +3299,8 @@ def build_install_decision_record(args: argparse.Namespace, root: Path, profile:
         for item in challenge.get("assumptions_detected", []):
             assumptions.append({"id": safe_slug(str(item)), "description": item, "source": challenge["report_id"], "status": "review_required"})
     missing_information = sorted(set(reports["intake"].get("missing_information", []) if isinstance(reports["intake"].get("missing_information"), list) else []))
+    if not git_fact_known:
+        missing_information.append("git_repository_detection_unknown")
     for challenge in challenge_reports:
         for item in challenge.get("missing_information", []):
             if item not in missing_information:
@@ -2975,6 +3312,7 @@ def build_install_decision_record(args: argparse.Namespace, root: Path, profile:
             "conflict_category": item.get("conflict_category"),
             "conflict_reason": item.get("conflict_reason"),
             "recommended_decision": item.get("recommended_decision"),
+            "deprecation_evidence": item.get("deprecation_evidence"),
             "human_review_required": item.get("human_review_required", True),
         }
         for item in artifacts
@@ -3132,11 +3470,47 @@ def build_install_decision_record(args: argparse.Namespace, root: Path, profile:
         }
         for item in memory_decisions
     )
-    findings = [finding("install_decision_record.activation", severity_for_profile(profile, policy), "review_required", "Activation and durable adoption decisions require human review.")]
+    findings = [finding(
+        "install_decision_record.activation",
+        severity_for_profile(profile, policy),
+        "review_required",
+        "Activation and durable adoption decisions require human review.",
+        evidence_classification="confirmed",
+        classification_scope="generated_adoption_review_obligation_only",
+        classification_reason=(
+            "The decision record explicitly leaves activation pending human review; "
+            "no activation or durable adoption approval is recorded."
+        ),
+        source_path=str(Path(__file__).resolve()),
+    )]
     if collisions:
-        findings.append(finding("install_decision_record.ai_collisions", severity_for_profile(profile, policy), "review_required", "AI artifact collisions or review-required surfaces must be decided before activation.", collision_count=len(collisions)))
+        findings.append(finding(
+            "install_decision_record.ai_collisions",
+            severity_for_profile(profile, policy),
+            "review_required",
+            "AI artifact collisions or review-required surfaces must be decided before activation.",
+            collision_count=len(collisions),
+            evidence_classification="confirmed",
+            classification_scope="generated_adoption_review_obligation_only",
+            classification_reason=(
+                "The record contains detected or review-required AI surfaces awaiting disposition; "
+                "the presence of this review obligation does not prove an actual conflict or approval."
+            ),
+            source_path=str(Path(__file__).resolve()),
+        ))
     if gaps:
-        findings.append(finding("install_decision_record.traceability_gaps", "advisory", "review_required", "Traceability gaps remain open until owner decisions close them.", gap_count=len(gaps)))
+        findings.append(finding(
+            "install_decision_record.traceability_gaps", "advisory", "review_required",
+            "Traceability gap-register entries require owner review before closure is claimed.",
+            gap_count=len(gaps),
+            evidence_classification="confirmed",
+            classification_scope="generated_nonempty_gap_register_review_obligation_only",
+            classification_reason=(
+                "The consumed traceability gap register has entries; this does not establish "
+                "that each entry remains open or replace an owner closure decision."
+            ),
+            source_path=str(Path(__file__).resolve()),
+        ))
     return base_report(
         "install_decision_record",
         args,

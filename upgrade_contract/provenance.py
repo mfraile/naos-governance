@@ -7,6 +7,7 @@ authority only through a separate digest-confirmed enrollment operation.
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import stat
@@ -239,7 +240,7 @@ def _validate_integrity(value: dict[str, Any], *, label: str) -> str:
     return observed
 
 
-def _safe_file_bytes(path: Path) -> bytes:
+def _safe_file_bytes(path: Path, *, max_bytes: int | None = None) -> bytes:
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -251,11 +252,18 @@ def _safe_file_bytes(path: Path) -> bytes:
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
             raise ProvenanceError(f"Refusing unsafe provenance file: {path}")
+        if max_bytes is not None and before.st_size > max_bytes:
+            raise ProvenanceError(f"Provenance file exceeds byte bound: {path}")
         chunks: list[bytes] = []
+        size = 0
         while True:
-            block = os.read(descriptor, 65536)
+            read_size = 65536 if max_bytes is None else min(65536, max_bytes - size + 1)
+            block = os.read(descriptor, read_size)
             if not block:
                 break
+            size += len(block)
+            if max_bytes is not None and size > max_bytes:
+                raise ProvenanceError(f"Provenance file exceeds byte bound: {path}")
             chunks.append(block)
         after = os.fstat(descriptor)
         if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
@@ -666,55 +674,14 @@ def _mkdir_exclusive(path: Path) -> None:
     os.chmod(path, 0o700)
 
 
-def _write_exclusive(path: Path, value: dict[str, Any]) -> None:
-    _write_exclusive_bytes(path, canonical_bytes(value) + b"\n")
 
 
-def _write_exclusive_bytes(path: Path, data: bytes) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = os.open(path, flags, 0o600)
-    try:
-        os.fchmod(descriptor, 0o600)
-        offset = 0
-        while offset < len(data):
-            offset += os.write(descriptor, data[offset:])
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
 
 
-def _pending_enrollment_path(path: Path) -> Path:
-    return path.with_name(f".{path.name}.enrolling")
 
 
-def _remove_pending_enrollment_file(path: Path) -> None:
-    kind = _existing_kind(path)
-    if kind == "absent":
-        return
-    if kind != "file":
-        raise ProvenanceError(
-            f"Unsafe enrollment pending file is preserved and refused: {path}"
-        )
-    metadata = os.lstat(path)
-    if metadata.st_nlink != 1 or stat.S_IMODE(metadata.st_mode) != 0o600:
-        raise ProvenanceError(
-            f"Unsafe enrollment pending-file metadata is preserved and refused: {path}"
-        )
-    path.unlink()
-    _fsync_dir(path.parent)
 
 
-def _write_atomic_new(path: Path, data: bytes) -> None:
-    """Publish new enrollment bytes without exposing a partial final file."""
-
-    pending = _pending_enrollment_path(path)
-    _remove_pending_enrollment_file(pending)
-    _write_exclusive_bytes(pending, data)
-    _fsync_dir(pending.parent)
-    rename_no_replace(pending, path)
-    _fsync_dir(path.parent)
 
 
 def _fsync_dir(path: Path) -> None:
@@ -2498,60 +2465,6 @@ def _enrollment_temp_path(root: Path, scope: dict[str, Any]) -> Path:
     return root / ".naos" / f"upgrade-v1.enrolling.{plan_sha256[:24]}"
 
 
-def _validate_or_remove_partial_enrollment(
-    path: Path,
-    *,
-    owner: dict[str, Any],
-    scope: dict[str, Any],
-) -> None:
-    if _existing_kind(path) == "absent":
-        return
-    if _existing_kind(path) != "directory":
-        raise ProvenanceError(f"Unsafe enrollment preparation is preserved and refused: {path}")
-    expected_files = {
-        "OWNER.json": canonical_bytes(owner) + b"\n",
-        "provenance/scopes/repository-intelligence.json": canonical_bytes(scope) + b"\n",
-        "locks/control-root-enrollment.lock": b"",
-        "locks/repository-intelligence.lock": b"",
-    }
-    expected_pending = {
-        _pending_enrollment_path(path / relative).relative_to(path).as_posix()
-        for relative in expected_files
-    }
-    expected_directories = {
-        "provenance",
-        "provenance/scopes",
-        "transactions",
-        "transactions/repository-intelligence",
-        "locks",
-        "state",
-    }
-    for child in sorted(path.rglob("*"), key=lambda item: len(item.relative_to(path).parts), reverse=True):
-        relative = child.relative_to(path).as_posix()
-        kind = _existing_kind(child)
-        if kind == "directory" and relative in expected_directories:
-            continue
-        if kind == "file" and relative in expected_files:
-            if _safe_file_bytes(child) != expected_files[relative]:
-                raise ProvenanceError(
-                    f"Enrollment preparation content mismatch is preserved and refused: {child}"
-                )
-            continue
-        if kind == "file" and relative in expected_pending:
-            metadata = os.lstat(child)
-            if metadata.st_nlink != 1 or stat.S_IMODE(metadata.st_mode) != 0o600:
-                raise ProvenanceError(
-                    f"Unsafe enrollment pending-file metadata is preserved and refused: {child}"
-                )
-            continue
-        raise ProvenanceError(f"Unknown enrollment preparation entry is preserved and refused: {child}")
-    for child in sorted(path.rglob("*"), key=lambda item: len(item.relative_to(path).parts), reverse=True):
-        if child.is_dir():
-            child.rmdir()
-        else:
-            child.unlink()
-    path.rmdir()
-    _fsync_dir(path.parent)
 
 
 def commit_enrollment(
@@ -3016,31 +2929,73 @@ def inspect_managed_content_manifest(
     )
 
 
+def managed_content_creator_identity(kit_root: Path) -> dict[str, Any]:
+    """Bind creator metadata to the executing kit's packaged source declaration.
+
+    The package initializer is the source version authority, including checkout
+    execution. Installed distribution metadata may describe a different kit and
+    Git history is unavailable in installed artifacts, so neither is inferred.
+    """
+    from .source_origins import SourceOrigins
+
+    initializer = kit_root / "__init__.py"
+    try:
+        tree = ast.parse(_safe_file_bytes(initializer, max_bytes=64 * 1024),
+                         filename=str(initializer))
+    except (SyntaxError, UnicodeError) as exc:
+        raise ProvenanceError("Kit version initializer is invalid.") from exc
+    versions = [
+        node.value.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "__version__"
+                for target in node.targets)
+        and isinstance(node.value, ast.Constant)
+        and type(node.value.value) is str
+    ]
+    assignments = sum(
+        1 for node in tree.body
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign))
+        and any(isinstance(target, ast.Name) and target.id == "__version__"
+                for target in (node.targets if isinstance(node, ast.Assign)
+                               else [node.target]))
+    )
+    if assignments != 1 or len(versions) != 1 or not versions[0].strip():
+        raise ProvenanceError("Kit version must have one nonempty literal declaration.")
+    declaration = SourceOrigins.from_kit(kit_root).declaration
+    return {
+        "kit_id": "naos-governance",
+        "kit_version": versions[0],
+        "source_commit": None,
+        "source_manifest_sha256": declaration.sha256,
+    }
+
+
 def _managed_content_owner_object(
     *,
     project_id: str,
     authorization_digest: str,
-    source_policy_sha256: str,
+    creator_identity: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    return _with_integrity(
+    if not isinstance(creator_identity, dict):
+        raise ProvenanceError("First-owner enrollment requires explicit kit creator identity.")
+    owner = _with_integrity(
         {
             "schema": OWNER_SCHEMA,
             "canonicalization": CANONICALIZATION,
             "project_id": project_id,
             "control_root": CONTROL_ROOT.as_posix(),
             "owner_kind": "naos_operation_control_root",
-            "created_by": {
-                "kit_id": "naos-governance",
-                "kit_version": "1.0.0",
-                "source_commit": None,
-                "source_manifest_sha256": source_policy_sha256,
-            },
+            "created_by": dict(creator_identity),
             "enrollment_authorization": {
                 "plan_sha256": authorization_digest,
                 "review_receipt_sha256": None,
             },
         }
     )
+
+    _validate_owner(owner)
+    return owner
 
 
 def _managed_content_enrollment_temp_path(
@@ -3061,71 +3016,6 @@ def _managed_content_scope_temp_path(
     )
 
 
-def _validate_or_remove_partial_managed_content_scope_enrollment(
-    path: Path,
-    *,
-    scope: dict[str, Any],
-) -> None:
-    if _existing_kind(path) == "absent":
-        return
-    if _existing_kind(path) != "directory":
-        raise ProvenanceError(
-            "Unsafe managed-content scope preparation is preserved and refused: "
-            f"{path}"
-        )
-    expected_files = {
-        "scope.json": canonical_bytes(scope) + b"\n",
-        "lock": b"",
-    }
-    expected_directories = {
-        "transactions",
-        "state",
-        "state/bases",
-        "state/receipts",
-    }
-    expected_pending = {
-        _pending_enrollment_path(path / relative).relative_to(path).as_posix()
-        for relative in expected_files
-    }
-    for child in sorted(
-        path.rglob("*"),
-        key=lambda item: len(item.relative_to(path).parts),
-        reverse=True,
-    ):
-        relative = child.relative_to(path).as_posix()
-        kind = _existing_kind(child)
-        if kind == "directory" and relative in expected_directories:
-            continue
-        if kind == "file" and relative in expected_files:
-            if _safe_file_bytes(child) != expected_files[relative]:
-                raise ProvenanceError(
-                    "Managed-content scope preparation content differs: "
-                    f"{child}"
-                )
-            continue
-        if kind == "file" and relative in expected_pending:
-            metadata = os.lstat(child)
-            if metadata.st_nlink != 1 or stat.S_IMODE(metadata.st_mode) != 0o600:
-                raise ProvenanceError(
-                    "Unsafe managed-content scope pending file is preserved: "
-                    f"{child}"
-                )
-            continue
-        raise ProvenanceError(
-            "Unknown managed-content scope preparation entry is preserved: "
-            f"{child}"
-        )
-    for child in sorted(
-        path.rglob("*"),
-        key=lambda item: len(item.relative_to(path).parts),
-        reverse=True,
-    ):
-        if child.is_dir():
-            child.rmdir()
-        else:
-            child.unlink()
-    path.rmdir()
-    _fsync_dir(path.parent)
 
 
 def _publish_managed_content_scope_runtime(
@@ -3156,78 +3046,6 @@ def _publish_managed_content_scope_runtime(
     )
 
 
-def _validate_or_remove_partial_managed_content_enrollment(
-    path: Path,
-    *,
-    owner: dict[str, Any],
-    scope: dict[str, Any],
-) -> None:
-    if _existing_kind(path) == "absent":
-        return
-    if _existing_kind(path) != "directory":
-        raise ProvenanceError(
-            f"Unsafe managed-content enrollment preparation is preserved and refused: {path}"
-        )
-    expected_files = {
-        "OWNER.json": canonical_bytes(owner) + b"\n",
-        "managed-content/scope.json": canonical_bytes(scope) + b"\n",
-        "locks/control-root-enrollment.lock": b"",
-        "managed-content/lock": b"",
-    }
-    expected_directories = {
-        "provenance",
-        "provenance/scopes",
-        "transactions",
-        "locks",
-        "state",
-        "managed-content",
-        "managed-content/transactions",
-        "managed-content/state",
-        "managed-content/state/bases",
-        "managed-content/state/receipts",
-    }
-    expected_pending = {
-        _pending_enrollment_path(path / relative).relative_to(path).as_posix()
-        for relative in expected_files
-    }
-    for child in sorted(
-        path.rglob("*"),
-        key=lambda item: len(item.relative_to(path).parts),
-        reverse=True,
-    ):
-        relative = child.relative_to(path).as_posix()
-        kind = _existing_kind(child)
-        if kind == "directory" and relative in expected_directories:
-            continue
-        if kind == "file" and relative in expected_files:
-            if _safe_file_bytes(child) != expected_files[relative]:
-                raise ProvenanceError(
-                    "Managed-content enrollment preparation content mismatch is "
-                    f"preserved and refused: {child}"
-                )
-            continue
-        if kind == "file" and relative in expected_pending:
-            metadata = os.lstat(child)
-            if metadata.st_nlink != 1 or stat.S_IMODE(metadata.st_mode) != 0o600:
-                raise ProvenanceError(
-                    "Unsafe managed-content enrollment pending file is preserved "
-                    f"and refused: {child}"
-                )
-            continue
-        raise ProvenanceError(
-            f"Unknown managed-content enrollment entry is preserved and refused: {child}"
-        )
-    for child in sorted(
-        path.rglob("*"),
-        key=lambda item: len(item.relative_to(path).parts),
-        reverse=True,
-    ):
-        if child.is_dir():
-            child.rmdir()
-        else:
-            child.unlink()
-    path.rmdir()
-    _fsync_dir(path.parent)
 
 
 def _commit_initial_managed_content_enrollment(
@@ -3235,6 +3053,7 @@ def _commit_initial_managed_content_enrollment(
     *,
     authorization_digest: str,
     source_policy_sha256: str,
+    creator_identity: dict[str, Any] | None,
 ) -> None:
     project_id = (
         "urn:uuid:"
@@ -3248,7 +3067,7 @@ def _commit_initial_managed_content_enrollment(
     owner = _managed_content_owner_object(
         project_id=project_id,
         authorization_digest=authorization_digest,
-        source_policy_sha256=source_policy_sha256,
+        creator_identity=creator_identity,
     )
     owner_integrity = str(owner["integrity"]["value"])
     scope = _managed_content_scope_object(
@@ -3307,7 +3126,13 @@ def commit_managed_content_enrollment(
     *,
     authorization_digest: str,
     source_policy_sha256: str,
+    creator_identity: dict[str, Any] | None = None,
 ) -> ManagedContentScopeInspection:
+    """Enroll content authority; creator identity is required only for a new OWNER.
+
+    Existing owners are immutable and retain their historical creator fields.
+    Creator metadata does not replace or expand the authorization digest/policy.
+    """
     root = project_root.resolve(strict=True)
     opening = inspect_managed_content_scope(root)
     if opening.status == "valid":
@@ -3317,6 +3142,7 @@ def commit_managed_content_enrollment(
             root,
             authorization_digest=authorization_digest,
             source_policy_sha256=source_policy_sha256,
+            creator_identity=creator_identity,
         )
         result = inspect_managed_content_scope(root)
         if result.status != "valid":

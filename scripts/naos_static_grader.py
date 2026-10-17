@@ -56,6 +56,16 @@ def load_json_report(path: Path) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def observed_path_presence(path: Path) -> bool | None:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return None
+    return True
+
+
 def collect_input_reports(root: Path, naos_root: str, policy: dict[str, Any]) -> list[dict[str, Any]]:
     reports: list[dict[str, Any]] = []
     for path_key, report_id, label in DETERMINISTIC_INPUT_REPORTS:
@@ -66,6 +76,7 @@ def collect_input_reports(root: Path, naos_root: str, policy: dict[str, Any]) ->
             "id": report_id,
             "label": label,
             "path": str(path),
+            "source_path_exists": observed_path_presence(path),
             "present": data is not None,
             "status": data.get("status") if isinstance(data, dict) else None,
             "schema": data.get("schema") if isinstance(data, dict) else None,

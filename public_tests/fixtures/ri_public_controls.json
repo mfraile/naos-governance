@@ -1,0 +1,809 @@
+{
+  ".naos/upgrade-v1/OWNER.json": {
+    "canonicalization": "rfc8785",
+    "control_root": ".naos/upgrade-v1",
+    "created_by": {
+      "kit_id": "naos-governance",
+      "kit_version": "1.1.1.dev0",
+      "source_commit": null,
+      "source_manifest_sha256": "ff8ed89ce86eea0f3625e4c8aa47d97d510971dc31cbd637c3b715f37ec14e95"
+    },
+    "enrollment_authorization": {
+      "plan_sha256": "ab5f251ce0af0cdf04a9181ab24d3b63a8197a1abbbc14b5113528ec6c3a510d",
+      "review_receipt_sha256": null
+    },
+    "integrity": {
+      "algorithm": "sha3-512",
+      "canonicalization": "rfc8785",
+      "scope": "object_without_integrity",
+      "value": "ec22cc3924dbcdf85129f22689537583e5829fafecf065007ddff600c267e04eca1d6d9f0e632bb2b1d290f47573864c68edade86e16567856a3ca24b3866cfc"
+    },
+    "owner_kind": "naos_operation_control_root",
+    "project_id": "urn:uuid:9d3170b6-2942-5dde-b15a-a6a951da58e8",
+    "schema": "naos.upgrade.control_root_owner.v1"
+  },
+  ".naos/upgrade-v1/provenance/scopes/repository-intelligence.json": {
+    "canonicalization": "rfc8785",
+    "capability_id": "CAP-LOCAL-CONTEXT-INDEX",
+    "enrollment": {
+      "observed_governed_root_state": "absent",
+      "plan_sha256": "ab5f251ce0af0cdf04a9181ab24d3b63a8197a1abbbc14b5113528ec6c3a510d",
+      "review_receipt_sha256": null
+    },
+    "governed_root": ".naos/upgrade-v1/state/repository-intelligence",
+    "integrity": {
+      "algorithm": "sha3-512",
+      "canonicalization": "rfc8785",
+      "scope": "object_without_integrity",
+      "value": "d4bcffc5d2cd786ca083c000520476abb66e694324cb50697fecae771cb9dd29b17cbcf24f94aa84b12b4094331afd2477e57d4e8bc42261a57472b7b2d4d45c"
+    },
+    "owner_integrity_sha3_512": "ec22cc3924dbcdf85129f22689537583e5829fafecf065007ddff600c267e04eca1d6d9f0e632bb2b1d290f47573864c68edade86e16567856a3ca24b3866cfc",
+    "policy": {
+      "existing_without_valid_chain": "refuse",
+      "generation_id_pattern": "^RI-[0-9a-f]{24}$",
+      "immutable_generation_root": ".naos/upgrade-v1/state/repository-intelligence/generations",
+      "initial_root_state": "absent",
+      "lock_path": ".naos/upgrade-v1/locks/repository-intelligence.lock",
+      "mutable_paths": [
+        ".naos/upgrade-v1/state/repository-intelligence/active.json"
+      ],
+      "ownership_inference": "forbidden",
+      "transaction_root": ".naos/upgrade-v1/transactions/repository-intelligence",
+      "transient_paths": [
+        ".naos/upgrade-v1/transactions/repository-intelligence/<transaction_id>/staging"
+      ],
+      "unknown_entries": "refuse"
+    },
+    "project_id": "urn:uuid:9d3170b6-2942-5dde-b15a-a6a951da58e8",
+    "schema": "naos.upgrade.capability_scope.v1",
+    "scope_id": "repository-intelligence"
+  },
+  ".naos/upgrade-v1/state/repository-intelligence/active.json": {
+    "active_sha256": "871764ee1841a57f2a89d1c34f03dab32cfa916eebe9a8661671ee95522ba794",
+    "control": {
+      "activation_receipt_file_sha256": "8bdda0be9ba1d65aeba24b0233dc8f9059ff27d9f7f584c59f16ed6b7f7e28eb",
+      "activation_receipt_path": ".naos/upgrade-v1/transactions/repository-intelligence/RIT-d665c276b7e516ed570f4bbf/receipt.json",
+      "activation_receipt_sha256": "04897cad0595a7c4e747726187d5c5412a2715a20d881ed2e1e070ac6fc7203a",
+      "bundle_sha256": "fb8c79f721f1d93e41cdde60369718363ab5c8a6188e36184cbdf2e3f970298c",
+      "component_mode": "baseline",
+      "effective_source_sha256": "e741a10be8f20269c3d17fa4ad3a7d88af13f001512f286bc734f58ec58c6afd",
+      "generation_content_sha256": "271b1c7ee91addc7606d46da077a2064acb54149cab089dc368e29cf9e5d5c8a",
+      "generation_id": "RI-271b1c7ee91addc7606d46da",
+      "manifest_file_sha256": "9f3c051eadc321eced1e6b11d1665b49bb8b3aa3f1904f6aa6d3fe63f90f3169",
+      "manifest_path": ".naos/upgrade-v1/state/repository-intelligence/generations/RI-271b1c7ee91addc7606d46da/manifest.json",
+      "manifest_sha256": "517c200eb58d0b80cdfa19dd3cbb7b2349bd9e85393f671b67ed27c6ed712db8",
+      "ongoing_use_scope": [
+        "brownfield_adoption",
+        "requirements_reconstruction",
+        "traceability_gap_analysis",
+        "task_context",
+        "change_impact",
+        "source_test_navigation",
+        "review_preparation"
+      ],
+      "plan_sha256": "77436482c5d2ba08752f1adc5ac6d28e44b984f5612f551424fc0de9262af44d",
+      "previous_generation_id": null,
+      "profile": "standard",
+      "provenance_owner_sha3_512": "ec22cc3924dbcdf85129f22689537583e5829fafecf065007ddff600c267e04eca1d6d9f0e632bb2b1d290f47573864c68edade86e16567856a3ca24b3866cfc",
+      "provenance_project_id": "urn:uuid:9d3170b6-2942-5dde-b15a-a6a951da58e8",
+      "provenance_scope_sha3_512": "d4bcffc5d2cd786ca083c000520476abb66e694324cb50697fecae771cb9dd29b17cbcf24f94aa84b12b4094331afd2477e57d4e8bc42261a57472b7b2d4d45c",
+      "purpose": "brownfield-onboarding",
+      "transaction_id": "RIT-d665c276b7e516ed570f4bbf",
+      "validation_receipt_file_sha256": "0ff4b4d9df94016c57ad590d6382c84bc00cc2075880d79667cacee8bbb20119",
+      "validation_receipt_path": ".naos/upgrade-v1/state/repository-intelligence/generations/RI-271b1c7ee91addc7606d46da/validation_receipt.json",
+      "validation_receipt_sha256": "875b1f4a7e44ddc1d2a3d189bb9f3965c9a03ff660e6047cc4725799de9dda49"
+    },
+    "human_review_required": true,
+    "schema": "naos.repository_intelligence.active.v1",
+    "source_artifacts_remain_authoritative": true,
+    "status": "validated_active"
+  },
+  ".naos/upgrade-v1/state/repository-intelligence/generations/RI-271b1c7ee91addc7606d46da/manifest.json": {
+    "control": {
+      "candidate_only": true,
+      "component_mode": "baseline",
+      "components": {
+        "networkx_graphml": {
+          "applicability_basis": "explicit_source_bound_relationships",
+          "effectiveness_over_sqlite_fts": "untested",
+          "engine": "networkx_graphml",
+          "relationship_count": 6,
+          "required_version": "3.6.1",
+          "selected": false,
+          "status": "not_applicable",
+          "utility_evidence": {
+            "adds_beyond_direct_lookup": false,
+            "artifact_edges": 1,
+            "effectiveness_over_sqlite_fts": "untested",
+            "enables_candidate_beyond_exact_or_single_link_lookup": false,
+            "minimum_artifact_families": 2,
+            "minimum_artifacts": 3,
+            "minimum_path_edges": 2,
+            "qualifying_path": null,
+            "recommendation_boundary": "eligibility_hypothesis_not_effectiveness_proof",
+            "relationship_questions": [
+              "Which current source, tests, specifications, migrations, and documentation are explicitly connected?",
+              "Which multi-hop source relationships can improve requirements reconstruction and traceability review?"
+            ],
+            "status": "no_incremental_multi_hop_case"
+          },
+          "version": null
+        },
+        "sqlite_fts": {
+          "applicability_basis": "executed_inventory_and_fts5_probe",
+          "engine": "python_stdlib_sqlite3_fts5",
+          "status": "ready",
+          "version": "3.47.1"
+        },
+        "sqlite_vec": {
+          "applicability_basis": "frozen_workload_and_vector_producer_required",
+          "engine": "sqlite_vec",
+          "status": "workload_not_defined",
+          "version": null
+        }
+      },
+      "coverage": {
+        "artifact_families": {
+          "documentation": 1,
+          "source": 1,
+          "tests": 1
+        },
+        "excluded_artifacts": 0,
+        "explicit_relationships": 6,
+        "graph_nodes": 8,
+        "indexed_artifacts": 3,
+        "truncated": false
+      },
+      "effective_source_sha256": "e741a10be8f20269c3d17fa4ad3a7d88af13f001512f286bc734f58ec58c6afd",
+      "files": [
+        {
+          "path": "inventory.json",
+          "sha256": "591d65918c4cd88d1d9f67eb3425af5f0be9c22df381fc5d00f8d5deb6e3a766",
+          "size_bytes": 12146
+        },
+        {
+          "path": "local_context_index.sqlite",
+          "sha256": "49ca3b0019994b9a32c32502f3b705add5b49e02e2285d86c96cbd944cc23e22",
+          "size_bytes": 106496
+        },
+        {
+          "path": "repository_intelligence_rules.yaml",
+          "sha256": "10b2b67b3e70e9db1b24ff5386e4c3f56eaec0229302bb3efa5f18701e4ca996",
+          "size_bytes": 6766
+        },
+        {
+          "path": "validation_receipt.json",
+          "sha256": "0ff4b4d9df94016c57ad590d6382c84bc00cc2075880d79667cacee8bbb20119",
+          "size_bytes": 4853
+        }
+      ],
+      "generation_content_sha256": "271b1c7ee91addc7606d46da077a2064acb54149cab089dc368e29cf9e5d5c8a",
+      "generation_id": "RI-271b1c7ee91addc7606d46da",
+      "graph_model_sha256": "7818d771b8c2a02f9f11ed3b02e7a7d5e4f5f8e2cefe0ddd1c6dbf477db1dc21",
+      "implementation": {
+        "canonical_adapter_sha256": "9f92a9a3d9a81872ef0ec683ad028edce1e437c359e355bb9ea516df56b2e9fd",
+        "contract_version": 1,
+        "engine_sha256": "ff8ed89ce86eea0f3625e4c8aa47d97d510971dc31cbd637c3b715f37ec14e95",
+        "graphml_writer": "networkx.write_graphml_xml",
+        "local_context_index_sha256": "be653bfdad2973f82bc83d1639309645aad23e4d91cb18b3d354b7e4f2c9e98e",
+        "sqlite_serializer": "python_stdlib_sqlite3"
+      },
+      "ongoing_use_scope": [
+        "brownfield_adoption",
+        "requirements_reconstruction",
+        "traceability_gap_analysis",
+        "task_context",
+        "change_impact",
+        "source_test_navigation",
+        "review_preparation"
+      ],
+      "profile": "standard",
+      "project_root": "/private/tmp/r22-WFA-macOS-311-standard-wheel-brownfield/workspace/project",
+      "provenance_gate": {
+        "activation_eligible": true,
+        "enrollment_project_id": null,
+        "governed_root": ".naos/upgrade-v1/state/repository-intelligence",
+        "legacy_bootstrap_allowed": false,
+        "owner_integrity_sha3_512": "ec22cc3924dbcdf85129f22689537583e5829fafecf065007ddff600c267e04eca1d6d9f0e632bb2b1d290f47573864c68edade86e16567856a3ca24b3866cfc",
+        "owner_path": ".naos/upgrade-v1/OWNER.json",
+        "ownership_inference": "forbidden",
+        "project_id": "urn:uuid:9d3170b6-2942-5dde-b15a-a6a951da58e8",
+        "refusal": null,
+        "scope_integrity_sha3_512": "d4bcffc5d2cd786ca083c000520476abb66e694324cb50697fecae771cb9dd29b17cbcf24f94aa84b12b4094331afd2477e57d4e8bc42261a57472b7b2d4d45c",
+        "scope_path": ".naos/upgrade-v1/provenance/scopes/repository-intelligence.json",
+        "status": "valid"
+      },
+      "purpose": "brownfield-onboarding",
+      "rules": {
+        "path": "/private/tmp/naos-r22-carrier-task-native18-install-preparation-20261010/native18/mac311-wheel/install/venv/lib/python3.11/site-packages/naos_governance/templates/structural-seeds/naos/repository_intelligence_rules.yaml",
+        "sha256": "10b2b67b3e70e9db1b24ff5386e4c3f56eaec0229302bb3efa5f18701e4ca996",
+        "source": "template"
+      },
+      "rules_snapshot": "repository_intelligence_rules.yaml",
+      "runtime": {
+        "networkx": {
+          "imported_version": null,
+          "install_extra": "naos-governance[repository-intelligence]",
+          "installed_version": null,
+          "module_sha256": null,
+          "required_version": "3.6.1",
+          "status": "prerequisite_missing",
+          "writer": "networkx.write_graphml_xml",
+          "writer_available": false
+        },
+        "platform": {
+          "implementation": "CPython",
+          "machine": "arm64",
+          "python": "3.11.13",
+          "supported_for_apply": true,
+          "supported_tuple": "macos_arm64_cpython_3_11_to_3_13_binary_wheels",
+          "system": "Darwin"
+        },
+        "rfc8785": {
+          "installed_version": "0.1.4",
+          "required_version": "0.1.4",
+          "status": "ready"
+        },
+        "sqlite_fts": {
+          "fts5_available": true,
+          "probe": "create_insert_match",
+          "sqlite_version": "3.47.1",
+          "status": "ready"
+        },
+        "sqlite_vec": {
+          "reason": "No frozen retrieval workload or deterministic vector producer is configured.",
+          "runtime_probed": false,
+          "status": "workload_not_defined"
+        }
+      },
+      "validation_receipt_sha256": "875b1f4a7e44ddc1d2a3d189bb9f3965c9a03ff660e6047cc4725799de9dda49"
+    },
+    "limitations": [
+      "Results are generated candidates and must be verified against current repository source.",
+      "GraphML records observed deterministic relationships; it does not establish semantic truth or complete relationship coverage.",
+      "Absence of a relationship is not evidence that no relationship exists.",
+      "sqlite-vec remains unavailable until a concrete local workload and deterministic vector producer are approved and validated."
+    ],
+    "manifest_sha256": "517c200eb58d0b80cdfa19dd3cbb7b2349bd9e85393f671b67ed27c6ed712db8",
+    "not_claimed": [
+      "source of truth",
+      "complete dependency graph",
+      "semantic truth",
+      "automatic requirements approval",
+      "automatic maturity promotion",
+      "compliance or readiness approval",
+      "sqlite-vec effectiveness"
+    ],
+    "schema": "naos.repository_intelligence.manifest.v1",
+    "status": "validated"
+  },
+  ".naos/upgrade-v1/state/repository-intelligence/generations/RI-271b1c7ee91addc7606d46da/validation_receipt.json": {
+    "control": {
+      "candidate_only": true,
+      "component_mode": "baseline",
+      "effective_source_sha256": "e741a10be8f20269c3d17fa4ad3a7d88af13f001512f286bc734f58ec58c6afd",
+      "generation_content_sha256": "271b1c7ee91addc7606d46da077a2064acb54149cab089dc368e29cf9e5d5c8a",
+      "generation_id": "RI-271b1c7ee91addc7606d46da",
+      "implementation": {
+        "canonical_adapter_sha256": "9f92a9a3d9a81872ef0ec683ad028edce1e437c359e355bb9ea516df56b2e9fd",
+        "contract_version": 1,
+        "engine_sha256": "ff8ed89ce86eea0f3625e4c8aa47d97d510971dc31cbd637c3b715f37ec14e95",
+        "graphml_writer": "networkx.write_graphml_xml",
+        "local_context_index_sha256": "be653bfdad2973f82bc83d1639309645aad23e4d91cb18b3d354b7e4f2c9e98e",
+        "sqlite_serializer": "python_stdlib_sqlite3"
+      },
+      "networkx_graphml": {
+        "reason": "No qualifying multi-hop cross-family relationship case was detected.",
+        "status": "not_applicable"
+      },
+      "profile": "standard",
+      "provenance_gate": {
+        "activation_eligible": true,
+        "enrollment_project_id": null,
+        "governed_root": ".naos/upgrade-v1/state/repository-intelligence",
+        "legacy_bootstrap_allowed": false,
+        "owner_integrity_sha3_512": "ec22cc3924dbcdf85129f22689537583e5829fafecf065007ddff600c267e04eca1d6d9f0e632bb2b1d290f47573864c68edade86e16567856a3ca24b3866cfc",
+        "owner_path": ".naos/upgrade-v1/OWNER.json",
+        "ownership_inference": "forbidden",
+        "project_id": "urn:uuid:9d3170b6-2942-5dde-b15a-a6a951da58e8",
+        "refusal": null,
+        "scope_integrity_sha3_512": "d4bcffc5d2cd786ca083c000520476abb66e694324cb50697fecae771cb9dd29b17cbcf24f94aa84b12b4094331afd2477e57d4e8bc42261a57472b7b2d4d45c",
+        "scope_path": ".naos/upgrade-v1/provenance/scopes/repository-intelligence.json",
+        "status": "valid"
+      },
+      "purpose": "brownfield-onboarding",
+      "runtime": {
+        "networkx": {
+          "imported_version": null,
+          "install_extra": "naos-governance[repository-intelligence]",
+          "installed_version": null,
+          "module_sha256": null,
+          "required_version": "3.6.1",
+          "status": "prerequisite_missing",
+          "writer": "networkx.write_graphml_xml",
+          "writer_available": false
+        },
+        "platform": {
+          "implementation": "CPython",
+          "machine": "arm64",
+          "python": "3.11.13",
+          "supported_for_apply": true,
+          "supported_tuple": "macos_arm64_cpython_3_11_to_3_13_binary_wheels",
+          "system": "Darwin"
+        },
+        "rfc8785": {
+          "installed_version": "0.1.4",
+          "required_version": "0.1.4",
+          "status": "ready"
+        },
+        "sqlite_fts": {
+          "fts5_available": true,
+          "probe": "create_insert_match",
+          "sqlite_version": "3.47.1",
+          "status": "ready"
+        },
+        "sqlite_vec": {
+          "reason": "No frozen retrieval workload or deterministic vector producer is configured.",
+          "runtime_probed": false,
+          "status": "workload_not_defined"
+        }
+      },
+      "source_revalidated_after_generation": true,
+      "sqlite_fts": {
+        "content_identity_binding": {
+          "artifact_chunks": {
+            "count": 5,
+            "ids_sha256": "a7248c758ee95047291f96b115ac4699f2f82abfcc2abe4154b907c44f63b6b1",
+            "rows_sha256": "6be45f54fa0a19bf47393424e127e6ef4219dd138a2ca9424f2ed846b4a797dc"
+          },
+          "artifact_links": {
+            "count": 5,
+            "ids_sha256": "69f75adbcb0fd12fc51ef1010a55bdddbaaae1e318f3d1beb9bc25068ef4d824",
+            "rows_sha256": "2a0d25acf797ba9cca4da36281f7ebdee36d467329f70b6a4b069fd01df0cfc3"
+          },
+          "artifacts": {
+            "count": 3,
+            "ids_sha256": "770ff5b746c16b8be42ea1ed39a29ed22cbffff5cdd3f13f2f32f964ed2de1eb",
+            "rows_sha256": "27ae59215468d6cc41a7467e7cbace48069c0268a841ab1b6e941b940a3cd1e4"
+          },
+          "repository_relationships": {
+            "count": 6,
+            "ids_sha256": "d963ddbb565045660cb425bbb7a064a6d676cb4b8363c6da42fb2a41d7dca7ee",
+            "rows_sha256": "315a8a3f4596c2bd3c4f386c8faad270364d1893a8b576d4683b22980e1827c0"
+          }
+        },
+        "fts_probe_matches": 0,
+        "fts_query_executed": true,
+        "integrity_check": "ok",
+        "relational_consistency_validated": true,
+        "required_tables": [
+          "artifact_chunks",
+          "artifact_chunks_fts",
+          "artifact_links",
+          "artifacts",
+          "index_runs",
+          "repository_metadata",
+          "repository_relationships"
+        ],
+        "source_binding_validated": true,
+        "status": "validated"
+      }
+    },
+    "not_claimed": [
+      "source authority",
+      "reviewer authentication",
+      "complete graph coverage"
+    ],
+    "receipt_sha256": "875b1f4a7e44ddc1d2a3d189bb9f3965c9a03ff660e6047cc4725799de9dda49",
+    "schema": "naos.repository_intelligence.validation_receipt.v1",
+    "status": "validated_generation"
+  },
+  ".naos/upgrade-v1/state/repository-intelligence/generations/RI-271b1c7ee91addc7606d46da/inventory.json": {
+    "artifacts": [
+      {
+        "artifact_id": "A-e7b73709522035bf",
+        "artifact_type": "documentation",
+        "audit_event_readiness": "index_run_recorded",
+        "authority_level": "repository_documentation",
+        "chunk_count": 1,
+        "confidence": "declared_artifact",
+        "exclusion_reason": null,
+        "family_id": "documentation",
+        "freshness_status": "content_hash_bound",
+        "include_policy": "bounded_sections_and_references",
+        "indexed_at": null,
+        "limitations": [
+          "bounded summary only",
+          "not authority"
+        ],
+        "modified_at": null,
+        "path": "docs/adopter-baseline.md",
+        "profile_scope": "all",
+        "provenance": "repo_file",
+        "recall_trace_readiness": "metadata_available",
+        "review_status": "unreviewed_candidate",
+        "scope": "project_local",
+        "size_bytes": 95,
+        "source_hash": "76c7696225f3cab0998302b5ee23d913bf6cdd3cfcb4c47e7c0b37848238ba99",
+        "source_reference": "docs/adopter-baseline.md",
+        "use_policy": "candidate_reference_only"
+      },
+      {
+        "artifact_id": "A-7743c9b00fea2753",
+        "artifact_type": "source",
+        "audit_event_readiness": "index_run_recorded",
+        "authority_level": "current_git_state",
+        "chunk_count": 2,
+        "confidence": "declared_artifact",
+        "exclusion_reason": null,
+        "family_id": "source",
+        "freshness_status": "content_hash_bound",
+        "include_policy": "bounded_source_blocks",
+        "indexed_at": null,
+        "limitations": [
+          "bounded summary only",
+          "not authority"
+        ],
+        "modified_at": null,
+        "path": "src/adopter_existing.py",
+        "profile_scope": "all",
+        "provenance": "repo_file",
+        "recall_trace_readiness": "metadata_available",
+        "review_status": "unreviewed_candidate",
+        "scope": "project_local",
+        "size_bytes": 1609,
+        "source_hash": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "source_reference": "src/adopter_existing.py",
+        "use_policy": "candidate_reference_only"
+      },
+      {
+        "artifact_id": "A-e3ac33afe1512502",
+        "artifact_type": "test",
+        "audit_event_readiness": "index_run_recorded",
+        "authority_level": "current_git_state",
+        "chunk_count": 2,
+        "confidence": "declared_artifact",
+        "exclusion_reason": null,
+        "family_id": "tests",
+        "freshness_status": "content_hash_bound",
+        "include_policy": "bounded_source_blocks",
+        "indexed_at": null,
+        "limitations": [
+          "bounded summary only",
+          "not authority"
+        ],
+        "modified_at": null,
+        "path": "tests/test_adopter_existing.py",
+        "profile_scope": "all",
+        "provenance": "repo_file",
+        "recall_trace_readiness": "metadata_available",
+        "review_status": "unreviewed_candidate",
+        "scope": "project_local",
+        "size_bytes": 1687,
+        "source_hash": "ccf2422c96dbf84d8634f8a677ae66547e83a9b85a5d62a2d632cf3a65cb4926",
+        "source_reference": "tests/test_adopter_existing.py",
+        "use_policy": "candidate_reference_only"
+      }
+    ],
+    "candidate_only": true,
+    "components": {
+      "networkx_graphml": {
+        "applicability_basis": "explicit_source_bound_relationships",
+        "effectiveness_over_sqlite_fts": "untested",
+        "engine": "networkx_graphml",
+        "relationship_count": 6,
+        "required_version": "3.6.1",
+        "selected": false,
+        "status": "not_applicable",
+        "utility_evidence": {
+          "adds_beyond_direct_lookup": false,
+          "artifact_edges": 1,
+          "effectiveness_over_sqlite_fts": "untested",
+          "enables_candidate_beyond_exact_or_single_link_lookup": false,
+          "minimum_artifact_families": 2,
+          "minimum_artifacts": 3,
+          "minimum_path_edges": 2,
+          "qualifying_path": null,
+          "recommendation_boundary": "eligibility_hypothesis_not_effectiveness_proof",
+          "relationship_questions": [
+            "Which current source, tests, specifications, migrations, and documentation are explicitly connected?",
+            "Which multi-hop source relationships can improve requirements reconstruction and traceability review?"
+          ],
+          "status": "no_incremental_multi_hop_case"
+        },
+        "version": null
+      },
+      "sqlite_fts": {
+        "applicability_basis": "executed_inventory_and_fts5_probe",
+        "engine": "python_stdlib_sqlite3_fts5",
+        "status": "ready",
+        "version": "3.47.1"
+      },
+      "sqlite_vec": {
+        "applicability_basis": "frozen_workload_and_vector_producer_required",
+        "engine": "sqlite_vec",
+        "status": "workload_not_defined",
+        "version": null
+      }
+    },
+    "effective_source_sha256": "e741a10be8f20269c3d17fa4ad3a7d88af13f001512f286bc734f58ec58c6afd",
+    "excluded_artifacts": [],
+    "generation_id": "RI-271b1c7ee91addc7606d46da",
+    "limitations": [
+      "Results are generated candidates and must be verified against current repository source.",
+      "GraphML records observed deterministic relationships; it does not establish semantic truth or complete relationship coverage.",
+      "Absence of a relationship is not evidence that no relationship exists.",
+      "sqlite-vec remains unavailable until a concrete local workload and deterministic vector producer are approved and validated."
+    ],
+    "not_claimed": [
+      "source of truth",
+      "complete dependency graph",
+      "semantic truth",
+      "automatic requirements approval",
+      "automatic maturity promotion",
+      "compliance or readiness approval",
+      "sqlite-vec effectiveness"
+    ],
+    "ongoing_use_scope": [
+      "brownfield_adoption",
+      "requirements_reconstruction",
+      "traceability_gap_analysis",
+      "task_context",
+      "change_impact",
+      "source_test_navigation",
+      "review_preparation"
+    ],
+    "project_root": "/private/tmp/r22-WFA-macOS-311-standard-wheel-brownfield/workspace/project",
+    "relationships": [
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "provenance": "current_repository_source",
+        "reference_id": "specs/03-requirements.md#fr-001",
+        "relationship_id": "R-fe07cbdb85501b44",
+        "relationship_type": "spec_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "target_node": "spec:specs/03-requirements.md#fr-001",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "provenance": "current_repository_source",
+        "reference_id": "specs/03-requirements.md#fr-002",
+        "relationship_id": "R-9f8d5754f10200b2",
+        "relationship_type": "spec_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "target_node": "spec:specs/03-requirements.md#fr-002",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "provenance": "current_repository_source",
+        "reference_id": "specs/03-requirements.md#nfr-001",
+        "relationship_id": "R-11236abfe6f16a5d",
+        "relationship_type": "spec_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "target_node": "spec:specs/03-requirements.md#nfr-001",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "provenance": "current_repository_source",
+        "reference_id": "specs/03-requirements.md#nfr-002",
+        "relationship_id": "R-05546635830ba7bb",
+        "relationship_type": "spec_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "target_node": "spec:specs/03-requirements.md#nfr-002",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "provenance": "current_repository_source",
+        "reference_id": "T-001",
+        "relationship_id": "R-df3572377ca94d3d",
+        "relationship_type": "task_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8",
+        "target_node": "task:T-001",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": 6,
+        "evidence_sha256": "ccf2422c96dbf84d8634f8a677ae66547e83a9b85a5d62a2d632cf3a65cb4926",
+        "provenance": "current_repository_source",
+        "relationship_id": "R-51e74a4bc666e8f3",
+        "relationship_type": "python_import",
+        "source_node": "artifact:A-e3ac33afe1512502",
+        "source_path": "tests/test_adopter_existing.py",
+        "source_sha256": "ccf2422c96dbf84d8634f8a677ae66547e83a9b85a5d62a2d632cf3a65cb4926",
+        "target_node": "artifact:A-7743c9b00fea2753",
+        "target_path": "src/adopter_existing.py",
+        "target_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8"
+      }
+    ],
+    "schema": "naos.repository_intelligence.inventory.v1",
+    "source_inventory": [
+      {
+        "artifact_id": "A-e7b73709522035bf",
+        "artifact_type": "documentation",
+        "authority_level": "repository_documentation",
+        "family_id": "documentation",
+        "path": "docs/adopter-baseline.md",
+        "size_bytes": 95,
+        "source_sha256": "76c7696225f3cab0998302b5ee23d913bf6cdd3cfcb4c47e7c0b37848238ba99"
+      },
+      {
+        "artifact_id": "A-7743c9b00fea2753",
+        "artifact_type": "source",
+        "authority_level": "current_git_state",
+        "family_id": "source",
+        "path": "src/adopter_existing.py",
+        "size_bytes": 1609,
+        "source_sha256": "123436912d1c72f103bf94e36154ac97cd5267e81a11e6fc2d1491f68f638ce8"
+      },
+      {
+        "artifact_id": "A-e3ac33afe1512502",
+        "artifact_type": "test",
+        "authority_level": "current_git_state",
+        "family_id": "tests",
+        "path": "tests/test_adopter_existing.py",
+        "size_bytes": 1687,
+        "source_sha256": "ccf2422c96dbf84d8634f8a677ae66547e83a9b85a5d62a2d632cf3a65cb4926"
+      }
+    ],
+    "sqlite_content_binding": {
+      "artifact_chunks": {
+        "count": 5,
+        "ids_sha256": "a7248c758ee95047291f96b115ac4699f2f82abfcc2abe4154b907c44f63b6b1",
+        "rows_sha256": "6be45f54fa0a19bf47393424e127e6ef4219dd138a2ca9424f2ed846b4a797dc"
+      },
+      "artifact_links": {
+        "count": 5,
+        "ids_sha256": "69f75adbcb0fd12fc51ef1010a55bdddbaaae1e318f3d1beb9bc25068ef4d824",
+        "rows_sha256": "2a0d25acf797ba9cca4da36281f7ebdee36d467329f70b6a4b069fd01df0cfc3"
+      },
+      "artifacts": {
+        "count": 3,
+        "ids_sha256": "770ff5b746c16b8be42ea1ed39a29ed22cbffff5cdd3f13f2f32f964ed2de1eb",
+        "rows_sha256": "27ae59215468d6cc41a7467e7cbace48069c0268a841ab1b6e941b940a3cd1e4"
+      },
+      "repository_relationships": {
+        "count": 6,
+        "ids_sha256": "d963ddbb565045660cb425bbb7a064a6d676cb4b8363c6da42fb2a41d7dca7ee",
+        "rows_sha256": "315a8a3f4596c2bd3c4f386c8faad270364d1893a8b576d4683b22980e1827c0"
+      }
+    },
+    "status": "staged"
+  },
+  ".naos/upgrade-v1/transactions/repository-intelligence/RIT-d665c276b7e516ed570f4bbf/receipt.json": {
+    "control": {
+      "active_pointer_publication": "pending",
+      "bundle_sha256": "fb8c79f721f1d93e41cdde60369718363ab5c8a6188e36184cbdf2e3f970298c",
+      "generation_content_sha256": "271b1c7ee91addc7606d46da077a2064acb54149cab089dc368e29cf9e5d5c8a",
+      "generation_id": "RI-271b1c7ee91addc7606d46da",
+      "manifest_file_sha256": "9f3c051eadc321eced1e6b11d1665b49bb8b3aa3f1904f6aa6d3fe63f90f3169",
+      "manifest_sha256": "517c200eb58d0b80cdfa19dd3cbb7b2349bd9e85393f671b67ed27c6ed712db8",
+      "plan_sha256": "77436482c5d2ba08752f1adc5ac6d28e44b984f5612f551424fc0de9262af44d",
+      "postcopy_validation": true,
+      "preapply_revalidation": true,
+      "previous_generation_id": null,
+      "profile": "standard",
+      "provenance_owner_sha3_512": "ec22cc3924dbcdf85129f22689537583e5829fafecf065007ddff600c267e04eca1d6d9f0e632bb2b1d290f47573864c68edade86e16567856a3ca24b3866cfc",
+      "provenance_project_id": "urn:uuid:9d3170b6-2942-5dde-b15a-a6a951da58e8",
+      "provenance_scope_sha3_512": "d4bcffc5d2cd786ca083c000520476abb66e694324cb50697fecae771cb9dd29b17cbcf24f94aa84b12b4094331afd2477e57d4e8bc42261a57472b7b2d4d45c",
+      "reviewer": {
+        "authentication_status": "not_claimed",
+        "identity_status": "declared_attribution",
+        "required": true,
+        "reviewer_id": "TEST-FIXTURE-RI-REVIEWER"
+      },
+      "transaction_id": "RIT-d665c276b7e516ed570f4bbf",
+      "validation_receipt_file_sha256": "0ff4b4d9df94016c57ad590d6382c84bc00cc2075880d79667cacee8bbb20119",
+      "validation_receipt_sha256": "875b1f4a7e44ddc1d2a3d189bb9f3965c9a03ff660e6047cc4725799de9dda49"
+    },
+    "not_claimed": [
+      "reviewer authentication",
+      "source authority",
+      "filesystem-wide atomic visibility"
+    ],
+    "receipt_sha256": "04897cad0595a7c4e747726187d5c5412a2715a20d881ed2e1e070ac6fc7203a",
+    "recorded_at": "2026-10-10T18:07:09Z",
+    "schema": "naos.repository_intelligence.activation_receipt.v1",
+    "status": "authorized_for_publication"
+  },
+  ".naos/upgrade-v1/transactions/repository-intelligence/RIT-d665c276b7e516ed570f4bbf/journal.json": {
+    "actions": [
+      "copy_exact_bundle",
+      "publish_generation",
+      "write_activation_receipt",
+      "publish_active_pointer",
+      "validate_current"
+    ],
+    "active_before": null,
+    "active_before_bytes_hex": null,
+    "active_before_file_sha256": null,
+    "active_path": ".naos/upgrade-v1/state/repository-intelligence/active.json",
+    "active_pending_path": ".naos/upgrade-v1/state/repository-intelligence/.active.json.pending",
+    "bundle_sha256": "fb8c79f721f1d93e41cdde60369718363ab5c8a6188e36184cbdf2e3f970298c",
+    "completed_action_index": 4,
+    "context_published": true,
+    "context_staging_device": 16777233,
+    "context_staging_inode": 785545651,
+    "context_staging_path": ".naos/upgrade-v1/transactions/repository-intelligence/RIT-d665c276b7e516ed570f4bbf/context",
+    "created_at": "2026-10-10T18:07:09Z",
+    "final_path": ".naos/upgrade-v1/state/repository-intelligence/generations/RI-271b1c7ee91addc7606d46da",
+    "generation_content_sha256": "271b1c7ee91addc7606d46da077a2064acb54149cab089dc368e29cf9e5d5c8a",
+    "generation_id": "RI-271b1c7ee91addc7606d46da",
+    "generation_published": true,
+    "initial_context_absent": true,
+    "journal_sha256": "7806c6dcec66672cd2e56e81688fb5448d51b11a53120fbd58a9164121eaf198",
+    "last_error": null,
+    "plan_sha256": "77436482c5d2ba08752f1adc5ac6d28e44b984f5612f551424fc0de9262af44d",
+    "proposed_active_file_sha256": "a26116d6123947a8f955d3c0caef674ced6974097939cb636613bdf502bd6e8f",
+    "proposed_active_sha256": "871764ee1841a57f2a89d1c34f03dab32cfa916eebe9a8661671ee95522ba794",
+    "schema": "naos.repository_intelligence.transaction_journal.v1",
+    "staging_device": 16777233,
+    "staging_files": [
+      {
+        "path": "inventory.json",
+        "sha256": "591d65918c4cd88d1d9f67eb3425af5f0be9c22df381fc5d00f8d5deb6e3a766",
+        "size_bytes": 12146
+      },
+      {
+        "path": "local_context_index.sqlite",
+        "sha256": "49ca3b0019994b9a32c32502f3b705add5b49e02e2285d86c96cbd944cc23e22",
+        "size_bytes": 106496
+      },
+      {
+        "path": "manifest.json",
+        "sha256": "9f3c051eadc321eced1e6b11d1665b49bb8b3aa3f1904f6aa6d3fe63f90f3169",
+        "size_bytes": 7298
+      },
+      {
+        "path": "repository_intelligence_rules.yaml",
+        "sha256": "10b2b67b3e70e9db1b24ff5386e4c3f56eaec0229302bb3efa5f18701e4ca996",
+        "size_bytes": 6766
+      },
+      {
+        "path": "validation_receipt.json",
+        "sha256": "0ff4b4d9df94016c57ad590d6382c84bc00cc2075880d79667cacee8bbb20119",
+        "size_bytes": 4853
+      }
+    ],
+    "staging_inode": 785545644,
+    "staging_path": ".naos/upgrade-v1/transactions/repository-intelligence/RIT-d665c276b7e516ed570f4bbf/staging",
+    "state": "COMMITTED",
+    "transaction_id": "RIT-d665c276b7e516ed570f4bbf",
+    "updated_at": "2026-10-10T18:07:09Z"
+  }
+}

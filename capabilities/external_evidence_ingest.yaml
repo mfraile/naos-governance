@@ -41,6 +41,8 @@ prohibited_resources:
   - "approval or attestation"
 constraints:
   - "Must keep imported findings external and unverified by default."
+  - "When --source is omitted, only naos/external_evidence_source.json may select a bounded project-contained local SARIF source; source: null remains not configured."
+  - "A confirmed ingest observation records local parsing, exact source hash and result count only; external finding adequacy and validity remain unknown."
   - "Must not promote external findings to source-of-truth authority."
   - "Must not retain arbitrary SARIF result-message text in the bounded result record."
   - "G2/G6 labels on generated routes are human-review destinations only and do not change gate decisions."
@@ -65,7 +67,7 @@ dashboard_signals:
 maturity_path:
   L0: "Capability contract, schema, and command exist."
   L1: "Local SARIF can be summarized and preserved per result without network calls or raw-message retention."
-  L2: "Report is visible in gates, evidence pack, dashboard, and self-check."
+  L2: "Exact-source local SARIF ingest structure is visible in gates, evidence pack, dashboard, and self-check; imported findings remain unverified and their adequacy is not established."
   L3: "Adopter policy defines required scanners and freshness expectations."
   L4: "External evidence trends are reviewed over release cadence."
   L5: "External evidence is independently verified before release decisions."
@@ -83,6 +85,7 @@ not_claimed:
   - "proof of compliance"
   - "source-of-truth authority"
 related_docs:
+  - "templates/structural-seeds/naos/external_evidence_source.json"
   - docs/CONTROL_PLANE.md
   - docs/CLAIMS_AND_LIMITATIONS.md
 related_scripts:

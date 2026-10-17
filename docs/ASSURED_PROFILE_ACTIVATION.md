@@ -127,12 +127,17 @@ naos setup-recommendations --profile assured
 naos agentic-workflow-review --profile assured
 naos pre-implementation-alignment-review --profile assured
 naos policy-overrides --profile assured --dry-run
-naos self-check --profile assured
-naos gate-status --profile assured
-naos gate-evaluate --profile assured
+naos self-check --profile assured --refresh
+naos gate-status --profile assured --output naos/reports/gate_status.json
+naos gate-evaluate --profile assured --strict-required --output naos/reports/gate_evaluation.json
 naos evidence-pack --profile assured
 naos dashboard --profile assured --json
 ```
+
+The gate commands persist review reports. `--strict-required` makes missing
+required gates exit nonzero; blocked gates also fail. Inspect the JSON findings
+and resolve missing evidence before continuing. A successful exit is review
+evidence, not approval or deployment authorization.
 
 Use `naos add setup-module profile_baseline --profile assured --dry-run` before
 copying optional modules. Remove `--dry-run` only after reviewing the proposed

@@ -5,14 +5,14 @@ regulated or audited delivery. It is review evidence only.
 
 | Spec-Kit artifact | NAOS evidence surface | Review boundary |
 | --- | --- | --- |
-| `.specify/specs/control-requirements.md` | `naos/evidence/evidence_pack.json` | Evidence pack shows referenced artifacts; it is not proof of compliance. |
-| `.specify/specs/control-requirements.md` | `naos/reports/evidence_conflict_detection.json` | Conflict detection flags disagreements; it does not resolve them. |
-| `.specify/specs/model-risk-notes.md` | `naos/reports/control_plane_review.json` | Review routing records disposition candidates; humans decide. |
-| `.specify/specs/release-constraints.md` | `naos/reports/gate_evaluation.json` | Gates provide review signals; they do not authorize release. |
+| `specs/001-control-requirements/spec.md` | `naos/evidence/evidence_pack.json` | Evidence pack shows referenced artifacts; it is not proof of compliance. |
+| `specs/001-control-requirements/spec.md` | `naos/reports/evidence_conflict_detection.json` | Conflict detection flags disagreements; it does not resolve them. |
+| `specs/002-model-risk/spec.md` | `naos/reports/control_plane_review.json` | Review routing records disposition candidates; humans decide. |
+| `specs/003-release-constraints/spec.md` | `naos/reports/gate_evaluation.json` | Gates provide review signals; they do not authorize release. |
 
 Recommended regulated review steps:
 
-1. Treat `.specify/specs/*.md` as source artifacts under repository control.
+1. Treat `specs/<feature>/spec.md` as source artifacts under repository control.
 2. Generate NAOS evidence, gate, conflict, task-claim, and dashboard reports.
 3. Route unresolved gaps to control-plane review, known gaps, residual risks, or waivers.
 4. Keep approval, legal/regulatory decisions, and release authorization outside the adapter.

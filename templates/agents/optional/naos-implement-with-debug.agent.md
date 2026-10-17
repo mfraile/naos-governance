@@ -1,6 +1,6 @@
 ---
 name: naos-implement-with-debug
-model: "[ADAPT: e.g. claude-sonnet-4-5 | gpt-4o]"
+# Model omitted: adopter host selection applies; this does not pin or approve a model.
 naos_model_role: implementation
 target: vscode
 description: "Opt-in implementation agent with one bounded no-direct-edit debug escalation"

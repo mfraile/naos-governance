@@ -143,7 +143,17 @@
         "workspace_registry_metadata": {"type": "boolean"},
         "user_registry_metadata": {"type": "boolean"},
         "values_reported": {"const": false},
-        "descriptor_ids": {"type": "array", "items": {"type": "string"}}
+        "descriptor_ids": {"type": "array", "items": {"type": "string"}},
+        "source_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "source_count", "sha256"],
+          "properties": {
+            "schema": {"const": "naos.mcp_config_source_identity.v1"},
+            "source_count": {"type": "integer", "minimum": 0},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        }
       },
       "additionalProperties": true
     },

@@ -36,7 +36,20 @@ python -m naos_governance.secure_coding_reporting_cli \
   --refresh-sources
 ```
 
-The portable Make wrapper is seeded for Lite, Standard, and Assured projects:
+The portable Make wrapper is seeded for Lite, Standard, and Assured projects.
+Its default profile matches the selected scaffold profile; explicit
+`NAOS_PROFILE` overrides remain supported. Each target uses one quoted `PYTHON`
+executable, without POSIX shell probes. The Python dispatcher selects the
+canonical installed module when `naos_governance` is discoverable; otherwise it
+runs `NAOS_P3_SCRIPT` (default `scripts/naos_secure_coding_reporting.py`).
+A present but broken module fails without falling back. A complete copied
+runtime needs its existing support modules/dependencies but no NAOS package.
+The script path may be overridden to an existing source-kit or copied entry,
+including paths with spaces. A bare generated wrapper does not provision a
+complete P3 runtime; absence of both routes remains unsupported.
+GNU make can be launched from cmd.exe, PowerShell or POSIX using its
+platform-default recipe shell. `PYTHON` is one executable path, not a command
+plus flags; custom PowerShell recipe shells are not covered.
 
 ```bash
 make -f Makefile.naos.secure-coding-reporting \
@@ -106,7 +119,13 @@ compliance, approval, or release authorization.
 P3 is derived presentation, not an additional gate input. G4 and G6 continue to
 consume the underlying P1/P2 evidence and existing governance artifacts. The P3
 report cannot change severity, gate outcomes, waivers, approvals, exceptions, or
-release decisions.
+release decisions. The capability contract declares normal G4/G6 links for
+Assured L3. Its adopter-declared current and target maturity and profile
+enforcement contribute to the ordinary capability maturity severity ceiling;
+this relationship is not inert metadata. A below-target capability contributes
+only advisory enforcement, and the ceiling cannot raise a gate above its
+declared severity. This governance relationship keeps P3 report content outside gate evidence,
+validators, and semantic inputs and does not promote maturity or approve work.
 
 ## Boundaries
 
@@ -114,3 +133,12 @@ The P3 report is deterministic file-first reporting. It makes no network calls,
 does not call models or providers, does not change policy or gate outcomes, does
 not grant waivers, and does not replace human review. Projection changes only
 the named generated artifacts and one bounded Markdown marker region.
+
+Portable reference manifests use native repository-relative paths. Drive-relative,
+rooted, and parent-traversal operands are refused before reading or copying.
+Inputs and temporary destinations must remain inside their selected project, kit,
+or temporary root; symlink and Windows reparse ancestors are refused. Missing
+optional targets and missing project detectors with a safe kit fallback remain
+supported. POSIX literal colon and backslash filenames retain native semantics.
+These are read-time containment checks, not race-free filesystem custody or
+proof of secure code, control satisfaction, compliance, or human approval.

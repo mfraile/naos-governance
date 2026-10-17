@@ -12,9 +12,14 @@ if __package__ in (None, ""):
         ValidationResult,
         build_root_parser,
         candidate_files,
+        load_metadata_scope,
+        MetadataScopeError,
+        METADATA_SCOPE_PATH,
+        scoped_frontmatter_results,
         collect_markdown_targets,
         is_non_empty_string,
         is_non_empty_string_list,
+        model_selector_is_valid,
         parse_frontmatter,
         print_results,
     )
@@ -23,9 +28,14 @@ else:  # pragma: no cover - package import path
         ValidationResult,
         build_root_parser,
         candidate_files,
+        load_metadata_scope,
+        MetadataScopeError,
+        METADATA_SCOPE_PATH,
+        scoped_frontmatter_results,
         collect_markdown_targets,
         is_non_empty_string,
         is_non_empty_string_list,
+        model_selector_is_valid,
         parse_frontmatter,
         print_results,
     )
@@ -148,13 +158,14 @@ def validate_review_report_contract(
 
 
 def default_agent_files(root: Path) -> list[Path]:
+    scope = load_metadata_scope(root)
     files = candidate_files(
         root, "templates/agents/*.agent.md", ".github/agents/*.agent.md"
     )
     optional_dir = root / "templates" / "agents" / "optional"
     if optional_dir.is_dir():
         files.extend(sorted(optional_dir.glob("*.agent.md")))
-    return files
+    return sorted({p.resolve(): p for p in files + [p for p, k in scope.items() if k == "agent"]}.values(), key=lambda p: p.as_posix())
 
 
 def validate_goal_backward_contract(
@@ -192,10 +203,17 @@ def validate_agent_file(path: Path) -> list[ValidationResult]:
     stale_tools = sorted(tool_names & LEGACY_OR_UNDOCUMENTED_CORE_TOOLS)
     results = [
         ValidationResult(
+            path, "description",
+            is_non_empty_string(document.data.get("description")),
+            "NAOS requires a non-empty description; this is not universal host validation",
+        ),
+        ValidationResult(
             path,
             "model",
-            is_non_empty_string(document.data.get("model")),
-            "required non-empty string field 'model' is missing or malformed",
+            model_selector_is_valid(document.data),
+            "model may be omitted for host selection; an explicit selector must be "
+            "a non-empty string or VS Code prioritized string list without ADAPT placeholders; "
+            "this checks declaration shape, not availability, actual selection or approval",
         ),
         ValidationResult(
             path,
@@ -210,6 +228,12 @@ def validate_agent_file(path: Path) -> list[ValidationResult]:
             "legacy or undocumented VS Code core tool names: " + ", ".join(stale_tools),
         ),
     ]
+    if "[ADAPT" in str(document.data.get("model", "")).upper():
+        results.append(ValidationResult(
+            path, "model-placeholder-unresolved", False,
+            "unresolved ADAPT model selector: omit model for adopter-controlled host selection "
+            "or supply an explicitly reviewed host-supported selector before invocation",
+        ))
     contract_result = validate_goal_backward_contract(path, document.body)
     if contract_result is not None:
         results.append(contract_result)
@@ -222,20 +246,20 @@ def validate_agent_file(path: Path) -> list[ValidationResult]:
     return results
 
 
-def validate_agent_files(paths: list[Path]) -> list[ValidationResult]:
-    agent_files = [path for path in paths if path.name.endswith(".agent.md")]
-    results: list[ValidationResult] = []
-    for path in agent_files:
-        results.extend(validate_agent_file(path))
-    return results
+def validate_agent_files(paths: list[Path], *, root: Path | None = None) -> list[ValidationResult]:
+    files = [path for path in paths if path.name.endswith(".agent.md")]
+    return scoped_frontmatter_results(files, root, "agent", validate_agent_file)
 
 
 def main() -> int:
     parser = build_root_parser("Validate NAOS .agent.md frontmatter")
     args = parser.parse_args()
     root = Path(args.root).resolve()
-    targets = collect_markdown_targets(args.paths, default_agent_files(root))
-    results = validate_agent_files(targets)
+    try:
+        targets = collect_markdown_targets(args.paths, default_agent_files(root))
+        results = validate_agent_files(targets, root=root)
+    except MetadataScopeError as exc:
+        results = [ValidationResult(root / METADATA_SCOPE_PATH, "metadata-scope", False, str(exc))]
     return print_results("Agent Frontmatter", root, results)
 
 

@@ -1,67 +1,50 @@
 ---
-name: "gov-refresh"
-description: "Run the full governance refresh pipeline: rebuild function index, sync ARCH tags, update traceability matrix, dashboard, and coherence checks. Call after adding functions, changing task status, or editing specs."
-parameters:
-  - name: mode
-    description: "Refresh mode: 'full' runs gov-refresh + truth validation, 'standard' runs gov-refresh only"
-    required: false
-    default: "standard"
+name: gov-refresh
+description: Sync task-derived files and dashboard. Rebuild function and traceability indexes separately when needed.
+metadata:
+  naos-parameters: '[{"name":"mode","description":"Refresh mode: ''full'' runs gov-refresh + truth validation, ''standard'' runs gov-refresh only","required":false,"default":"standard"}]'
 ---
 
 # Skill: Governance Refresh
 
-Runs `make -f Makefile.naos gov-refresh` (or `make -f Makefile.naos gov-full`) to keep all auto-generated governance artifacts accurate.
-
 ## When to Use
 
-- After creating or modifying any function in `[ADAPT: your source directory]`
-- After changing task status in `naos/TASK_REGISTRY.yaml`
-- After editing spec files in `specs/`
-- Before submitting a PR to ensure metrics are current
-- When dashboard numbers look stale or inaccurate
+Use after task-registry or spec-status changes, or when backlog and dashboard
+status needs refresh. Review generated changes before relying on them.
 
-## Execution
-
-### Standard Refresh (`mode: standard`)
+## Run
 
 ```bash
 make -f Makefile.naos gov-refresh
 ```
 
-Runs in sequence:
-1. `python scripts/naos_function_index_query.py --rebuild-index` — rebuild FUNCTION_INDEX.yaml
-2. Sync ARCH source tags across all project files
-3. Update `naos/TRACEABILITY_MATRIX.md`
-4. Run or recommend `make -f Makefile.naos naos-spec-pack-contract` and `make -f Makefile.naos naos-spec-cascade` when specs, task registry entries, source headers, source spec references, or source traceability changed
-5. Refresh `naos/DASHBOARD.md` with current task/FR coherence metrics
-6. Run coherence checks (orphan detection, spec alignment, boundary violations)
+This runs registry sync (backlog, execution task matrix, marked project-status
+sections and dashboard metrics), conditional spec-status sync, optional installed
+AI catalogue/component/plan helpers, then dashboard generation. It does not
+rebuild the function index or traceability matrix or run every validator.
 
-### Full Refresh with Truth Validation (`mode: full`)
+Select additional commands for the changed inputs:
 
 ```bash
-make -f Makefile.naos gov-full
+make -f Makefile.naos function-index                         # source functions
+python scripts/naos_function_index_query.py --rebuild-index # derived similarity index
+python scripts/workflows/generate_traceability_matrix.py   # source/spec links
+make -f Makefile.naos naos-spec-pack-contract                # spec contract
+make -f Makefile.naos naos-spec-cascade                      # source/spec gaps
 ```
 
-Runs `gov-refresh` plus `scripts/naos_validate_truth.py` — verifies `GOVERNANCE_TRUTH_TABLE.md` matches auto-computed metrics.
+`function-index` writes `naos/inventory/FUNCTION_INDEX.yaml`; the query script
+writes `FUNCTION_SIMILARITY_INDEX.json`. The traceability script writes
+`naos/TRACEABILITY_MATRIX.md`. Run only the applicable commands available in
+the installed profile.
 
-## Output Interpretation
+For truth validation after the refresh, use `make -f Makefile.naos gov-full`.
+That target adds `scripts/naos_validate_truth.py`; it does not run the separate
+index, matrix, or spec commands above.
 
-| Output | Meaning |
-|--------|---------|
-| `✅ N/N coherence checks passed` | All governance invariants satisfied |
-| `⚠️ WARNING: orphan FR detected` | FR exists with no linked task — add to TASK_REGISTRY |
-| `❌ ERROR: spec alignment violation` | `Implements:` header references unknown FR — fix header |
-| `📊 Dashboard updated` | `naos/DASHBOARD.md` reflects current state |
+## Review
 
-## After Running
-
-- Read `naos/DASHBOARD.md` for updated completion metrics
-- Read `naos/PROJECT_STATUS.md` for delivered requirements count
-- Read `naos/reports/spec_cascade_coherence.json` when spec/source traceability
-  or source spec references changed
-- If metrics changed significantly, update `naos/governance/GOVERNANCE_TRUTH_TABLE.md`
-
-## Anti-Patterns
-
-- **NEVER** manually calculate derived metrics (task completion %, requirements delivered) — the scripts compute these correctly
-- **NEVER** skip gov-refresh after adding new functions — FUNCTION_INDEX.yaml will be stale
+Read `naos/DASHBOARD.md` and `naos/PROJECT_STATUS.md`; inspect optional helper
+reports only when those helpers ran. Do not treat `gov-refresh` success as proof
+that unrelated indexes, a project-defined `MASTER_INVENTORY.md`, or all
+governance checks are current.

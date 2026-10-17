@@ -1,7 +1,15 @@
+# On-demand configuration: start with naos add setup-module --list, then
+# dry-run the selected module. Read common semantics, that module record and
+# its declared dependencies; do not load the entire catalogue as startup context.
 version: "1.0"
 semantics:
   catalog: "Adopter-facing setup module catalogue; this file is configuration, not proof."
   recommendation: "NAOS evaluates profile and simple project signals to recommend, defer, or keep modules optional."
+  project_signal_sources:
+    detected: [brownfield_like, greenfield_like, has_ai_surfaces, has_ci, has_docs, has_naos_state, has_python, has_source, has_specs, has_tests, uses_claude_code, uses_codex, uses_pull_requests]
+    profile_derived: [regulated_posture_requested, selected_profile]
+    reserved_intake_only: [active_task_tracking, agent_orchestration_requested, ai_assisted_sdlc, ambiguous_requirements, brownfield_onboarding, complex_debugging_expected, concurrent_naos_runs, governed_agent_delegation_requested, greenfield_setup, has_memory_context, local_policy_variation, many_cross_artifact_links, multi_operator, multi_team_use, multi_user_requested, operator_traceability_requested, optional_tool_integration_requested, team_coordination_requested, team_usage_expected, uses_spec_kit]
+    limits: "Static plain local regular-file metadata presence only; no readability, valid configuration, host loading, provider execution, adoption, team intent, or automatic module activation. Refused/incomplete bounded inventory cannot establish greenfield absence. Reserved names are unresolved and have no command intake mechanism. Unknown custom names are reported as unknown_custom and do not match automatically."
   governance_decision: "Humans decide which modules to enable, defer, approve, or treat as residual risk."
   flow: "choice -> rationale -> benefit -> warning -> consequence -> next action"
   not_claimed:
@@ -30,7 +38,7 @@ modules:
         post_install_next_actions:
           - "Run naos-governance setup-recommendations --profile <profile>."
     post_install_next_actions:
-      - "Review naos/setup_module_catalog.yaml before enabling additional modules."
+      - "Review common semantics, the selected module and its declared dependencies in naos/setup_module_catalog.yaml before enabling additional modules."
     profile_default:
       quickstart: recommended
       lite: recommended
@@ -875,11 +883,11 @@ modules:
     status: active
     installable: false
     requires_confirmation: false
-    not_addable_reason: "NAOS provides an example workflow template under templates/workflows/; adopters must explicitly review and copy it into their own CI configuration."
+    not_addable_reason: "NAOS ships an inert example at naos/workflows/examples/naos-pr-governance.yml.example; adopters must review approved artifact URL/hash, sensitivity and Actions budget before manually activating CI."
     install_actions: []
     post_install_next_actions:
-      - "Review templates/workflows/naos-pr-governance.yml.example for artifact sensitivity and team metadata choices."
-      - "Copy the example into .github/workflows only after adopter review; NAOS does not auto-enable CI."
+      - "Review naos/workflows/examples/naos-pr-governance.yml.example for artifact sensitivity and team metadata choices."
+      - "Copy the example into .github/workflows only after adopter review; this PR example is not activated automatically."
       - "Run make -f Makefile.naos naos-pr-risk-classify before PR governance summary when PR diff risk evidence is needed."
       - "Run make -f Makefile.naos naos-pr-governance-summary after gate/evidence reports are generated."
     profile_default:
@@ -892,7 +900,7 @@ modules:
     why_recommended: "PR-time CI lets teams generate deterministic NAOS governance evidence and review signals on pull requests without treating CI as approval."
     benefit: "Summarizes gate status, gate evaluation, PR risk classification, evidence pack, dashboard, evidence-conflict, task-claim, and SARIF findings as a review input for pull requests."
     prerequisites:
-      - "local package install works in CI"
+      - "approved artifact acquisition works in CI"
       - "deterministic NAOS scripts available"
       - "adopter review of artifact sensitivity before upload/retention"
     evidence_outputs:
@@ -935,7 +943,7 @@ modules:
       - "naos/reports/gate_evaluation.json"
       - "naos/evidence/evidence_pack.json"
     related_docs:
-      - "templates/workflows/naos-pr-governance.yml.example"
+      - "naos/workflows/examples/naos-pr-governance.yml.example"
       - "docs/CONTROL_PLANE.md"
       - "docs/tutorials/README.md"
       - "NAOS_CATALOG.md"
@@ -1039,10 +1047,11 @@ modules:
     recommended_profiles: []
     project_signals: [uses_claude_code, ai_assisted_sdlc]
     why_recommended: "Teams using Claude Code may want local hook templates that surface NAOS session, claim, gate, and self-check posture during common session moments."
-    benefit: "Provides conservative shell templates and settings examples without changing NAOS core behavior or active Claude settings."
+    benefit: "Provides an advisory Python dispatcher, POSIX compatibility wrappers and settings examples without changing active Claude settings."
     prerequisites:
       - "Claude Code installed and configured by the adopter if hooks are desired"
-      - "manual review of settings templates and shell scripts"
+      - "Python 3.11-3.13 with NAOS installed in the interpreter selected for the hook"
+      - "manual review of settings templates and the Python dispatcher; native host registration must be checked"
     evidence_outputs:
       - "NAOS reports generated by explicitly activated local hooks"
     commands:
@@ -1050,7 +1059,7 @@ modules:
       - "review naos/integrations/claude-code/settings.template.json"
     warning_if_enabled_too_early: "Hooks can be noisy if enabled before teams agree on task/session conventions; they remain convenience checks only."
     consequence_if_deferred: "NAOS remains usable through terminal CLI/Make commands in Claude Code or any other tool."
-    dependency_posture: "optional shell templates only; no automatic hook activation, no .claude/settings.json overwrite, no provider/API calls, no secrets, no memory write-back, no deployment, and no release automation"
+    dependency_posture: "optional Python hook templates with POSIX wrappers; no automatic hook activation, no .claude/settings.json overwrite, no provider/API calls, no secrets, no memory write-back, no deployment, and no release automation"
     noise_risk: medium
     human_review_boundary: "Humans decide whether and how to activate hooks, interpret findings, and route remediation or waivers."
     not_claimed:
@@ -2268,6 +2277,15 @@ modules:
     not_addable_reason: ""
     install_actions:
       - type: copy_file
+        source: "scripts/naos_resource_boundary.py"
+        destination: "scripts/naos_resource_boundary.py"
+        copy_mode: file
+        overwrite: skip
+        profiles: [standard, assured]
+        explanation: "Install the shared project-input and trusted kit-resource boundary used by this reporter."
+        post_install_next_actions:
+          - "Keep this helper alongside the report generator."
+      - type: copy_file
         source: "templates/structural-seeds/naos/ai_component_inventory_rules.yaml"
         destination: "naos/ai_component_inventory_rules.yaml"
         copy_mode: file
@@ -2374,6 +2392,15 @@ modules:
     requires_confirmation: true
     not_addable_reason: ""
     install_actions:
+      - type: copy_file
+        source: "scripts/naos_resource_boundary.py"
+        destination: "scripts/naos_resource_boundary.py"
+        copy_mode: file
+        overwrite: skip
+        profiles: [standard, assured]
+        explanation: "Install the shared project-input and trusted kit-resource boundary used by this reporter."
+        post_install_next_actions:
+          - "Keep this helper alongside the report generator."
       - type: copy_file
         source: "templates/setup-modules/agent_sponsor_registry.yaml"
         destination: "naos/agent_sponsor_registry.yaml"
@@ -2487,6 +2514,15 @@ modules:
     requires_confirmation: true
     not_addable_reason: ""
     install_actions:
+      - type: copy_file
+        source: "scripts/naos_resource_boundary.py"
+        destination: "scripts/naos_resource_boundary.py"
+        copy_mode: file
+        overwrite: skip
+        profiles: [standard, assured]
+        explanation: "Install the shared project-input and trusted kit-resource boundary used by this reporter."
+        post_install_next_actions:
+          - "Keep this helper alongside the report generator."
       - type: copy_file
         source: "templates/setup-modules/aivss_assessments.yaml"
         destination: "naos/aivss_assessments.yaml"
@@ -2708,6 +2744,33 @@ modules:
         explanation: "Add the inert local model telemetry evidence declaration seed; it keeps provider/model/API/gateway/MCP/memory/runtime behavior disabled."
         post_install_next_actions:
           - "Run make -f Makefile.naos naos-model-telemetry to produce naos/reports/model_telemetry_evidence.json."
+      - type: copy_file
+        source: "scripts/naos_policy.py"
+        destination: "scripts/naos_policy.py"
+        copy_mode: file
+        overwrite: skip
+        profiles: [quickstart, lite, standard, assured]
+        explanation: "Add the standalone file-first policy helper required by the telemetry reviewer."
+        post_install_next_actions:
+          - "Keep policy review local; this helper does not enable provider or runtime calls."
+      - type: copy_file
+        source: "scripts/naos_self_check_inspection.py"
+        destination: "scripts/naos_self_check_inspection.py"
+        copy_mode: file
+        overwrite: skip
+        profiles: [quickstart, lite, standard, assured]
+        explanation: "Add the process-local inspection helper required by policy report paths and writes; outside an explicit self-check inspection it preserves the normal path."
+        post_install_next_actions:
+          - "Keep inspection custody and output ownership checks intact; copying this helper does not start self-check, redirect arbitrary inputs, or grant execution authority."
+      - type: copy_file
+        source: "scripts/naos_secret_patterns.py"
+        destination: "scripts/naos_secret_patterns.py"
+        copy_mode: file
+        overwrite: skip
+        profiles: [quickstart, lite, standard, assured]
+        explanation: "Add the bounded local credential-pattern filter required by the telemetry reviewer."
+        post_install_next_actions:
+          - "Keep the filter local and review excluded or redacted evidence without treating it as complete secret detection."
       - type: copy_file
         source: "scripts/naos_model_telemetry_evidence.py"
         destination: "scripts/naos_model_telemetry_evidence.py"
@@ -3142,7 +3205,7 @@ modules:
       - "naos/reports/model_provider_policy.json"
       - "naos/reports/control_plane_review.json"
     related_docs:
-      - "docs/decisions/ADR-0013-opencode-governed-activation-surface.md"
+      - "docs/CONTROL_PLANE.md"
     next_actions:
       - "Enable only after the project has repo-local OpenCode surfaces to review."
       - "Use findings as local review evidence only; do not treat them as runtime, security, compliance, or approval proof."
@@ -3521,6 +3584,33 @@ modules:
         explanation: "Add the file-first behavioral readiness/impacter reporter; it does not run models, providers, external APIs, schedulers, or behavioral evaluators."
         post_install_next_actions:
           - "Review naos/reports/behavioral_governance_readiness.json before first baseline work or baseline maintenance."
+      - type: copy_file
+        source: "schemas/naos/static_grader_report.schema.json"
+        destination: "schemas/naos/static_grader_report.schema.json"
+        copy_mode: file
+        overwrite: skip
+        profiles: [quickstart, lite, standard, assured]
+        explanation: "Install the deterministic prerequisite report contract used by behavioral readiness."
+        post_install_next_actions:
+          - "Regenerate and validate prerequisite reports before behavioral readiness review."
+      - type: copy_file
+        source: "schemas/naos/grader_assessment.schema.json"
+        destination: "schemas/naos/grader_assessment.schema.json"
+        copy_mode: file
+        overwrite: skip
+        profiles: [quickstart, lite, standard, assured]
+        explanation: "Install the deterministic prerequisite report contract used by behavioral readiness."
+        post_install_next_actions:
+          - "Regenerate and validate prerequisite reports before behavioral readiness review."
+      - type: copy_file
+        source: "schemas/naos/llm_grader_readiness.schema.json"
+        destination: "schemas/naos/llm_grader_readiness.schema.json"
+        copy_mode: file
+        overwrite: skip
+        profiles: [quickstart, lite, standard, assured]
+        explanation: "Install the deterministic prerequisite report contract used by behavioral readiness."
+        post_install_next_actions:
+          - "Regenerate and validate prerequisite reports before behavioral readiness review."
     post_install_next_actions:
       - "Generate deterministic prerequisites first: conformance, StaticGrader, Grader Assessment, and LLMGrader Readiness."
       - "Keep baseline_state.auto_create false; create or update behavioral baseline metadata only through human-reviewed project workflow."
@@ -4487,7 +4577,7 @@ modules:
     status: optional
     installable: false
     requires_confirmation: false
-    not_addable_reason: "The optional similarity layer is project-configured and disabled by default; Group 21 does not install providers, models, or embedding dependencies."
+    not_addable_reason: "The optional similarity layer is project-configured and disabled by default; this module does not install providers, models, or embedding dependencies."
     install_actions: []
     post_install_next_actions:
       - "Use deterministic function-index health first, then document any future optional similarity design through control-plane review."
@@ -4532,7 +4622,7 @@ modules:
     status: experimental
     installable: false
     requires_confirmation: false
-    not_addable_reason: "Structured substrate support is experimental/readiness-only; Group 21 does not install databases, graph engines, daemons, or services."
+    not_addable_reason: "Structured substrate support is experimental/readiness-only; this module does not install databases, graph engines, daemons, or services."
     install_actions: []
     post_install_next_actions:
       - "Track substrate needs as roadmap or residual-risk items until a focused implementation is approved."

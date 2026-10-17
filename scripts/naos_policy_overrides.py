@@ -20,6 +20,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from naos_self_check_inspection import inspection_active  # noqa: E402
+
 from naos_policy import (  # noqa: E402
     default_naos_root,
     exit_code_for_summary,
@@ -31,6 +33,8 @@ from naos_policy import (  # noqa: E402
     report_output_path,
     resolve_operator_attribution,
     severity_for_profile,
+    safe_path_under,
+    validate_report_write_path,
     validate_operator_value,
     write_report,
 )
@@ -56,6 +60,8 @@ LIMITATIONS = [
     "Team/operator scope is resolved from local static configuration or explicit CLI flags; no identity provider is queried.",
     "Unknown or protected override paths are reported as findings and are not applied.",
     "The v1 hook does not discover or execute Python plugins, shell commands, provider integrations, or cloud services.",
+    "Profile severity and failure-condition minima are taken from the initially selected policy and cannot be weakened by overlays.",
+    "Effective policy is not installed automatically; consumers require explicit reviewed --policy selection.",
     "The merge report is a review aid; durable policy decisions remain human-owned.",
 ]
 
@@ -676,6 +682,67 @@ def apply_allowed_override(effective: dict[str, Any], path: str, value: Any, str
     set_path(effective, path, value)
 
 
+# These ranks and conditions match the severities consumed by NAOS reports.
+CONTROL_SEVERITY_RANK = {"none": 0, "advisory": 1, "warning": 2, "required": 3, "blocking": 4}
+CONTROL_FAILURE_FIELDS = {"fail_on", "strict_fail_on", "transition_fail_on"}
+CONTROL_PREFIXES = ("profiles.severity_by_profile", "profiles.exit_code")
+
+
+def selected_policy_control_reason(
+    initial_policy: dict[str, Any], effective: dict[str, Any], path: str, value: Any,
+) -> str | None:
+    """Validate a proposed mutation against the immutable selected policy minima."""
+    if not any(path == prefix or path.startswith(prefix + ".") or prefix.startswith(path + ".")
+               for prefix in CONTROL_PREFIXES):
+        return None
+    proposed = copy.deepcopy(effective)
+    set_path(proposed, path, value)
+    severities = get_path(proposed, "profiles.severity_by_profile")
+    exits = get_path(proposed, "profiles.exit_code")
+    if not isinstance(severities, dict) or not isinstance(exits, dict):
+        return "profile severity and exit-code controls must remain mappings"
+    for profile, severity in severities.items():
+        if not isinstance(severity, str) or severity not in CONTROL_SEVERITY_RANK:
+            return f"severity for {profile} must be a recognized severity string"
+    baseline_severities = get_path(initial_policy, "profiles.severity_by_profile")
+    if isinstance(baseline_severities, dict):
+        for profile, baseline in baseline_severities.items():
+            if isinstance(baseline, str) and baseline in CONTROL_SEVERITY_RANK:
+                if profile not in severities or CONTROL_SEVERITY_RANK[severities[profile]] < CONTROL_SEVERITY_RANK[baseline]:
+                    return f"severity for {profile} cannot be lower than the selected initial policy"
+    for profile, conditions in exits.items():
+        if not isinstance(conditions, dict):
+            return f"exit-code controls for {profile} must remain a mapping"
+        for field, values in conditions.items():
+            if field not in CONTROL_FAILURE_FIELDS:
+                return f"unrecognized exit-code condition: {profile}.{field}"
+            if not isinstance(values, list) or any(not isinstance(item, str) or item not in CONTROL_SEVERITY_RANK for item in values):
+                return f"{profile}.{field} must be a list of recognized severity strings"
+    baseline_exits = get_path(initial_policy, "profiles.exit_code")
+    if isinstance(baseline_exits, dict):
+        for profile, conditions in baseline_exits.items():
+            if not isinstance(conditions, dict):
+                continue
+            for field in CONTROL_FAILURE_FIELDS:
+                values = conditions.get(field)
+                if not isinstance(values, list):
+                    continue
+                retained = {item for item in values if isinstance(item, str) and item in CONTROL_SEVERITY_RANK}
+                proposed_values = exits.get(profile, {}).get(field, [])
+                if not retained.issubset(set(proposed_values)):
+                    return f"{profile}.{field} cannot remove selected initial policy failure conditions"
+    return None
+
+
+def guarded_effective_policy_path(root: Path, path: Path) -> Path:
+    """Reuse existing policy path guards for a requested YAML output path."""
+    base = Path(path.anchor) if path.is_absolute() else root.resolve()
+    relative = path.relative_to(base) if path.is_absolute() else path
+    target = safe_path_under(base, relative, field="effective_policy_output")
+    validate_report_write_path(target)
+    return target
+
+
 def collect_yaml_files(directory: Path, *, missing_reason: str | None = None) -> tuple[list[Path], list[dict[str, Any]], bool]:
     if not directory.exists():
         return [], ([] if missing_reason is None else [{"path": str(directory), "reason": missing_reason}]), True
@@ -790,7 +857,8 @@ def build_merge_report(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     generated_at = utc_now_text()
     default_policy_path = policy.get("_meta", {}).get("path")
-    effective = copy.deepcopy({key: value for key, value in policy.items() if key != "_meta"})
+    initial_policy = copy.deepcopy({key: value for key, value in policy.items() if key != "_meta"})
+    effective = copy.deepcopy(initial_policy)
     findings: list[dict[str, Any]] = []
     schema_results: list[dict[str, Any]] = []
     conflicts: list[dict[str, Any]] = []
@@ -899,7 +967,9 @@ def build_merge_report(
                     )
                 seen_paths[leaf_path] = str(path)
 
-                reason = protected_reason(leaf_path, value)
+                reason = protected_reason(leaf_path, value) or selected_policy_control_reason(
+                    initial_policy, effective, leaf_path, value,
+                )
                 if reason:
                     rejected_paths.append(leaf_path)
                     record["rejected_paths"].append(leaf_path)
@@ -952,7 +1022,9 @@ def build_merge_report(
             )
         )
 
-    if any(scope.get("missing") for scope in overlay_scope_records if scope.get("scope_type") != "global"):
+    missing_selected_scopes = [scope for scope in overlay_scope_records
+                               if scope.get("scope_type") != "global" and scope.get("missing")]
+    if missing_selected_scopes:
         findings.append(
             finding(
                 "POLICY_OVERRIDE_SCOPE_DIR_MISSING",
@@ -960,6 +1032,14 @@ def build_merge_report(
                 "scope_directory_missing",
                 "A selected team/operator overlay directory was missing; merge continued with available scopes.",
                 actions=["Create the selected team/operator overlay directory or update naos/team_operator_map.yaml."],
+                evidence_classification="confirmed",
+                classification_scope="selected_overlay_directory_absence_observation_only",
+                evidence_refs=[{"type": "local_file", "ref": scope["directory"]}
+                               for scope in missing_selected_scopes],
+                observed_missing_scopes=[{key: scope[key] for key in ("scope_type", "scope_id", "directory", "missing")}
+                                         for scope in missing_selected_scopes],
+                human_review_required=True,
+                not_claimed=["overlay applicability decision", "effective policy approval", "issue resolution"],
             )
         )
 
@@ -989,13 +1069,29 @@ def build_merge_report(
     else:
         status = "no_overrides"
 
-    if write_effective_policy and effective_policy_path is not None and not (schema_invalid or protected_invalid):
-        effective_policy_path.parent.mkdir(parents=True, exist_ok=True)
-        effective_policy_path.write_text(
-            "# Derived NAOS effective policy. Source is default policy plus validated static overlays.\n"
-            + yaml.safe_dump(effective, sort_keys=True),
-            encoding="utf-8",
-        )
+    effective_policy_written = False
+    if write_effective_policy and not (schema_invalid or protected_invalid):
+        try:
+            if effective_policy_path is None:
+                effective_policy_path = report_default_path(root, naos_root, policy, "effective_policy")
+            target = guarded_effective_policy_path(root, effective_policy_path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            # Recheck existing guards after parent creation. This retains the
+            # existing direct YAML-write contract; no recovery is claimed.
+            target = guarded_effective_policy_path(root, effective_policy_path)
+            target.write_text(
+                "# Derived NAOS effective policy. Source is selected policy plus validated static overlays.\n"
+                + yaml.safe_dump(effective, sort_keys=True), encoding="utf-8",
+            )
+            effective_policy_written = True
+        except (OSError, ValueError, RuntimeError) as exc:
+            findings.append(finding(
+                "POLICY_OVERRIDE_EFFECTIVE_WRITE_FAILED", "blocking", "effective_policy_write_failed",
+                f"Requested effective policy was not written: {exc}",
+                path=str(effective_policy_path) if effective_policy_path is not None else None,
+                actions=["Review the requested target and its permissions before retrying."],
+            ))
+            status = "blocked"
 
     counts = finding_counts(findings)
     team_ids = overlay_scope.get("team_ids") or []
@@ -1075,11 +1171,19 @@ def build_merge_report(
                 "id": "POLICY_OVERRIDE_PLUGIN_RUNTIME_DEFERRED",
                 "description": "Python/plugin customization is deferred pending separate security review, explicit enablement, trust model, and sandboxing posture.",
                 "classification": "safe_to_defer",
+                "evidence_classification": "confirmed",
+                "classification_scope": "shipped_policy_override_runtime_limit",
+                "source_path": str(Path(__file__).resolve()),
+                "human_review_required": True,
             },
             {
                 "id": "MULTI_TEAM_GATEKEEPER_CONFIG_DEFERRED",
                 "description": "Team/operator scoped overlays do not configure gatekeeper severity per team; multi-team gatekeeper config is deferred to a later control.",
                 "classification": "safe_to_defer",
+                "evidence_classification": "confirmed",
+                "classification_scope": "shipped_policy_override_scope_limit",
+                "source_path": str(Path(__file__).resolve()),
+                "human_review_required": True,
             }
         ],
         "residual_risks": [
@@ -1087,16 +1191,28 @@ def build_merge_report(
                 "id": "POLICY_OVERRIDE_MISCONFIGURATION_RISK",
                 "description": "Allowed overlays can still create noisy or overly lenient local thresholds if reviewers do not inspect the merge report.",
                 "mitigation": "Review policy_override_merge.json before relying on generated effective policy.",
+                "evidence_classification": "hypothesized",
+                "classification_scope": "possible_policy_override_risk",
+                "source_path": str(Path(__file__).resolve()),
+                "hypothesis_reason": "Allowlisted overrides can alter local thresholds; this report does not establish a specific misuse.",
+                "next_review_step": "Review each applied overlay and effective policy before relying on its thresholds.",
+                "human_review_required": True,
             },
             {
                 "id": "TEAM_OPERATOR_MAPPING_STALENESS_RISK",
                 "description": "Local team/operator mappings can drift from real organizational assignments.",
                 "mitigation": "Treat mapping as configuration metadata and require human review for durable governance decisions.",
+                "evidence_classification": "hypothesized",
+                "classification_scope": "possible_mapping_staleness_risk",
+                "source_path": str(Path(__file__).resolve()),
+                "hypothesis_reason": "A static local mapping can become stale; no actual organizational mismatch is asserted.",
+                "next_review_step": "Compare local mapping with the responsible human team's current assignments.",
+                "human_review_required": True,
             }
         ],
         "limitations": LIMITATIONS,
         "not_claimed": NOT_CLAIMED,
-        "human_review_required": bool(protected_invariant_violations or (profile in {"standard", "assured"} and status_driving_findings)),
+        "human_review_required": bool(status == "blocked" or protected_invariant_violations or (profile in {"standard", "assured"} and status_driving_findings)),
         "summary": {
             **counts,
             "status": status,
@@ -1109,7 +1225,7 @@ def build_merge_report(
             "operator_overlay_id": overlay_scope.get("operator_overlay_id"),
             "team_operator_map_valid": bool(team_operator_map.get("valid")),
             "schema_valid": not schema_invalid,
-            "effective_policy_written": bool(write_effective_policy and effective_policy_path is not None and effective_policy_path.exists()),
+            "effective_policy_written": effective_policy_written,
         },
     }
     return report, effective
@@ -1143,9 +1259,10 @@ def main(argv: list[str] | None = None) -> int:
     override_dir = Path(args.override_dir) if args.override_dir else root / naos_root / "policy_overrides.d"
     map_path = team_operator_map_path(root, naos_root, policy, args.team_operator_map)
 
-    effective_policy_default = report_default_path(root, naos_root, policy, "effective_policy")
-    effective_policy_path = Path(args.effective_policy_output) if args.effective_policy_output else effective_policy_default
+    if inspection_active(root, naos_root) and not args.dry_run:
+        raise ValueError("Inspection requires policy-overrides --dry-run")
     write_effective = bool(args.write_effective_policy and not args.dry_run)
+    effective_policy_path = Path(args.effective_policy_output) if write_effective and args.effective_policy_output else None
 
     report, _effective = build_merge_report(
         root=root,
@@ -1164,27 +1281,27 @@ def main(argv: list[str] | None = None) -> int:
     output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "policy_override_merge_report")
     if output is not None:
         write_report(output, report)
-        audit_result = write_audit_event(
-            root=root,
-            naos_root=naos_root,
-            policy=policy,
-            profile=profile,
-            event_type="policy_override_merged",
-            source_report_path=output,
-            source_report=report,
-            related_artifacts=[
-                str(path)
-                for path in [output, effective_policy_path if write_effective else None]
-                if path is not None
-            ],
-        )
-        report["audit_log_event"] = {
-            "status": audit_result.get("status"),
-            "event_file": audit_result.get("event_file"),
-            "findings": audit_result.get("findings") or [],
-        }
-        write_report(output, report)
-
+        if not inspection_active(root, naos_root):
+            audit_result = write_audit_event(
+                root=root,
+                naos_root=naos_root,
+                policy=policy,
+                profile=profile,
+                event_type="policy_override_merged",
+                source_report_path=output,
+                source_report=report,
+                related_artifacts=[
+                    str(path)
+                    for path in [output, report["effective_policy_path"] if report["summary"]["effective_policy_written"] else None]
+                    if path is not None
+                ],
+            )
+            report["audit_log_event"] = {
+                "status": audit_result.get("status"),
+                "event_file": audit_result.get("event_file"),
+                "findings": audit_result.get("findings") or [],
+            }
+            write_report(output, report)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
@@ -1200,6 +1317,8 @@ def main(argv: list[str] | None = None) -> int:
             for item in report["findings"]:
                 print(f"  - [{item['severity']}] {item['id']}: {item['message']}")
 
+    if report["status"] == "blocked":
+        return 1
     if is_kit_repository(root, naos_root):
         return 0
     return exit_code_for_summary(profile, report["summary"], policy, strict=args.strict)

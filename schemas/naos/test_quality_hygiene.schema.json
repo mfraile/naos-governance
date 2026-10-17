@@ -16,8 +16,37 @@
     "rules_path": {"type": ["string", "null"]},
     "deterministic": {"type": "boolean"},
     "cost_posture": {"$ref": "#/$defs/cost_posture"},
-    "summary": {"type": "object", "additionalProperties": true},
-    "scans": {"type": "object", "additionalProperties": true},
+    "summary": {"type": "object", "additionalProperties": true, "properties": {
+      "early_returns": {"type": "integer", "minimum": 0},
+      "tests_with_effective_assertion": {"type": "integer", "minimum": 0},
+      "tests_without_effective_assertion": {"type": "integer", "minimum": 0},
+      "non_python_disable_markers": {"type": "integer", "minimum": 0},
+      "discovery_errors": {"type": "integer", "minimum": 0},
+      "skipped_tests": {"type": "integer", "minimum": 0},
+      "dead_assertions": {"type": "integer", "minimum": 0},
+      "swallowed_assertions": {"type": "integer", "minimum": 0},
+      "unassessed_test_files": {"type": "integer", "minimum": 0},
+      "trivial_assertions": {"type": "integer", "minimum": 0},
+      "files_selected": {"type": "integer", "minimum": 0},
+      "files_scanned": {"type": "integer", "minimum": 0},
+      "files_failed": {"type": "integer", "minimum": 0},
+      "parse_errors": {"type": "integer", "minimum": 0},
+      "read_errors": {"type": "integer", "minimum": 0},
+      "coverage_status": {"enum": ["complete", "incomplete", "not_configured"]}
+    }},
+    "scans": {"type": "object", "additionalProperties": true, "properties": {
+      "non_python_assertion_coverage": {"const": "unassessed"},
+      "non_python_marker_inputs": {"type": "array", "items": {
+        "type": "object", "required": ["path", "status"], "additionalProperties": false,
+        "properties": {"path": {"type": "string"}, "status": {"enum": ["marker_scanned", "size_limit", "read_error"]}}
+      }},
+      "unassessed_test_files": {"type": "array", "items": {"type": "string"}},
+      "coverage_status": {"enum": ["complete", "incomplete", "not_configured"]},
+      "input_files": {"type": "array", "items": {
+        "type": "object", "required": ["path", "status"], "additionalProperties": false,
+        "properties": {"path": {"type": "string"}, "status": {"enum": ["parsed", "parse_error", "read_error"]}}
+      }}
+    }},
     "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
     "waivers": {"type": "array", "items": {"type": "object"}},
     "known_gaps": {"type": "array", "items": {"type": "string"}},

@@ -4,24 +4,178 @@
   "title": "NAOS Existing Resource Inventory Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schema", "generated_at", "profile", "status", "command", "mode", "naos_root", "project_root", "human_review_required", "not_claimed", "limitations", "findings", "summary"],
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "command",
+    "mode",
+    "naos_root",
+    "project_root",
+    "human_review_required",
+    "not_claimed",
+    "limitations",
+    "findings",
+    "summary"
+  ],
   "properties": {
-    "schema": {"const": "naos.existing_resource_inventory.v1"},
-    "generated_at": {"type": "string"},
-    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
-    "command": {"const": "existing-resource-inventory"},
-    "mode": {"type": "string"},
-    "naos_root": {"type": "string"},
-    "project_root": {"type": "string"},
-    "session_id": {"type": ["string", "null"]},
-    "generated_by": {"type": "object"},
-    "human_review_required": {"type": "boolean"},
-    "not_claimed": {"type": "array", "items": {"type": "string"}},
-    "limitations": {"type": "array", "items": {"type": "string"}},
-    "findings": {"type": "array", "items": {"type": "object"}},
-    "known_gaps": {"type": "array"},
-    "residual_risks": {"type": "array"},
-    "summary": {"type": "object"}
+    "schema": {
+      "const": "naos.existing_resource_inventory.v1"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "profile": {
+      "enum": [
+        "quickstart",
+        "lite",
+        "standard",
+        "assured"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "advisory",
+        "review_required",
+        "warning",
+        "invalid_config",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "command": {
+      "const": "existing-resource-inventory"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "naos_root": {
+      "type": "string"
+    },
+    "project_root": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "generated_by": {
+      "type": "object"
+    },
+    "human_review_required": {
+      "type": "boolean"
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "known_gaps": {
+      "type": "array"
+    },
+    "residual_risks": {
+      "type": "array"
+    },
+    "summary": {
+      "type": "object"
+    },
+    "scan_scope": {
+      "type": "object",
+      "required": [
+        "root",
+        "naos_root",
+        "rules_source",
+        "rules_path",
+        "scan_categories",
+        "ignored_parts",
+        "max_files",
+        "file_count",
+        "complete",
+        "truncated",
+        "invalid_config",
+        "issues"
+      ],
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "naos_root": {
+          "type": "string"
+        },
+        "rules_source": {
+          "enum": [
+            "defaults",
+            "project"
+          ]
+        },
+        "rules_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scan_categories": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "docs",
+              "specs",
+              "tests",
+              "source",
+              "workflows",
+              "naos_artifacts"
+            ]
+          }
+        },
+        "ignored_parts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "max_files": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "invalid_config": {
+          "type": "boolean"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    }
   }
 }

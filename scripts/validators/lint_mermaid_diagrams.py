@@ -21,7 +21,7 @@ This is a source-hygiene linter, not a Mermaid grammar parser or renderer; a
 passing result does not prove syntax validity or rendered fidelity.
 
 USAGE:
-    python scripts/validators/lint_mermaid_diagrams.py [<root_dir_or_file>]
+    python scripts/validators/lint_mermaid_diagrams.py [<root_dir_or_file>] [--config-root <project_root>]
 
 EXIT CODES:
     0 — No violations
@@ -30,10 +30,13 @@ EXIT CODES:
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sys
 from pathlib import Path
+
+import yaml
 
 EMOJI_PATTERN = re.compile(r"[\U0001F300-\U0001F6FF\U0001F900-\U0001FAFF]")
 BR_PATTERN = re.compile(r"<br/?>", re.IGNORECASE)
@@ -55,29 +58,50 @@ EXCLUDED_DIRECTORY_NAMES = {
 }
 
 
-def _load_json(path: Path) -> dict:
+def _load_config(path: Path, *, yaml_config: bool = False) -> dict:
     if not path.exists():
         return {}
-    text = path.read_text(encoding="utf-8")
     try:
-        return json.loads(text)
-    except json.JSONDecodeError as exc:  # pragma: no cover
+        text = path.read_text(encoding="utf-8-sig")
+        data = yaml.safe_load(text) if yaml_config else json.loads(text)
+        if not isinstance(data, dict):
+            raise ValueError("configuration must be a mapping")
+        return data
+    except (OSError, UnicodeError, json.JSONDecodeError, yaml.YAMLError, ValueError) as exc:
         raise SystemExit(f"Invalid governance config {path}: {exc}") from exc
 
 
-GOV_CFG = _load_json(GOVERNANCE_CFG)
-Q_CFG = _load_json(QUALITY_CFG)
-ALLOWED_TYPES = set(Q_CFG.get("allowedDiagramTypes", []))
-ALLOWED_DIRECTIONS = set(GOV_CFG.get("layout", {}).get("allowedDirections", []))
-MAX_LABEL = int(Q_CFG.get("maxLabelLength", 80))
-MAX_EDGE_LABEL = int(Q_CFG.get("maxEdgeLabelLength", MAX_LABEL))
-MAX_NODES = int(Q_CFG.get("maxNodes", 999))
-MAX_EDGES = int(Q_CFG.get("maxEdges", 999))
-MAX_LINES = int(Q_CFG.get("maxDiagramLines", 999))
-REQUIRE_TITLE = Q_CFG.get("requireTitleComment", False)
-REQUIRE_LEGEND = Q_CFG.get("requireLegend", False)
-DISALLOW_HTML = GOV_CFG.get("layout", {}).get("disallowHTML", True)
-DISALLOW_EMOJI = GOV_CFG.get("layout", {}).get("disallowEmojis", True)
+def load_rules(root: Path) -> dict:
+    """Load optional project-local rules; never consult an unrelated CWD."""
+    try:
+        GOV_CFG = _load_config(root / GOVERNANCE_CFG, yaml_config=True)
+        Q_CFG = _load_config(root / QUALITY_CFG)
+        ALLOWED_TYPES = set(Q_CFG.get("allowedDiagramTypes", []))
+        ALLOWED_DIRECTIONS = set(GOV_CFG.get("layout", {}).get("allowedDirections", []))
+        MAX_LABEL = int(Q_CFG.get("maxLabelLength", 80))
+        MAX_EDGE_LABEL = int(Q_CFG.get("maxEdgeLabelLength", MAX_LABEL))
+        MAX_NODES = int(Q_CFG.get("maxNodes", 999))
+        MAX_EDGES = int(Q_CFG.get("maxEdges", 999))
+        MAX_LINES = int(Q_CFG.get("maxDiagramLines", 999))
+        REQUIRE_TITLE = Q_CFG.get("requireTitleComment", False)
+        REQUIRE_LEGEND = Q_CFG.get("requireLegend", False)
+        DISALLOW_HTML = GOV_CFG.get("layout", {}).get("disallowHTML", True)
+        DISALLOW_EMOJI = GOV_CFG.get("layout", {}).get("disallowEmojis", True)
+        return {
+            "ALLOWED_TYPES": ALLOWED_TYPES,
+            "ALLOWED_DIRECTIONS": ALLOWED_DIRECTIONS,
+            "MAX_LABEL": MAX_LABEL,
+            "MAX_EDGE_LABEL": MAX_EDGE_LABEL,
+            "MAX_NODES": MAX_NODES,
+            "MAX_EDGES": MAX_EDGES,
+            "MAX_LINES": MAX_LINES,
+            "REQUIRE_TITLE": REQUIRE_TITLE,
+            "REQUIRE_LEGEND": REQUIRE_LEGEND,
+            "DISALLOW_HTML": DISALLOW_HTML,
+            "DISALLOW_EMOJI": DISALLOW_EMOJI,
+        }
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise SystemExit(f"Invalid Mermaid rule shape under {root}: {exc}") from exc
 
 
 def extract_mermaid_blocks(text: str) -> list[tuple[int, int, str]]:
@@ -99,6 +123,8 @@ def extract_mermaid_blocks(text: str) -> list[tuple[int, int, str]]:
                 in_block = False
             else:
                 buf.append(line)
+    if in_block:
+        blocks.append((start, len(lines), "\n".join(buf)))
     return blocks
 
 
@@ -120,10 +146,13 @@ def _candidate_files(root: Path) -> list[Path]:
     )
 
 
-def lint_file(path: Path) -> list[str]:
+def lint_file(path: Path, rules: dict | None = None) -> list[str]:
+    rules = load_rules(path.parent) if rules is None else rules
     text = path.read_text(encoding="utf-8", errors="replace")
     violations: list[str] = []
     for start, end, block in _blocks_for_path(path, text):
+        if path.suffix.lower() != ".mmd" and end == len(text.splitlines()):
+            violations.append(f"{path}: line {start + 1}: unterminated Mermaid fence")
         block_lines = block.splitlines()
         header_lines = [ln.strip() for ln in block_lines if ln.strip().startswith("%%")]
         body_lines = [
@@ -131,14 +160,14 @@ def lint_file(path: Path) -> list[str]:
         ]
         first_body = body_lines[0].strip() if body_lines else ""
 
-        if DISALLOW_EMOJI:
+        if rules['DISALLOW_EMOJI']:
             emojis = EMOJI_PATTERN.findall(block)
             if emojis:
                 violations.append(
                     f"{path}: lines {start + 1}-{end + 1}: emoji characters: {''.join(sorted(set(emojis)))}"
                 )
         if (
-            DISALLOW_HTML
+            rules['DISALLOW_HTML']
             and path.suffix.lower() != ".mmd"
             and BR_PATTERN.search(block)
         ):
@@ -147,16 +176,16 @@ def lint_file(path: Path) -> list[str]:
             )
 
         diagram_type = first_body.split()[0] if first_body else ""
-        if ALLOWED_TYPES and diagram_type and diagram_type not in ALLOWED_TYPES:
+        if rules['ALLOWED_TYPES'] and diagram_type and diagram_type not in rules['ALLOWED_TYPES']:
             violations.append(
-                f"{path}: lines {start + 1}-{end + 1}: diagram type '{diagram_type}' not in {sorted(ALLOWED_TYPES)}"
+                f"{path}: lines {start + 1}-{end + 1}: diagram type '{diagram_type}' not in {sorted(rules['ALLOWED_TYPES'])}"
             )
 
         if diagram_type in {"flowchart", "graph"} and len(first_body.split()) >= 2:
             direction = first_body.split()[1]
-            if ALLOWED_DIRECTIONS and direction not in ALLOWED_DIRECTIONS:
+            if rules['ALLOWED_DIRECTIONS'] and direction not in rules['ALLOWED_DIRECTIONS']:
                 violations.append(
-                    f"{path}: line {start + 1}: direction '{direction}' must be one of {sorted(ALLOWED_DIRECTIONS)}"
+                    f"{path}: line {start + 1}: direction '{direction}' must be one of {sorted(rules['ALLOWED_DIRECTIONS'])}"
                 )
 
         if diagram_type == "sequenceDiagram":
@@ -176,34 +205,34 @@ def lint_file(path: Path) -> list[str]:
                     "use #59; for prose punctuation"
                 )
 
-        if REQUIRE_TITLE and not any(
+        if rules['REQUIRE_TITLE'] and not any(
             ln.startswith("%% Implements") for ln in header_lines
         ):
             violations.append(
                 f"{path}: lines {start + 1}-{end + 1}: missing '%% Implements' comment"
             )
-        if REQUIRE_TITLE and not any("%% Theme" in ln for ln in header_lines):
+        if rules['REQUIRE_TITLE'] and not any("%% Theme" in ln for ln in header_lines):
             violations.append(
                 f"{path}: lines {start + 1}-{end + 1}: missing '%% Theme' comment"
             )
-        if REQUIRE_LEGEND and "Legend" not in block:
+        if rules['REQUIRE_LEGEND'] and "Legend" not in block:
             violations.append(
                 f"{path}: lines {start + 1}-{end + 1}: add a Legend note per governance rules"
             )
 
         node_count = len(NODE_PATTERN.findall(block))
         edge_count = len(EDGE_PATTERN.findall(block))
-        if node_count > MAX_NODES:
+        if node_count > rules['MAX_NODES']:
             violations.append(
-                f"{path}: lines {start + 1}-{end + 1}: {node_count} nodes (max {MAX_NODES})"
+                f"{path}: lines {start + 1}-{end + 1}: {node_count} nodes (max {rules['MAX_NODES']})"
             )
-        if edge_count > MAX_EDGES:
+        if edge_count > rules['MAX_EDGES']:
             violations.append(
-                f"{path}: lines {start + 1}-{end + 1}: {edge_count} edges (max {MAX_EDGES})"
+                f"{path}: lines {start + 1}-{end + 1}: {edge_count} edges (max {rules['MAX_EDGES']})"
             )
-        if len(block_lines) > MAX_LINES:
+        if len(block_lines) > rules['MAX_LINES']:
             violations.append(
-                f"{path}: lines {start + 1}-{end + 1}: {len(block_lines)} lines (max {MAX_LINES})"
+                f"{path}: lines {start + 1}-{end + 1}: {len(block_lines)} lines (max {rules['MAX_LINES']})"
             )
 
         for match in NODE_LABEL_PATTERN.findall(block):
@@ -216,24 +245,30 @@ def lint_file(path: Path) -> list[str]:
             longest_segment = max(
                 (len(segment.strip()) for segment in label_segments), default=0
             )
-            if longest_segment > MAX_LABEL:
+            if longest_segment > rules['MAX_LABEL']:
                 violations.append(
                     f"{path}: lines {start + 1}-{end + 1}: label segment "
-                    f"'{label}' exceeds {MAX_LABEL} chars"
+                    f"'{label}' exceeds {rules['MAX_LABEL']} chars"
                 )
 
     return violations
 
 
 def main(argv: list[str]) -> int:
-    root = Path(argv[1]) if len(argv) > 1 else Path(".")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("target", nargs="?", default=".")
+    parser.add_argument("--config-root", help="Project root containing optional .ai/rules; defaults to target directory or file parent")
+    args = parser.parse_args(argv[1:])
+    root = Path(args.target).resolve()
     if not root.exists():
         print(f"Mermaid diagram lint input does not exist: {root}")
         return 1
+    config_root = Path(args.config_root).resolve() if args.config_root else (root.parent if root.is_file() else root)
+    rules = load_rules(config_root)
     source_files = _candidate_files(root)
     all_violations: list[str] = []
     for source_file in source_files:
-        all_violations.extend(lint_file(source_file))
+        all_violations.extend(lint_file(source_file, rules))
     if all_violations:
         print("Mermaid diagram lint violations:")
         for v in all_violations:

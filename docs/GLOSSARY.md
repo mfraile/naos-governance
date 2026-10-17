@@ -295,7 +295,7 @@ evaluation and minimal guardrails; actual setup effort is repository-specific.
 
 ## Readiness gate
 
-The check that a project has the prerequisites for advanced kit features. Implemented in `scripts/naos_readiness.py`. Verifies specs/01–04 ≥250 chars, ADAPT markers resolved, AI policy valid, task registry anchors populated. The gate is the precondition for future behavioural baseline runs.
+The check that a project has the prerequisites for advanced kit features. Implemented in `scripts/naos_readiness.py`. Verifies specs/01–04 ≥250 chars, ADAPT markers resolved, AI policy valid, task registry anchors populated. All current readiness targets (`phase2`, `baseline`, `drift`) require a nonempty FR identifier set in specs/03 and every declared task requirement to match that set; missing, TBD, TODO and NONE anchors block readiness. `--allow-adapt` only relaxes spec markers, not requirement anchors. An empty task list remains allowed when FR identifiers exist; this check does not establish task breakdown completeness. The gate is the precondition for future behavioural baseline runs.
 
 ## ROM / RAM (Rule 19 memory model)
 
@@ -342,7 +342,7 @@ the kit installs no host-level automatic loader.
 
 ## Truth Table
 
-`naos/governance/GOVERNANCE_TRUTH_TABLE.md`. Canonical metrics file. Other governance documents (DASHBOARD, PROJECT_STATUS, README) must match the values here. Drift between any of them and the truth table is detected by `scripts/naos_validate_truth.py`. Manipulating the truth table itself is a known evidence-integrity risk.
+`naos/governance/GOVERNANCE_TRUTH_TABLE.md`. Project-maintained metrics snapshot. `scripts/naos_validate_truth.py` checks only its Tasks Total, Tasks Complete, Tasks %, and Phases rows against the parsed task registry and canonical delivery semantics. Requirement, specification, test, review-date, and cross-document consistency are not checked by that command. Changing the table to match an incorrect registry or leaving an unreviewed date placeholder is an evidence-integrity risk.
 
 ## Vendor cascade
 

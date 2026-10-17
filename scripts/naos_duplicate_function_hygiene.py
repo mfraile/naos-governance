@@ -14,7 +14,7 @@ from naos_hygiene_common import check_duplicate_function_hygiene, run_report_com
 
 
 FALLBACK_RULES = {
-    "scan_roots": ["src", "app", "tests"],
+    "scan_roots": "inferred",
     "exclude_dirs": ["dev", "dist", "build", "__pycache__"],
     "exclude_globs": [],
     "min_normalized_dump_length": 240,

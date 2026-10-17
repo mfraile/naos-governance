@@ -140,6 +140,10 @@
           ]
         },
         "human_review_required": {"type": "boolean"},
+        "external_review_consumption": {"$ref": "#/$defs/external_review_consumption"},
+        "external_imported_human_review_required": {"type": "boolean"},
+        "external_result_classification": {"enum": ["unknown", null]},
+        "external_result_verification_status": {"enum": ["unverified", null]},
         "known_gap_ref": {"type": ["string", "null"]},
         "residual_risk_ref": {"type": ["string", "null"]},
         "waiver_ref": {"type": ["string", "null"]},
@@ -196,6 +200,10 @@
         "source_reports": {
           "type": "array",
           "items": {"type": "object", "additionalProperties": true}
+        },
+        "optional_report_load_errors": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
         },
         "optional_report_refs": {
           "type": "array",
@@ -658,6 +666,81 @@
         "required_next_actions": {
           "type": "array",
           "items": {"type": "string"}
+        }
+      }
+    },
+    "external_review_consumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "claim_scope",
+        "routing_review_consumed",
+        "reason_codes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_declared",
+            "consumed",
+            "rejected"
+          ]
+        },
+        "claim_scope": {
+          "const": "routing_review_only"
+        },
+        "routing_review_consumed": {
+          "type": "boolean"
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "review": {
+          "$ref": "#/$defs/external_result_review"
+        }
+      }
+    },
+    "external_result_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_result_id",
+        "source_sha256",
+        "report_content_sha256",
+        "reviewed_at",
+        "supporting_ref",
+        "supporting_sha256"
+      ],
+      "properties": {
+        "external_result_id": {
+          "type": "string",
+          "pattern": "^sarif-[0-9a-f]{64}$"
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "report_content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "supporting_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supporting_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     }

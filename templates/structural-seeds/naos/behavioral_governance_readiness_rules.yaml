@@ -38,18 +38,9 @@ baseline_state:
 path_fingerprinting:
   max_files_per_path: 200
 
-impacter_paths:
-  - naos/behavioral_governance_readiness_rules.yaml
-  - naos/llm_grader_readiness_rules.yaml
-  - naos/ai_surface_context_budget_rules.yaml
-  - naos/agent_trace_events.yaml
-  - configs/naos_autoresearch.yaml
-  - .github/configs/naos_autoresearch.yaml
-  - .github/autoresearch/task_battery
-  - .github/workflows
-  - .claude/settings.json
-  - AGENTS.md
-  - CLAUDE.md
+# Empty selects shared host-surface defaults plus effective inventory-rule paths.
+# A nonempty list is an explicit adopter replacement, preserved on every OS.
+impacter_paths: []
 
 status_policy:
   missing_required_report: not_ready

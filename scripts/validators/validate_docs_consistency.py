@@ -9,14 +9,17 @@ generated-project DOCS_INDEX, and NAOS_QUICK_REFERENCE.
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import re
 import sys
 from tempfile import TemporaryDirectory
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import unquote
 
 TRUSTED_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from validator_context import validation_scope
 
 
 ROOT_PUBLIC_DOCS = [
@@ -84,10 +87,12 @@ def markdown_links(path: Path) -> list[str]:
     return [target.strip() for target in LINK_RE.findall(text(path))]
 
 
-def local_link_files(root: Path) -> list[Path]:
+def local_link_files(root: Path, scope: str = "kit") -> list[Path]:
     files = [root / p for p in [*ROOT_PUBLIC_DOCS, *DOCS_PUBLIC_DOCS]]
     files.extend(sorted((root / "docs" / "decisions").glob("*.md")))
     files.extend(sorted((root / "docs" / "tutorials").glob("*.md")))
+    if scope == "project":
+        return sorted(set(files + [root / "QUICK_START.md", root / "docs/DOCS_INDEX.md"]))
     files.extend(
         [
             root / "templates" / "structural-seeds" / "docs" / "DOCS_INDEX.md",
@@ -116,13 +121,22 @@ def check_exists(root: Path) -> list[str]:
     return issues
 
 
-def check_local_links(root: Path) -> list[str]:
+def check_local_links(root: Path, scope: str = "kit") -> list[str]:
     issues: list[str] = []
-    for path in local_link_files(root):
+    for path in local_link_files(root, scope):
         if not path.exists():
             continue
         for target in markdown_links(path):
             if not target or target.startswith(("#", "http://", "https://", "mailto:")):
+                continue
+            if target.startswith("kit://"):
+                upstream = unquote(target.removeprefix("kit://").split("#", 1)[0])
+                parsed = PurePosixPath(upstream)
+                if (not upstream or upstream == "." or parsed.is_absolute() or ".." in parsed.parts
+                        or parsed.as_posix() != upstream or re.fullmatch(r"[A-Za-z0-9_./-]+", upstream) is None):
+                    issues.append(f"{rel(path, root)}: invalid upstream kit reference -> {target}")
+                # Explicit upstream URI is not a local file/existence assertion;
+                # no filesystem access or kit source availability is inferred.
                 continue
             target_path = target.split("#", 1)[0]
             if not target_path:
@@ -159,10 +173,10 @@ def check_public_index(root: Path) -> list[str]:
     issues: list[str] = []
     for item in ROOT_PUBLIC_DOCS:
         if item == "README.md":
-            token = "../README.md"
+            reference = "../README.md"
         else:
-            token = f"../{item}"
-        if token not in content:
+            reference = f"../{item}"
+        if reference not in content:
             issues.append(f"docs/INDEX.md does not list public root doc: {item}")
     for item in DOCS_PUBLIC_DOCS:
         if item == "docs/INDEX.md":
@@ -345,17 +359,29 @@ def check_quickstart_tier_table(root: Path) -> list[str]:
     return issues
 
 
-def main() -> int:
-    root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd().resolve()
-    issues: list[str] = []
-    issues.extend(check_exists(root))
-    issues.extend(check_local_links(root))
-    issues.extend(check_public_boundary(root))
-    issues.extend(check_public_index(root))
-    issues.extend(check_catalog_inventory(root))
-    issues.extend(check_generated_docs_index(root))
-    issues.extend(check_naos_quick_reference_control_plane(root))
-    issues.extend(check_quickstart_tier_table(root))
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", nargs="?", default=".")
+    parser.add_argument("--scope", choices=("auto", "kit", "project"), default="auto")
+    args = parser.parse_args(argv)
+    root = Path(args.root).resolve()
+    try:
+        scope = validation_scope(root, args.scope)
+    except ValueError as exc:
+        print(f"Docs Consistency: unsupported context: {exc}")
+        return 2
+    print(f"Docs Consistency scope: {scope} ({root})")
+    issues: list[str] = check_local_links(root, scope)
+    if scope == "kit":
+        issues.extend(check_exists(root))
+        issues.extend(check_public_boundary(root))
+        issues.extend(check_public_index(root))
+        issues.extend(check_catalog_inventory(root))
+        issues.extend(check_generated_docs_index(root))
+        issues.extend(check_naos_quick_reference_control_plane(root))
+        issues.extend(check_quickstart_tier_table(root))
+    else:
+        print("  - canonical kit inventories/templates: NOT_APPLICABLE (project scope)")
 
     if issues:
         print("Docs Consistency: FAIL")

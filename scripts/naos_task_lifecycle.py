@@ -177,6 +177,20 @@ def safe_digest_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def completed_card_digest(payload: bytes, canonicalization: str = "raw-bytes-v1") -> str:
+    """Hash exactly the representation declared by a completion record.
+
+    Unmarked historical records retain raw-byte custody. Only explicitly
+    versioned new records equate CRLF with LF; lone CR, whitespace, encoding,
+    BOMs and every other byte remain significant. Never try alternate digests.
+    """
+    if canonicalization == "crlf-to-lf-v1":
+        payload = payload.replace(b"\r\n", b"\n")
+    elif canonicalization != "raw-bytes-v1":
+        raise ValueError("Task identity archived card digest canonicalization is unsupported.")
+    return safe_digest_bytes(payload)
+
+
 def safe_digest(path: Path) -> str | None:
     if not path.is_file():
         return None
@@ -570,8 +584,13 @@ def find_completed_task_card(
             if digest is not None:
                 if not isinstance(digest, dict) or digest.get("algorithm") != "sha256" or not re.fullmatch(r"[0-9a-f]{64}", str(digest.get("value") or "")):
                     raise ValueError(f"Task identity archived card digest is malformed for {task_id}.")
-                if safe_digest_bytes(declared.read_bytes()) != digest["value"]:
-                    raise ValueError(f"Task identity archived card digest mismatch for {task_id}.")
+                canonicalization = digest.get("canonicalization", "raw-bytes-v1")
+                if completed_card_digest(declared.read_bytes(), canonicalization) != digest["value"]:
+                    recovery = (
+                        " Restore the original archived bytes; historical raw digests are not reinterpreted."
+                        if canonicalization == "raw-bytes-v1" else ""
+                    )
+                    raise ValueError(f"Task identity archived card digest mismatch for {task_id}.{recovery}")
             if matches and declared.resolve() != matches[0].resolve():
                 raise ValueError(f"Task identity ambiguous: history and completed card disagree for {task_id}.")
             return declared
@@ -1034,8 +1053,97 @@ def validate_completion_verification(
 def _write_yaml_temp(path: Path, data: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_name(f".{path.name}.naos-tmp")
-    temp.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    temp.write_bytes(yaml.safe_dump(data, sort_keys=False, allow_unicode=True).encode("utf-8"))
     return temp
+
+
+def _completion_registry_bytes(original: bytes, expected: dict[str, Any], task_id: str) -> bytes:
+    """Edit only completion scalars, preserving unrelated YAML text and comments.
+
+    PyYAML marks address decoded characters, not UTF-8 byte offsets. Parse the
+    candidate again and require exact semantic agreement before any file write.
+    Ambiguous mappings/aliases that cannot be edited safely fail without mutation.
+    Existing line endings are retained; newly inserted lines use the same style.
+    """
+    text = original.decode("utf-8")
+    document = yaml.compose(text, Loader=yaml.SafeLoader)
+    patches: list[tuple[int, int, str]] = []
+    newline = "\r\n" if "\r\n" in text else "\n"
+
+    def mapping(node):
+        if not isinstance(node, yaml.MappingNode):
+            raise ValueError("Registry text preservation requires an unambiguous YAML mapping.")
+        result = {}
+        for key, value in node.value:
+            if not isinstance(key, yaml.ScalarNode) or key.value in result:
+                raise ValueError("Registry text preservation refuses duplicate or complex mapping keys.")
+            result[key.value] = (key, value)
+        return result
+
+    def scalar(value, style=None):
+        return yaml.safe_dump(value, allow_unicode=True, default_flow_style=True,
+                              default_style=style if style in {"'", '"'} else None).removesuffix("...\n").rstrip("\n")
+
+    def update(node, updates):
+        fields = mapping(node)
+        missing = []
+        for key, value in updates.items():
+            if key not in fields:
+                missing.append((key, value))
+                continue
+            old = fields[key][1]
+            if not isinstance(old, yaml.ScalarNode):
+                raise ValueError(f"Registry completion field {key} must be scalar for a safe text edit.")
+            replacement = scalar(value, old.style)
+            segment = text[old.start_mark.index:old.end_mark.index]
+            if segment.endswith("\n"):
+                replacement += newline
+            patches.append((old.start_mark.index, old.end_mark.index, replacement))
+        if not missing:
+            return
+        if node.flow_style:
+            position = text.index("{", node.start_mark.index) + 1
+            addition = ", ".join(f"{key}: {scalar(value)}" for key, value in missing)
+            if fields:
+                addition += ", "
+        else:
+            # A task's id is a scalar on its first line; insert after its whole
+            # line (including an inline comment), using the mapping key indent.
+            anchor = fields.get("id")
+            if anchor and isinstance(anchor[1], yaml.ScalarNode):
+                end = text.find("\n", anchor[1].end_mark.index)
+                position = len(text) if end < 0 else end + 1
+                prefix = newline if end < 0 else ""
+            else:
+                first_key = node.value[0][0]
+                position = first_key.start_mark.index - first_key.start_mark.column
+                prefix = ""
+            indent = " " * node.value[0][0].start_mark.column
+            addition = prefix + "".join(f"{indent}{key}: {scalar(value)}{newline}" for key, value in missing)
+        patches.append((position, position, addition))
+
+    top = mapping(document)
+    tasks = top.get("tasks", (None, None))[1]
+    if not isinstance(tasks, yaml.SequenceNode):
+        raise ValueError("Registry text preservation requires a tasks sequence.")
+    selected = []
+    for node in tasks.value:
+        fields = mapping(node)
+        identity = fields.get("id", (None, None))[1]
+        if isinstance(identity, yaml.ScalarNode) and normalize_task_id(identity.value) == task_id:
+            selected.append(node)
+    if len(selected) != 1:
+        raise ValueError("Registry text preservation requires one exact task entry.")
+    entry = registry_task(expected, task_id)
+    update(document, {"schema": expected["schema"], "lifecycle_contract_version": expected["lifecycle_contract_version"]})
+    update(selected[0], {key: entry[key] for key in (
+        "status", "lifecycle_state", "delivery_state", "verification_state", "completed_at", "completed_history_record"
+    )})
+    for start, end, replacement in sorted(patches, reverse=True):
+        text = text[:start] + replacement + text[end:]
+    if yaml.safe_load(text) != expected:
+        raise ValueError("Registry text edit does not match the validated completion; no files changed.")
+    return text.encode("utf-8")
 
 
 def _restore_file(path: Path, original: bytes | None) -> None:
@@ -1233,7 +1341,11 @@ def complete_task(
             "profile": profile,
             "completed_at": completed_at,
         },
-        "active_record_digest": {"algorithm": "sha256", "value": safe_digest_bytes(card_bytes)},
+        "active_record_digest": {
+            "algorithm": "sha256",
+            "canonicalization": "crlf-to-lf-v1",
+            "value": completed_card_digest(card_bytes, "crlf-to-lf-v1"),
+        },
         "completed_card_path": completed_path_reference,
         "superseded_by": None,
         "cancelled_reason": None,
@@ -1304,6 +1416,7 @@ def complete_task(
             "blocking": 0,
         },
     }
+    registry_bytes = _completion_registry_bytes(registry_original, registry, exact)
     if dry_run:
         return report
 
@@ -1317,7 +1430,8 @@ def complete_task(
     completed_dir.mkdir(parents=True, exist_ok=True)
     completed_temp = completed_path.with_name(f".{completed_path.name}.naos-tmp")
     completed_temp.write_bytes(card_bytes)
-    registry_temp = _write_yaml_temp(registry_path, registry)
+    registry_temp = registry_path.with_name(f".{registry_path.name}.naos-tmp")
+    registry_temp.write_bytes(registry_bytes)
     history_temp = _write_yaml_temp(history_path, history)
     try:
         os.replace(completed_temp, completed_path)

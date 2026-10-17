@@ -25,18 +25,24 @@
     },
     "active_session_ids": {
       "type": "array",
-      "items": {"type": "string"}
+      "items": {"$ref": "#/$defs/session_id"}
     },
     "closed_session_ids": {
       "type": "array",
-      "items": {"type": "string"}
+      "items": {"$ref": "#/$defs/session_id"}
     },
-    "latest_session_id": {"type": ["string", "null"]},
+    "latest_session_id": {"anyOf": [{"$ref": "#/$defs/session_id"}, {"type": "null"}]},
     "limitations": {"type": "array", "items": {"type": "string"}},
     "not_claimed": {"type": "array", "items": {"type": "string"}},
     "human_review_required": {"type": "boolean"}
   },
   "$defs": {
+    "session_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|$))[a-z0-9][a-z0-9_-]*(?:\\.[a-z0-9_-]+)*(?![\\s\\S])"
+    },
     "session_record": {
       "type": "object",
       "additionalProperties": true,
@@ -53,10 +59,7 @@
         "not_claimed"
       ],
       "properties": {
-        "session_id": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"
-        },
+        "session_id": {"$ref": "#/$defs/session_id"},
         "created_at": {"type": "string"},
         "updated_at": {"type": "string"},
         "status": {"type": "string", "enum": ["active", "closed", "unknown"]},

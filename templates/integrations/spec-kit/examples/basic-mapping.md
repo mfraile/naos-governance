@@ -1,14 +1,14 @@
 # Basic Spec-Kit To NAOS Mapping Example
 
-This example shows a small, non-regulated mapping from `.specify/specs/` files
+This example shows a small, non-regulated mapping from `specs/<feature>/spec.md` files
 to NAOS review evidence.
 
 | Spec-Kit artifact | NAOS concept | Suggested NAOS action |
 | --- | --- | --- |
-| `.specify/specs/user-profile.md` | Source artifact for task context | Run `naos task-context --task T-123 --profile lite` after linking the task to the spec. |
-| `.specify/specs/user-profile.md` | Evidence source | Include the spec path in an evidence pack or reviewer notes. |
-| `.specify/specs/api-contract.md` | Gate input | Run `naos gate-status --profile lite` and review missing evidence. |
-| `.specify/specs/api-contract.md` | Control-plane review candidate | Add a control-plane review item if the spec changes governance surfaces. |
+| `specs/001-user-profile/spec.md` | Source artifact for task context | Run `naos task-context --task T-123 --profile lite` after linking the task to the spec. |
+| `specs/001-user-profile/spec.md` | Evidence source | Include the spec path in an evidence pack or reviewer notes. |
+| `specs/002-api-contract/spec.md` | Gate input | Run `naos gate-status --profile lite` and review missing evidence. |
+| `specs/002-api-contract/spec.md` | Control-plane review candidate | Add a control-plane review item if the spec changes governance surfaces. |
 
 Recommended flow:
 

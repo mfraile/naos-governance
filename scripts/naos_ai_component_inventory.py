@@ -25,7 +25,14 @@ from naos_emit_capabilities import (  # noqa: E402
     default_instruction_files,
     default_skill_files,
     emit_catalogue,
+    METADATA_SCOPE_PATH,
 )
+from naos_resource_boundary import resource_reference, select_resource  # noqa: E402
+
+from naos_self_check_inspection import (  # noqa: E402
+    inspection_output_path, inspection_validation_root,
+)
+
 from naos_policy import (  # noqa: E402
     controlled_utc_now_text,
     default_naos_root,
@@ -178,9 +185,8 @@ def resolve_rules_path(
         return (candidate if candidate.is_absolute() else root / candidate).absolute(), "explicit"
     filename = str(policy.get("paths", {}).get("ai_component_inventory_rules") or "ai_component_inventory_rules.yaml")
     project_path = root / naos_root / filename
-    if project_path.is_file():
-        return project_path, "project"
-    return default_rules_template(), "template"
+    selected = select_resource(root, project_path, "templates/structural-seeds/naos/ai_component_inventory_rules.yaml")
+    return selected, "project" if selected == project_path else "template"
 
 
 def resolve_model_policy_path(
@@ -194,19 +200,18 @@ def resolve_model_policy_path(
         return (candidate if candidate.is_absolute() else root / candidate).absolute(), "explicit"
     filename = str(policy.get("paths", {}).get("model_provider_policy") or "model_provider_policy.yaml")
     project_path = root / naos_root / filename
-    if project_path.is_file():
-        return project_path, "project"
-    return default_model_policy_template(), "template"
+    selected = select_resource(root, project_path, "templates/structural-seeds/naos/model_provider_policy.yaml")
+    return selected, "project" if selected == project_path else "template"
 
 
 def inventory_schema_path(root: Path) -> Path:
     project_schema = root / "schemas" / "naos" / "ai_component_inventory.schema.json"
-    return project_schema if project_schema.is_file() else kit_root() / "schemas" / "naos" / project_schema.name
+    return select_resource(root, project_schema, f"schemas/naos/{project_schema.name}")
 
 
 def rules_schema_path(root: Path) -> Path:
     project_schema = root / "schemas" / "naos" / "ai_component_inventory_rules.schema.json"
-    return project_schema if project_schema.is_file() else kit_root() / "schemas" / "naos" / project_schema.name
+    return select_resource(root, project_schema, f"schemas/naos/{project_schema.name}")
 
 
 def schema_errors(instance: dict[str, Any], schema_path: Path) -> list[str]:
@@ -214,9 +219,9 @@ def schema_errors(instance: dict[str, Any], schema_path: Path) -> list[str]:
     return sorted(error.message for error in Draft202012Validator(schema).iter_errors(instance))
 
 
-def input_record(path: Path, root: Path, role: str) -> dict[str, str]:
+def input_record(path: Path, root: Path, role: str, *, resource_ref: str | None = None) -> dict[str, str]:
     return {
-        "path": relative_bounded_path(path, root),
+        "path": resource_ref if resource_ref is not None else relative_bounded_path(path, root),
         "role": role,
         "sha256": sha256_file(path),
     }
@@ -263,7 +268,7 @@ def component_from_surface(surface: dict[str, Any], root: Path) -> tuple[dict[st
     source_ref = relative_bounded_path(source, root)
     raw_declarations = {
         key: surface[key]
-        for key in ("model", "naos_model_role", "tools", "parameters", "apply_to", "related_rules")
+        for key in ("model", "model_selection", "naos_model_role", "tools", "parameters", "authoring_base", "apply_to", "related_rules")
         if key in surface
     }
     declarations, redactions = sanitize_declared_value(raw_declarations)
@@ -282,8 +287,8 @@ def component_from_surface(surface: dict[str, Any], root: Path) -> tuple[dict[st
     )
 
 
-def model_components(policy_data: dict[str, Any], policy_path: Path, root: Path) -> list[dict[str, Any]]:
-    policy_ref = relative_bounded_path(policy_path, root)
+def model_components(policy_data: dict[str, Any], policy_path: Path, root: Path, *, policy_ref: str | None = None) -> list[dict[str, Any]]:
+    policy_ref = policy_ref if policy_ref is not None else relative_bounded_path(policy_path, root)
     policy_digest = sha256_file(policy_path)
     components: list[dict[str, Any]] = []
     roles = policy_data.get("roles") if isinstance(policy_data.get("roles"), dict) else {}
@@ -456,7 +461,7 @@ def component_findings(
 
 
 def digest_payload(report: dict[str, Any]) -> dict[str, Any]:
-    return {
+    payload = {
         key: report[key]
         for key in (
             "schema",
@@ -483,6 +488,10 @@ def digest_payload(report: dict[str, Any]) -> dict[str, Any]:
         )
     }
 
+    if "host_declarations" in report:
+        payload["host_declarations"] = report["host_declarations"]
+    return payload
+
 
 def build_inventory_report(
     *,
@@ -495,12 +504,10 @@ def build_inventory_report(
     model_policy_path: Path,
     model_policy_source: str,
 ) -> dict[str, Any]:
-    relative_bounded_path(rules_path, root)
-    relative_bounded_path(model_policy_path, root)
+    rules_ref = resource_reference(rules_path, root, kit_relative="templates/structural-seeds/naos/ai_component_inventory_rules.yaml" if rules_source == "template" else None)
+    model_ref = resource_reference(model_policy_path, root, kit_relative="templates/structural-seeds/naos/model_provider_policy.yaml" if model_policy_source == "template" else None)
     rules_schema = rules_schema_path(root)
     report_schema = inventory_schema_path(root)
-    relative_bounded_path(rules_schema, root)
-    relative_bounded_path(report_schema, root)
     for candidate in (
         default_agent_files(root)
         + default_skill_files(root)
@@ -527,12 +534,23 @@ def build_inventory_report(
         component, source = component_from_surface(surface, root)
         components.append(component)
         source_paths.append(source)
-    components.extend(model_components(model_policy, model_policy_path, root))
+    host_records = []
+    for declaration in catalogue.get("host_declarations") or []:
+        source = root / declaration["source_file"]
+        relative_bounded_path(source, root)
+        clean, redactions = sanitize_declared_value(declaration["declarations"])
+        host_records.append({**declaration, "declarations": clean,
+                             "source_sha256": sha256_file(source), "redactions": redactions})
+        source_paths.append(source)
+    components.extend(model_components(model_policy, model_policy_path, root, policy_ref=model_ref))
     components.sort(key=lambda item: (str(item.get("component_id")), str(item.get("source_file"))))
 
-    inputs = [input_record(rules_path, root, "inventory_rules"), input_record(model_policy_path, root, "model_policy")]
+    inputs = [input_record(rules_path, root, "inventory_rules", resource_ref=rules_ref), input_record(model_policy_path, root, "model_policy", resource_ref=model_ref)]
     for path in sorted(set(source_paths), key=lambda item: relative_bounded_path(item, root)):
         inputs.append(input_record(path, root, "ai_surface_declaration"))
+    scope_path = root / METADATA_SCOPE_PATH
+    if scope_path.is_file():
+        inputs.append(input_record(scope_path, root, "metadata_scope"))
     for helper in (
         root / "scripts" / "naos_ai_component_inventory.py",
         root / "scripts" / "naos_emit_capabilities.py",
@@ -577,12 +595,12 @@ def build_inventory_report(
         "review_owner": str(rules.get("review_owner") or "project-governance-reviewer"),
         "lifecycle": rules.get("lifecycle") or {},
         "rules": {
-            "path": relative_bounded_path(rules_path, root),
+            "path": rules_ref,
             "source": rules_source,
             "sha256": sha256_file(rules_path),
         },
         "model_policy": {
-            "path": relative_bounded_path(model_policy_path, root),
+            "path": model_ref,
             "source": model_policy_source,
             "sha256": sha256_file(model_policy_path),
         },
@@ -604,6 +622,8 @@ def build_inventory_report(
         "human_review_required": human_review_required,
         "summary": summary,
     }
+    if host_records:
+        report["host_declarations"] = host_records
     report["inventory_digest"] = canonical_digest(digest_payload(report))
     errors = schema_errors(report, report_schema)
     if errors:
@@ -699,11 +719,15 @@ def main(argv: list[str] | None = None) -> int:
     naos_root = args.naos_root or default_naos_root(policy)
     profile = normalize_profile(args.profile, policy)
     output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "ai_component_inventory_report")
-    if not output.is_absolute():
+    if output is not None and not output.is_absolute():
         output = root / output
     try:
-        preflight_bounded_output(output, root)
-    except InventoryError as exc:
+        if output is not None:
+            # The helper admits only this producer's exact registered sink.
+            # Apply the original topology preflight within that custody root.
+            output = inspection_output_path(root, naos_root, output)
+            preflight_bounded_output(output, inspection_validation_root(root, output))
+    except ValueError as exc:
         print(f"NAOS AI component inventory: FAIL — {exc}", file=sys.stderr)
         return 2
     try:
@@ -720,7 +744,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.check:
-        if not output.is_file():
+        if output is None or not output.is_file():
             print(f"NAOS AI component inventory: FAIL — missing report: {output}", file=sys.stderr)
             return 1
         try:

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -15,18 +16,30 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent / "validators"))
     from frontmatter_utils import (  # type: ignore[import-not-found]
         candidate_files,
+        metadata_host_paths,
+        MetadataScopeError,
+        host_declaration,
+        METADATA_SCOPE_PATH as METADATA_SCOPE_PATH,
         display_path,
         is_non_empty_string,
         is_non_empty_string_list,
+        model_selector_is_valid,
         parse_frontmatter,
+        skill_authoring_metadata,
     )
 else:  # pragma: no cover - package import path
     from .validators.frontmatter_utils import (
         candidate_files,
+        metadata_host_paths,
+        MetadataScopeError,
+        host_declaration,
+        METADATA_SCOPE_PATH as METADATA_SCOPE_PATH,
         display_path,
         is_non_empty_string,
         is_non_empty_string_list,
+        model_selector_is_valid,
         parse_frontmatter,
+        skill_authoring_metadata,
     )
 
 
@@ -65,25 +78,15 @@ def related_rules(body: str) -> list[str]:
 def normalize_parameters(value: Any, path: Path) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         raise CapabilityEmissionError(f"{path}: skill parameters must be a list")
-
-    parameters: list[dict[str, Any]] = []
-    for index, entry in enumerate(value, start=1):
-        if not isinstance(entry, dict):
-            raise CapabilityEmissionError(f"{path}: parameter {index} must be a mapping")
-        if not is_non_empty_string(entry.get("name")):
-            raise CapabilityEmissionError(f"{path}: parameter {index} is missing name")
-        if not is_non_empty_string(entry.get("description")):
-            raise CapabilityEmissionError(f"{path}: parameter {index} is missing description")
-        normalized = {
-            "name": entry["name"].strip(),
-            "description": entry["description"].strip(),
-        }
-        if "required" in entry:
-            normalized["required"] = bool(entry["required"])
-        if "default" in entry:
-            normalized["default"] = str(entry["default"])
-        parameters.append(normalized)
-    return parameters
+    try:
+        parameters, _ = skill_authoring_metadata({"metadata": {
+            "naos-parameters": json.dumps(value, allow_nan=False)}})
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise CapabilityEmissionError(f"{path}: malformed skill parameters: {exc}") from exc
+    # Preserve JSON values and extension fields. Defaults and lists are
+    # declarations, not executable inputs.
+    return [{**entry, "name": entry["name"].strip(),
+             "description": entry["description"].strip()} for entry in parameters]
 
 
 def normalize_apply_to(value: Any, path: Path) -> str | list[str]:
@@ -104,12 +107,18 @@ def instruction_slug(path: Path) -> str:
 
 
 def base_capability(capability_id: str, name: str, description: str, kind: str, path: Path, root: Path) -> dict[str, Any]:
+    # The catalogue is a portable data record, not a native-shell display.
+    # Keep source references identical when the same tree is generated on NTFS.
+    try:
+        source_file = path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        source_file = path.as_posix()
     return {
         "id": capability_id,
         "name": name,
         "description": description,
         "type": kind,
-        "source_file": display_path(path, root),
+        "source_file": source_file,
         "status": "active",
         "schema_version": SCHEMA_VERSION,
     }
@@ -119,8 +128,11 @@ def emit_agent(path: Path, root: Path) -> dict[str, Any]:
     document = parse_frontmatter(path)
     if document.error:
         raise CapabilityEmissionError(f"{path}: {document.error}")
-    if not is_non_empty_string(document.data.get("model")):
-        raise CapabilityEmissionError(f"{path}: agent model must be a non-empty string")
+    if not model_selector_is_valid(document.data):
+        raise CapabilityEmissionError(
+            f"{path}: invalid explicit agent model selector; omit for host selection "
+            "or supply a non-empty host-supported scalar/list without ADAPT placeholders"
+        )
     if not is_non_empty_string_list(document.data.get("tools")):
         raise CapabilityEmissionError(f"{path}: agent tools must be a non-empty list of strings")
 
@@ -128,7 +140,15 @@ def emit_agent(path: Path, root: Path) -> dict[str, Any]:
     name = document.data.get("name") if is_non_empty_string(document.data.get("name")) else f"@naos-{slug}"
     description = document.data.get("description") if is_non_empty_string(document.data.get("description")) else f"NAOS {friendly_name_from_slug(slug)} agent."
     capability = base_capability(f"CAP-A-{slugify(slug)}", name.strip(), description.strip(), "agent", path, root)
-    capability["model"] = document.data["model"].strip()
+    # These describe repository declarations, never observed host selection.
+    if "model" not in document.data:
+        capability["model"] = None
+        capability["model_selection"] = "host_default_unspecified"
+    else:
+        value = document.data["model"]
+        capability["model"] = ([item.strip() for item in value]
+                               if isinstance(value, list) else value.strip())
+        capability["model_selection"] = "explicit_declaration"
     if is_non_empty_string(document.data.get("naos_model_role")):
         capability["naos_model_role"] = document.data["naos_model_role"].strip()
     capability["tools"] = [item.strip() for item in document.data["tools"]]
@@ -156,7 +176,13 @@ def emit_skill(path: Path, root: Path) -> dict[str, Any]:
         path,
         root,
     )
-    capability["parameters"] = normalize_parameters(document.data.get("parameters"), path)
+    try:
+        parameters, base = skill_authoring_metadata(document.data)
+    except ValueError as exc:
+        raise CapabilityEmissionError(f"{path}: {exc}") from exc
+    capability["parameters"] = normalize_parameters(parameters, path)
+    if base is not None:
+        capability["authoring_base"] = base
     rules = related_rules(document.body)
     if rules:
         capability["related_rules"] = rules
@@ -185,7 +211,10 @@ def default_agent_files(root: Path) -> list[Path]:
 
 
 def default_skill_files(root: Path) -> list[Path]:
-    return candidate_files(root, "templates/skills/*/SKILL.md", ".github/skills/*/SKILL.md")
+    scope = metadata_host_paths(root)
+    files = candidate_files(root, "templates/skills/*/SKILL.md", ".github/skills/*/SKILL.md")
+    return sorted({p.resolve(): p for p in files + [p for p, kind in scope.items() if kind == "skill"]}.values(),
+                  key=lambda path: path.as_posix())
 
 
 def default_instruction_files(root: Path) -> list[Path]:
@@ -193,13 +222,21 @@ def default_instruction_files(root: Path) -> list[Path]:
 
 
 def emit_catalogue(root: Path) -> dict[str, Any]:
+    try:
+        scope = metadata_host_paths(root)
+        host_records = [host_declaration(path, root, kind) for path, kind in sorted(scope.items(), key=lambda item: item[0].relative_to(root.resolve()).as_posix())]
+    except MetadataScopeError as exc:
+        raise CapabilityEmissionError(str(exc)) from exc
     capabilities: list[dict[str, Any]] = []
     for path in default_agent_files(root):
-        capabilities.append(emit_agent(path, root))
+        if path.resolve() not in scope:
+            capabilities.append(emit_agent(path, root))
     for path in default_skill_files(root):
-        capabilities.append(emit_skill(path, root))
+        if path.resolve() not in scope:
+            capabilities.append(emit_skill(path, root))
     for path in default_instruction_files(root):
-        capabilities.append(emit_instruction(path, root))
+        if path.resolve() not in scope:
+            capabilities.append(emit_instruction(path, root))
 
     by_id: dict[str, Path] = {}
     for capability in capabilities:
@@ -212,7 +249,7 @@ def emit_catalogue(root: Path) -> dict[str, Any]:
         by_id[capability_id] = source
 
     capabilities.sort(key=lambda item: item["id"])
-    return {
+    catalogue = {
         "catalogue_version": CATALOGUE_VERSION,
         "schema_version": SCHEMA_VERSION,
         "generated_by": GENERATED_BY,
@@ -224,6 +261,9 @@ def emit_catalogue(root: Path) -> dict[str, Any]:
         ),
         "capabilities": capabilities,
     }
+    if scope:
+        catalogue["host_declarations"] = host_records
+    return catalogue
 
 
 def render_catalogue(catalogue: dict[str, Any]) -> str:
@@ -237,10 +277,11 @@ def render_catalogue(catalogue: dict[str, Any]) -> str:
 
 def write_catalogue(output: Path, content: str) -> bool:
     output.parent.mkdir(parents=True, exist_ok=True)
-    existing = output.read_text(encoding="utf-8") if output.exists() else None
-    if existing == content:
+    encoded = content.encode("utf-8")
+    existing = output.read_bytes() if output.exists() else None
+    if existing == encoded:
         return False
-    output.write_text(content, encoding="utf-8")
+    output.write_bytes(encoded)
     return True
 
 

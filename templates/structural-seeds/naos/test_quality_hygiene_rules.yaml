@@ -8,6 +8,29 @@ exclude_dirs:
   - build
   - __pycache__
 exclude_globs: []
+# Skip/xfail and literal-disabled/post-return assertions and swallowed AssertionError are advisory Python AST observations.
+# Existing authorized native skips remain valid; compare changed contracts in PR risk.
+# Marker detection is supplementary; non-Python assertions/execution remain unassessed.
+# Globs match root-relative paths or basenames within scan_roots; [] disables markers.
+non_python_test_globs:
+  - '*.test.js'
+  - '*.test.jsx'
+  - '*.test.ts'
+  - '*.test.tsx'
+  - '*.spec.js'
+  - '*.spec.jsx'
+  - '*.spec.ts'
+  - '*.spec.tsx'
+  - 'test_*.js'
+  - 'test_*.ts'
+  - '*Test.java'
+  - '*Tests.java'
+  - '*Test.cs'
+  - '*Tests.cs'
+# Supports common JS/TS skip/todo/xit, Java Disabled/Ignore and C# Ignore/Skip syntax.
+# Marker-free inputs never establish meaningful assertions or execution.
+# Non-Python files in selected roots make assertion coverage incomplete.
+# No expression execution, alias resolution, or runtime reachability is claimed.
 human_review_required: true
 not_claimed:
   - behavioral correctness proof

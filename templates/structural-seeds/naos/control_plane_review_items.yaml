@@ -3,6 +3,8 @@ semantics:
   items: "Structured review and routing declarations. They are not proof by themselves."
   report: "Run naos control-plane-review to evaluate routing status."
   human_decision: "Humans approve disposition, remediation, waiver, and residual-risk treatment."
+  external_result_review: "Opt-in exact-current external result routing review: external_result_review binds external_result_id, source_sha256, report_content_sha256, reviewed_at, supporting_ref and supporting_sha256. Ordinary owner, rationale, review_date, routed disposition and routing targets are required. This consumes routing review only; it does not verify findings, authenticate reviewers or approve work."
+  evidence_conflicts: "Use a conflict source_type and the exact conflict_id as source_ref. Supply the required owner, disposition and target_surfaces; text mentions alone do not establish routing. Routing does not resolve a conflict."
 
 items: []
 known_gaps: []

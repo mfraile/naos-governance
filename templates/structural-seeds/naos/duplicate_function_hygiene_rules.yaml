@@ -1,9 +1,6 @@
 schema: naos.duplicate_function_hygiene_rules.v1
 mode: deterministic_local
-scan_roots:
-  - src
-  - app
-  - tests
+scan_roots: inferred
 exclude_dirs:
   - dev
   - dist
@@ -11,7 +8,11 @@ exclude_dirs:
   - __pycache__
 exclude_globs: []
 min_normalized_dump_length: 240
+# Exact normalized-AST hashes retain their original algorithm; groups can share a file.
 allowed_hashes: []
+# Bounded local/argument renaming is a separate advisory tier, never semantic proof.
+renamed_identifier_review: true
+allowed_renamed_hashes: []
 human_review_required: true
 not_claimed:
   - semantic correctness proof

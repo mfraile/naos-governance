@@ -4,25 +4,139 @@
   "title": "NAOS Traceability Gap Register Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schema", "generated_at", "profile", "status", "command", "mode", "naos_root", "project_root", "human_review_required", "not_claimed", "limitations", "findings", "summary"],
+  "required": [
+    "schema",
+    "generated_at",
+    "profile",
+    "status",
+    "command",
+    "mode",
+    "naos_root",
+    "project_root",
+    "human_review_required",
+    "not_claimed",
+    "limitations",
+    "findings",
+    "summary"
+  ],
   "properties": {
-    "schema": {"const": "naos.traceability_gap_register.v1"},
-    "generated_at": {"type": "string"},
-    "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
-    "status": {"enum": ["ready", "advisory", "review_required", "warning", "invalid_config", "blocked", "unknown"]},
-    "command": {"const": "traceability-gap-register"},
-    "mode": {"type": "string"},
-    "naos_root": {"type": "string"},
-    "project_root": {"type": "string"},
-    "session_id": {"type": ["string", "null"]},
-    "generated_by": {"type": "object"},
-    "human_review_required": {"type": "boolean"},
-    "not_claimed": {"type": "array", "items": {"type": "string"}},
-    "limitations": {"type": "array", "items": {"type": "string"}},
-    "findings": {"type": "array", "items": {"type": "object"}},
-    "known_gaps": {"type": "array"},
-    "residual_risks": {"type": "array"},
-    "summary": {"type": "object"},
-    "repository_intelligence": {"type": ["object", "null"]}
+    "schema": {
+      "const": "naos.traceability_gap_register.v1"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "profile": {
+      "enum": [
+        "quickstart",
+        "lite",
+        "standard",
+        "assured"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "advisory",
+        "review_required",
+        "warning",
+        "invalid_config",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "command": {
+      "const": "traceability-gap-register"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "naos_root": {
+      "type": "string"
+    },
+    "project_root": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "generated_by": {
+      "type": "object"
+    },
+    "human_review_required": {
+      "type": "boolean"
+    },
+    "not_claimed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "known_gaps": {
+      "type": "array"
+    },
+    "residual_risks": {
+      "type": "array"
+    },
+    "summary": {
+      "type": "object"
+    },
+    "repository_intelligence": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "analysis_scope": {
+      "type": "object",
+      "required": [
+        "candidate_truth_verified",
+        "source_links_evaluated",
+        "test_links_evaluated",
+        "ownership_links_evaluated",
+        "closure_verified",
+        "kind",
+        "authority_effect"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "candidate_truth_verified": {
+          "const": false
+        },
+        "source_links_evaluated": {
+          "const": false
+        },
+        "test_links_evaluated": {
+          "const": false
+        },
+        "ownership_links_evaluated": {
+          "const": false
+        },
+        "closure_verified": {
+          "const": false
+        },
+        "kind": {
+          "const": "candidate_review_only"
+        },
+        "authority_effect": {
+          "const": "none"
+        }
+      }
+    }
   }
 }

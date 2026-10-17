@@ -40,6 +40,8 @@ ENVIRONMENT:
 from __future__ import annotations
 
 import argparse
+import csv
+import math
 import json
 import os
 import re
@@ -59,7 +61,10 @@ SCRIPT_DIR = Path(__file__).resolve().parents[1]
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from naos_report_composition import compose_publication, collection_count, CompositionError
+
 from naos_policy import (  # noqa: E402
+    SAFE_FALLBACK_POLICY,
     dashboard_output_path,
     default_naos_root,
     evidence_pack_output_path,
@@ -77,6 +82,7 @@ from naos_policy import (  # noqa: E402
     write_report,
 )
 from naos_self_check import self_check_finding_occurrences  # noqa: E402
+from naos_pr_governance_summary import project_gate_readiness  # noqa: E402
 from naos_systemic_impact import (  # noqa: E402
     build_actionable_presentation,
     finding_occurrence,
@@ -93,6 +99,7 @@ from naos_validate_task_registry import (  # noqa: E402
     require_valid_team_config,
 )
 from source_roots import existing_source_roots  # noqa: E402
+import spec_header  # noqa: E402
 
 try:
     import yaml
@@ -115,7 +122,6 @@ GOV_COMPLETED_DIR = NAOS_ROOT / "completed"
 CONFORMANCE_FILE = NAOS_ROOT / "reports" / "conformance_latest.json"
 EVAL_LOG_FILE = NAOS_ROOT / "reports" / "eval_log.jsonl"
 
-REQ_STATUS_RE = re.compile(r"^\*\*Status\*\*:\s*(.+)$", re.M)
 REQ_HEADER_RE = re.compile(r"^###\s+(FR|NFR)-(\d{3}):\s*(.+)$", re.M)
 
 
@@ -349,54 +355,41 @@ def _filter_raw_tasks_by_team(
 
 def parse_authoritative_counts(specs_path: Path) -> dict:
     """Parse FR/NFR status counts from specs/03-requirements.md."""
-    if not specs_path.exists():
-        return {
-            "fr": (0, 0, 0, 0),
-            "nfr": (0, 0, 0, 0),
-            "all": (0, 0, 0, 0),
-            "fr_complete": [],
-            "fr_in_progress": [],
-            "fr_planned": [],
-            "nfr_complete": [],
-            "nfr_in_progress": [],
-            "nfr_planned": [],
-        }
-    text = specs_path.read_text(encoding="utf-8")
-    fr_complete, fr_in_progress, fr_planned = [], [], []
-    nfr_complete, nfr_in_progress, nfr_planned = [], [], []
+    buckets: dict[str, dict[str, list[str]]] = {
+        kind: {state: [] for state in ("complete", "in_progress", "planned", "unresolved")}
+        for kind in ("fr", "nfr")
+    }
+    source_status = "missing" if not specs_path.is_file() else "parsed"
+    if source_status == "parsed":
+        text = specs_path.read_text(encoding="utf-8")
+        entries = spec_header.requirement_statuses(text)
+        for rid, status in entries.items():
+            kind = "fr" if rid.startswith("FR-") else "nfr"
+            state = spec_header.classify_requirement_status(status)
+            if state == "documentation_only":
+                state = "unresolved"
+            buckets[kind][state].append(rid)
+        if not entries:
+            source_status = "no_requirements"
 
-    fr_pattern = re.compile(
-        r"^## (FR-[A-Z0-9-]+):[\s\S]*?^\*\*Status\*\*:\s*([^\n]+)", re.M
-    )
-    nfr_pattern = re.compile(r"^## (NFR-\d+):[\s\S]*?^\*\*Status\*\*:\s*([^\n]+)", re.M)
-
-    for rid, status in fr_pattern.findall(text):
-        s = status.lower()
-        if "verif" in s or "implement" in s or "complete" in s:
-            fr_complete.append(rid)
-        elif "progress" in s:
-            fr_in_progress.append(rid)
-        else:
-            fr_planned.append(rid)
-
-    for rid, status in nfr_pattern.findall(text):
-        s = status.lower()
-        if "progress" in s:
-            nfr_in_progress.append(rid)
-        elif "verif" in s or "implement" in s or "complete" in s:
-            nfr_complete.append(rid)
-        else:
-            nfr_planned.append(rid)
+    fr_complete = buckets["fr"]["complete"]
+    fr_in_progress = buckets["fr"]["in_progress"]
+    fr_planned = buckets["fr"]["planned"]
+    fr_unresolved = buckets["fr"]["unresolved"]
+    nfr_complete = buckets["nfr"]["complete"]
+    nfr_in_progress = buckets["nfr"]["in_progress"]
+    nfr_planned = buckets["nfr"]["planned"]
+    nfr_unresolved = buckets["nfr"]["unresolved"]
 
     return {
         "fr": (
-            len(fr_complete) + len(fr_in_progress) + len(fr_planned),
+            len(fr_complete) + len(fr_in_progress) + len(fr_planned) + len(fr_unresolved),
             len(fr_complete),
             len(fr_in_progress),
             len(fr_planned),
         ),
         "nfr": (
-            len(nfr_complete) + len(nfr_in_progress) + len(nfr_planned),
+            len(nfr_complete) + len(nfr_in_progress) + len(nfr_planned) + len(nfr_unresolved),
             len(nfr_complete),
             len(nfr_in_progress),
             len(nfr_planned),
@@ -405,9 +398,11 @@ def parse_authoritative_counts(specs_path: Path) -> dict:
             len(fr_complete)
             + len(fr_in_progress)
             + len(fr_planned)
+            + len(fr_unresolved)
             + len(nfr_complete)
             + len(nfr_in_progress)
-            + len(nfr_planned),
+            + len(nfr_planned)
+            + len(nfr_unresolved),
             len(fr_complete) + len(nfr_complete),
             len(fr_in_progress) + len(nfr_in_progress),
             len(fr_planned) + len(nfr_planned),
@@ -415,10 +410,28 @@ def parse_authoritative_counts(specs_path: Path) -> dict:
         "fr_complete": fr_complete,
         "fr_in_progress": fr_in_progress,
         "fr_planned": fr_planned,
+        "fr_unresolved": fr_unresolved,
         "nfr_complete": nfr_complete,
         "nfr_in_progress": nfr_in_progress,
         "nfr_planned": nfr_planned,
+        "nfr_unresolved": nfr_unresolved,
+        "source_status": source_status,
     }
+
+
+def requirement_badge(
+    total: int, complete: int, in_progress: int, planned: int, unresolved: int
+) -> str:
+    """Summarize completion without giving an empty set a pass badge."""
+    if total == 0:
+        return "⚠️ No requirements parsed"
+    if unresolved:
+        return f"⚠️ {unresolved} status(es) unresolved"
+    if complete == total:
+        return "✅ Complete"
+    if in_progress:
+        return f"🔵 {in_progress} in progress"
+    return f"📋 {planned} planned"
 
 
 def load_registry_metrics() -> dict | None:
@@ -835,22 +848,96 @@ def parse_decisions() -> list[dict]:
     return rows
 
 
+PROGRESS_FIELDS = ("timestamp", "done_percent", "done", "in_progress", "total")
+LEGACY_PROGRESS_FIELDS = ("date", "total_tasks", "implemented", "verified", "done", "absorbed", "in_progress", "planned", "deferred")
+
+
+def _read_progress_history(path: Path) -> tuple[str, list[str], list[dict[str, str]], list[float]]:
+    """Read known named columns; reject malformed/mixed history as a whole."""
+    if not path.exists():
+        return "missing", list(PROGRESS_FIELDS), [], []
+    with path.open(encoding="utf-8-sig", newline="") as stream:
+        records = [row for row in csv.reader(stream, strict=True)
+                   if row and any(row) and not row[0].startswith("#")]
+    if not records:
+        raise ValueError("history has no header")
+    fields = records[0]
+    if len(fields) != len(set(fields)):
+        raise ValueError("history has duplicate columns")
+    if set(fields) == set(PROGRESS_FIELDS):
+        kind = "canonical"
+    elif set(fields) == set(LEGACY_PROGRESS_FIELDS):
+        kind = "legacy"
+    else:
+        raise ValueError("history header is unsupported")
+    rows, values = [], []
+    for cells in records[1:]:
+        if len(cells) != len(fields):
+            raise ValueError("history contains mixed-width rows")
+        row = dict(zip(fields, cells))
+        datetime.fromisoformat(row["timestamp"]) if kind == "canonical" else date.fromisoformat(row["date"])
+        count_fields = ("done", "in_progress", "total") if kind == "canonical" else LEGACY_PROGRESS_FIELDS[1:]
+        if any(re.fullmatch(r"[0-9]+", row[name]) is None for name in count_fields):
+            raise ValueError("history counts must be nonnegative integers")
+        total = int(row["total"] if kind == "canonical" else row["total_tasks"])
+        done = int(row["done"])
+        if total <= 0 or any(int(row[name]) > total for name in count_fields):
+            raise ValueError("history counts exceed a positive total")
+        if kind == "canonical" and done + int(row["in_progress"]) > total:
+            raise ValueError("history completed and in-progress counts exceed total")
+        percentage = done / total * 100
+        if kind == "canonical":
+            stored = float(row["done_percent"])
+            if not math.isfinite(stored) or not 0 <= stored <= 100 or abs(stored - percentage) > .011:
+                raise ValueError("history percentage contradicts its counts")
+            percentage = stored
+        rows.append(row)
+        values.append(percentage)
+    return kind, fields, rows, values
+
+
 def parse_trend_history() -> list[float]:
-    """Parse real done_percent history from TASK_PROGRESS_HISTORY.csv."""
-    if not TREND_FILE.exists():
+    """Use percentages from known history contracts, never positional counts."""
+    try:
+        _kind, _fields, _rows, values = _read_progress_history(TREND_FILE)
+    except (OSError, UnicodeError, csv.Error, ValueError) as exc:
+        print("PROGRESS_HISTORY_INVALID: " + str(exc), file=sys.stderr)
         return []
-    values: list[float] = []
-    for line in TREND_FILE.read_text(encoding="utf-8").splitlines():
-        if not line or line.startswith("timestamp"):
-            continue
-        parts = line.split(",")
-        if len(parts) < 2:
-            continue
-        try:
-            values.append(float(parts[1]))
-        except ValueError:
-            continue
     return values if len(values) >= 2 else []
+
+
+def append_progress_history(path: Path, *, done: int, in_progress: int, total: int,
+                            now: datetime | None = None) -> str:
+    """Append only canonical history; retain incompatible existing bytes."""
+    if (any(type(value) is not int or value < 0 for value in (done, in_progress, total))
+            or total <= 0 or done + in_progress > total):
+        return "invalid_counts"
+    try:
+        kind, fields, rows, _values = _read_progress_history(path)
+        if kind == "legacy":
+            print("PROGRESS_HISTORY_MIGRATION_REQUIRED: legacy history preserved without append", file=sys.stderr)
+            return "migration_required"
+        current = now or datetime.now(UTC)
+        if any(datetime.fromisoformat(row["timestamp"]).date() == current.date() for row in rows):
+            return "already_recorded"
+        row = {"timestamp": current.isoformat(), "done_percent": f"{done / total * 100:.2f}",
+               "done": done, "in_progress": in_progress, "total": total}
+        needs_separator = False
+        if kind != "missing":
+            with path.open("rb") as existing:
+                existing.seek(-1, os.SEEK_END)
+                needs_separator = existing.read(1) not in {b"\n", b"\r"}
+        with path.open("x" if kind == "missing" else "a", encoding="utf-8", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=fields, lineterminator="\n")
+            if kind == "missing":
+                writer.writeheader()
+            elif needs_separator:
+                stream.write("\n")
+            writer.writerow(row)
+        return "appended"
+    except (OSError, UnicodeError, csv.Error, ValueError) as exc:
+        print("PROGRESS_HISTORY_INVALID: history not updated: " + str(exc), file=sys.stderr)
+        return "invalid_history"
 
 
 def render_trend_sparkline(values: list[float]) -> str:
@@ -925,6 +1012,23 @@ def scan_ghost_features(reqs: dict) -> list[str]:
     return list(set(ghosts))
 
 
+def display_artifact_path(value: str | Path | None, root: Path) -> str | None:
+    """Presentation only; native collection/authority paths remain unchanged."""
+    if value is None:
+        return None
+    try:
+        return Path(os.path.abspath(value)).relative_to(Path(os.path.abspath(root))).as_posix()
+    except ValueError:
+        return "[external path redacted]"
+
+
+def artifact_load_error(exc: Exception) -> str:
+    # OSError text can contain an absolute file or ancestor path.
+    if isinstance(exc, OSError):
+        return f"{type(exc).__name__} (errno={exc.errno})"
+    return str(exc)
+
+
 def read_json_artifact(path: Path | None, label: str, missing_status: str = "missing") -> dict[str, Any]:
     if path is None:
         return {
@@ -934,7 +1038,24 @@ def read_json_artifact(path: Path | None, label: str, missing_status: str = "mis
             "status": "not_configured",
             "data": None,
         }
-    if not path.exists():
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        # ENOENT also describes a broken ancestor link. Only genuine absence
+        # may receive a workflow exemption; preserve invalid path evidence.
+        try:
+            for ancestor in path.parents:
+                try:
+                    ancestor.lstat()
+                except FileNotFoundError:
+                    continue
+                ancestor.stat()
+                break
+        except OSError as exc:
+            return {
+                "label": label, "path": str(path), "exists": False,
+                "status": "parse_error", "error": artifact_load_error(exc), "data": None,
+            }
         return {
             "label": label,
             "path": str(path),
@@ -942,15 +1063,30 @@ def read_json_artifact(path: Path | None, label: str, missing_status: str = "mis
             "status": missing_status,
             "data": None,
         }
+    except OSError as exc:
+        return {
+            "label": label, "path": str(path), "exists": False,
+            "status": "parse_error", "error": artifact_load_error(exc), "data": None,
+        }
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        raw = path.read_bytes()
+        data = json.loads(raw.decode("utf-8"))
     except Exception as exc:
         return {
             "label": label,
             "path": str(path),
             "exists": True,
             "status": "parse_error",
-            "error": str(exc),
+            "error": artifact_load_error(exc),
+            "data": None,
+        }
+    if not isinstance(data, dict):
+        return {
+            "label": label,
+            "path": str(path),
+            "exists": True,
+            "status": "parse_error",
+            "error": "Dashboard report JSON must be an object.",
             "data": None,
         }
     return {
@@ -959,6 +1095,8 @@ def read_json_artifact(path: Path | None, label: str, missing_status: str = "mis
         "exists": True,
         "status": "present",
         "report_status": data.get("status") if isinstance(data, dict) else None,
+        "collection_sha256": __import__("hashlib").sha256(raw).hexdigest(),
+        "collection_size_bytes": len(raw),
         "data": data,
     }
 
@@ -2198,6 +2336,13 @@ def summarize_evidence_classification(artifact: dict[str, Any]) -> dict[str, Any
         "policy_valid": bool(data.get("policy_valid")),
         "findings_scanned": int(data.get("findings_scanned") or 0),
         "classification_counts": data.get("classification_counts") or {},
+        **{key: data[key] for key in ("declared_classification_counts", "inferred_classification_counts")
+           if key in data},
+        "classification_count_semantics": data.get("classification_count_semantics")
+        or "legacy_unspecified_labels_not_verified_evidence",
+        **({"unclassified_context": data["unclassified_context"],
+            "unclassified_context_counts": data.get("unclassified_context_counts") or {}}
+           if "unclassified_context" in data else {}),
         "missing_classification": data.get("missing_classification") or [],
         "unknown_findings": data.get("unknown_findings") or [],
         "findings": data.get("findings") or [],
@@ -2358,6 +2503,11 @@ def summarize_evidence_pack(artifact: dict[str, Any]) -> dict[str, Any]:
     summary = data.get("summary") or {}
     return {
         "status": artifact.get("report_status") or artifact.get("status"),
+        "status_scope": "collection_findings",
+        "assembly_status": data.get("assembly_status", "not_evaluated"),
+        "producer_outcome_summary": data.get("producer_outcome_summary") or {},
+        "readiness": data.get("readiness") or {"status": "not_evaluated"},
+        "projection_scope": "stored_pack_fields",
         "summary": summary,
         "known_gaps": data.get("known_gaps") or [],
         "residual_risks": data.get("residual_risks") or [],
@@ -2367,20 +2517,29 @@ def summarize_evidence_pack(artifact: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def summarize_gatekeepers(artifact: dict[str, Any]) -> dict[str, Any]:
+def summarize_gatekeepers(artifact: dict[str, Any], projection: dict[str, Any] | None = None,
+                         evaluation: dict[str, Any] | None = None) -> dict[str, Any]:
     data = artifact.get("data") or {}
     gates = data.get("gates") or []
     return {
         "status": artifact.get("report_status") or artifact.get("status"),
+        "status_scope": "collection_or_declared_source_status",
+        "readiness": (projection or {}).get("readiness", "not_evaluated"),
+        "validated_projection": projection or {},
+        "evaluation": evaluation or {},
         "summary": data.get("summary") or {},
         "gates": [
             {
                 "id": gate.get("id"),
                 "name": gate.get("name"),
                 "status": gate.get("status"),
+                "readiness": gate.get("readiness", "not_evaluated"),
                 "severity": gate.get("severity"),
                 "missing_inputs": gate.get("missing_inputs") or [],
                 "missing_evidence": gate.get("missing_evidence") or [],
+                "unresolved_evidence": gate.get("unresolved_evidence") or [],
+                "evidence_results": gate.get("evidence_results") or [],
+                "protected_invariant_violations": gate.get("protected_invariant_violations") or [],
                 "experimental": bool(gate.get("experimental")),
             }
             for gate in gates
@@ -2395,20 +2554,325 @@ def missing_report_findings(
     naos_root: str,
     profile: str,
     policy: dict[str, Any],
+    exempt_inputs: set[str] | None = None,
+    advisory_inputs: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     severity = "advisory" if is_kit_repository(root, naos_root) else severity_for_profile(profile, policy)
     findings: list[dict[str, Any]] = []
     for key, artifact in artifacts.items():
-        if artifact.get("status") in {"missing", "parse_error"}:
+        artifact = {**artifact, "path": display_artifact_path(artifact.get("path"), root)}
+        if artifact.get("status") in {"missing", "parse_error"} and not (
+            artifact.get("status") == "missing" and key in (exempt_inputs or set())
+        ):
             findings.append(
                 {
                     "id": key,
-                    "severity": severity,
+                    "severity": "advisory" if artifact.get("status") == "missing" and key in (advisory_inputs or set()) else severity,
                     "status": artifact["status"],
                     "message": f"Dashboard input is not available: {artifact.get('path')}",
+                    "evidence_classification": "confirmed",
+                    "classification_scope": "dashboard_selected_input_load_observation_only",
+                    "evidence_refs": [{"type": "generated_report", "ref": str(artifact.get("path"))}],
+                    "observed_input_status": artifact["status"],
+                    "observed_load_error": artifact.get("error"),
+                    "human_review_required": True,
+                    "not_claimed": ["input report truth", "input report readiness", "approval", "issue resolution"],
                 }
             )
     return findings
+
+
+# Only these producers have a source-documented workflow prerequisite. This is
+# deliberately narrower than any fixture's list of absent dashboard reports.
+WORKFLOW_INPUTS: dict[str, tuple[str, ...]] = {
+    "professional_adoption": (
+        "adoption_summary", "context_challenge", "plan_challenge",
+        "decision_probe", "planning_gate_review",
+    ),
+    "brownfield_adoption": ("brownfield_baseline", "repo_context_challenge"),
+    "ai_code_provenance": ("ai_code_provenance",),
+    "regulated_context": ("compliance_posture",),
+}
+
+WORKFLOW_PATH_KEYS = {
+    "adoption_summary": "adoption_summary_report", "context_challenge": "context_challenge_report",
+    "plan_challenge": "plan_challenge_report", "decision_probe": "decision_probe_report",
+    "planning_gate_review": "planning_gate_review_report", "brownfield_baseline": "brownfield_baseline_report",
+    "repo_context_challenge": "repo_context_challenge_report", "ai_code_provenance": "ai_code_provenance_report",
+    "compliance_posture": "compliance_posture_report",
+}
+
+
+class _UniqueApplicabilityLoader(yaml.SafeLoader):
+    """Do not let duplicate policy/gate keys erase requirements on opt-in."""
+
+    def construct_mapping(self, node: Any, deep: bool = False) -> dict[Any, Any]:
+        self.flatten_mapping(node)
+        result: dict[Any, Any] = {}
+        for key_node, value_node in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            try:
+                duplicate = key in result
+            except TypeError as exc:
+                raise ValueError("Applicability policy/gate mapping has an invalid key") from exc
+            if duplicate:
+                raise ValueError(f"Duplicate applicability policy/gate key: {key}")
+            result[key] = self.construct_object(value_node, deep=deep)
+        return result
+
+
+def _strict_applicability_yaml(path: Path) -> Any:
+    return yaml.load(path.read_text(encoding="utf-8"), Loader=_UniqueApplicabilityLoader)
+
+
+def _dashboard_declaration_seed(filename: str, schema: str, items: str) -> dict[str, Any]:
+    """Use the adjacent generated seed, or the source/installed shipped seed."""
+    baseline = Path(__file__).resolve().with_name(filename.removesuffix('.yaml') + '.baseline.yaml')
+    try:
+        baseline.lstat()
+    except FileNotFoundError:
+        from naos_policy import kit_root
+        baseline = kit_root() / 'templates/structural-seeds/naos' / filename
+    # A present invalid generated baseline is never replaced by kit fallback.
+    if baseline.is_symlink() or not baseline.is_file():
+        raise ValueError('Unsafe or missing dashboard declaration baseline')
+    seed = _strict_applicability_yaml(baseline)
+    if (not isinstance(seed, dict) or seed.get('schema') != schema
+            or not isinstance(seed.get(items), list)
+            or any(not isinstance(item, dict) for item in seed[items])):
+        raise ValueError('Malformed dashboard declaration baseline')
+    return seed
+
+
+def _dashboard_obligation_paths(root, naos_root, profile, policy):
+    """Actual full-F producer observations and enabled operational evidence."""
+    import naos_self_check as self_check
+    import naos_evidence_contracts as evidence_contracts
+    import naos_capability_maturity as maturity
+    from naos_self_check_dependency_resolution import _output_key
+    from naos_policy import safe_policy_path
+
+    paths = set()
+    # These are the existing source-owned replay output contracts; other selected
+    # producers use the same main-entry sink inference as the full-F proof.
+    replay_outputs = {
+        'naos_session_identity.py': 'session_identity_report',
+        'naos_operator_attribution.py': 'operator_attribution_report',
+        'naos_session_lifecycle.py': 'session_lifecycle_report',
+        'naos_audit_log.py': 'audit_log_summary_report',
+        'naos_behavioral_governance_readiness.py': 'behavioral_governance_readiness_report',
+        'naos_agentic_workflow_review.py': 'agentic_workflow_review_report',
+        'naos_pre_implementation_alignment_review.py': 'pre_implementation_alignment_review_report',
+        'naos_cross_harness_review_readiness.py': 'cross_harness_review_readiness_report',
+        'naos_evidence_conflicts.py': 'evidence_conflict_detection_report',
+    }
+    for script, _ in self_check.selected_script_checks(root, profile, naos_root, policy):
+        primitive = evidence_contracts._SELF_CHECK_PRIMITIVES.get(Path(script).stem)
+        key = (primitive[1] if primitive else replay_outputs.get(script)) or _output_key(script)
+        paths.add(report_default_path(root, naos_root, policy, key).resolve())
+    state_path = safe_policy_path(root / naos_root,
+        policy['paths'].get('capability_state') or 'capability_state.yaml', field='capability_state')
+    state = _strict_applicability_yaml(state_path)
+    # Use the actual maturity producer's state contract; generated profile
+    # rows may omit optional schema-only metadata such as waiver_policy.
+    entries = maturity.normalize_state_entries(state, state_path)
+    contracts = maturity.load_capability_contracts(root, naos_root, profile)
+    for cap_id, entry in entries.items():
+        if cap_id not in contracts:
+            raise ValueError(f'Unknown dashboard capability declaration: {cap_id}')
+        if entry['enabled'] is not True:
+            continue
+        if max(maturity.maturity_index(entry['current_maturity']),
+               maturity.maturity_index(entry['target_maturity'])) < 2:
+            continue
+        # L0/L1 are declared metadata. Operational evidence selection starts L2.
+        # Documentary contract strings that do not name these report paths do
+        # not create report prerequisites; authored refs remain exact operands.
+        for ref in list(contracts[cap_id].get('required_evidence') or []) + entry.get('evidence_refs', []):
+            if not isinstance(ref, str) or not ref.strip():
+                raise ValueError('Invalid dashboard operational evidence reference')
+            parts = Path(ref.split('#', 1)[0])
+            if parts.is_absolute() or '..' in parts.parts or '\\' in ref:
+                raise ValueError('Unsafe dashboard operational evidence reference')
+            paths.add((root / parts).resolve())
+    return paths
+
+
+def dashboard_applicability(
+    root: Path,
+    naos_root: str,
+    policy: dict[str, Any],
+    artifacts: dict[str, dict[str, Any]],
+    default_paths: dict[str, Path],
+    profile: str | None = None,
+    explicit_inputs: set[str] | None = None,
+) -> tuple[dict[str, Any] | None, set[str]]:
+    """Classify absent inputs; declarations never override gate requirements."""
+    if "dashboard" not in policy:
+        return None, set()
+    declaration = policy["dashboard"]
+
+    result: dict[str, Any] = {"mode": "selected_workflows", "selected_workflows": [], "inputs": {}, "errors": []}
+    # The shared loader serves legacy consumers. Independently check its exact
+    # policy source before this new feature grants any absence exemptions.
+    policy_source = policy.get("_meta", {}).get("path")
+    if policy_source:
+        try:
+            _strict_applicability_yaml(Path(policy_source))
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            result["errors"].append(str(exc))
+            return result, set()
+    if (
+        not isinstance(declaration, dict)
+        or set(declaration) != {"applicability", "selected_workflows"}
+        or declaration.get("applicability") not in {"selected_workflows", "selected_obligations"}
+        or not isinstance(declaration.get("selected_workflows"), list)
+    ):
+        result["errors"].append("dashboard must contain exactly a known applicability mode and selected_workflows: [known workflow ids]")
+        return result, set()
+    selected = declaration["selected_workflows"]
+    if any(not isinstance(item, str) or item not in WORKFLOW_INPUTS for item in selected) or len(set(selected)) != len(selected):
+        result["errors"].append("selected_workflows contains an unknown, non-string, or duplicate workflow id")
+        return result, set()
+    result["selected_workflows"] = selected
+    result["mode"] = declaration["applicability"]
+
+    # Both the shipped and project gate manifests can impose requirements.
+    # Invalid gate data denies exemptions; it cannot silently erase a gate.
+    required_paths: set[Path] = set()
+    baseline = Path(__file__).resolve().with_name("gatekeepers.baseline.yaml")
+    project_gates = root / naos_root / "gatekeepers.yaml"
+    try:
+        # Generated and relocated runtimes carry the shipped baseline beside
+        # this script. Source/installed kit commands use the original template.
+        # A present but invalid baseline never falls back to project gates.
+        try:
+            baseline.lstat()
+        except FileNotFoundError:
+            baseline = SCRIPT_DIR.parent / "templates/structural-seeds/naos/gatekeepers.yaml"
+        gate_sources = [baseline]
+        try:
+            project_gates.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            gate_sources.append(project_gates)
+        for source in gate_sources:
+            gate_data = _strict_applicability_yaml(source)
+            if result['mode'] == 'selected_obligations':
+                from naos_gate_status import validate_manifest
+                validate_manifest(gate_data)
+            if not isinstance(gate_data, dict) or not isinstance(gate_data.get("gates"), list):
+                raise ValueError(f"invalid gate manifest: {source}")
+            for gate in gate_data["gates"]:
+                if not isinstance(gate, dict):
+                    raise ValueError(f"invalid gate entry: {source}")
+                for field in ("required_inputs", "required_evidence"):
+                    paths = gate.get(field, [])
+                    if not isinstance(paths, list) or any(not isinstance(path, str) or not path.strip() for path in paths):
+                        raise ValueError(f"invalid {field}: {source}")
+                    required_paths.update((root / path).resolve() for path in paths)
+    except (OSError, ValueError, AttributeError, yaml.YAMLError) as exc:
+        result["errors"].append(str(exc))
+        return result, set()
+
+    if result['mode'] == 'selected_obligations':
+        try:
+            if set(artifacts) != set(default_paths) or not (explicit_inputs or set()) <= set(artifacts):
+                raise ValueError('Unknown dashboard input role or selection')
+            required_paths.update(_dashboard_obligation_paths(root, naos_root,
+                profile or str(policy.get('default_profile') or 'standard'), policy))
+            workflow_keys = {key: workflow for workflow, keys in WORKFLOW_INPUTS.items() for key in keys}
+            # A meaningful authored source declaration activates its observation,
+            # independently of an explicitly selected workflow.
+            declarations = (('ai_code_provenance', 'ai_code_provenance_manifest', 'ai_code_provenance.yaml',
+                             'naos.ai_code_provenance_manifest.v1', 'ai_use_declarations'),
+                            ('compliance_posture', 'compliance_posture_manifest', 'compliance_posture.yaml',
+                             'naos.compliance_posture_manifest.v1', 'declared_contexts'))
+            from naos_policy import safe_policy_path
+            declared = set()
+            for key, field, filename, schema, items in declarations:
+                path = safe_policy_path(root / naos_root, policy['paths'].get(field) or filename, field=field)
+                try:
+                    path.lstat()
+                except FileNotFoundError:
+                    continue
+                if path.is_symlink() or not path.is_file():
+                    raise ValueError('Unsafe dashboard workflow declaration')
+                document = _strict_applicability_yaml(path)
+                if (not isinstance(document, dict) or document.get('schema') != schema
+                        or not isinstance(document.get(items), list)):
+                    raise ValueError('Malformed dashboard workflow declaration')
+                if any(not isinstance(item, dict) for item in document[items]):
+                    raise ValueError('Malformed dashboard workflow declaration entry')
+                # Shipped draft placeholders are inert declaration surfaces.
+                # Only strict equality to the current source-owned seed exempts
+                # that default; modified authored declarations stay selected.
+                seed = _dashboard_declaration_seed(filename, schema, items)
+                if document != seed:
+                    declared.add(key)
+            advisory = set()
+            for key, artifact in artifacts.items():
+                actual = artifact.get('path')
+                canonical = default_paths[key].resolve()
+                import fnmatch
+                candidates = {canonical}
+                if isinstance(actual, str):
+                    candidates.add(Path(actual).resolve())
+                # Preserve canonical gate obligations across policy/root remaps.
+                for field, value in policy['paths'].items():
+                    if not isinstance(value, str):
+                        continue
+                    if report_default_path(root, naos_root, policy, field).resolve() == canonical:
+                        candidates.add(report_default_path(root, default_naos_root(SAFE_FALLBACK_POLICY), SAFE_FALLBACK_POLICY, field).resolve())
+                gate_or_operational = any(fnmatch.fnmatchcase(str(candidate), str(required))
+                    for candidate in candidates for required in required_paths)
+                workflow = workflow_keys.get(key)
+                required = gate_or_operational or key in (explicit_inputs or set()) or workflow in selected or key in declared
+                if required:
+                    decision, reason = 'selected_required', 'Current gate, operational capability, full-F producer or explicit workflow/input requires this role.'
+                elif artifact.get('status') == 'missing':
+                    decision, reason = 'unselected_missing_advisory', 'Known source-owned dashboard role has no selected obligation; absence remains advisory and visible.'
+                    advisory.add(key)
+                else:
+                    decision, reason = 'present_or_invalid', 'Present or malformed inputs retain their actual producer/load observations.'
+                result['inputs'][key] = {'workflow': workflow or 'source_obligations', 'decision': decision, 'reason': reason,
+                    'path': actual, 'input_status': artifact.get('status')}
+            result['advisory_missing_inputs'] = sorted(advisory)
+            return result, set()
+        except (OSError, ValueError, TypeError, KeyError, AttributeError, yaml.YAMLError) as exc:
+            result['errors'].append(str(exc))
+            return result, set()
+
+    exempt: set[str] = set()
+    for workflow, keys in WORKFLOW_INPUTS.items():
+        for key in keys:
+            artifact = artifacts[key]
+            actual_path = artifact.get("path")
+            canonical_path = report_default_path(root, naos_root, SAFE_FALLBACK_POLICY, WORKFLOW_PATH_KEYS[key]).resolve()
+            original_canonical_path = report_default_path(
+                root, default_naos_root(SAFE_FALLBACK_POLICY), SAFE_FALLBACK_POLICY, WORKFLOW_PATH_KEYS[key]
+            ).resolve()
+            # Compare canonical, policy-default, and CLI-selected paths so a
+            # remap cannot detach the input from a gate's original requirement.
+            gate_required = bool(
+                {canonical_path, original_canonical_path, default_paths[key].resolve()} & required_paths
+                or (isinstance(actual_path, str) and Path(actual_path).resolve() in required_paths)
+            )
+            if gate_required:
+                decision, reason = "required_by_gate", "Canonical or project gate requires this report path."
+            elif workflow in selected:
+                decision, reason = "selected", f"Workflow {workflow} is selected."
+            elif artifact["status"] == "missing":
+                decision, reason = "exempt_missing", f"Workflow {workflow} is explicitly unselected; only this missing input is exempt."
+                exempt.add(key)
+            else:
+                decision, reason = "present_or_invalid", f"Workflow {workflow} is unselected, but a present input must still be evaluated."
+            result["inputs"][key] = {
+                "workflow": workflow, "decision": decision, "reason": reason,
+                "path": actual_path, "input_status": artifact["status"],
+            }
+    return result, exempt
 
 
 def build_dashboard_summary(
@@ -2610,7 +3074,17 @@ def build_dashboard_summary(
         for key in ("self_check", "systemic_impact"):
             data = artifacts[key].get("data") or {}
             presentation_inputs[key] = data if isinstance(data, dict) else {}
-    findings = missing_report_findings(artifacts, root, naos_root, profile, policy)
+    applicability, exempt_inputs = dashboard_applicability(root, naos_root, policy, artifacts, default_paths, profile,
+        {key for key, value in explicit_paths.items() if value is not None})
+    findings = missing_report_findings(artifacts, root, naos_root, profile, policy, exempt_inputs,
+        set(applicability.get("advisory_missing_inputs", [])) if applicability and not applicability["errors"] else set())
+    if applicability and applicability["errors"]:
+        findings.append({
+            "id": "dashboard_applicability",
+            "severity": "advisory" if is_kit_repository(root, naos_root) else severity_for_profile(profile, policy),
+            "status": "invalid_config",
+            "message": "; ".join(applicability["errors"]),
+        })
     summary_counts = finding_counts(findings)
     policy_meta = policy.get("_meta", {})
     capability_summary = load_capability_contracts(root, profile, args.capabilities_dir)
@@ -2682,9 +3156,10 @@ def build_dashboard_summary(
     capability_summary["readiness_report"] = capability_maturity_readiness
     evidence_pack = summarize_evidence_pack(artifacts["evidence_pack"])
     exceptions = evidence_pack["exceptions_waivers"]
-    return {
+    dashboard_report = {
         "schema": "naos.dashboard_summary.v1",
         "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "project_root": str(root.resolve()),
         "profile": profile,
         "status": status_from_counts(summary_counts),
         "naos_root": naos_root,
@@ -2752,7 +3227,12 @@ def build_dashboard_summary(
         "professional_adoption": professional_adoption,
         "deterministic_hygiene": deterministic_hygiene,
         "ac_completion_evidence": ac_completion_evidence,
-        "gatekeeper_readiness": summarize_gatekeepers(artifacts["gate_status"]),
+        "gatekeeper_readiness": summarize_gatekeepers(
+            artifacts["gate_status"],
+            project_gate_readiness(root, naos_root, profile, policy, "gate_status",
+                                   source_path=Path(artifacts["gate_status"]["path"])),
+            project_gate_readiness(root, naos_root, profile, policy, "gate_evaluation"),
+        ),
         "claims_validation": summarize_claims(artifacts["claims_validation"], policy),
         "self_conformance": summarize_self_check(artifacts["self_check"]),
         "roadmap_crosswalk": summarize_roadmap(artifacts["roadmap_crosswalk"]),
@@ -3060,6 +3540,13 @@ def build_dashboard_summary(
             "Evidence verification reports local digest comparison, signature-entry presence, and best-effort Git HEAD metadata; it does not validate third-party signatures, authenticate identities, or sign artifacts for NAOS.",
         ],
     }
+    if applicability is not None:
+        dashboard_report["input_applicability"] = {
+            **applicability,
+            "inputs": {key: {**item, "path": display_artifact_path(item.get("path"), root)}
+                       for key, item in applicability["inputs"].items()},
+        }
+    return dashboard_report
 
 
 def _table_cell(value: Any) -> str:
@@ -3219,7 +3706,7 @@ def render_control_plane_status_matrix(control_plane: dict[str, Any]) -> list[st
     rows = [
         (
             "Gatekeeper readiness",
-            gatekeeper.get("status"),
+            gatekeeper.get("readiness", "not_evaluated"),
             "see gates",
             f"{len(gatekeeper_gates)} gates reported",
             "naos gate-status --profile <profile>",
@@ -3338,9 +3825,9 @@ def render_control_plane_status_matrix(control_plane: dict[str, Any]) -> list[st
         ),
         (
             "Evidence pack",
-            evidence_pack.get("status"),
+            (evidence_pack.get("readiness") or {}).get("status", "not_evaluated"),
             "review if gaps",
-            f"present: {_table_cell(evidence_pack_summary.get('present_artifacts'))}; missing: {_table_cell(evidence_pack_summary.get('missing_artifacts'))}; stale: {_table_cell(evidence_pack_summary.get('stale_artifacts'))}",
+            f"collection: {_table_cell(evidence_pack.get('assembly_status', 'not_evaluated'))}; present: {_table_cell(evidence_pack_summary.get('present_artifacts'))}; missing: {_table_cell(evidence_pack_summary.get('missing_artifacts'))}; stale: {_table_cell(evidence_pack_summary.get('stale_artifacts'))}",
             "naos evidence-pack --profile <profile>",
         ),
     ]
@@ -3368,9 +3855,9 @@ def render_behavioral_readiness_flow() -> list[str]:
         "",
         "```mermaid",
         "flowchart LR",
-        "    D[\"Deterministic evidence<br/>conformance, StaticGrader, reports\"] --> R[\"Readiness classification<br/>review input only\"]",
-        "    R --> H[\"Human baseline decision<br/>create or maintain outside this command\"]",
-        "    H -. \"optional advisory only; non-authoritative; not executed here\" .-> A[\"Non-deterministic readiness<br/>LLM posture, no provider call\"]",
+        "    D[\"Deterministic evidence: conformance, StaticGrader, reports\"] --> R[\"Readiness classification: review input only\"]",
+        "    R --> H[\"Human baseline decision: create or maintain outside this command\"]",
+        "    H -. \"optional advisory only; non-authoritative; not executed here\" .-> A[\"Non-deterministic readiness: LLM posture, no provider call\"]",
         "```",
     ]
 
@@ -3433,6 +3920,8 @@ def render_testing_metrics(
         "|--------|-------|--------|--------|",
         f"| Pytest coverage | {pytest_coverage:.1f}% / target {pytest_target:.0f}% | {_table_cell(coverage_status)} | {_table_cell(coverage_source)} |",
         f"| Source-to-test map | {source_map_value} mapped sources | {_table_cell(test_evidence.get('health_status'))} | `naos/test_evidence/source_to_test_map.json` |",
+        f"| Coverage inputs | selected {_table_cell(test_summary.get('coverage_inputs_selected'))}; parsed {_table_cell(test_summary.get('coverage_inputs_parsed'))}; failed {_table_cell(test_summary.get('coverage_inputs_failed'))}; unsupported {_table_cell(test_summary.get('coverage_inputs_unsupported'))} | {_table_cell(test_summary.get('coverage_input_status', 'unknown'))} | `naos/test_evidence/source_to_test_map.json` |",
+        f"| Test evidence inputs | selected {_table_cell(test_summary.get('test_inputs_selected'))}; read {_table_cell(test_summary.get('test_inputs_read'))}; failed {_table_cell(test_summary.get('test_inputs_failed'))} | {_table_cell(test_summary.get('test_input_status', 'unknown'))} | `naos/test_evidence/source_to_test_map.json` |",
         f"| Unmapped sources | {unmapped_value} | {_table_cell(test_evidence.get('health_status'))} | `naos/test_evidence/source_to_test_map.json` |",
         f"| Evidence type counts | {_table_cell(evidence_type_value)} | {_table_cell(test_evidence.get('map_status'))} | `naos/test_evidence/source_to_test_map.json` |",
         f"| Coverage support default | {_table_cell(test_evidence.get('coverage_supports_source_default'))} | {_table_cell(test_evidence.get('health_status'))} | `naos/reports/test_evidence_health.json` |",
@@ -3440,6 +3929,7 @@ def render_testing_metrics(
         f"| Test functions scanned | {_table_cell(test_quality_summary.get('test_functions_scanned'))} | {_table_cell(test_quality_status)} | `naos/reports/test_quality_hygiene.json` |",
         f"| Missing assertions | {_table_cell(test_quality_summary.get('missing_assertions'))} | {_table_cell(test_quality_status)} | `naos/reports/test_quality_hygiene.json` |",
         f"| Trivial assertions | {_table_cell(test_quality_summary.get('trivial_assertions'))} | {_table_cell(test_quality_status)} | `naos/reports/test_quality_hygiene.json` |",
+        f"| Test scan inputs | selected {_table_cell(test_quality_summary.get('files_selected'))}; scanned {_table_cell(test_quality_summary.get('files_scanned'))}; failed {_table_cell(test_quality_summary.get('files_failed'))} | {_table_cell(test_quality_summary.get('coverage_status', 'unknown'))} | `naos/reports/test_quality_hygiene.json` |",
         f"| Test parse errors | {_table_cell(test_quality_summary.get('parse_errors'))} | {_table_cell(test_quality_status)} | `naos/reports/test_quality_hygiene.json` |",
         f"| Package-reality findings | {_table_cell(package_reality_summary.get('total_findings'))} | {_table_cell(package_reality_status)} | `naos/reports/package_reality.json` |",
         f"| Package-reality registry mode | {_table_cell(package_reality_summary.get('registry_mode'))} | {_table_cell(package_reality_status)} | `naos/reports/package_reality.json` |",
@@ -3605,6 +4095,19 @@ def render_control_plane_dashboard(control_plane: dict[str, Any] | None) -> list
         "> NAOS ships a portable, file-first capability-contract framework for SDLC governance. It does not ship runtime governance, behavioral grading, or compliance certification. Projects activate and mature capabilities progressively through profiles, readiness gates, and evidence.",
         "",
     ]
+    applicability = control_plane.get("input_applicability")
+    if applicability is not None:
+        lines.extend(["### Dashboard Input Applicability", ""])
+        if applicability["errors"]:
+            lines.append("Invalid applicability declaration; missing inputs retain their normal findings: " + "; ".join(applicability["errors"]))
+        else:
+            lines.append("Selected workflows: " + (", ".join(applicability["selected_workflows"]) or "none") + ". This classifies input availability only; producer findings, gate decisions, and human review remain separate.")
+            lines.extend(["", "| Input | Availability | Decision | Reason |", "|-------|--------------|----------|--------|"])
+            for key, item in applicability["inputs"].items():
+                lines.append(
+                    f"| `{key}` | `{_table_cell(item['input_status'])}` | `{_table_cell(item['decision'])}` | {_table_cell(item['reason'])} |"
+                )
+        lines.append("")
     lines.extend(render_control_plane_status_matrix(control_plane))
     lines.extend(
         [
@@ -3719,7 +4222,7 @@ def render_control_plane_dashboard(control_plane: dict[str, Any] | None) -> list
         f"| Compliance Posture | {_table_cell(compliance_posture.get('status'))} | manifest: {_table_cell(compliance_manifest.get('present'))}; declared contexts: {_table_cell(compliance_summary.get('declared_contexts'))}; missing evidence: {_table_cell(compliance_summary.get('missing_evidence'))}; cost_usd: {_table_cell(compliance_cost.get('cost_usd'))}; human review: {_table_cell(compliance_posture.get('human_review_required'))} |"
     )
     lines.append(
-        f"| Gatekeeper readiness | {_table_cell(control_plane['gatekeeper_readiness']['status'])} | {len(control_plane['gatekeeper_readiness']['gates'])} gates reported |"
+        f"| Gatekeeper readiness | {_table_cell(control_plane['gatekeeper_readiness'].get('readiness', 'not_evaluated'))} | {len(control_plane['gatekeeper_readiness']['gates'])} gates reported; stored report validation |"
     )
     lines.append(
         f"| Claims validation | {_table_cell(control_plane['claims_validation']['status'])} | {control_plane['claims_validation']['overclaim_findings']} overclaim findings, {control_plane['claims_validation']['external_references_unverified']} unverified external references |"
@@ -3744,7 +4247,7 @@ def render_control_plane_dashboard(control_plane: dict[str, Any] | None) -> list
     )
     evidence_summary = control_plane["evidence_pack"]["summary"]
     lines.append(
-        f"| Evidence pack | {_table_cell(control_plane['evidence_pack']['status'])} | present artifacts: {_table_cell(evidence_summary.get('present_artifacts'))}; missing: {_table_cell(evidence_summary.get('missing_artifacts'))}; stale: {_table_cell(evidence_summary.get('stale_artifacts'))} |"
+        f"| Evidence pack | {_table_cell((control_plane['evidence_pack'].get('readiness') or {}).get('status', 'not_evaluated'))} | collection: {_table_cell(control_plane['evidence_pack'].get('assembly_status', 'not_evaluated'))}; present artifacts: {_table_cell(evidence_summary.get('present_artifacts'))}; missing: {_table_cell(evidence_summary.get('missing_artifacts'))}; stale: {_table_cell(evidence_summary.get('stale_artifacts'))}; stored pack projection |"
     )
     lines.append(
         f"| Exceptions / waivers | {_table_cell('advisory' if control_plane['exceptions_waivers']['count'] else 'not_configured')} | {control_plane['exceptions_waivers']['count']} recorded; waived risk is not hidden as pass |"
@@ -5247,8 +5750,10 @@ def render_control_plane_dashboard(control_plane: dict[str, Any] | None) -> list
             "> These reports improve deterministic review discipline. They do not calibrate models, prove truth, approve work, resolve issues, certify outcomes, or prove compliance.",
             "",
             f"Calibration shadow status: `{_table_cell(calibration.get('status'))}`; drift items: `{_table_cell(calibration.get('drift_count'))}`; missing reports: `{_table_cell(len(calibration.get('reports_missing') or []))}`.",
-            f"Evidence classification status: `{_table_cell(evidence_classification.get('status'))}`; findings scanned: `{_table_cell(evidence_classification.get('findings_scanned'))}`; missing classifications: `{_table_cell(len(evidence_classification.get('missing_classification') or []))}`.",
+            f"Evidence classification status: `{_table_cell(evidence_classification.get('status'))}`; findings scanned: `{_table_cell(evidence_classification.get('findings_scanned'))}`; missing classifications: `{_table_cell(collection_count(evidence_classification, 'missing_classification'))}`.",
             "",
+            *([f"Unclassified text gap/risk disclosures: `{len(evidence_classification.get('unclassified_context') or [])}`. These remain human-review context; ready classification does not resolve them.", ""]
+              if evidence_classification.get("unclassified_context") else []),
             "Run `make -f Makefile.naos naos-calibration-shadow` and `make -f Makefile.naos naos-evidence-classification` to refresh these reports.",
             "",
             "### Cross-Harness Review Readiness",
@@ -5328,6 +5833,8 @@ def render_control_plane_dashboard(control_plane: dict[str, Any] | None) -> list
 def render_dashboard(
     control_plane: dict[str, Any] | None = None,
     finding_presentation: dict[str, Any] | None = None,
+    *,
+    record_progress_history: bool = True,
 ) -> str:
     tasks = parse_task_matrix()
     auth_counts = parse_authoritative_counts(REQ_FILE)
@@ -5338,12 +5845,16 @@ def render_dashboard(
         reqs[rid] = {"title": "", "status": "In Progress"}
     for rid in auth_counts["fr_planned"]:
         reqs[rid] = {"title": "", "status": "Planned"}
+    for rid in auth_counts["fr_unresolved"]:
+        reqs[rid] = {"title": "", "status": "Unresolved"}
     for rid in auth_counts["nfr_complete"]:
         reqs[rid] = {"title": "", "status": "Implemented"}
     for rid in auth_counts["nfr_in_progress"]:
         reqs[rid] = {"title": "", "status": "In Progress"}
     for rid in auth_counts["nfr_planned"]:
         reqs[rid] = {"title": "", "status": "Planned"}
+    for rid in auth_counts["nfr_unresolved"]:
+        reqs[rid] = {"title": "", "status": "Unresolved"}
     req_stats = {
         "fr": auth_counts["fr"],
         "nfr": auth_counts["nfr"],
@@ -5367,30 +5878,16 @@ def render_dashboard(
     gov_sprints = parse_governance_sprints()
     current_date = datetime.now(UTC).strftime("%Y-%m-%d")
 
-    # Persist progress history once per run
+    # Acquisition records history; a consumer of sealed inputs only renders it.
     total_reqs_hist = fr_t + nfr_t
     done_reqs_hist = fr_i + nfr_i
     in_prog_reqs_hist = fr_p + nfr_p
 
-    if total_reqs_hist > 0:
-        history_file = NAOS_ROOT / "TASK_PROGRESS_HISTORY.csv"
-        pct_hist = done_reqs_hist / total_reqs_hist * 100
-        if not history_file.exists():
-            history_file.write_text("timestamp,done_percent,done,in_progress,total\n")
-        ts = datetime.now(UTC).isoformat()
-        today_str = ts[:10]
-        write_row = True
-        try:
-            existing = history_file.read_text().strip().splitlines()
-            if len(existing) > 1 and existing[-1].startswith(today_str):
-                write_row = False
-        except Exception:
-            pass
-        if write_row:
-            with history_file.open("a") as hf:
-                hf.write(
-                    f"{ts},{pct_hist:.2f},{done_reqs_hist},{in_prog_reqs_hist},{total_reqs_hist}\n"
-                )
+    if record_progress_history and total_reqs_hist > 0:
+        append_progress_history(
+            NAOS_ROOT / "TASK_PROGRESS_HISTORY.csv",
+            done=done_reqs_hist, in_progress=in_prog_reqs_hist, total=total_reqs_hist,
+        )
 
     # Build Gantt chart with logical dependencies
     acyclic_deps = remove_cycles(logical_deps, tasks)
@@ -5536,6 +6033,9 @@ def render_dashboard(
     implemented_reqs = fr_i + nfr_i
     in_progress_reqs = fr_p + nfr_p
     planned_reqs = fr_pl + nfr_pl
+    fr_unresolved = len(auth_counts["fr_unresolved"])
+    nfr_unresolved = len(auth_counts["nfr_unresolved"])
+    unresolved_reqs = fr_unresolved + nfr_unresolved
     overall_pct = (implemented_reqs / total_reqs * 100) if total_reqs else 0.0
 
     phase_1_5_tasks = [t for t in tasks if _phase_num(t) < 6]
@@ -5568,14 +6068,21 @@ def render_dashboard(
     else:
         risk_status = f"{active_risks} active risks requiring attention"
 
-    if in_progress_reqs > 0:
+    if total_reqs == 0:
+        next_steps_text = "Define requirements in specs/03-requirements.md; none were parsed"
+    elif unresolved_reqs:
+        next_steps_text = f"Resolve {unresolved_reqs} requirement status(es) before claiming completion"
+    elif in_progress_reqs > 0:
         next_steps_text = f"Complete {in_progress_reqs} in-progress requirement(s)"
     elif planned_reqs > 0:
         next_steps_text = f"Begin {planned_reqs} planned requirement(s)"
     else:
-        next_steps_text = "All requirements delivered — focus on next phase"
+        next_steps_text = "All parsed requirements have complete status declarations — review the next phase"
 
-    lines.append(f"- **Where are we?** → {overall_pct:.1f}% complete, {trajectory}")
+    if total_reqs:
+        lines.append(f"- **Where are we?** → {overall_pct:.1f}% marked complete in spec, {trajectory}")
+    else:
+        lines.append("- **Where are we?** → Requirement completion unavailable; 0 requirements parsed")
     lines.append(f"- **What's at risk?** → {risk_status}")
     lines.append(f"- **What's next?** → {next_steps_text}")
     lines.append(
@@ -5598,8 +6105,9 @@ def render_dashboard(
         trajectory_desc = "building momentum"
 
     narrative = (
-        f"The project is in {health} with **{overall_pct:.1f}% of requirements delivered** "
+        f"The project is in {health} with **{overall_pct:.1f}% of requirements marked complete in spec** "
         f"({implemented_reqs}/{total_reqs}), {trajectory_desc}."
+        if total_reqs else "Requirement delivery cannot be assessed because no requirements were parsed."
     )
     if active_risks == 0:
         narrative += " **No active high-priority risks.**"
@@ -5612,19 +6120,21 @@ def render_dashboard(
     lines.append("### Key Metrics")
     lines.append("")
     lines.append(
-        f"**Overall Project Completion**: {implemented_reqs}/{total_reqs} requirements ({overall_pct:.1f}%)"
+        f"**Declared Requirement Completion**: {implemented_reqs}/{total_reqs} requirements ({overall_pct:.1f}%)"
+        if total_reqs else "**Declared Requirement Completion**: unavailable (0 requirements parsed)"
     )
     lines.append("")
     lines.append("| Metric | Value | Status |")
     lines.append("|--------|-------|--------|")
     lines.append(
-        f"| **Requirements Delivered** | {implemented_reqs}/{total_reqs} ({overall_pct:.1f}%) | {'🟢 On Track' if overall_pct >= 50 else '🟡 Behind'} |"
+        f"| **Requirements Marked Complete** | {implemented_reqs}/{total_reqs} ({overall_pct:.1f}%) | {'🟢 On Track' if overall_pct >= 50 else '🟡 Behind'} |"
+        if total_reqs else "| **Requirements Marked Complete** | unavailable (0 requirements parsed) | ⚠️ Unresolved |"
     )
     lines.append(
-        f"| **Functional (FR)** | {fr_i}/{fr_t} ({(fr_i / fr_t * 100) if fr_t else 0:.1f}%) | {'✅ Complete' if fr_i == fr_t else f'🔵 {fr_p} in progress'} |"
+        f"| **Functional (FR)** | {fr_i}/{fr_t} ({(fr_i / fr_t * 100) if fr_t else 0:.1f}%) | {requirement_badge(fr_t, fr_i, fr_p, fr_pl, fr_unresolved)} |"
     )
     lines.append(
-        f"| **Non-Functional (NFR)** | {nfr_i}/{nfr_t} ({(nfr_i / nfr_t * 100) if nfr_t else 0:.1f}%) | {'✅ Complete' if nfr_i == nfr_t else f'🔵 {nfr_p} in progress'} |"
+        f"| **Non-Functional (NFR)** | {nfr_i}/{nfr_t} ({(nfr_i / nfr_t * 100) if nfr_t else 0:.1f}%) | {requirement_badge(nfr_t, nfr_i, nfr_p, nfr_pl, nfr_unresolved)} |"
     )
     if registry_metrics:
         lines.append(
@@ -5671,13 +6181,13 @@ def render_dashboard(
                 lines.append(f"- **{f['file']}**: {f['status']} - {f['msg']}")
 
     lines.append(
-        f"| **Phase 1-5 Progress** | {phase_1_5_done}/{phase_1_5_total} tasks ({phase_1_5_pct:.1f}%) | {'✅ Complete' if phase_1_5_done == phase_1_5_total else '🔵 In Progress'} |"
+        f"| **Phase 1-5 Progress** | {phase_1_5_done}/{phase_1_5_total} tasks ({phase_1_5_pct:.1f}%) | {'⚪ No tasks' if phase_1_5_total == 0 else ('✅ Complete' if phase_1_5_done == phase_1_5_total else '🔵 In Progress')} |"
     )
     phase_6_pct = (
         (phase_6_plus_done / phase_6_plus_total * 100) if phase_6_plus_total else 0.0
     )
     lines.append(
-        f"| **Phase 6+ Progress** | {phase_6_plus_done}/{phase_6_plus_total} tasks ({phase_6_pct:.1f}%) | {'✅ Complete' if phase_6_plus_done == phase_6_plus_total else ('🔵 In Progress' if phase_6_plus_done > 0 else '⚪ Planned')} |"
+        f"| **Phase 6+ Progress** | {phase_6_plus_done}/{phase_6_plus_total} tasks ({phase_6_pct:.1f}%) | {'⚪ No tasks' if phase_6_plus_total == 0 else ('✅ Complete' if phase_6_plus_done == phase_6_plus_total else ('🔵 In Progress' if phase_6_plus_done > 0 else '⚪ Planned'))} |"
     )
     lines.append(
         f"| **Active Risks** | {active_risks} risks | {'🟢 Low' if active_risks <= 2 else '🟡 Monitor'} |"
@@ -5739,12 +6249,25 @@ def render_dashboard(
         lines.append(render_trend_sparkline(trend))
 
     lines.append("\n## Requirement Coverage")
-    lines.append("| Type | Total | Implemented | In Progress | Planned |")
-    lines.append("|------|-------|-------------|------------|---------|")
-    lines.append(f"| FR | {fr_t} | {fr_i} | {fr_p} | {fr_pl} |")
-    lines.append(f"| NFR | {nfr_t} | {nfr_i} | {nfr_p} | {nfr_pl} |")
+    lines.append(
+        "> Counts reflect declarations in `specs/03-requirements.md`; they do not authenticate implementation or delivery."
+    )
+    lines.append("| Type | Total | Implemented | In Progress | Planned | Unresolved |")
+    lines.append("|------|-------|-------------|------------|---------|------------|")
+    lines.append(f"| FR | {fr_t} | {fr_i} | {fr_p} | {fr_pl} | {fr_unresolved} |")
+    lines.append(f"| NFR | {nfr_t} | {nfr_i} | {nfr_p} | {nfr_pl} | {nfr_unresolved} |")
     all_t, all_i, all_p, all_pl = req_stats["all"]
-    lines.append(f"| All | {all_t} | {all_i} | {all_p} | {all_pl} |")
+    lines.append(f"| All | {all_t} | {all_i} | {all_p} | {all_pl} | {unresolved_reqs} |")
+    if not total_reqs:
+        reason = (
+            "missing"
+            if auth_counts["source_status"] == "missing"
+            else "contains no parseable requirements"
+        )
+        lines.append(f"\n⚠️ Requirement source is {reason}: `specs/03-requirements.md`.")
+    elif unresolved_reqs:
+        ids = ", ".join(auth_counts["fr_unresolved"] + auth_counts["nfr_unresolved"])
+        lines.append(f"\n⚠️ Requirement statuses need review: {ids}.")
     lines.extend(render_testing_metrics(control_plane, traceability))
 
     # === TRACEABILITY HEALTH ===
@@ -6076,6 +6599,11 @@ def main() -> int:
     parser.add_argument("--json-output", help="Optional machine-readable dashboard summary output path.")
     parser.add_argument("--json", action="store_true", help="Print machine-readable dashboard summary JSON.")
     parser.add_argument(
+        "--no-progress-history",
+        action="store_true",
+        help="Render existing progress history without appending to it; preserve sealed dependency inputs.",
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         help="Show every human-readable finding occurrence; JSON is always complete.",
@@ -6215,7 +6743,20 @@ def main() -> int:
         show_all=args.all,
         limitations=limitations,
     )
-    markdown = render_dashboard(dashboard_summary, finding_presentation)
+    markdown = render_dashboard(
+        dashboard_summary, finding_presentation,
+        record_progress_history=not args.no_progress_history,
+    )
+    try:
+        dashboard_summary = compose_publication(dashboard_summary, root)
+        # Only after source-reference validation/collection has used native paths.
+        dashboard_summary["inputs"] = {
+            key: {**item, "path": display_artifact_path(item.get("path"), root)}
+            for key, item in dashboard_summary["inputs"].items()
+        }
+    except CompositionError as exc:
+        print(f"NAOS dashboard composition failed: {exc}", file=sys.stderr)
+        return 2
     if not args.json:
         print("NAOS dashboard findings:")
         for line in presentation_lines(finding_presentation):
@@ -6224,7 +6765,7 @@ def main() -> int:
     output_path = Path(args.output) if args.output else dashboard_output_path(root, naos_root, policy)
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(markdown, encoding="utf-8")
+        output_path.write_text(markdown, encoding="utf-8", newline="\n")
         print(f"Wrote {output_path}", file=sys.stderr if args.json else sys.stdout)
     else:
         print(

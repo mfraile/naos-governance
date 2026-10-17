@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import configparser
 import hashlib
 import json
 import re
@@ -15,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 RECEIPT = ROOT / "NAOS_PUBLIC_EXPORT_MANIFEST.json"
 PUBLIC_REPOSITORY = "https://github.com/mfraile/naos-governance"
 ACTIVATION_BOUNDARY = (
-    "Managed `--activate` mutation is currently supported only on Darwin ARM64 "
-    "with CPython"
+    "Managed activation targets native macOS, Ubuntu and Windows 11 with CPython "
+    "3.11–3.13"
 )
 INTERNAL_HISTORY_PATTERNS = (
     re.compile("ROAD" + r"MAP-[0-9]{2}", re.IGNORECASE),
@@ -85,6 +86,16 @@ class PublicCandidateTests(unittest.TestCase):
         self.assertFalse((ROOT / "dev").exists())
         self.assertFalse((ROOT / "tests").exists())
         self.assertFalse((ROOT / "configs" / "naos_public_ci.yml").exists())
+        self.assertFalse((ROOT / "configs" / "naos_public_gitignore").exists())
+        self.assertNotIn("dev/" + "audits/", (ROOT / ".gitignore").read_text())
+
+    def test_default_pytest_collection_targets_public_tests(self) -> None:
+        config = configparser.ConfigParser()
+        self.assertEqual(config.read(ROOT / "pytest.ini"), [str(ROOT / "pytest.ini")])
+        self.assertEqual(config["pytest"]["testpaths"].split(), ["public_tests"])
+        self.assertEqual(config["pytest"]["python_files"].split(), ["test_*.py"])
+        self.assertEqual(config["pytest"]["addopts"].split(), ["-p", "no:cacheprovider"])
+        self.assertFalse((ROOT / "tests").exists())
 
     def test_release_identity_and_repository_urls_are_current(self) -> None:
         metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
@@ -151,8 +162,28 @@ class PublicCandidateTests(unittest.TestCase):
         ):
             with self.subTest(platform_boundary=path):
                 normalized = " ".join(content.replace("\n> ", "\n").split())
-                self.assertIn(ACTIVATION_BOUNDARY, normalized)
-        self.assertIn("Create-only activation is currently supported only on Darwin ARM64", greenfield_diagram)
+                if path == "installation manual":
+                    self.assertIn(
+                        "Use `python -m naos_governance <command>` in the selected Python "
+                        "environment on macOS, Ubuntu and Windows 11.", normalized,
+                    )
+                    self.assertIn(
+                        "Use CPython 3.11–3.13 on a qualified native filesystem.", normalized,
+                    )
+                    self.assertIn(
+                        "Any successor requires its own source, artifact and installation bindings",
+                        normalized,
+                    )
+                elif path in {"quickstart tutorial", "lite tutorial", "standard tutorial"}:
+                    self.assertIn("Native macOS ARM64/APFS, Ubuntu x86_64/ext4 and Windows 11 x86_64/NTFS", normalized)
+                    self.assertIn("recorded Python 3.11–3.13 installation checks", normalized)
+                    self.assertIn("qualification for an activation, update or receiving operation depends on its named route and evidence", normalized)
+                    self.assertIn("Linux aarch64 is not qualified", normalized)
+                else:
+                    self.assertIn(ACTIVATION_BOUNDARY, normalized)
+        self.assertIn("Native macOS, Ubuntu and Windows 11 adapters target CPython 3.11-3.13", greenfield_diagram)
+        self.assertIn("Qualification is specific to the operation, profile, architecture and filesystem", greenfield_diagram)
+        self.assertIn("Preview and installation do not qualify filesystem recovery", greenfield_diagram)
 
     def test_public_workflow_is_read_only_and_non_publishing(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

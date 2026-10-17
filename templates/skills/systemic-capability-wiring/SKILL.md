@@ -1,7 +1,8 @@
 ---
-name: "systemic-capability-wiring"
-description: "Use when designing, changing, or reviewing capabilities, validators, AI surfaces, docs, source modules, workflows, or project configuration so NAOS changes are wired without orphan artifacts."
-parameters: []
+name: systemic-capability-wiring
+description: Use when designing, changing, or reviewing capabilities, validators, AI surfaces, docs, source modules, workflows, or project configuration so NAOS changes are wired without orphan artifacts.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Systemic Capability Wiring Skill

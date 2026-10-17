@@ -24,6 +24,7 @@
     "validators_run",
     "gate_status_summary",
     "gate_evaluation_summary",
+    "gate_readiness",
     "evidence_pack_summary",
     "dashboard_summary",
     "evidence_conflict_summary",
@@ -79,6 +80,7 @@
     },
     "gate_status_summary": {"type": "object"},
     "gate_evaluation_summary": {"type": "object"},
+    "gate_readiness": {"$ref": "#/$defs/gate_readiness"},
     "evidence_pack_summary": {"type": "object"},
     "dashboard_summary": {"type": "object"},
     "evidence_conflict_summary": {"type": "object"},
@@ -111,5 +113,66 @@
     },
     "human_review_required": {"type": "boolean"},
     "summary": {"type": "object"}
+  },
+  "$defs": {
+    "gate_readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_status", "gate_evaluation"],
+      "properties": {
+        "gate_status": {"$ref": "#/$defs/gate_projection"},
+        "gate_evaluation": {"$ref": "#/$defs/gate_projection"}
+      }
+    },
+    "gate_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_path", "readiness", "validation", "scope", "reason_codes", "source_finding_refs", "evaluation_scope", "summary", "gates", "protected_invariant_violations", "enforcement"],
+      "properties": {
+        "source_path": {"type": "string"},
+        "required_readiness": {"enum": ["not_evaluated", "unresolved", "ready"]},
+        "required_reason_codes": {"type": "array", "items": {"type": "string"}},
+        "source_content_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+        "readiness": {"enum": ["ready", "unresolved", "not_evaluated"]},
+        "validation": {"enum": ["valid", "invalid", "unsupported", "not_evaluated"]},
+        "scope": {"enum": ["matched", "mismatched", "not_established", "not_applicable"]},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "source_finding_refs": {"type": "array", "items": {"type": "object", "required": ["reference", "id"], "properties": {"reference": {"type": "string"}, "id": {"type": "string"}}}},
+        "evaluation_scope": {"type": ["object", "null"]},
+        "summary": {"type": ["object", "null"]},
+        "gates": {"type": "array", "items": {"$ref": "#/$defs/gate"}},
+        "protected_invariant_violations": {"type": "array", "items": {"type": "object"}},
+        "enforcement": {"type": ["object", "null"]}
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "readiness", "severity", "unresolved_evidence", "evidence_results"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"type": "string"},
+        "readiness": {"enum": ["ready", "unresolved", "not_applicable"]},
+        "severity": {"type": "string"},
+        "unresolved_evidence": {"type": "array", "items": {"type": "string"}},
+        "evidence_results": {"type": "array", "items": {"$ref": "#/$defs/evidence_result"}}
+      }
+    },
+    "evidence_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "availability", "applicability", "validation", "scope", "freshness", "producer_outcome", "requirement_outcome", "reason_codes"],
+      "properties": {
+        "reference": {"type": "string"},
+        "availability": {"type": "string"},
+        "applicability": {"type": "string"},
+        "validation": {"type": "string"},
+        "scope": {"type": "string"},
+        "freshness": {"type": "string"},
+        "producer_outcome": {"type": "string"},
+        "requirement_outcome": {"type": "string"},
+        "reason_codes": {"type": "array", "items": {"type": "string"}}
+      }
+    }
   }
 }

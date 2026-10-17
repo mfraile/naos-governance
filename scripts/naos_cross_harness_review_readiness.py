@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +17,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    controlled_utc_now_text,
     build_generated_by,
     default_naos_root,
     exit_code_for_summary,
@@ -77,10 +77,7 @@ RESIDUAL_RISKS = [
 
 
 def utc_now() -> str:
-    fixed = os.environ.get("NAOS_FIXED_TIME")
-    if fixed:
-        return fixed
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return controlled_utc_now_text()
 
 
 def latest_session_id(root: Path, naos_root: str, policy: dict[str, Any]) -> str | None:
@@ -265,11 +262,13 @@ def evaluate_config(data: dict[str, Any], profile: str, policy: dict[str, Any]) 
     }
 
 
-def status_for_report(profile: str, config_present: bool, config_valid: bool, evaluated: dict[str, Any]) -> str:
+def status_for_report(profile: str, config_present: bool, config_valid: bool, evaluated: dict[str, Any], *, config_enabled: bool = True) -> str:
     if not config_present:
         return "missing_config"
     if not config_valid:
         return "invalid_config"
+    if not config_enabled:
+        return "disabled"
     finding_statuses = {str(item.get("status")) for item in evaluated.get("findings") or []}
     if "provider_api_enabled" in finding_statuses:
         return "provider_api_enabled"
@@ -332,7 +331,10 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, in
             findings.extend(evaluated["findings"])
 
     summary = finding_counts(findings)
-    status = status_for_report(profile, config_present, config_valid, evaluated)
+    status = status_for_report(
+        profile, config_present, config_valid, evaluated,
+        config_enabled=data is not None and data.get("enabled") is True,
+    )
     session_id = latest_session_id(root, naos_root, policy)
     report = {
         "schema": SCHEMA,

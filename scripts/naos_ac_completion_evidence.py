@@ -11,7 +11,7 @@ import shlex
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 import yaml
@@ -34,7 +34,7 @@ from naos_policy import (  # noqa: E402
 
 SCHEMA = "naos.ac_completion_evidence.v1"
 MANIFEST_SCHEMA = "naos.ac_completion_evidence_manifest.v1"
-AC_SCEN_RE = re.compile(r"\b((?:AC|SCEN)-[A-Z0-9][A-Z0-9_.-]*)\b", re.IGNORECASE)
+from spec_header import AC_SCEN_RE  # Shared legacy-compatible identifier grammar.
 EVIDENCE_TYPES = {"test_report", "validator_report", "command_output", "manual_review"}
 DETERMINISTIC_EVIDENCE_TYPES = EVIDENCE_TYPES - {"manual_review"}
 CLAIMED_COMPLETE = "claimed_complete"
@@ -130,21 +130,37 @@ def collect_defined_ac_scen(specs_root: Path) -> set[str]:
 
 def rel_display(root: Path, path: Path) -> str:
     try:
-        return str(path.relative_to(root))
+        return path.relative_to(root).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix()
 
 
 def resolve_in_repo(root: Path, raw_path: Any) -> tuple[Path | None, str | None]:
     if not isinstance(raw_path, str) or not raw_path.strip():
         return None, "Evidence item is missing a path."
-    candidate = Path(raw_path.strip())
+    if any(ord(character) < 32 or ord(character) == 127 for character in raw_path):
+        return None, "Evidence paths must not contain control characters."
+    value = raw_path.strip()
+    windows = PureWindowsPath(value)
+    native = Path(value)
+    if (os.name != "nt" and (windows.drive or value.startswith("\\"))) or (
+        (windows.drive or windows.root) and not native.is_absolute()
+    ):
+        return None, "Evidence paths must be relative or native absolute paths inside the project root."
+    portable = value.replace("\\", "/")
+    if ".." in portable.split("/"):
+        return None, "Evidence paths must not contain parent-directory segments."
+    # A colon beyond the native drive designator is not a portable filename
+    # (and could select an NTFS alternate data stream).
+    if ":" in (portable[2:] if os.name == "nt" and windows.drive and not windows.drive.startswith("\\") else portable):
+        return None, "Evidence paths must not contain colon-bearing components."
+    candidate = Path(portable)
     if not candidate.is_absolute():
         candidate = root / candidate
     try:
         resolved = candidate.resolve()
         resolved.relative_to(root.resolve())
-    except (OSError, ValueError):
+    except (OSError, ValueError, RuntimeError):
         return candidate, "Evidence path must stay inside the project root."
     return resolved, None
 
@@ -188,7 +204,8 @@ def run_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
             ["git", "-C", str(root), *args],
             capture_output=True,
             text=True,
-            errors="replace",
+            encoding="utf-8",
+            errors="surrogateescape",
             timeout=10,
             check=False,
         )
@@ -411,6 +428,10 @@ def repository_binding_status(
 
 
 def normalized_subject_path(raw: str) -> tuple[str | None, str | None]:
+    if any(ord(character) < 32 or ord(character) == 127 for character in raw):
+        return None, "Subject-tree operands must not contain control characters."
+    if PureWindowsPath(raw.strip()).drive:
+        return None, "Subject-tree operands must be repository-relative paths."
     value = raw.strip()
     if "::" in value:
         value = value.split("::", 1)[0]
@@ -419,9 +440,7 @@ def normalized_subject_path(raw: str) -> tuple[str | None, str | None]:
     value = value.replace("\\", "/")
     if value == ".":
         return ".", None
-    if any(marker in value for marker in ("\x00", "\r", "\n")):
-        return None, "Subject-tree operands must not contain control characters."
-    if not value or value.startswith("/") or re.match(r"^[A-Za-z]:/", value):
+    if not value or value.startswith("/") or ":" in value:
         return None, "Subject-tree operands must be repository-relative paths."
     if any(char in value for char in "*?["):
         return None, "Subject-tree operands must be exact paths, not globs."

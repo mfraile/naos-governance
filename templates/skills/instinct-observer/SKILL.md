@@ -1,7 +1,8 @@
 ---
-name: "instinct-observer"
-description: "Record, review, and promote recurring behavioural instincts. Invoke when a pattern recurs, after compaction recovery, or after a behavioral drift signal."
-parameters: []
+name: instinct-observer
+description: Record, review, and promote recurring behavioural instincts. Invoke when a pattern recurs, after compaction recovery, or after a behavioral drift signal.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # SKILL: instinct-observer
@@ -102,7 +103,7 @@ When the same pattern recurs in a new session:
 - Strong consensus + testable via scenario
 - Action:
   1. Append Rule N to `.ai/RULES.md` (next available number)
-  2. Add scenario to `.github/autoresearch/task_battery/core_scenarios.yaml`
+  2. Add scenario to `.github/autoresearch/task_battery/portable_scenarios.yaml`
   3. Set `promoted_to_rule: "Rule-NN"` in the INS file
   4. Set `status: promoted` (optional field)
   - **NEVER auto-promote** — requires explicit human sign-off
@@ -139,5 +140,5 @@ When the same pattern recurs in a new session:
 - `.github/instincts/schema.yaml` — format reference (read-only)
 - Approved user-scoped memory, preferably local-first Engram under `ENGRAM_DATA_DIR` — Tier 2 instincts (after promotion); replication remains local/off unless separately reviewed
 - `.ai/RULES.md` — when instinct graduates to Rule
-- `.github/autoresearch/task_battery/core_scenarios.yaml` — when Rule needs scenario
+- `.github/autoresearch/task_battery/portable_scenarios.yaml` — when Rule needs scenario
 - Engram (`mem_save`) — for every new or updated instinct only when memory write access is configured, authorized, verified, permitted by memory-use policy, and explicitly human-approved for durable write use; otherwise use compact/task-card degraded evidence

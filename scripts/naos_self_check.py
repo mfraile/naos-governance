@@ -7,8 +7,10 @@ import argparse
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    controlled_utc_now_text,
     exit_code_for_summary,
     finding_counts,
     kit_root,
@@ -85,6 +88,108 @@ def check_status(findings: list[dict[str, Any]]) -> str:
     return status_from_counts(finding_counts(findings))
 
 
+
+SELF_CHECK_CHILD_TIMEOUT_SECONDS = 180
+
+
+def _child_platform() -> str:
+    return os.name
+
+
+def _run_check_child(command, *, cwd):
+    """Bound the direct child and independently snapshot regular-file capture.
+
+    No pipe EOF/reader thread is required. Independent reader handles never seek
+    the inherited writers' shared offsets. Timeout captures are retained; their
+    snapshots do not claim complete descendant output or whole-tree retirement.
+    """
+    import base64
+    import hashlib
+    platform_name = _child_platform()
+    capture_root = Path(tempfile.mkdtemp(prefix="naos-self-check-child-"))
+    paths = {name: capture_root / name for name in ("stdout", "stderr")}
+    captured, snapshots = {}, {}
+    evidence = None
+    interrupted = None
+    with os.fdopen(os.open(paths["stdout"], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stdout_file, os.fdopen(os.open(paths["stderr"], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stderr_file:
+        process = subprocess.Popen(command, cwd=cwd, stdout=stdout_file, stderr=stderr_file,
+                                   start_new_session=platform_name == "posix")
+        try:
+            process.wait(timeout=SELF_CHECK_CHILD_TIMEOUT_SECONDS)
+        except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
+            interrupted = error if isinstance(error, KeyboardInterrupt) else None
+            evidence = {"timeout_seconds": SELF_CHECK_CHILD_TIMEOUT_SECONDS,
+                        "trigger": type(error).__name__, "direct_pid": process.pid,
+                        "tree_quiescence_proven": False, "cleanup_errors": [],
+                        "cleanup_helper_invoked": False, "output_capture": "regular_file_bounded_snapshot"}
+            if platform_name == "posix":
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    evidence["cleanup_attempt"] = "SIGKILL owned session process group"
+                except OSError as cleanup_error:
+                    evidence["cleanup_errors"].append(str(cleanup_error))
+            else:
+                evidence["cleanup_attempt"] = "owned direct child termination only; descendants unproven"
+            if process.poll() is None:
+                try:
+                    process.kill()
+                except OSError as cleanup_error:
+                    evidence["cleanup_errors"].append(str(cleanup_error))
+            try:
+                process.wait(timeout=5)
+                evidence["direct_child_reaped"] = True
+            except (subprocess.TimeoutExpired, KeyboardInterrupt) as reap_error:
+                evidence["direct_child_reaped"] = False
+                evidence["reap_error"] = type(reap_error).__name__
+                if isinstance(reap_error, KeyboardInterrupt):
+                    interrupted = reap_error
+            evidence["direct_returncode"] = process.returncode
+        for key, path in paths.items():
+            with path.open("rb") as reader:
+                observed_size = os.fstat(reader.fileno()).st_size
+                raw = reader.read(observed_size)
+            captured[key] = raw.decode("utf-8", errors="replace")
+            snapshots[key] = captured[key]
+            snapshots[key + "_base64"] = base64.b64encode(raw).decode("ascii")
+            snapshots[key + "_sha256"] = hashlib.sha256(raw).hexdigest()
+            snapshots[key + "_observed_size"] = observed_size
+            snapshots[key + "_snapshot_bytes"] = len(raw)
+    if evidence is None:
+        try:
+            for path in paths.values():
+                path.unlink()
+            capture_root.rmdir()
+        except OSError as cleanup_error:
+            evidence = {"trigger": "CaptureCleanupIncomplete", "direct_pid": process.pid,
+                        "direct_returncode": process.returncode, "direct_child_reaped": True,
+                        "tree_quiescence_proven": False, "cleanup_helper_invoked": False,
+                        "cleanup_errors": [str(cleanup_error)]}
+    if evidence is not None:
+        evidence.update(snapshots)
+        evidence["capture_root"] = str(capture_root)
+        evidence["capture_retained"] = capture_root.exists()
+        evidence["descendant_output_complete"] = False
+    if interrupted is not None:
+        print(json.dumps({"self_check_child_interrupted": evidence}), file=sys.stderr, flush=True)
+        raise interrupted
+    code = (125 if evidence.get("trigger") == "CaptureCleanupIncomplete" else 124) if evidence else process.returncode
+    result = subprocess.CompletedProcess(command, code, captured["stdout"], captured["stderr"])
+    result.timeout_evidence = evidence
+    return result
+
+
+def _child_timeout_payload(result, severity):
+    evidence = getattr(result, "timeout_evidence", None)
+    if evidence is None:
+        return None
+    timed_out = evidence.get("trigger") != "CaptureCleanupIncomplete"
+    return {"status": "error", "summary": {"total_findings": 1}, "findings": [{
+        "id": "SELF_CHECK_CHILD_TIMEOUT" if timed_out else "SELF_CHECK_CAPTURE_CLEANUP_INCOMPLETE", "severity": severity,
+        "status": "script_timeout" if timed_out else "script_capture_cleanup_incomplete",
+        "message": ("Self-check producer exceeded its child timeout; output is retained." if timed_out
+                    else "Direct producer exited, but capture cleanup remained incomplete; output snapshot is retained."),
+        "timeout_evidence": evidence}]}
+
 def first_existing_dir(paths: list[Path]) -> Path:
     for path in paths:
         if path.is_dir():
@@ -104,18 +209,36 @@ def validate_capability_contracts(root: Path, profile: str, naos_root: str, poli
     findings: list[dict[str, Any]] = []
     capabilities_dir = first_existing_dir(
         [
-            root / "capabilities",
             root / naos_root / "capabilities",
             kit_root() / "capabilities",
         ]
     )
+    # Copied adopter helpers also call their parent the kit root. Only the
+    # complete executing kit layout may supply fallback cards; this is a
+    # layout distinction, not authentication of the declaration or its cards.
+    executing_kit = kit_root()
+    if capabilities_dir == executing_kit / "capabilities" and not (
+        (executing_kit / "naos_init.py").is_file()
+        and (executing_kit / "configs" / "source_modes.json").is_file()
+    ):
+        capabilities_dir = root / naos_root / "capabilities"
     contracts = sorted(p for p in capabilities_dir.glob("*.yaml") if not p.name.startswith("_"))
+    if not contracts:
+        findings.append({"id": str(capabilities_dir), "severity": severity,
+                         "status": "missing_capability_contracts",
+                         "message": "No NAOS capability contracts found in the selected directory."})
     ids: list[str] = []
     for path in contracts:
         try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            if data is None:
+                data = {}
         except Exception as exc:
             findings.append({"id": str(path), "severity": severity, "status": "parse_error", "message": str(exc)})
+            continue
+        if not isinstance(data, dict):
+            findings.append({"id": str(path), "severity": severity, "status": "parse_error",
+                             "message": "Capability contract must be a mapping."})
             continue
         missing = sorted(CAPABILITY_REQUIRED_FIELDS - set(data))
         if missing:
@@ -330,12 +453,27 @@ def validate_maturity_and_profiles(root: Path, profile: str, naos_root: str, pol
     )
     profile_paths = sorted(profile_dir.glob("governance-*.yaml"))
     try:
-        maturity = yaml.safe_load(maturity_path.read_text(encoding="utf-8")) or {}
-        level_ids = {str(level.get("id")) for level in maturity.get("levels", []) if isinstance(level, dict)}
-        if level_ids != {"L0", "L1", "L2", "L3", "L4", "L5"}:
-            findings.append({"id": "maturity_levels", "severity": severity, "status": "invalid_levels", "message": "Expected L0-L5 maturity levels."})
+        maturity = yaml.safe_load(maturity_path.read_text(encoding="utf-8"))
     except Exception as exc:
         findings.append({"id": str(maturity_path), "severity": severity, "status": "parse_error", "message": str(exc)})
+    else:
+        try:
+            from jsonschema import Draft202012Validator
+
+            # Validate with this kit's schema, not an adopter-supplied replacement.
+            schema_path = kit_root() / "schemas" / "naos" / "capability_maturity.schema.json"
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            Draft202012Validator.check_schema(schema)
+            for error in Draft202012Validator(schema).iter_errors(maturity):
+                field = ".".join(str(part) for part in error.absolute_path) or "model"
+                findings.append(value_finding(maturity_path, field, severity, error.message))
+        except Exception as exc:
+            findings.append({"id": str(maturity_path), "severity": severity,
+                             "status": "schema_validation_error", "message": str(exc)})
+        levels = maturity.get("levels") if isinstance(maturity, dict) else None
+        level_ids = {str(level.get("id")) for level in levels if isinstance(level, dict)} if isinstance(levels, list) else set()
+        if level_ids != MATURITY_LEVELS:
+            findings.append({"id": "maturity_levels", "severity": severity, "status": "invalid_levels", "message": "Expected L0-L5 maturity levels."})
     found_profiles: set[str] = set()
     for path in profile_paths:
         try:
@@ -419,15 +557,11 @@ def validate_profile_rules_regeneration(
             "findings": findings,
         }
 
-    result = subprocess.run(
-        [sys.executable, str(renderer), "--check", "--root", str(root), "--json"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_check_child(
+        [sys.executable, str(renderer), "--check", "--root", str(root), "--json"], cwd=root)
+
     try:
-        payload = json.loads(result.stdout)
+        payload = _child_timeout_payload(result, severity) or json.loads(result.stdout)
     except json.JSONDecodeError:
         payload = {
             "status": "failed",
@@ -446,6 +580,7 @@ def validate_profile_rules_regeneration(
             "severity": severity,
             "status": "profile_rules_drift",
             "message": str(item.get("message") or "Profile RULES parity failed."),
+            **({"timeout_evidence": item["timeout_evidence"]} if "timeout_evidence" in item else {}),
             "suggested_fix": str(
                 item.get("suggested_fix") or "Regenerate the derived profile RULES outputs."
             ),
@@ -491,10 +626,22 @@ def run_json_script(
     ]
     if policy_path:
         command.extend(["--policy", policy_path])
-    result = subprocess.run(command, cwd=Path.cwd(), capture_output=True, text=True)
+    from naos_self_check_inspection import producer_command, complete_producer
+    inspected_command = producer_command(script, command[2:])
+    if inspected_command is not None:
+        command = inspected_command
+    # An unscoped diagnostic must not replace a previous scoped query receipt.
+    # The actual producer still runs and its no_query/no_seed findings remain.
+    unscoped_query = script in {"naos_local_context_query.py", "naos_graph_context_query.py"} and not args
+    if unscoped_query and inspected_command is None:
+        with tempfile.TemporaryDirectory(prefix="naos-context-inspection-") as directory:
+            command.extend(["--output", str(Path(directory) / "diagnostic.json")])
+            result = _run_check_child(command, cwd=Path.cwd())
+    else:
+        result = _run_check_child(command, cwd=Path.cwd())
     payload: dict[str, Any]
     try:
-        payload = json.loads(result.stdout)
+        payload = _child_timeout_payload(result, severity_for_profile(profile, policy)) or json.loads(result.stdout)
     except json.JSONDecodeError:
         payload = {
             "schema": f"naos.{Path(script).stem}.error",
@@ -509,13 +656,25 @@ def run_json_script(
                 }
             ],
         }
-    return {
+    if not isinstance(payload, dict):
+        payload = {"schema": f"naos.{Path(script).stem}.error", "status": "error",
+                   "summary": {"total_findings": 1}, "findings": [{"id": script,
+                       "severity": severity_for_profile(profile, policy), "status": "script_error",
+                       "message": "Producer JSON must be an object."}]}
+    complete_producer(script, payload, result.returncode)
+    check = {
         "id": Path(script).stem,
         "returncode": result.returncode,
         "status": payload.get("status", "unknown"),
         "summary": payload.get("summary", {}),
         "findings": payload.get("findings", []),
     }
+    if unscoped_query:
+        check["publication"] = {
+            "mode": "invocation_only_no_context",
+            "default_receipt": "preserved_not_validated",
+        }
+    return check
 
 
 def aggregate_checks(checks: list[dict[str, Any]]) -> dict[str, Any]:
@@ -556,85 +715,158 @@ def self_check_finding_occurrences(report: dict[str, Any]) -> list[dict[str, Any
     return occurrences
 
 
+def selected_script_checks(
+    root: Path,
+    profile: str,
+    naos_root: str,
+    policy: dict[str, Any],
+    *,
+    pr_base_ref: str | None = None,
+    pr_head_ref: str | None = None,
+    task: str | None = None,
+    query: str | None = None,
+    graph_path: str | None = None,
+) -> list[tuple[str, list[str]]]:
+    """Canonical full self-check producer plan; evaluating it runs no producer."""
+    task = task if task is not None else os.environ.get("TASK") or os.environ.get("NAOS_TASK") or None
+    for name, value in (("task", task), ("query", query), ("graph-path", graph_path)):
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise ValueError(f"Explicit {name} context must be a nonempty string")
+    task_options = ["--task", task] if task is not None else []
+    query_options = task_options + (["--query", query] if query is not None else [])
+    graph_options = task_options + (["--path", graph_path] if graph_path is not None else [])
+    pr_options = []
+    if pr_base_ref is not None or pr_head_ref is not None:
+        if not all(isinstance(value, str) and re.fullmatch(r"[0-9a-fA-F]{40}", value)
+                   for value in (pr_base_ref, pr_head_ref)):
+            raise ValueError("PR comparison requires explicit full 40-character base and head commit SHAs")
+        pr_options = ["--base-ref", pr_base_ref, "--head-ref", pr_head_ref]
+    return [
+        ("naos_setup_recommendations.py", []),
+        ("naos_governance_bypass_posture.py", []),
+        ("naos_external_evidence_ingest.py", []),
+        ("naos_evidence_attestation.py", []),
+        ("naos_memory_context_readiness.py", []),
+        ("naos_memory_provider_access.py", []),
+        ("naos_memory_use_policy.py", []),
+        ("naos_learning_loop_review.py", []),
+        ("naos_local_context_index.py", []),
+        ("naos_local_context_query.py", query_options),
+        ("naos_semantic_candidate_readiness.py", []),
+        ("naos_graph_context_readiness.py", []),
+        ("naos_graph_context_query.py", graph_options),
+        ("naos_task_context_pack.py", task_options),
+        ("naos_session_identity.py", ["--inspect-session"]),
+        ("naos_operator_attribution.py", ["--inspect-session"]),
+        ("naos_session_lifecycle.py", ["--mode", "session_start", "--inspect-session"]),
+        ("naos_policy_overrides.py", ["--dry-run"]),
+        ("naos_audit_log.py", ["--summary"]),
+        ("naos_task_claims.py", ["--action", "list"]),
+        ("naos_agent_trace_validate.py", []),
+        ("naos_ai_surface_budget.py", []),
+        ("naos_static_grader.py", []),
+        ("naos_grader_assessment.py", ["--mode", "assess"]),
+        ("naos_llm_grader_readiness.py", []),
+        ("naos_pr_risk_classification.py", pr_options),
+        ("naos_pr_governance_summary.py", []),
+        ("naos_agentic_workflow_review.py", []),
+        ("naos_pre_implementation_alignment_review.py", []),
+        ("naos_calibration_shadow.py", []),
+        # Refresh routing inputs before classification. Keep aggregate producers
+        # later: classifying their copied findings here amplifies fresh diagnostics.
+        *(
+            [("naos_ai_component_inventory.py", [])]
+            if profile in {"standard", "assured"}
+            else []
+        ),
+        *(
+            [("naos_agent_sponsor_registry.py", [])]
+            if (root / naos_root / str(policy.get("paths", {}).get("agent_sponsor_registry") or "agent_sponsor_registry.yaml")).is_file()
+            and (Path(__file__).resolve().parent / "naos_agent_sponsor_registry.py").is_file()
+            else []
+        ),
+        *(
+            [("naos_aivss_arithmetic_verification.py", [])]
+            if (root / naos_root / str(policy.get("paths", {}).get("aivss_assessments") or "aivss_assessments.yaml")).is_file()
+            and (Path(__file__).resolve().parent / "naos_aivss_arithmetic_verification.py").is_file()
+            else []
+        ),
+        ("naos_model_provider_policy.py", []),
+        ("naos_model_telemetry_evidence.py", []),
+        ("naos_failure_mode_posture.py", []),
+        ("naos_opencode_config_hygiene.py", []),
+        ("naos_design_traceability.py", []),
+        ("naos_ui_experience_quality.py", []),
+        ("naos_failure_mode_observations.py", []),
+        ("naos_control_plane_review.py", []),
+        ("naos_evidence_classification.py", []),
+        ("naos_cross_harness_review_readiness.py", []),
+        ("naos_systemic_impact.py", []),
+        # Readiness fingerprints systemic output; collect it after that producer.
+        ("naos_behavioral_governance_readiness.py", []),
+        ("naos_module_header_traceability.py", []),
+        ("naos_detect_spec_drift.py", []),
+        ("naos_validate_claims.py", []),
+        ("naos_validate_roadmap_crosswalk.py", []),
+        ("naos_function_index_health.py", []),
+        ("naos_evidence_conflicts.py", []),
+        ("naos_validate_test_evidence.py", ["--advisory"]),
+        ("naos_capability_maturity.py", []),
+    ]
+
+
+def selected_check_ids(
+    root: Path, profile: str, naos_root: str, policy: dict[str, Any], **context: Any,
+) -> list[str]:
+    """Exact full inventory shared by execution and dependency-proof readers."""
+    return [
+        "capability_contract_validation", "gatekeeper_manifest_validation",
+        "maturity_profile_parsing", "profile_rules_regeneration",
+        *(Path(script).stem for script, _ in selected_script_checks(
+            root, profile, naos_root, policy, **context)),
+    ]
+
+
 def build_report(
     root: Path,
     profile: str,
     naos_root: str,
     policy: dict[str, Any],
     policy_path: str | None,
+    *,
+    pr_base_ref: str | None = None,
+    pr_head_ref: str | None = None,
+    task: str | None = None,
+    query: str | None = None,
+    graph_path: str | None = None,
+    refresh: bool = False,
 ) -> dict[str, Any]:
-    checks = [
-        validate_capability_contracts(root, profile, naos_root, policy),
-        validate_gatekeeper_manifest(root, profile, naos_root, policy),
-        validate_maturity_and_profiles(root, profile, naos_root, policy),
-        validate_profile_rules_regeneration(root, profile, policy),
-        run_json_script("naos_setup_recommendations.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_governance_bypass_posture.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_external_evidence_ingest.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_evidence_attestation.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_memory_context_readiness.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_memory_provider_access.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_memory_use_policy.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_learning_loop_review.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_task_context_pack.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_local_context_index.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_local_context_query.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_semantic_candidate_readiness.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_graph_context_readiness.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_graph_context_query.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_session_identity.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_operator_attribution.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_session_lifecycle.py", ["--mode", "session_start"], profile, policy, naos_root, policy_path),
-        run_json_script("naos_audit_log.py", ["--summary"], profile, policy, naos_root, policy_path),
-        run_json_script("naos_task_claims.py", ["--action", "list"], profile, policy, naos_root, policy_path),
-        run_json_script("naos_agent_trace_validate.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_ai_surface_budget.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_static_grader.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_grader_assessment.py", ["--mode", "assess"], profile, policy, naos_root, policy_path),
-        run_json_script("naos_llm_grader_readiness.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_behavioral_governance_readiness.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_policy_overrides.py", ["--dry-run"], profile, policy, naos_root, policy_path),
-        run_json_script("naos_pr_risk_classification.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_pr_governance_summary.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_agentic_workflow_review.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_pre_implementation_alignment_review.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_calibration_shadow.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_evidence_classification.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_cross_harness_review_readiness.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_capability_maturity.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_systemic_impact.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_module_header_traceability.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_detect_spec_drift.py", [], profile, policy, naos_root, policy_path),
-        *(
-            [run_json_script("naos_ai_component_inventory.py", [], profile, policy, naos_root, policy_path)]
-            if profile in {"standard", "assured"}
-            else []
-        ),
-        *(
-            [run_json_script("naos_agent_sponsor_registry.py", [], profile, policy, naos_root, policy_path)]
-            if (root / naos_root / str(policy.get("paths", {}).get("agent_sponsor_registry") or "agent_sponsor_registry.yaml")).is_file()
-            and (Path(__file__).resolve().parent / "naos_agent_sponsor_registry.py").is_file()
-            else []
-        ),
-        *(
-            [run_json_script("naos_aivss_arithmetic_verification.py", [], profile, policy, naos_root, policy_path)]
-            if (root / naos_root / str(policy.get("paths", {}).get("aivss_assessments") or "aivss_assessments.yaml")).is_file()
-            and (Path(__file__).resolve().parent / "naos_aivss_arithmetic_verification.py").is_file()
-            else []
-        ),
-        run_json_script("naos_model_provider_policy.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_model_telemetry_evidence.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_control_plane_review.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_validate_claims.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_validate_roadmap_crosswalk.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_function_index_health.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_evidence_conflicts.py", [], profile, policy, naos_root, policy_path),
-        run_json_script("naos_validate_test_evidence.py", ["--advisory"], profile, policy, naos_root, policy_path),
-    ]
+    scripts = selected_script_checks(
+        root, profile, naos_root, policy, pr_base_ref=pr_base_ref, pr_head_ref=pr_head_ref,
+        task=task, query=query, graph_path=graph_path,
+    )
+    from contextlib import ExitStack
+    from naos_self_check_inspection import create_inspection_context, activate_inspection
+    with ExitStack() as stack:
+        if not refresh:
+            directory = stack.enter_context(tempfile.TemporaryDirectory(prefix="naos-self-check-inspection-"))
+            context_path = create_inspection_context(root, naos_root, profile, policy, scripts, Path(directory), policy_argument=policy_path)
+            stack.enter_context(activate_inspection(context_path))
+        checks = [
+            validate_capability_contracts(root, profile, naos_root, policy),
+            validate_gatekeeper_manifest(root, profile, naos_root, policy),
+            validate_maturity_and_profiles(root, profile, naos_root, policy),
+            validate_profile_rules_regeneration(root, profile, policy),
+            *(run_json_script(script, arguments, profile, policy, naos_root, policy_path)
+              for script, arguments in scripts),
+        ]
     aggregate = aggregate_checks(checks)
     return {
         "schema": "naos.self_check.v1",
+        "generated_at": controlled_utc_now_text(),
         "profile": profile,
+        "project_root": str(root.resolve()),
+        "naos_root": naos_root,
         "status": aggregate["status"],
         "summary": aggregate["summary"],
         "checks": checks,
@@ -647,18 +879,53 @@ def build_report(
     }
 
 
+def finalize_dependencies(
+    root: Path, profile: str, naos_root: str, policy: dict[str, Any],
+    *, context: dict[str, Any],
+) -> dict[str, Any]:
+    """Finalize the existing full report without rerunning or rewriting it.
+
+    The bounded resolver recomputes every required predicate before its separate
+    receipt is published. A stored status flag is never sufficient authority.
+    """
+    from naos_self_check_dependency_resolution import (
+        _json, build_resolution, write_resolution,
+    )
+    path = report_output_path(root, naos_root, policy, "self_check_report")
+    report, _ = _json(root, path)
+    resolution = build_resolution(
+        root, profile=profile, naos_root=naos_root, policy=policy,
+        self_check_report=report, context=context,
+    )
+    if resolution.get("status") == "resolved":
+        # Publication revalidates the complete proof and its current inputs.
+        write_resolution(root, resolution, naos_root=naos_root, policy=policy)
+    return resolution
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run NAOS self-conformance checks.")
     parser.add_argument("--profile")
     parser.add_argument("--naos-root", default=os.environ.get("NAOS_ROOT"))
     parser.add_argument("--policy")
     parser.add_argument("--output")
+    parser.add_argument("--refresh", action="store_true", help="Explicitly publish child reports and retain independent producer state/audit behavior; default is live inspection")
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--all",
         action="store_true",
         help="Show every human-readable finding occurrence; JSON is always complete.",
     )
+    parser.add_argument("--pr-base-ref", help="Explicit full base commit SHA for PR self-check")
+    parser.add_argument("--pr-head-ref", help="Explicit full head commit SHA for PR self-check")
+    parser.add_argument("--task", default=os.environ.get("TASK") or os.environ.get("NAOS_TASK") or None,
+                        help="Explicit task id for task pack and local/graph queries; defaults to TASK/NAOS_TASK")
+    parser.add_argument("--query", help="Literal bounded local-context query forwarded to its producer")
+    parser.add_argument("--graph-path", help="Exact indexed source path for graph-query --path")
+    parser.add_argument("--capture-dependency-inputs", action="store_true",
+                        help="Preserve current full self-check/evidence-pack bytes for the next collection; no approval or readiness claim")
+    parser.add_argument("--finalize-dependencies", action="store_true",
+                        help="Validate dependencies of the existing full self-check and publish a separate proof; does not rerun checks")
     parser.add_argument("--strict", action="store_true")
     return parser
 
@@ -670,8 +937,48 @@ def main(argv: list[str] | None = None) -> int:
     naos_root = args.naos_root or str(policy.get("paths", {}).get("default_naos_root") or "naos")
     profile = normalize_profile(args.profile, policy)
     policy_path = args.policy or policy.get("_meta", {}).get("path")
-    report = build_report(root, profile, naos_root, policy, policy_path)
-    output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "self_check_report")
+    if args.refresh and (args.capture_dependency_inputs or args.finalize_dependencies):
+        print("NAOS self-check input error: --refresh cannot combine with dependency capture/finalization", file=sys.stderr)
+        return 2
+    if args.capture_dependency_inputs:
+        if args.finalize_dependencies or args.output is not None:
+            print("NAOS dependency capture error: capture requires canonical inputs and cannot combine with finalization or --output", file=sys.stderr)
+            return 2
+        try:
+            from naos_self_check_dependency_resolution import capture_dependency_inputs
+            path = capture_dependency_inputs(root, naos_root=naos_root, policy=policy)
+        except (OSError, ValueError, TypeError) as error:
+            print(f"NAOS dependency capture error: {error}", file=sys.stderr)
+            return 2
+        print(f"NAOS dependency input bytes captured: {path}")
+        return 0
+    if args.finalize_dependencies:
+        if args.output is not None:
+            print("NAOS self-check input error: finalization uses the canonical full report and a separate proof destination; --output is not accepted", file=sys.stderr)
+            return 2
+        try:
+            resolution = finalize_dependencies(root, profile, naos_root, policy, context={
+                "pr_base_ref": args.pr_base_ref, "pr_head_ref": args.pr_head_ref,
+                "task": args.task, "query": args.query, "graph_path": args.graph_path,
+            })
+        except (OSError, ValueError, TypeError) as error:
+            print(f"NAOS dependency finalization error: {error}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps(resolution, indent=2))
+        else:
+            print(f"NAOS self-check dependency resolution: {resolution['status']}")
+            for refusal in resolution.get("refusals", []):
+                print(f"- {refusal['code']}: {refusal.get('detail', '')}")
+        return 0 if resolution.get("status") == "resolved" else 1
+    try:
+        report = build_report(root, profile, naos_root, policy, policy_path,
+                              pr_base_ref=args.pr_base_ref, pr_head_ref=args.pr_head_ref,
+                              task=args.task, query=args.query, graph_path=args.graph_path, refresh=args.refresh)
+    except ValueError as error:
+        print(f"NAOS self-check input error: {error}", file=sys.stderr)
+        return 2
+    output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "self_check_report") if args.refresh else None
     write_report(output, report)
     if args.json:
         print(json.dumps(report, indent=2))

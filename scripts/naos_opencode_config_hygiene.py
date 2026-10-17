@@ -17,7 +17,7 @@ import re
 import sys
 from collections import Counter
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]
@@ -93,14 +93,17 @@ REASON_GATES = {
 }
 SECRET_RE = re.compile(
     r"(?i)("
-    r"sk-[A-Za-z0-9_-]{8,}|"
+    r"(?<![\w-])sk-[A-Za-z0-9_-]{8,}|"
     r"xox[baprs]-[A-Za-z0-9-]{8,}|"
     r"gh[pousr]_[A-Za-z0-9_]{8,}|"
     r"AKIA[0-9A-Z]{12,}|"
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----|"
-    r"api[_-]?key\s*[:=]|"
     r"bearer\s+[A-Za-z0-9._-]{12,}|"
-    r"authorization\s*[:=]\s*[A-Za-z0-9._ -]{12,}"
+    # Require a value and its terminator; ordinary prose and bare key names
+    # are not credential evidence. Provider patterns above retain their contract.
+    r"(?<![\w-])(?:api[_-]?key|authorization)[\"']?[ \t]*[:=][ \t]*"
+    r"(?:(?P<assignment_quote>[\"'])(?:\\[^\r\n]|(?!(?P=assignment_quote))[^\\\r\n]){8,}(?P=assignment_quote)|"
+    r"[A-Za-z0-9._/+@:-]{8,}={0,2}[ \t]*(?=[,;}\]\r\n]|$))"
     r")"
 )
 LOCAL_MODEL_PROVIDER_REF = "naos/reports/model_provider_policy.json"
@@ -108,6 +111,7 @@ LIMITATIONS = [
     "OpenCode config hygiene reports evaluate repo-local declarations and files only.",
     "The report does not create, install, run, or configure OpenCode.",
     "The report does not inspect global user OpenCode configuration, IDE settings, credentials, private memory payloads, or external services.",
+    "Permission declarations are review signals only; effective permission precedence is not evaluated.",
     "JSONC parsing is intentionally limited to comment and trailing-comma tolerant local configuration review.",
     "Finding presence is review evidence only; it is not approval, certification, proof of compliance, runtime supervision, or security proof.",
 ]
@@ -226,7 +230,7 @@ def resolve_declaration_path(
 
 def relative_path(path: Path, root: Path) -> str:
     try:
-        return str(path.resolve(strict=False).relative_to(root.resolve()))
+        return path.resolve(strict=False).relative_to(root.resolve()).as_posix()
     except ValueError:
         return str(path)
 
@@ -338,9 +342,9 @@ def safe_read_text(path: Path) -> tuple[str | None, str | None]:
         return None, str(exc)
 
 
-def discover_opencode_files(root: Path) -> list[Path]:
+def discover_opencode_files(root: Path, *, include_shared_agents: bool = False) -> list[Path]:
     paths: list[Path] = []
-    for relative in ("AGENTS.md", "opencode.json", "opencode.jsonc", ".opencode/config.yaml", ".opencode/config.yml"):
+    for relative in ("opencode.json", "opencode.jsonc", ".opencode/config.yaml", ".opencode/config.yml"):
         path = root / relative
         if path.is_file():
             paths.append(path)
@@ -349,6 +353,11 @@ def discover_opencode_files(root: Path) -> list[Path]:
         directory = opencode_dir / dirname
         if directory.is_dir():
             paths.extend(path for path in sorted(directory.rglob("*")) if path.is_file())
+    # AGENTS.md is shared across tools; it does not establish OpenCode use.
+    if include_shared_agents or paths or opencode_dir.is_dir():
+        agents = root / "AGENTS.md"
+        if agents.is_file():
+            paths.append(agents)
     return sorted(dict.fromkeys(paths))
 
 
@@ -431,7 +440,9 @@ def has_remote_ref(value: str) -> bool:
 
 
 def has_absolute_ref(value: str) -> bool:
-    return Path(value).is_absolute()
+    # Shared configuration may contain another host's absolute path syntax.
+    # Classify declarations only; do not resolve or read the referenced path.
+    return PurePosixPath(value).is_absolute() or PureWindowsPath(value).is_absolute()
 
 
 def is_external_plugin_ref(value: str) -> bool:
@@ -462,10 +473,14 @@ def permission_review_needed(config: dict[str, Any]) -> tuple[bool, bool]:
     for path, value in walk_values(config):
         key = path.split(".")[-1].split("[")[0].lower()
         text = str(value).strip().lower()
-        if key in {"permission", "permissions"} and (
-            text in {"allow", "always", "all", "true"} or value == "*" or "*" in as_list(value)
-        ):
-            broad = True
+        if key in {"permission", "permissions"}:
+            # Review declarations, including agent/tool/input-pattern maps.
+            # This does not emulate precedence or effective runtime permissions.
+            for _, permission in walk_values(value):
+                if not isinstance(permission, (dict, list)) and str(permission).strip().lower() in {
+                    "allow", "always", "all", "true", "*",
+                }:
+                    broad = True
         if key in {"approval", "approvals", "auto_approval", "autoapprove", "auto_approve"} and text in {
             "auto",
             "allow",
@@ -479,14 +494,19 @@ def permission_review_needed(config: dict[str, Any]) -> tuple[bool, bool]:
 
 
 def mcp_remote_or_auth(value: Any) -> tuple[bool, bool, bool]:
-    enabled = bool(value)
+    # Each named server has its own enable switch. Absent enabled means a
+    # declared server is eligible; a disabled sibling cannot hide it.
+    servers = list(value.values()) if isinstance(value, dict) else as_list(value)
+    enabled = any(
+        str(server.get("enabled", True)).strip().lower() not in {"false", "0", "no", "off"}
+        if isinstance(server, dict) else bool(server)
+        for server in servers
+    )
     remote = False
     auth = False
     for path, child in walk_values(value):
         key = path.split(".")[-1].split("[")[0].lower()
         text = str(child).strip().lower()
-        if key == "enabled" and text in {"false", "0", "no", "off"}:
-            enabled = False
         if key in {"url", "endpoint"} and has_remote_ref(text):
             remote = True
         if key in {"type", "transport"} and text in {"remote", "http", "sse"}:
@@ -527,6 +547,7 @@ def build_report(
     policy: dict[str, Any],
     declaration_path: Path,
     declaration_source: str,
+    collect_provenance: bool = True,
 ) -> dict[str, Any]:
     generated_at = utc_now_text()
     declaration = load_yaml_mapping(declaration_path)
@@ -535,7 +556,7 @@ def build_report(
     base_severity = review_severity(profile, root, naos_root)
     findings: list[dict[str, Any]] = []
 
-    files = discover_opencode_files(root)
+    files = discover_opencode_files(root, include_shared_agents=enabled or declared)
     config_paths = [path for path in files if path.name in {"opencode.json", "opencode.jsonc"}]
     config_reports: list[dict[str, Any]] = []
     configs: list[dict[str, Any]] = []
@@ -628,7 +649,7 @@ def build_report(
                     "opencode_config_hygiene.broad_permission_review",
                     unsafe_severity(base_severity, "broad_permission_review"),
                     "broad_permission_review",
-                    "OpenCode configuration appears to grant broad permissions and needs human review.",
+                    "OpenCode permission declarations contain allow or broad values and need human review; effective permission precedence is not evaluated.",
                 )
             )
         if auto_approval and not bool_value(declaration.get("allow_auto_approval")):
@@ -822,7 +843,7 @@ def build_report(
         "limitations": LIMITATIONS,
         "not_claimed": not_claimed,
         "human_review_required": human_review_required,
-        "generated_by": build_generated_by(root, generated_at=generated_at),
+        "generated_by": build_generated_by(root, generated_at=generated_at) if collect_provenance else {},
         "summary": summary,
     }
 

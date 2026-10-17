@@ -1,8 +1,12 @@
 schema: naos.install_plan_rules.v1
 profile: quickstart
 updated_at: null
+contract_role: descriptive_reference
+runtime_configurable: false
+# This seed documents producer behavior. Editing it does not change runtime
+# evaluation, activation boundaries or mandatory human review.
 description: >
-  Rules for deterministic install-plan reports. Plans remain review evidence
+  Reference for deterministic install-plan reports. Plans remain review evidence
   and must not silently activate hooks, CI, providers, memory writes, or project
   file changes.
 required_inputs:

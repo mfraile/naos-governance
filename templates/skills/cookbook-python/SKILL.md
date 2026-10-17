@@ -1,7 +1,8 @@
 ---
-name: "cookbook-python"
-description: "If-then recipes for Python backend code. Invoke when creating modules, recording datetimes, writing except blocks, reading config values, or adding Enum columns."
-parameters: []
+name: cookbook-python
+description: If-then recipes for Python backend code. Invoke when creating modules, recording datetimes, writing except blocks, reading config values, or adding Enum columns.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Cookbook: Python Backend

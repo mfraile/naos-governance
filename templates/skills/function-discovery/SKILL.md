@@ -1,19 +1,8 @@
 ---
-name: "function-discovery"
-description: "Search index/source before coding; reduce duplication with file-first and optional similarity evidence."
-parameters:
-  - name: query
-    description: "Natural language description of the function you need (e.g. 'calculate confidence score for document triage')"
-    required: false
-    default: ""
-  - name: package
-    description: "Package name to list all functions (e.g. 'services', 'core', 'utils')"
-    required: false
-    default: ""
-  - name: rebuild
-    description: "Set to 'true' to rebuild the index from source before searching"
-    required: false
-    default: "false"
+name: function-discovery
+description: Search index/source before coding; reduce duplication with file-first and optional similarity evidence.
+metadata:
+  naos-parameters: '[{"name":"query","description":"Natural language description of the function you need (e.g. ''calculate confidence score for document triage'')","required":false,"default":""},{"name":"package","description":"Package name to list all functions (e.g. ''services'', ''core'', ''utils'')","required":false,"default":""},{"name":"rebuild","description":"Set to ''true'' to rebuild the index from source before searching","required":false,"default":"false"}]'
 ---
 
 # Skill: Function Discovery
@@ -23,6 +12,14 @@ Core NAOS uses deterministic file-first inventory and source search. Optional
 similarity providers are non-core; a project may configure a local CPU provider
 such as `sentence-transformers/all-mpnet-base-v2`, but only as project-owned
 evidence.
+
+Both index rebuild and similarity query read the current project configuration
+in `configs/naos_ai_precommit.yaml`. Embeddings require a real YAML `enabled: true`,
+the supported provider and a nonempty model name. A query also requires cached
+provider/model/device metadata to match that configuration exactly. Disabling
+the provider takes effect even when an older index contains embeddings. Missing
+dependencies or mismatched metadata use token similarity; rebuild the index
+after an intentional provider/model/device change.
 
 ## When to Use
 
@@ -53,10 +50,13 @@ Returns: All functions in that package directory with their descriptions.
 ### Rebuild Index (after adding new functions)
 
 ```bash
+make -f Makefile.naos function-index
 python scripts/naos_function_index_query.py --rebuild-index
 ```
 
-Or use the `gov-refresh` skill which includes this step.
+The Make target regenerates `naos/inventory/FUNCTION_INDEX.yaml`. The query
+script then rebuilds the separate `FUNCTION_SIMILARITY_INDEX.json` from that
+index. `gov-refresh` does not run either command.
 
 ## Detection Methodology
 

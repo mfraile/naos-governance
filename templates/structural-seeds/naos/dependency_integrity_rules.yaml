@@ -1,9 +1,6 @@
 schema: naos.dependency_integrity_rules.v1
 mode: deterministic_local
-scan_roots:
-  - src
-  - app
-  - tests
+scan_roots: inferred
 exclude_dirs:
   - dev
   - dist

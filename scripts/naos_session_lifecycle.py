@@ -32,6 +32,7 @@ from naos_policy import (  # noqa: E402
     kit_root,
     load_policy,
     normalize_profile,
+    nonnegative_integer_setting,
     report_default_path,
     report_output_path,
     session_report_default_path,
@@ -40,6 +41,7 @@ from naos_policy import (  # noqa: E402
 )
 from naos_session_identity import (  # noqa: E402
     ensure_session_context,
+    inspect_session_context,
     record_session_report_reference,
     validate_session_id,
 )
@@ -309,6 +311,21 @@ def discover_task_id(root: Path, naos_root: str, explicit_task: str | None) -> d
     }
 
 
+def confirmed_absent_path(root: Path, path_text: str | None) -> bool:
+    if not path_text:
+        return False
+    path = Path(path_text)
+    if not path.is_absolute():
+        path = root / path
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
 def file_record(root: Path, path: Path | None, freshness_days: int, now: datetime) -> dict[str, Any]:
     if path is None:
         return {"path": None, "exists": False, "status": "missing", "freshness": "missing"}
@@ -328,7 +345,7 @@ def file_record(root: Path, path: Path | None, freshness_days: int, now: datetim
             "size_bytes": stat.st_size,
             "modified_time": modified.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
             "age_days": age_days,
-            "freshness": "stale" if freshness_days >= 0 and age_days > freshness_days else "fresh",
+            "freshness": "stale" if (now - modified).total_seconds() > freshness_days * 86400 else "fresh",
             "digest": safe_digest(path),
         }
     )
@@ -478,7 +495,10 @@ def summarize_report_input(root: Path, path: Path, freshness_days: int, now: dat
 
 
 def collect_report_inputs(root: Path, naos_root: str, policy: dict[str, Any], rules: dict[str, Any], now: datetime) -> dict[str, dict[str, Any]]:
-    freshness_days = int(as_mapping(rules.get("report_freshness_policy")).get("freshness_days") or 7)
+    freshness_days = nonnegative_integer_setting(
+        rules.get("report_freshness_policy", {}), "freshness_days", 7,
+        context="report_freshness_policy",
+    )
     inputs: dict[str, dict[str, Any]] = {}
     for key, label in REPORT_INPUTS.items():
         inputs[label] = summarize_report_input(root, report_path_for(root, naos_root, policy, key), freshness_days, now)
@@ -765,16 +785,24 @@ def evaluate_findings(
     for label in sorted(required_reports):
         record = report_inputs.get(label) or {}
         if not record.get("exists"):
-            findings.append(
-                finding(
-                    f"session_lifecycle.{label}.missing",
-                    severity,
-                    "missing",
-                    f"Required lifecycle input report is missing: {label}.",
-                    ["Run the corresponding NAOS report command or record why it is not configured."],
-                    report=label,
-                )
+            missing_finding = finding(
+                f"session_lifecycle.{label}.missing",
+                severity,
+                "missing",
+                f"Required lifecycle input report is missing: {label}.",
+                ["Run the corresponding NAOS report command or record why it is not configured."],
+                report=label,
             )
+            if confirmed_absent_path(root, record.get("path")):
+                missing_finding.update(
+                    evidence_classification="confirmed",
+                    classification_scope="selected_lifecycle_report_absent_at_check",
+                    reasoning_summary="The configured lifecycle input report was absent at this check; this does not decide why it is absent or waive the required input.",
+                    source_path=str(Path(__file__).resolve()),
+                    selected_report_path=record.get("path"),
+                    human_review_required=True,
+                )
+            findings.append(missing_finding)
         elif record.get("freshness") == "stale":
             findings.append(
                 finding(
@@ -844,8 +872,18 @@ def build_report(
     now = now_utc()
     posture = profile_posture(rules, profile)
     severity = severity_for_rules(root, naos_root, profile, policy, posture)
-    card_days = int(as_mapping(rules.get("active_card_policy")).get("freshness_days") or 14)
-    compact_days = int(as_mapping(rules.get("compact_checkpoint_policy")).get("compact_freshness_days") or 7)
+    card_days = nonnegative_integer_setting(
+        rules.get("active_card_policy", {}), "freshness_days", 14,
+        context="active_card_policy",
+    )
+    compact_days = nonnegative_integer_setting(
+        rules.get("compact_checkpoint_policy", {}), "compact_freshness_days", 7,
+        context="compact_checkpoint_policy",
+    )
+    nonnegative_integer_setting(
+        rules.get("report_freshness_policy", {}), "freshness_days", 7,
+        context="report_freshness_policy",
+    )
     task_discovery = discover_task_id(root, naos_root, explicit_task)
     task_id = task_discovery.get("task_id")
     task_resolution = (
@@ -983,6 +1021,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--session-id", help="Use an existing filesystem-safe session id.")
     parser.add_argument("--new-session", action="store_true", help="Create a new session id instead of reusing the latest active session.")
     parser.add_argument("--close-session", action="store_true", help="Mark the selected session as closed after writing the lifecycle report.")
+    parser.add_argument("--inspect-session", action="store_true", help="Inspect existing session context without starting, updating, or ending a session.")
     parser.add_argument("--output", help="Optional JSON report output path.")
     parser.add_argument("--json", action="store_true", help="Print JSON report.")
     parser.add_argument("--strict", action="store_true", help="Use strict profile exit policy.")
@@ -991,6 +1030,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.inspect_session and (args.new_session or args.close_session or args.output):
+        print("ERROR: --inspect-session is stdout-only and cannot create, close, or write a report", file=sys.stderr)
+        return 2
     try:
         root = Path.cwd()
         policy = load_policy(args.policy, args.naos_root, root)
@@ -1013,21 +1055,48 @@ def main(argv: list[str] | None = None) -> int:
             args.task,
             args.recovery_mode,
         )
-        session_context = ensure_session_context(
-            root=root,
-            naos_root=naos_root,
-            policy=policy,
-            profile=profile,
-            requested_session_id=args.session_id,
-            new_session=args.new_session,
-            close_session=args.close_session,
-            task_id=report.get("task_id") or args.task,
+        session_context = (
+            inspect_session_context(root, naos_root, policy, args.session_id)
+            if args.inspect_session else
+            ensure_session_context(
+                root=root,
+                naos_root=naos_root,
+                policy=policy,
+                profile=profile,
+                requested_session_id=args.session_id,
+                new_session=args.new_session,
+                close_session=args.close_session,
+                task_id=report.get("task_id") or args.task,
+            )
         )
     except Exception as exc:  # pragma: no cover - defensive CLI boundary
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
     output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "session_lifecycle_report")
+    if args.inspect_session:
+        report["inspection_only"] = True
+        report["session_id"] = session_context.get("session_id")
+        report["session_root"] = rel_path(session_context["session_root"], root) if session_context.get("session_root") else None
+        report["session_report_root"] = rel_path(session_context["session_report_root"], root) if session_context.get("session_report_root") else None
+        report["generated_by"] = build_generated_by(root, session_id=session_context.get("session_id"), generated_at=report.get("generated_at"))
+        report["findings"].extend(session_context.get("findings") or [])
+        report["status"] = (
+            "blocked" if session_context.get("status") == "blocked"
+            else status_from_findings(mode, rules, report["findings"])
+        )
+        report["summary"].update(finding_counts(report["findings"]))
+        report["summary"]["status"] = report["status"]
+        report["summary"]["session_activity_recorded"] = False
+        report["human_review_required"] = bool(report["human_review_required"] or session_context.get("findings"))
+        report["latest_report_compatibility"] = {"enabled": False, "inspection_only": True}
+        if args.json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print(f"NAOS session lifecycle inspection {mode} ({profile}): {report['status']}")
+            print("report: stdout only")
+        exit_code = exit_code_for_summary(profile, report["summary"], policy, strict=args.strict)
+        return 2 if session_context.get("status") == "blocked" else exit_code
     session_output = None
     if session_context.get("session_id") and args.output is None:
         session_output = session_report_default_path(root, naos_root, policy, str(session_context["session_id"]), "session_lifecycle_report")

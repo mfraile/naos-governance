@@ -8,6 +8,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, date, datetime
@@ -250,19 +251,19 @@ def load_json_mapping(path: Path) -> dict[str, Any]:
     return data
 
 
+# Serialized scope globs use one host-independent lexical contract. Native
+# filesystem containment is still enforced separately by project_path.
+SAFE_RELATIVE_PATH_PATTERN = '^(?!\\s)(?![\\s\\S]*\\s$)(?!\\.[gG][iI][tT](?:/|$))(?![\\s\\S]*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\:\\x00-\\x1f\\x7f]+(?:/[^/\\\\:\\x00-\\x1f\\x7f]+)*(?![\\s\\S])'
+
+
 def safe_relative_path(raw: Any, *, field: str) -> str:
-    value = str(raw or "").strip()
-    candidate = Path(value)
-    if (
-        not value
-        or candidate.is_absolute()
-        or ".." in candidate.parts
-        or any(part in {"", "."} for part in candidate.parts)
-        or candidate.parts[0] == ".git"
-        or any(ord(character) < 32 for character in value)
-    ):
-        raise ContractError(f"{field} must be one safe repository-relative path: {value!r}")
-    return candidate.as_posix()
+    # Internal callers already hold native Path objects. Convert their
+    # separators before applying the serialized-string contract.
+    if isinstance(raw, Path):
+        raw = raw.as_posix()
+    if not isinstance(raw, str) or re.fullmatch(SAFE_RELATIVE_PATH_PATTERN, raw) is None:
+        raise ContractError(f"{field} must be one canonical repository-relative path: {raw!r}")
+    return raw
 
 
 def project_path(root: Path, raw: Any, *, field: str, must_exist: bool = True) -> Path:
@@ -601,7 +602,9 @@ def contract_age_days(raw: Any) -> int:
     return (utc_now().date() - checked).days
 
 
-def validate_client_contracts(policy: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def validate_client_contracts(
+    policy: dict[str, Any], *, enforce_freshness: bool = True
+) -> dict[str, dict[str, Any]]:
     contracts = as_mapping(policy.get("client_contracts"))
     max_age = int(policy.get("client_contract_max_age_days") or 0)
     if tuple(sorted(contracts)) != tuple(sorted(ALLOWED_CLIENTS)):
@@ -635,7 +638,7 @@ def validate_client_contracts(policy: dict[str, Any]) -> dict[str, dict[str, Any
         age = contract_age_days(contract.get("source_checked_at"))
         if age < 0:
             raise ContractError(f"Client contract {client} has a future source_checked_at date.")
-        if age > max_age:
+        if enforce_freshness and age > max_age:
             raise ContractError(f"Client contract {client} is stale ({age} days > {max_age}).")
         result[client] = {
             **contract,
@@ -1089,7 +1092,13 @@ def build_report(
             label="agent orchestration request",
         )
         report["configured"] = True
-        report["client_contracts"] = validate_client_contracts(orchestration_policy)
+        report["client_contracts"] = validate_client_contracts(
+            orchestration_policy,
+            enforce_freshness=(
+                orchestration_policy.get("enabled") is True
+                and request.get("enabled") is True
+            ),
+        )
         report["authority"] = as_mapping(orchestration_policy.get("authority"))
         report["not_claimed"] = sorted({*NOT_CLAIMED, *[str(item) for item in as_list(orchestration_policy.get("required_nonclaims"))]})
         if orchestration_policy.get("enabled") is not True or request.get("enabled") is not True:

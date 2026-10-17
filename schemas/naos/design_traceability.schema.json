@@ -106,12 +106,46 @@
           "implementation_paths": {"type": "array", "items": {"type": "object"}},
           "changed_file_refs": {"type": "array", "items": {"type": "string"}},
           "test_evidence_refs": {"type": "array", "items": {"type": "string"}},
+          "changed_file_evidence_results": {"type": "array", "items": {"$ref": "#/$defs/evidenceReferenceResult"}},
+          "test_evidence_results": {"type": "array", "items": {"$ref": "#/$defs/evidenceReferenceResult"}},
           "optional_design_refs": {"type": "array", "items": {"type": "object"}},
           "design_ref_reviewed": {"type": "boolean"},
           "human_review_required": {"type": "boolean"},
           "review_disposition": {},
           "residual_risks": {"type": "array", "items": {"type": "string"}},
           "non_claims": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "evidence_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "claim_ceiling",
+        "changed_status_verified",
+        "test_outcome_verified",
+        "relationship_verified",
+        "external_reference_verified"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "claim_ceiling": {
+          "const": "local_artifact_availability_review"
+        },
+        "changed_status_verified": {
+          "const": false
+        },
+        "test_outcome_verified": {
+          "const": false
+        },
+        "relationship_verified": {
+          "const": false
+        },
+        "external_reference_verified": {
+          "const": false
         }
       }
     },
@@ -169,6 +203,105 @@
         "referenced_paths_missing": {"type": "integer", "minimum": 0},
         "assured_blocking_enabled": {"const": 0}
       }
+    }
+  },
+  "$defs": {
+    "evidenceReferenceResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "reference",
+        "reference_kind",
+        "evidence_ref",
+        "availability",
+        "content_sha256",
+        "claim_ceiling",
+        "external_reference_verified"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reference_kind": {
+          "enum": [
+            "reference_context",
+            "local_artifact"
+          ]
+        },
+        "evidence_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "availability": {
+          "enum": [
+            "available",
+            "missing_or_placeholder",
+            "invalid_declaration",
+            "unsafe_path",
+            "missing",
+            "not_regular_file",
+            "empty_file",
+            "unreadable"
+          ]
+        },
+        "content_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "claim_ceiling": {
+          "enum": [
+            "local_artifact_available",
+            "none"
+          ]
+        },
+        "external_reference_verified": {
+          "const": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "availability": {
+                "const": "available"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "content_sha256": {
+                "type": "string"
+              },
+              "claim_ceiling": {
+                "const": "local_artifact_available"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "content_sha256": {
+                "type": "null"
+              },
+              "claim_ceiling": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

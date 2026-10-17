@@ -10,17 +10,20 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from naos_hygiene_common import check_secret_hygiene, run_report_command
+from naos_hygiene_common import check_secret_hygiene, run_report_command  # noqa: E402
+from naos_secret_patterns import SECRET_SCAN_ROOTS, SECRET_SCAN_SUFFIXES  # noqa: E402
 
 
 FALLBACK_RULES = {
-    "scan_roots": ["src", "app", "tests", ".github"],
-    "suffixes": [".py", ".yaml", ".yml", ".json", ".toml", ".env", ".ini", ".cfg", ".md", ".txt"],
+    "scan_roots": ["."],
+    "include_root_files": True,
+    "suffixes": list(SECRET_SCAN_SUFFIXES),
     "exclude_dirs": ["dev", "dist", "build", "__pycache__"],
     "exclude_globs": [],
     "entropy_min_length": 20,
     "entropy_threshold": 4.0,
     "allowed_values": [],
+    "entropy_allowed_values": [],
 }
 
 
@@ -34,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         fallback_rules=FALLBACK_RULES,
         builder=check_secret_hygiene,
         summary_label="Secret Hygiene",
+        pass_policy=True,
     )
 
 

@@ -12,11 +12,13 @@
 Use this file as a compact rule index. See `naos/NAOS_QUICK_REFERENCE.md`.
 Consider Standard for team or production use; plan first, then apply only through the separate digest-bound workflow.
 
+> **H: Human-review obligation**: Each `[H]` table row/heading binds the full rule and its `Review Rn [H]` evidence. Human reviewers must verify all applicable rule requirements and listed evidence, withholding approval until verified; waivers require existing project-policy authority. Deterministic triggers/refusals remain; passing checks does not prove full rule satisfaction.
+
 ## Enforcement Key
 
 | Mark | Meaning |
 | --- | --- |
-| BLOCKING | Must be satisfied or explicitly waived by project policy/human review. |
+| BLOCKING [H] | Must be satisfied or explicitly waived by project policy/human review. |
 | ADVISORY | Consider and document when relevant. |
 | DEFERRED | Available in standard/assured; do not claim it is enforced in lite. |
 | ADAPT | Project-specific details must be filled in before relying on the rule. |
@@ -25,11 +27,11 @@ Consider Standard for team or production use; plan first, then apply only throug
 
 | Rule | Lite posture |
 | --- | --- |
-| 1 Update existing files | BLOCKING |
-| 2 No archive folders | BLOCKING |
+| 1 Update existing files | BLOCKING [H] |
+| 2 No archive folders | BLOCKING [H] |
 | 5 Exploration notes only | ADVISORY |
 | 7 Deep analysis protocol | ADVISORY |
-| 10 License compliance | BLOCKING |
+| 10 License compliance | BLOCKING [H] |
 | 19 Memory governance | ADVISORY |
 | 20 Dependency declaration | ADVISORY |
 | 24 Work-item context brief | ADVISORY |
@@ -39,7 +41,9 @@ Rules 3, 4, 12, 15, 16, 17, and 23 require project adaptation. Rules 6, 8,
 9, 11, 13, 14, 18, 21, 22, and 25 are deferred to standard/assured unless a
 project policy explicitly adopts them.
 
-## Rule 1: Update Existing Files
+## Rule 1: Update Existing Files [H]
+
+> **Review R1 [H]**: Document searches; new-file justification/index; stated exceptions.
 
 Do not create throwaway summaries, final reports, or duplicate status files when
 a canonical file exists. Update the current README, status, backlog, specs, or
@@ -48,10 +52,19 @@ existing doc instead.
 **Policy-review patterns** (not comprehensively checked by pre-commit):
 `*_SUMMARY.md`, `*_ANALYSIS.md`, `*_PLAN.md`, `*_FINAL*.md`; hook source is narrower.
 
-## Rule 2: No Archive Folders
+## Rule 2: No Archive Folders [H]
 
-Do not create `archive/`, `old/`, `backup/`, or similar history folders. Git is
-the archive. Remove obsolete tracked files with normal version-control review.
+> **Review R2 [H]**: Changed paths; obsolete-file removal through Git.
+
+Do not retain obsolete files in shadow history folders; use normal Git removal
+and review instead. Legitimate archive/backup domain code is allowed, including
+`src/archive/domain.py` and `db_backup.py`.
+
+**Generated-hook scope**: blocks top-level `archive/`, `docs/archive/`, and
+`<NAOS_ROOT>/archive/` (default `naos/archive/`), plus `.bak`/`.backup` file
+extensions. Other obsolete copies remain subject to Review R2; a passing
+filename check does not establish their absence.
+
 
 ## Rule 5: Exploration Notes Only
 
@@ -73,7 +86,9 @@ Lite minimums: dependency changes require source/license verification; bug work
 requires reproduction and impact search; feature work requires affected-file
 search, tests/evidence, and explicit out-of-scope.
 
-## Rule 10: License Compliance
+## Rule 10: License Compliance [H]
+
+> **Review R10 [H]**: Licence verification at source; copyleft-risk/unknown/custom human sign-off.
 
 Do not add AGPL/GPL/copyleft-risk dependencies without explicit project
 approval. Verify license at source such as package metadata, PyPI, registry

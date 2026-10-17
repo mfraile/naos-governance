@@ -1,8 +1,15 @@
 # Document Index
 
-A single page listing every public kit-shipped document with one-line scope and the question it answers. If you are new to the kit, start with `README.md` and `START_HERE_NAOS_OVERVIEW_AND_LEARNING_PATH.md`. If you are evaluating NAOS for a regulated context, start with `docs/COMPLIANCE_MAPPING.md`.
+A curated guide to public kit documentation with one-line scope and the question each entry answers. If you are new to the kit, start with `README.md` and `START_HERE_NAOS_OVERVIEW_AND_LEARNING_PATH.md`. If you are evaluating NAOS for a regulated context, start with `docs/COMPLIANCE_MAPPING.md`.
 
-This file is mechanically maintained — every documented file is listed here exactly once, and orphaned documents will be flagged by `scripts/validators/validate_project_coherence.py`.
+This is the curated public documentation index.
+`scripts/validators/validate_docs_consistency.py` checks coverage of its explicit
+`ROOT_PUBLIC_DOCS` and `DOCS_PUBLIC_DOCS` inventories; it does not discover every
+repository document, enforce unique entries, or detect all orphaned documents.
+The same validator checks the separate generated-project index template at
+`templates/structural-seeds/docs/DOCS_INDEX.md` against
+`GENERATED_DOCS_INDEX_REQUIRED`. Keep these inventories and indexes aligned when
+adding a document within their scope.
 
 ## Public planning surface
 
@@ -19,6 +26,8 @@ These public documents define what NAOS commits to ship and what evidences each 
 | [`docs/NAOS_THREAT_MODEL.md`](NAOS_THREAT_MODEL.md) | Public threat model | *What are the main SDLC evidence risks and trust boundaries for NAOS?* |
 | [`docs/AUDIT_PLAYBOOK.md`](AUDIT_PLAYBOOK.md) | Public audit playbook | *How should adopters run deterministic NAOS checks and package review evidence without overclaiming approval?* |
 | [`docs/ASSURED_PROFILE_ACTIVATION.md`](ASSURED_PROFILE_ACTIVATION.md) | Assured profile activation guide | *What must be configured before using `assured` seriously, and what does it still not prove?* |
+| [`docs/LANGUAGE_COVERAGE.md`](LANGUAGE_COVERAGE.md) | Readiness language applicability | *Which code controls support Python, Java, Node and Go, and what does READY actually establish?* |
+| [`docs/PROJECT_CONTEXT_FACTS.md`](PROJECT_CONTEXT_FACTS.md) | Generated project facts and preset guidance | *Which generated values describe NAOS configuration, and which require project confirmation?* |
 | [`docs/BEHAVIORAL_AUDIT_ENABLEMENT.md`](BEHAVIORAL_AUDIT_ENABLEMENT.md) | Behavioral/advisory enablement guide | *How do StaticGrader, LLMGrader readiness, agentic workflow review, calibration shadow, evidence classification, and advisory findings stay bounded?* |
 | [`docs/CROSS_HARNESS_REVIEW_READINESS.md`](CROSS_HARNESS_REVIEW_READINESS.md) | Cross-harness/DSSE readiness guide | *What must be declared before future independent review or signing designs are safe to consider?* |
 | [`docs/COMPLIANCE_MAPPING.md`](COMPLIANCE_MAPPING.md) | Compliance lens | *Which NAOS artefacts may support framework-control discussions, and which responsibilities remain outside the kit?* |
@@ -26,6 +35,7 @@ These public documents define what NAOS commits to ship and what evidences each 
 | [`docs/DORA_MAPPING.md`](DORA_MAPPING.md) | DORA evidence lens | *Where can NAOS SDLC evidence support DORA control discussions, and which operational resilience controls remain outside NAOS?* |
 | [`docs/ADMISSIBILITY.md`](ADMISSIBILITY.md) | Evidence-pack definition | *Which NAOS artefacts are ready for reviewer handoff, and what do they not prove?* |
 | [`docs/FRONTMATTER_CONFORMANCE.md`](FRONTMATTER_CONFORMANCE.md) | Static conformance reference | *Which agent, skill, and instruction frontmatter fields must generated projects declare?* |
+| [`docs/AI_METADATA_SCOPE.md`](AI_METADATA_SCOPE.md) | Adopter metadata scope | Exact host-file declarations, strict NAOS defaults, and separate catalogue/inventory records. |
 | [`docs/ENGRAM_SETUP.md`](ENGRAM_SETUP.md) | Memory setup guide | *How do I configure local/private Engram memory, or safely defer it?* |
 | [`docs/TOOL_NEUTRAL_USAGE.md`](TOOL_NEUTRAL_USAGE.md) | Optional integrations guide | *How do I use NAOS with common AI-assisted SDLC tools without making them core dependencies?* |
 | [`docs/CODEX_PLUGIN_AND_MCP.md`](CODEX_PLUGIN_AND_MCP.md) | Plugin/MCP adapter guide | *How do repo-versioned Codex and Claude Code plugins coexist with project-local NAOS and future MCP adapters?* |
@@ -120,7 +130,7 @@ additional runtime capabilities and do not change command semantics.
 | [`configs/secure_coding_control_register.yaml`](../configs/secure_coding_control_register.yaml) | Active canonical secure/agentic coding requirements register; does not own enforcement policy or prove security |
 | [`configs/secure_coding_control_register.sample.yaml`](../configs/secure_coding_control_register.sample.yaml) | Illustrative compatibility seed; not the active requirement authority |
 | [`configs/secure_coding_control_render_manifest.yaml`](../configs/secure_coding_control_render_manifest.yaml) | Reviewed binding from canonical controls to bounded generated consumer sections |
-| [`schemas/team_config.schema.yaml`](../schemas/team_config.schema.yaml) | Multi-team filter config (TASK_REGISTRY `team_config` block) |
+| [`schemas/team_config.schema.yaml`](../schemas/team_config.schema.yaml) | Draft 2020-12 schema for a registry document's optional `team_config` block; contextual checks remain in the shared runtime validator |
 | [`schemas/naos/capability.schema.json`](../schemas/naos/capability.schema.json) | Canonical capability-card schema used by the capability contract validator |
 | [`schemas/naos/systemic_impact_rules.schema.json`](../schemas/naos/systemic_impact_rules.schema.json) | Artifact families, typed review surfaces, and separate kit-source/adopter-generated changed-path routes |
 | [`schemas/naos/systemic_impact_review.schema.json`](../schemas/naos/systemic_impact_review.schema.json) | Current-state and optional explicit changed-path systemic-impact report contract |
@@ -149,5 +159,5 @@ additional runtime capabilities and do not change command semantics.
 ## What this index is NOT
 
 - **Not exhaustive across maintainer-private planning material.** This index covers the published kit only. Internal research, marketing, and release-planning material stays outside the public documentation surface until explicitly approved for publication.
-- **Not a sitemap for generated documents.** Documents produced by `make -f Makefile.naos gov-refresh` (DASHBOARD.md, TRACEABILITY_MATRIX.md, BACKLOG.md, PROJECT_STATUS.md) are intentionally not listed — they are outputs, not inputs.
+- **Not a sitemap for generated documents.** `make -f Makefile.naos gov-refresh` updates `DASHBOARD.md`, `BACKLOG.md`, and parts of `PROJECT_STATUS.md`; `python scripts/workflows/generate_traceability_matrix.py` separately generates `TRACEABILITY_MATRIX.md`. These project outputs are intentionally not listed as public-kit inputs.
 - **Not version-pinned.** Document content changes between releases; the index structure does not. If a document is missing here, that is a bug in the kit, not in your installation.

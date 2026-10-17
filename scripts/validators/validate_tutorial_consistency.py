@@ -12,6 +12,7 @@ appears after repo structure, profile, or public-surface changes.
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import re
 import sys
@@ -20,6 +21,8 @@ from typing import Any
 from urllib.parse import unquote
 
 TRUSTED_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from validator_context import validation_scope
 
 
 FORBIDDEN_PUBLIC_REFS = [
@@ -27,8 +30,6 @@ FORBIDDEN_PUBLIC_REFS = [
     "../THREAT_MODEL.md",
     "docs/MULTI_TEAM_DESIGN.md",
     "../MULTI_TEAM_DESIGN.md",
-    "dev/",
-    "../dev/",
 ]
 
 LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
@@ -93,6 +94,14 @@ def check_public_boundary(root: Path, tutorial_files: list[Path]) -> list[str]:
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
+        for target in markdown_links(path):
+            local = target.split("#", 1)[0]
+            if local and not local.startswith(("http://", "https://", "mailto:")):
+                resolved = (path.parent / unquote(local)).resolve()
+                if resolved.is_relative_to((root / "dev").resolve()):
+                    issues.append(f"{path.relative_to(root)} references kit-internal dev path: {target}")
+        if re.search(r"(?<![A-Za-z0-9_./-])(?:\.\./)*dev/", text):
+            issues.append(f"{path.relative_to(root)} references kit-internal dev/ path")
         for forbidden in FORBIDDEN_PUBLIC_REFS:
             if forbidden in text:
                 issues.append(f"{path.relative_to(root)} references internalized path: {forbidden}")
@@ -141,8 +150,18 @@ def check_profile_facts(root: Path) -> list[str]:
     return issues
 
 
-def main() -> int:
-    root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd().resolve()
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", nargs="?", default=".")
+    parser.add_argument("--scope", choices=("auto", "kit", "project"), default="auto")
+    args = parser.parse_args(argv)
+    root = Path(args.root).resolve()
+    try:
+        scope = validation_scope(root, args.scope)
+    except ValueError as exc:
+        print(f"Tutorial Consistency: unsupported context: {exc}")
+        return 2
+    print(f"Tutorial Consistency scope: {scope} ({root})")
     tutorial_dir = root / "docs" / "tutorials"
     if not tutorial_dir.exists():
         print("Tutorial Consistency: SKIP — docs/tutorials not present")
@@ -152,8 +171,11 @@ def main() -> int:
     issues: list[str] = []
     issues.extend(check_tutorial_links(root, tutorial_files))
     issues.extend(check_tutorial_index(root, tutorial_dir, tutorial_files))
-    issues.extend(check_public_boundary(root, tutorial_files))
-    issues.extend(check_profile_facts(root))
+    if scope == "kit":
+        issues.extend(check_public_boundary(root, tutorial_files))
+        issues.extend(check_profile_facts(root))
+    else:
+        print("  - canonical kit profile/publication checks: NOT_APPLICABLE (project scope)")
 
     if issues:
         print("Tutorial Consistency: FAIL")

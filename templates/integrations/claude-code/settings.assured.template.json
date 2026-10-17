@@ -1,5 +1,5 @@
 {
-  "schema": "naos.claude_code_hook_template.v1",
+  "schema": "naos.claude_code_hook_template.v2",
   "description": "Optional assured-profile NAOS hook references for Claude Code. Review and merge manually; these remain convenience hooks, not authority.",
   "activation": "manual_review_required",
   "profile": "assured",
@@ -15,35 +15,113 @@
     "official Anthropic support"
   ],
   "hooks": {
-    "PreSession": [
+    "SessionStart": [
       {
-        "command": "NAOS_PROFILE=assured naos/integrations/claude-code/hooks/pre-session.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "session-start",
+              "--profile",
+              "assured"
+            ],
+            "timeout": 35
+          }
+        ]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
-        "command": "NAOS_PROFILE=assured naos/integrations/claude-code/hooks/pre-tool-edit.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "pre-tool-edit",
+              "--profile",
+              "assured"
+            ],
+            "timeout": 20
+          }
+        ]
       },
       {
-        "matcher": "Bash",
-        "command": "NAOS_PROFILE=assured naos/integrations/claude-code/hooks/pre-tool-bash.sh"
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "pre-tool-bash",
+              "--profile",
+              "assured"
+            ],
+            "timeout": 20
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
-        "command": "NAOS_PROFILE=assured naos/integrations/claude-code/hooks/post-tool-write.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "post-tool-write",
+              "--profile",
+              "assured"
+            ],
+            "timeout": 20
+          }
+        ]
       }
     ],
     "PreCompact": [
       {
-        "command": "NAOS_PROFILE=assured naos/integrations/claude-code/hooks/pre-compact.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "pre-compact",
+              "--profile",
+              "assured"
+            ],
+            "timeout": 20
+          }
+        ]
       }
     ],
-    "Stop": [
+    "SessionEnd": [
       {
-        "command": "NAOS_PROFILE=assured naos/integrations/claude-code/hooks/stop.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "session-end",
+              "--profile",
+              "assured"
+            ],
+            "timeout": 20
+          }
+        ]
       }
     ]
   }

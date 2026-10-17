@@ -30,10 +30,20 @@ ci_memory_access_default: none
 # registry. Client-policy files are not server declarations.
 allowed_config_locations: []
 user_mcp_config_metadata_check_allowed: true
+# Separate opt-ins; include_user never selects system managed locations.
+managed_mcp_config_metadata_check_allowed: false
+client_policy_mcp_config_metadata_check_allowed: false
 # User-scope coverage is supplied by the shared registry and listed by config ID
 # in each report. The scanner emits server names, project declarations, and
-# secret-like key names only; it never emits commands or environment values.
+# secret-like key names and credential field paths only; it never emits commands,
+# argument/header/other environment values. Deliberate exception: a non-credential-
+# shaped ENGRAM_PROJECT from an Engram server is reported as a project identifier
+# for scope reconciliation; this does not verify identity, access or authority.
+# Managed file metadata
+# does not establish MDM/remote-delivered policy, precedence or runtime access.
 
+# Exclusions apply to resolved project-relative paths and context inputs.
+# An external data_dir/engram.db is not prohibited storage or proof of access.
 provider_data_exclusions:
   - "**/engram.db"
   - "**/*.sqlite"
@@ -142,6 +152,8 @@ human_review_requirements:
   forbidden_category_exception: true
   cross_project_scope: true
 
+# Assured report severity cannot fall below the selected policy severity.
+# Kit reports stay advisory; lower profiles retain their configured posture.
 profile_posture:
   quickstart:
     state: disabled

@@ -56,25 +56,31 @@ Or:
 
 ### Step 3: Review the metrics output
 
-The agent will gather:
+Review the available outputs; missing evidence remains unknown:
 
 ```bash
 # Commits last 30 days
 git log --oneline --since="30 days ago" | wc -l
 
-# Pre-commit bypasses (governance concern)
-git log --oneline --since="30 days ago" | grep -i "no-verify\|skip" | wc -l
+# Local hook posture and self-reported commit-message mentions (portable CLI)
+naos governance-bypass-posture --since-days 30 --json
 
 # Test fix commits (quality indicator)
 git log --oneline --since="30 days ago" | grep -i "fix test\|test fix" | wc -l
 ```
+
+The posture report searches at most 200 local commit subjects across refs in the
+selected time window. Read `scans.bypass_commit_message_inspection`; a read error
+is unknown, not zero. Git does not record `--no-verify` use by default, and an
+innocent message can mention bypassing. Retained local/CI results can establish
+that particular checks ran; they cannot reconstruct past hook invocations.
 
 **Key metrics to review**:
 
 | Metric | Target | Concern Threshold |
 |--------|--------|------------------|
 | Velocity (commits/week) | Stable or improving | >40% drop |
-| Pre-commit bypass rate | 0% | >5% |
+| Self-reported hook-bypass message mentions | Review each mention | Unexplained mention; zero is not proof hooks ran |
 | Test fix ratio | <10% of commits | >20% |
 | Governance evidence/adherence rate | Improving | Any unexplained regression |
 | FR/NFR delivery rate | On plan | Behind on critical FRs |
@@ -83,13 +89,13 @@ git log --oneline --since="30 days ago" | grep -i "fix test\|test fix" | wc -l
 
 This is the most important part of the monthly review. For each pattern identified:
 
-1. **Identify the pattern**: "We bypassed pre-commit 3 times this month because of the lint rule for generated files."
+1. **Identify the observed pattern**: "Three commit messages mention a hook bypass; inspect retained check output and ask the authors before inferring what occurred."
 2. **Root cause**: "The lint rule doesn't exclude the `generated/` directory."
 3. **Action**: Update the governance rule to exclude `generated/`.
 4. **Encode the fix**: Update `.ai/RULES.md` or the pre-commit hook configuration.
 
 The `naos-m-review` prompt includes a structured audit for:
-- Pre-commit failures and bypass patterns
+- Retained pre-commit failures and self-reported bypass-message patterns
 - Test failures and rework patterns
 - Scope creep incidents
 - Documentation debt accumulation
@@ -120,7 +126,7 @@ Record the result in `naos/PROJECT_STATUS.md` under "Metrics Summary":
 ## Metrics Summary (2026-03)
 - Governance evidence/adherence: 82.4%
 - Velocity: 47 commits (avg 11.75/week)
-- Pre-commit bypass rate: 2.1% (1 bypass)
+- Self-reported hook-bypass message mentions: 1 (not an observed bypass count or rate)
 - Test fix ratio: 8.5%
 ```
 

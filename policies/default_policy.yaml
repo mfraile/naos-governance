@@ -57,6 +57,7 @@ paths:
   ac_completion_evidence_manifest: ac_completion_evidence.yaml
   ac_completion_evidence_report: ac_completion_evidence.json
   self_check_report: self_check.json
+  self_check_dependency_resolution_report: self_check_dependency_resolution.json
   capability_maturity_report: capability_maturity.json
   capability_state: capability_state.yaml
   systemic_impact_report: systemic_impact_review.json
@@ -172,6 +173,7 @@ paths:
   plan_coherence_report: plan_coherence.json
   secure_coding_control_routes: secure_coding_control_evidence_routes.yaml
   secure_coding_controls_report: secure_coding_controls.json
+  conformance_latest_report: conformance_latest.json
   secure_coding_reference_integrity_report: secure_coding_reference_integrity.json
   secure_coding_reporting_report: secure_coding_reporting.json
   pr_risk_rules: pr_risk_rules.yaml

@@ -1,7 +1,8 @@
 ---
-name: "cookbook-neo4j"
-description: "If-then recipes for graph database queries. Invoke when writing tenant-filtered Cypher/Gremlin/AQL, parameterized queries, global node queries, or creating tenant-owned nodes. Works with Neo4j, Amazon Neptune, and ArangoDB."
-parameters: []
+name: cookbook-neo4j
+description: If-then recipes for graph database queries. Invoke when writing tenant-filtered Cypher/Gremlin/AQL, parameterized queries, global node queries, or creating tenant-owned nodes. Works with Neo4j, Amazon Neptune, and ArangoDB.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Cookbook: Graph Database & Cypher
@@ -17,12 +18,14 @@ parameterized queries; global node queries; or tenant-owned nodes.
 **Then**: Always filter tenant nodes by `{tenant_id: $tid}` — never return data across tenant boundaries
 **Example**:
 ```cypher
--- WRONG — no tenant filter
+// WRONG — no tenant filter
 MATCH (t:[ADAPT: YourTenantNode])-[:[ADAPT: REL]]->([ADAPT: GlobalNode]) RETURN t
 
--- RIGHT
+// RIGHT
 MATCH (t:[ADAPT: YourTenantNode] {tenant_id: $tenant_id})-[:[ADAPT: REL]]->([ADAPT: GlobalNode]) RETURN t
 ```
+
+Cypher single-line comments use `//`; see the [official comment syntax](https://neo4j.com/docs/cypher-manual/current/syntax/comments/) (checked 2026-10-16). The ADAPT labels still require actual project schema names.
 
 ### If: Writing a Cypher query in Python
 **Then**: Use parameterized queries — never interpolate tenant_id or user input into the Cypher string
@@ -39,7 +42,7 @@ session.run("MATCH (t:[ADAPT: Node] {tenant_id: $tid}) RETURN t", tid=tenant_id)
 **Then**: Do NOT add a `tenant_id` filter — global nodes are shared across all tenants
 **Example**:
 ```cypher
--- CORRECT — shared reference node, no tenant filter needed
+// CORRECT — shared reference node, no tenant filter needed
 MATCH (ref:[ADAPT: YourGlobalNode] {code: $code}) RETURN ref
 ```
 

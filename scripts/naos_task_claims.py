@@ -4,12 +4,16 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
+import time
 import uuid
+from contextlib import contextmanager, nullcontext
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -19,6 +23,8 @@ import yaml
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+
+from naos_self_check_inspection import inspection_active, inspection_output_path  # noqa: E402
 
 from naos_policy import (  # noqa: E402
     build_generated_by,
@@ -47,6 +53,94 @@ REPORT_SCHEMA = "naos.task_claim_report.v1"
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@+-]{0,127}$")
 SAFE_FRAGMENT_RE = re.compile(r"[^A-Za-z0-9._:@+-]+")
 CLAIM_STATUSES = {"active", "released", "expired", "stale", "conflicting", "unknown"}
+LOCK_TIMEOUT_SECONDS = 10.0
+
+
+class ClaimLockError(RuntimeError):
+    """The cooperative claims transaction could not acquire its stable lock."""
+
+
+def _regular_lock_stat(path: Path) -> os.stat_result:
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+        raise ClaimLockError("Task claims lock must be a regular file, not a link or reparse point.")
+    return info
+
+
+@contextmanager
+def claim_transaction(claims_path: Path, *, timeout: float = LOCK_TIMEOUT_SECONDS):
+    """Serialize cooperating local callers; keep the lock inode after release.
+
+    The OS releases the lock after process death. This is not an authorization
+    boundary or a distributed lock for separate clones/network filesystems.
+    """
+    lock_path = claims_path.with_name(claims_path.name + ".lock")
+    fd = None
+    acquired = False
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            _regular_lock_stat(lock_path)
+        except FileNotFoundError:
+            pass
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        fd = os.open(lock_path, flags, 0o600)
+        opened = os.fstat(fd)
+
+        def check_identity():
+            live = _regular_lock_stat(lock_path)
+            if not stat.S_ISREG(opened.st_mode) or (live.st_dev, live.st_ino) != (opened.st_dev, opened.st_ino):
+                raise ClaimLockError("Task claims lock path changed; retry only after repository activity is stable.")
+
+        check_identity()
+        if os.name == "nt":
+            import msvcrt
+
+            def acquire():
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            def acquire():
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                acquire()
+                acquired = True
+                break
+            except OSError as exc:
+                if exc.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
+                    raise
+                if time.monotonic() >= deadline:
+                    raise ClaimLockError("Task claims lock timed out; no claims or shared reports were changed.") from exc
+                time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+        check_identity()
+    except OSError as exc:
+        if fd is not None:
+            os.close(fd)
+            fd = None
+        raise ClaimLockError(f"Task claims lock unavailable: {exc}") from exc
+    except BaseException:
+        if fd is not None:
+            os.close(fd)
+            fd = None
+        raise
+    try:
+        yield
+    finally:
+        if fd is not None:
+            try:
+                if acquired:
+                    if os.name == "nt":
+                        os.lseek(fd, 0, os.SEEK_SET)
+                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                    else:
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
 
 LIMITATIONS = [
     "Task claims are coordination metadata only; they are not authorization, approval, ownership proof, task completion, or a security boundary.",
@@ -211,19 +305,26 @@ def load_claims(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
                 "message": f"Task claims file could not be parsed: {exc}",
             }
         ]
-    if not isinstance(data, dict) or not isinstance(data.get("claims"), list):
+    if (
+        not isinstance(data, dict)
+        or not isinstance(data.get("claims"), list)
+        or any(not isinstance(item, dict) for item in data["claims"])
+        or any("status" in item and (
+            not isinstance(item["status"], str) or item["status"] not in CLAIM_STATUSES
+        ) for item in data["claims"])
+        or data.get("schema", CLAIMS_SCHEMA) != CLAIMS_SCHEMA
+    ):
         findings.append(
             {
                 "id": "task_claims.invalid_claim_schema",
                 "severity": "warning",
                 "status": "invalid_claims",
-                "message": "Task claims file is not a mapping with a claims list.",
+                "message": "Task claims file needs a supported schema, a claims list of mappings and supported status values; existing bytes were preserved.",
             }
         )
         return {"schema": CLAIMS_SCHEMA, "updated_at": None, "claims": []}, findings
     data.setdefault("schema", CLAIMS_SCHEMA)
     data.setdefault("updated_at", None)
-    data["claims"] = [item for item in data.get("claims") or [] if isinstance(item, dict)]
     return data, findings
 
 
@@ -440,13 +541,17 @@ def build_findings(
             "severity": "advisory",
             "status": "advisory",
             "message": "Task claims coordinate work; they are not authorization, approval, ownership proof, task completion, or separation-of-duties evidence.",
+            "evidence_classification": "confirmed",
+            "classification_scope": "task_claims_tool_limit",
+            "source_path": str(Path(__file__).resolve()),
+            "human_review_required": True,
         }
     )
     return findings
 
 
 def status_for_report(action_status: str, claims: list[dict[str, Any]], findings: list[dict[str, Any]], profile: str) -> str:
-    if action_status in {"claim_created", "claim_released", "invalid_claims"}:
+    if action_status in {"claim_created", "claim_released", "invalid_claims", "blocked"}:
         return action_status
     if not claims:
         return "no_claims"
@@ -703,35 +808,42 @@ def build_parser() -> argparse.ArgumentParser:
 def infer_action(args: argparse.Namespace) -> str:
     if args.action:
         return args.action
-    prog = Path(sys.argv[0]).name.lower()
-    raw = " ".join(sys.argv[:1]).lower()
-    if "task-claim" in raw or "task_claim" in prog:
+    invoked = Path(sys.argv[0]).name.lower().removesuffix(".py")
+    command = invoked.removeprefix("naos ").replace("_", "-")
+    if command in {"task-claim", "naos-task-claim"}:
         return "claim"
-    if "task-release" in raw or "task_release" in prog:
+    if command in {"task-release", "naos-task-release"}:
         return "release"
     return "list"
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-    root = Path.cwd()
-    policy = load_policy(args.policy, args.naos_root, root)
-    naos_root = args.naos_root or default_naos_root(policy)
-    profile = normalize_profile(args.profile, policy)
-    action = infer_action(args)
+def run_transaction(args, root, policy, naos_root, profile, action, *, lock_error=None):
+    # Called under the claims lock, including timestamp/session resolution and
+    # shared report publication. Lock failure produces stdout only.
+    inspecting = inspection_active(root, naos_root)
+    if inspecting and action != "list":
+        raise ValueError("Inspection permits task-claims --action list only")
     generated_at = utc_now_text()
     session_id = args.session_id or latest_session_id(root, naos_root, policy)
     operator, operator_findings = resolve_operator(root, args.operator_id)
     branch = args.branch or current_branch(root)
     task_id, task_finding = validate_task_id(args.task) if action in {"claim", "release"} else (None, None)
     claims_path = claims_file_path(root, naos_root, policy)
-    data, load_findings = load_claims(claims_path)
+    if lock_error is None:
+        data, load_findings = load_claims(claims_path)
+    else:
+        data = {"schema": CLAIMS_SCHEMA, "updated_at": None, "claims": []}
+        load_findings = [{"id": "task_claims.lock_unavailable", "severity": "warning",
+                          "status": "blocked", "message": str(lock_error)}]
 
     action_findings: list[dict[str, Any]] = []
     action_status = "ready"
     changed = False
     audit_event_type: str | None = None
-    if task_finding is None:
+    invalid_data = any(f.get("status") == "invalid_claims" for f in load_findings)
+    if lock_error is not None:
+        action_status = "blocked"
+    elif task_finding is None and not invalid_data:
         data, action_status, action_findings, changed, audit_event_type = apply_action(
             root=root,
             action=action,
@@ -747,7 +859,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         action_status = "invalid_claims"
 
-    if args.expires_at and action == "claim":
+    if args.expires_at and action == "claim" and not invalid_data and lock_error is None and task_finding is None:
         parsed = parse_timestamp(args.expires_at)
         if parsed is None:
             action_findings.append(
@@ -767,9 +879,11 @@ def main(argv: list[str] | None = None) -> int:
     if action in {"claim", "release"} and changed and not is_kit_repository(root, naos_root):
         atomic_write_yaml(claims_path, data)
 
-    output = report_path(root, naos_root, policy)
+    output = report_path(root, naos_root, policy) if lock_error is None else None
+    if output is not None:
+        output = inspection_output_path(root, naos_root, output)
     session_output = None
-    if session_id and output is not None and not is_kit_repository(root, naos_root):
+    if session_id and output is not None and not inspecting and not is_kit_repository(root, naos_root):
         session_output = session_report_default_path(root, naos_root, policy, session_id, "task_claim_report")
 
     audit_result = None
@@ -821,6 +935,29 @@ def main(argv: list[str] | None = None) -> int:
     write_report_with_session(output, session_output, report)
     if session_output is not None and output is not None:
         record_session_report_reference(root, naos_root, policy, session_id, "task_claim_report", output, session_output)
+    return report, output
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    root = Path.cwd()
+    policy = load_policy(args.policy, args.naos_root, root)
+    naos_root = args.naos_root or default_naos_root(policy)
+    profile = normalize_profile(args.profile, policy)
+    action = infer_action(args)
+    inspecting = inspection_active(root, naos_root)
+    if inspecting and action != "list":
+        print("ERROR: Inspection permits task-claims --action list only", file=sys.stderr)
+        return 2
+    # Kit inspection remains read-only and does not create adopter directories.
+    guard = nullcontext() if inspecting or is_kit_repository(root, naos_root) else claim_transaction(
+        claims_file_path(root, naos_root, policy)
+    )
+    try:
+        with guard:
+            report, output = run_transaction(args, root, policy, naos_root, profile, action)
+    except ClaimLockError as exc:
+        report, output = run_transaction(args, root, policy, naos_root, profile, action, lock_error=exc)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

@@ -313,12 +313,16 @@ def normalized_mode_id(record: dict[str, Any]) -> str:
 
 
 def text_contains_overclaim(record: dict[str, Any]) -> bool:
-    filtered = {
-        key: value
-        for key, value in record.items()
-        if key not in {"not_claimed", "limitations", "known_limitations", "residual_risks"}
-    }
-    return bool(OVERCLAIM_RE.search(json.dumps(filtered, sort_keys=True)))
+    # Inspect mode prose, including optional claim explanations, rather than
+    # identifiers, references, or disclaimer fields. A path naming attestation
+    # or certification is a reference, not a claim of either capability.
+    prose_fields = ("name", "coverage", "known_gaps", "notes", "rationale", "summary")
+    return any(
+        OVERCLAIM_RE.search(text)
+        for field in prose_fields
+        for text in as_list(record.get(field))
+        if isinstance(text, str)
+    )
 
 
 def normalize_mode(record: dict[str, Any], index: int) -> dict[str, Any]:
@@ -617,6 +621,7 @@ def build_report(
     policy: dict[str, Any],
     taxonomy_path: Path,
     taxonomy_source: str,
+    collect_provenance: bool = True,
 ) -> dict[str, Any]:
     declaration = load_yaml_mapping(taxonomy_path)
     posture = profile_posture(declaration, profile)
@@ -756,7 +761,7 @@ def build_report(
         "limitations": LIMITATIONS,
         "not_claimed": NOT_CLAIMED,
         "human_review_required": bool(findings) or bool_value(posture.get("human_review_required"), False),
-        "generated_by": build_generated_by(root),
+        "generated_by": build_generated_by(root) if collect_provenance else {},
         "summary": summary,
     }
 

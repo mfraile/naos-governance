@@ -34,6 +34,24 @@ schemas, policies, learning records, or audit history.
 This list describes repo-versioned plugin source contents. It is not proof of
 live local plugin installation.
 
+## Authoring metadata and base methods
+
+`extends` and `parameters` in these skill files describe NAOS authoring metadata.
+They do not provide Claude Code inheritance or native argument validation.
+Claude Code's [frontmatter reference](https://code.claude.com/docs/en/skills#frontmatter-reference)
+states that unrecognized fields are ignored; their presence alone does not prove
+that a skill fails to load.
+
+Before using `naos-forensic-audit` or `naos-systemic-wiring`, explicitly read and
+follow the respective base method, then the plugin skill body. In this kit
+repository the base files are `templates/skills/forensic-audit/SKILL.md` and
+`templates/skills/systemic-wiring/SKILL.md`. In an adopter project, verify the
+corresponding installed `.github/skills/<base-name>/SKILL.md` exists; if absent,
+obtain the base instructions explicitly before claiming the full method was
+performed. Supply the requested inputs in the invocation and check their meaning
+against the skill body; frontmatter does not enforce them. Plugin installation
+does not install or automatically run those base methods.
+
 ## Installability
 
 For local development or testing from the kit repository:

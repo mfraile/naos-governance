@@ -1,0 +1,630 @@
+{
+  "inventory.json": {
+    "artifacts": [
+      {
+        "artifact_id": "A-e7b73709522035bf",
+        "artifact_type": "documentation",
+        "audit_event_readiness": "index_run_recorded",
+        "authority_level": "repository_documentation",
+        "chunk_count": 1,
+        "confidence": "declared_artifact",
+        "exclusion_reason": null,
+        "family_id": "documentation",
+        "freshness_status": "content_hash_bound",
+        "include_policy": "bounded_sections_and_references",
+        "indexed_at": null,
+        "limitations": [
+          "bounded summary only",
+          "not authority"
+        ],
+        "modified_at": null,
+        "path": "docs/adopter-baseline.md",
+        "profile_scope": "all",
+        "provenance": "repo_file",
+        "recall_trace_readiness": "metadata_available",
+        "review_status": "unreviewed_candidate",
+        "scope": "project_local",
+        "size_bytes": 98,
+        "source_hash": "1b972e68527572ade37480b032c1d9113f7a8a1b6887b4c24a3222349263dd1e",
+        "source_reference": "docs/adopter-baseline.md",
+        "use_policy": "candidate_reference_only"
+      },
+      {
+        "artifact_id": "A-7743c9b00fea2753",
+        "artifact_type": "source",
+        "audit_event_readiness": "index_run_recorded",
+        "authority_level": "current_git_state",
+        "chunk_count": 2,
+        "confidence": "declared_artifact",
+        "exclusion_reason": null,
+        "family_id": "source",
+        "freshness_status": "content_hash_bound",
+        "include_policy": "bounded_source_blocks",
+        "indexed_at": null,
+        "limitations": [
+          "bounded summary only",
+          "not authority"
+        ],
+        "modified_at": null,
+        "path": "src/adopter_existing.py",
+        "profile_scope": "all",
+        "provenance": "repo_file",
+        "recall_trace_readiness": "metadata_available",
+        "review_status": "unreviewed_candidate",
+        "scope": "project_local",
+        "size_bytes": 1656,
+        "source_hash": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "source_reference": "src/adopter_existing.py",
+        "use_policy": "candidate_reference_only"
+      },
+      {
+        "artifact_id": "A-e3ac33afe1512502",
+        "artifact_type": "test",
+        "audit_event_readiness": "index_run_recorded",
+        "authority_level": "current_git_state",
+        "chunk_count": 2,
+        "confidence": "declared_artifact",
+        "exclusion_reason": null,
+        "family_id": "tests",
+        "freshness_status": "content_hash_bound",
+        "include_policy": "bounded_source_blocks",
+        "indexed_at": null,
+        "limitations": [
+          "bounded summary only",
+          "not authority"
+        ],
+        "modified_at": null,
+        "path": "tests/test_adopter_existing.py",
+        "profile_scope": "all",
+        "provenance": "repo_file",
+        "recall_trace_readiness": "metadata_available",
+        "review_status": "unreviewed_candidate",
+        "scope": "project_local",
+        "size_bytes": 1725,
+        "source_hash": "f6e0a492fe8a95c7b449f7c9ae8595848bb24d9e34d13695fce35ba2d3ce8549",
+        "source_reference": "tests/test_adopter_existing.py",
+        "use_policy": "candidate_reference_only"
+      }
+    ],
+    "candidate_only": true,
+    "components": {
+      "networkx_graphml": {
+        "applicability_basis": "explicit_source_bound_relationships",
+        "effectiveness_over_sqlite_fts": "untested",
+        "engine": "networkx_graphml",
+        "relationship_count": 6,
+        "required_version": "3.6.1",
+        "selected": false,
+        "status": "not_applicable",
+        "utility_evidence": {
+          "adds_beyond_direct_lookup": false,
+          "artifact_edges": 1,
+          "effectiveness_over_sqlite_fts": "untested",
+          "enables_candidate_beyond_exact_or_single_link_lookup": false,
+          "minimum_artifact_families": 2,
+          "minimum_artifacts": 3,
+          "minimum_path_edges": 2,
+          "qualifying_path": null,
+          "recommendation_boundary": "eligibility_hypothesis_not_effectiveness_proof",
+          "relationship_questions": [
+            "Which current source, tests, specifications, migrations, and documentation are explicitly connected?",
+            "Which multi-hop source relationships can improve requirements reconstruction and traceability review?"
+          ],
+          "status": "no_incremental_multi_hop_case"
+        },
+        "version": null
+      },
+      "sqlite_fts": {
+        "applicability_basis": "executed_inventory_and_fts5_probe",
+        "engine": "python_stdlib_sqlite3_fts5",
+        "status": "ready",
+        "version": "3.45.1"
+      },
+      "sqlite_vec": {
+        "applicability_basis": "frozen_workload_and_vector_producer_required",
+        "engine": "sqlite_vec",
+        "status": "workload_not_defined",
+        "version": null
+      }
+    },
+    "effective_source_sha256": "35ee6397db610fee3be3653d8c92a380c9f9e7962cd02592854821009d86dd62",
+    "excluded_artifacts": [],
+    "generation_id": "RI-000000000000000000000000",
+    "limitations": [
+      "Results are generated candidates and must be verified against current repository source.",
+      "GraphML records observed deterministic relationships; it does not establish semantic truth or complete relationship coverage.",
+      "Absence of a relationship is not evidence that no relationship exists.",
+      "sqlite-vec remains unavailable until a concrete local workload and deterministic vector producer are approved and validated."
+    ],
+    "not_claimed": [
+      "source of truth",
+      "complete dependency graph",
+      "semantic truth",
+      "automatic requirements approval",
+      "automatic maturity promotion",
+      "compliance or readiness approval",
+      "sqlite-vec effectiveness"
+    ],
+    "ongoing_use_scope": [
+      "brownfield_adoption",
+      "requirements_reconstruction",
+      "traceability_gap_analysis",
+      "task_context",
+      "change_impact",
+      "source_test_navigation",
+      "review_preparation"
+    ],
+    "project_root": "C:\\synthetic-ri-fixture\\project-abcdefghijklmnopqrstuvwxyz0123456789",
+    "relationships": [
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "provenance": "current_repository_source",
+        "reference_id": "specs/03-requirements.md#fr-001",
+        "relationship_id": "R-fe07cbdb85501b44",
+        "relationship_type": "spec_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "target_node": "spec:specs/03-requirements.md#fr-001",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "provenance": "current_repository_source",
+        "reference_id": "specs/03-requirements.md#fr-002",
+        "relationship_id": "R-9f8d5754f10200b2",
+        "relationship_type": "spec_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "target_node": "spec:specs/03-requirements.md#fr-002",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "provenance": "current_repository_source",
+        "reference_id": "specs/03-requirements.md#nfr-001",
+        "relationship_id": "R-11236abfe6f16a5d",
+        "relationship_type": "spec_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "target_node": "spec:specs/03-requirements.md#nfr-001",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "provenance": "current_repository_source",
+        "reference_id": "specs/03-requirements.md#nfr-002",
+        "relationship_id": "R-05546635830ba7bb",
+        "relationship_type": "spec_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "target_node": "spec:specs/03-requirements.md#nfr-002",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": null,
+        "evidence_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "provenance": "current_repository_source",
+        "reference_id": "T-001",
+        "relationship_id": "R-df3572377ca94d3d",
+        "relationship_type": "task_ref",
+        "source_node": "artifact:A-7743c9b00fea2753",
+        "source_path": "src/adopter_existing.py",
+        "source_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0",
+        "target_node": "task:T-001",
+        "target_path": null,
+        "target_sha256": null
+      },
+      {
+        "candidate_only": true,
+        "confidence": "explicit_source_reference",
+        "evidence_line": 6,
+        "evidence_sha256": "f6e0a492fe8a95c7b449f7c9ae8595848bb24d9e34d13695fce35ba2d3ce8549",
+        "provenance": "current_repository_source",
+        "relationship_id": "R-51e74a4bc666e8f3",
+        "relationship_type": "python_import",
+        "source_node": "artifact:A-e3ac33afe1512502",
+        "source_path": "tests/test_adopter_existing.py",
+        "source_sha256": "f6e0a492fe8a95c7b449f7c9ae8595848bb24d9e34d13695fce35ba2d3ce8549",
+        "target_node": "artifact:A-7743c9b00fea2753",
+        "target_path": "src/adopter_existing.py",
+        "target_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0"
+      }
+    ],
+    "schema": "naos.repository_intelligence.inventory.v1",
+    "source_inventory": [
+      {
+        "artifact_id": "A-e7b73709522035bf",
+        "artifact_type": "documentation",
+        "authority_level": "repository_documentation",
+        "family_id": "documentation",
+        "path": "docs/adopter-baseline.md",
+        "size_bytes": 98,
+        "source_sha256": "1b972e68527572ade37480b032c1d9113f7a8a1b6887b4c24a3222349263dd1e"
+      },
+      {
+        "artifact_id": "A-7743c9b00fea2753",
+        "artifact_type": "source",
+        "authority_level": "current_git_state",
+        "family_id": "source",
+        "path": "src/adopter_existing.py",
+        "size_bytes": 1656,
+        "source_sha256": "8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0"
+      },
+      {
+        "artifact_id": "A-e3ac33afe1512502",
+        "artifact_type": "test",
+        "authority_level": "current_git_state",
+        "family_id": "tests",
+        "path": "tests/test_adopter_existing.py",
+        "size_bytes": 1725,
+        "source_sha256": "f6e0a492fe8a95c7b449f7c9ae8595848bb24d9e34d13695fce35ba2d3ce8549"
+      }
+    ],
+    "sqlite_content_binding": {
+      "artifact_chunks": {
+        "count": 5,
+        "ids_sha256": "a7248c758ee95047291f96b115ac4699f2f82abfcc2abe4154b907c44f63b6b1",
+        "rows_sha256": "6be45f54fa0a19bf47393424e127e6ef4219dd138a2ca9424f2ed846b4a797dc"
+      },
+      "artifact_links": {
+        "count": 5,
+        "ids_sha256": "69f75adbcb0fd12fc51ef1010a55bdddbaaae1e318f3d1beb9bc25068ef4d824",
+        "rows_sha256": "2a0d25acf797ba9cca4da36281f7ebdee36d467329f70b6a4b069fd01df0cfc3"
+      },
+      "artifacts": {
+        "count": 3,
+        "ids_sha256": "770ff5b746c16b8be42ea1ed39a29ed22cbffff5cdd3f13f2f32f964ed2de1eb",
+        "rows_sha256": "ff912f46c9543ed829a3f58184a5c3b9ed7f17fe6965b0fccab70d6ec5efb0d5"
+      },
+      "repository_relationships": {
+        "count": 6,
+        "ids_sha256": "d963ddbb565045660cb425bbb7a064a6d676cb4b8363c6da42fb2a41d7dca7ee",
+        "rows_sha256": "80f9d7f7966e1e7900b3b74cb9478547649472e06f2c6ba8a3296d6152bf976a"
+      }
+    },
+    "status": "staged"
+  },
+  "manifest.json": {
+    "control": {
+      "candidate_only": true,
+      "component_mode": "baseline",
+      "components": {
+        "networkx_graphml": {
+          "applicability_basis": "explicit_source_bound_relationships",
+          "effectiveness_over_sqlite_fts": "untested",
+          "engine": "networkx_graphml",
+          "relationship_count": 6,
+          "required_version": "3.6.1",
+          "selected": false,
+          "status": "not_applicable",
+          "utility_evidence": {
+            "adds_beyond_direct_lookup": false,
+            "artifact_edges": 1,
+            "effectiveness_over_sqlite_fts": "untested",
+            "enables_candidate_beyond_exact_or_single_link_lookup": false,
+            "minimum_artifact_families": 2,
+            "minimum_artifacts": 3,
+            "minimum_path_edges": 2,
+            "qualifying_path": null,
+            "recommendation_boundary": "eligibility_hypothesis_not_effectiveness_proof",
+            "relationship_questions": [
+              "Which current source, tests, specifications, migrations, and documentation are explicitly connected?",
+              "Which multi-hop source relationships can improve requirements reconstruction and traceability review?"
+            ],
+            "status": "no_incremental_multi_hop_case"
+          },
+          "version": null
+        },
+        "sqlite_fts": {
+          "applicability_basis": "executed_inventory_and_fts5_probe",
+          "engine": "python_stdlib_sqlite3_fts5",
+          "status": "ready",
+          "version": "3.45.1"
+        },
+        "sqlite_vec": {
+          "applicability_basis": "frozen_workload_and_vector_producer_required",
+          "engine": "sqlite_vec",
+          "status": "workload_not_defined",
+          "version": null
+        }
+      },
+      "coverage": {
+        "artifact_families": {
+          "documentation": 1,
+          "source": 1,
+          "tests": 1
+        },
+        "excluded_artifacts": 0,
+        "explicit_relationships": 6,
+        "graph_nodes": 8,
+        "indexed_artifacts": 3,
+        "truncated": false
+      },
+      "effective_source_sha256": "354df33f04a301726ce1184973a4d11819e61c87080ee999cc3c6cf8e1d3b209",
+      "files": [
+        {
+          "path": "inventory.json",
+          "sha256": "dac907143a9e69bb0a21ed9b656860cca31bcb319fcfa187f28f3f7aaf986e67",
+          "size_bytes": 12147
+        },
+        {
+          "path": "local_context_index.sqlite",
+          "sha256": "1f6e8d4f0f25a1521e6c17e8843a3551141be518cec933f305d7c98c445674e9",
+          "size_bytes": 106496
+        },
+        {
+          "path": "repository_intelligence_rules.yaml",
+          "sha256": "36bf010226fa73b39876ffb3786d30a3d2002a13dabe2c501869a6c2fed9f5b4",
+          "size_bytes": 6766
+        },
+        {
+          "path": "validation_receipt.json",
+          "sha256": "508aa76dcbf8f5d909d7c05e913167bf2b8f923b95b168149897f63480252254",
+          "size_bytes": 6818
+        }
+      ],
+      "generation_content_sha256": "88a8efbeedc43443200c4986b1f2b5ac140c43120605a7181b9e573d3fdfcd62",
+      "generation_id": "RI-000000000000000000000000",
+      "graph_model_sha256": "00f9b39ecf28fc9f6a4f9388f0fae89931dbef70642efdb462077ba2989ef4d5",
+      "implementation": {
+        "canonical_adapter_sha256": "f71993a32608617fa7502010d3e1723fa814300bf71a7da63960442dbd5f3b6e",
+        "contract_version": 1,
+        "engine_sha256": "6ac43aab2003fa0bc5868ad5cdc2dbc7ac20cf7188b4fa95102b81763dba1659",
+        "graphml_writer": "networkx.write_graphml_xml",
+        "local_context_index_sha256": "099e90a5543f9102f6a38898712db40729d5c005ebac06cd951632324423df5a",
+        "sqlite_serializer": "python_stdlib_sqlite3",
+        "windows_ri_enrollment": {
+          "canonical.py": "d7fc720d900a782274ae92394312beda4cc31e06833271b7d1a2bb5b12a4680d",
+          "repository_intelligence_windows.py": "ea599dc9160f8092af932a029c02c9676b3ea4402256d8b8c62b6adbc16c161f",
+          "repository_intelligence_windows_enrollment.py": "1f657257ede8a26edc0794ab6ba00fd32fb1e1b32984e9e7d006f22a7eff6bc5",
+          "windows_handles.py": "7bbfb324b809c91cf24e1b1c60fdaad05bf4837fa1a3923446dbb82bde0009a8"
+        },
+        "windows_ri_public": "9f2e88de8c1d7930faf9f1a5c70100287ba8284a3a171cdc7fc3a27035e7e9d6",
+        "windows_ri_runtime": {
+          "canonical.py": "ee64a74576d3c19e7514208ae80f8081ce9637e66d5aadb31280746be303fc4c",
+          "repository_intelligence_windows.py": "5ca7051cfcb4c2f247860ee1757b163d2312ff39857f7b9ee45f9d0f21653dc3",
+          "repository_intelligence_windows_enrollment.py": "d9ec21d4858dd770de9d0c613a8dd6e344c2a6d6ff60e7786cb9b264949475a6",
+          "repository_intelligence_windows_runtime.py": "6119c870415e07dc6b615ed20402fda1288931fe4c880c0359e876cd315c28a4",
+          "windows_backend.py": "20386eb198074cbe1ba471e8ef652a84ca3a667f52948ee95a15b276f284abfc",
+          "windows_coordinator.py": "240ed5a483e4dabfdfe928324be69e821749bed0197fa4f5a00ab495ddb866f9",
+          "windows_exchange.py": "a989c8efdaf61056a6001b7ae314d0e0ef77b9bd8b0fcc6ad354dfaf824736c4",
+          "windows_handles.py": "c987e0eddc9792e42a9d8dff8b588c1206951ff8b3148447aaf9bbdd2065d37e",
+          "windows_operation.py": "3d57b03cf09d49aa94b0f0a7a38f533b0e76609049a2607202cad7e91ecffe76",
+          "windows_rename_identity.py": "b24978eb421da432bae235bc5a3416537eeda5b69058d6732ff0bdfea151b63f",
+          "windows_restoring_backend.py": "e8a4eb0db1b5387dfa31dc51a64e4f471b89b706458eb9260b4d1d05125b357c"
+        }
+      },
+      "ongoing_use_scope": [
+        "brownfield_adoption",
+        "requirements_reconstruction",
+        "traceability_gap_analysis",
+        "task_context",
+        "change_impact",
+        "source_test_navigation",
+        "review_preparation"
+      ],
+      "profile": "assured",
+      "project_root": "C:\\synthetic-ri-fixture\\project-abcdefghijklmnopqrstuvwxyz0123456789",
+      "provenance_gate": {},
+      "purpose": "brownfield-onboarding",
+      "rules": {
+        "path": "Z:\\synthetic-naos-kit\\templates\\naos\\repository_intelligence_rules.yaml",
+        "sha256": "d2a674bbf6df4a4d1824c92ba5a87b1b73565259ebd8b1236fa97a6ffa01ca10",
+        "source": "template"
+      },
+      "rules_snapshot": "repository_intelligence_rules.yaml",
+      "runtime": {
+        "networkx": {
+          "imported_version": null,
+          "install_extra": "naos-governance[repository-intelligence]",
+          "installed_version": null,
+          "module_sha256": null,
+          "required_version": "3.6.1",
+          "status": "prerequisite_missing",
+          "writer": "networkx.write_graphml_xml",
+          "writer_available": false
+        },
+        "platform": {
+          "implementation": "CPython",
+          "machine": "amd64",
+          "python": "3.11.0",
+          "supported_for_apply": true,
+          "supported_tuple": "windows_x86_64_cpython_3_11_to_3_13_native_handles",
+          "system": "Windows"
+        },
+        "rfc8785": {
+          "installed_version": "0.1.4",
+          "required_version": "0.1.4",
+          "status": "ready"
+        },
+        "sqlite_fts": {
+          "fts5_available": true,
+          "probe": "create_insert_match",
+          "sqlite_version": "3.0.0",
+          "status": "ready"
+        },
+        "sqlite_vec": {
+          "reason": "No frozen retrieval workload or deterministic vector producer is configured.",
+          "runtime_probed": false,
+          "status": "workload_not_defined"
+        }
+      },
+      "validation_receipt_sha256": "550482beba131794b748669b811ac76002f334dff7ec349725449200a4e7b180"
+    },
+    "limitations": [
+      "Results are generated candidates and must be verified against current repository source.",
+      "GraphML records observed deterministic relationships; it does not establish semantic truth or complete relationship coverage.",
+      "Absence of a relationship is not evidence that no relationship exists.",
+      "sqlite-vec remains unavailable until a concrete local workload and deterministic vector producer are approved and validated."
+    ],
+    "manifest_sha256": "f30d736e2a254bb680ab340364b623f8df7c306535e73d8bb6eda3e9cd1e5d07",
+    "not_claimed": [
+      "source of truth",
+      "complete dependency graph",
+      "semantic truth",
+      "automatic requirements approval",
+      "automatic maturity promotion",
+      "compliance or readiness approval",
+      "sqlite-vec effectiveness"
+    ],
+    "schema": "naos.repository_intelligence.manifest.v1",
+    "status": "validated"
+  },
+  "rules_yaml": "version: 1\nenabled: true\ncapability_id: CAP-LOCAL-CONTEXT-INDEX\nsemantics:\n  principle: Repository intelligence returns source-bound navigation candidates; repository source remains authoritative.\n  lifecycle: pre_onboarding_and_ongoing\n  mutation_boundary: operation_owned_dot_naos_upgrade_v1_only\nartifact_families:\n  - id: specifications\n    name: Specifications and requirements\n    artifact_type: spec\n    authority_level: repository_governance\n    include_policy: bounded_sections_and_references\n    chunk_kind: markdown_summary\n    include_patterns:\n      - specs/**/*.md\n      - requirements/**/*.md\n      - docs/requirements/**/*.md\n      - docs/specs/**/*.md\n  - id: documentation\n    name: Project documentation\n    artifact_type: documentation\n    authority_level: repository_documentation\n    include_policy: bounded_sections_and_references\n    chunk_kind: markdown_summary\n    include_patterns:\n      - README.md\n      - README*.md\n      - docs/**/*.md\n      - apps/**/README*.md\n      - packages/**/README*.md\n  - id: tests\n    name: Tests\n    artifact_type: test\n    authority_level: current_git_state\n    include_policy: bounded_source_blocks\n    chunk_kind: bounded_text\n    include_patterns:\n      - tests/**/*.py\n      - tests/**/*.js\n      - tests/**/*.jsx\n      - tests/**/*.ts\n      - tests/**/*.tsx\n      - test/**/*.py\n      - test/**/*.js\n      - test/**/*.ts\n      - \"**/*.test.js\"\n      - \"**/*.test.jsx\"\n      - \"**/*.test.ts\"\n      - \"**/*.test.tsx\"\n      - \"**/*.spec.js\"\n      - \"**/*.spec.jsx\"\n      - \"**/*.spec.ts\"\n      - \"**/*.spec.tsx\"\n  - id: migrations\n    name: Database migrations\n    artifact_type: migration\n    authority_level: current_git_state\n    include_policy: bounded_source_blocks\n    chunk_kind: bounded_text\n    include_patterns:\n      - migrations/**/*.sql\n      - db/migrations/**/*.sql\n      - apps/**/migrations/**/*.sql\n      - packages/**/migrations/**/*.sql\n  - id: source\n    name: Source code\n    artifact_type: source\n    authority_level: current_git_state\n    include_policy: bounded_source_blocks\n    chunk_kind: bounded_text\n    include_patterns:\n      - \"**/*.py\"\n      - \"**/*.js\"\n      - \"**/*.jsx\"\n      - \"**/*.ts\"\n      - \"**/*.tsx\"\n      - \"**/*.mjs\"\n      - \"**/*.cjs\"\n      - \"**/*.go\"\n      - \"**/*.rs\"\n      - \"**/*.java\"\n      - \"**/*.kt\"\n      - \"**/*.kts\"\n      - \"**/*.cs\"\n      - \"**/*.rb\"\n      - \"**/*.php\"\n      - \"**/*.sh\"\n  - id: build_and_configuration\n    name: Build and configuration\n    artifact_type: configuration\n    authority_level: current_git_state\n    include_policy: structured_or_bounded_summary\n    chunk_kind: bounded_text\n    include_patterns:\n      - pyproject.toml\n      - setup.cfg\n      - setup.py\n      - requirements*.txt\n      - package.json\n      - package-lock.json\n      - pnpm-lock.yaml\n      - yarn.lock\n      - Cargo.toml\n      - go.mod\n      - go.work\n      - pom.xml\n      - build.gradle\n      - build.gradle.kts\n      - Makefile\n      - \"**/Dockerfile\"\n      - .github/workflows/*.yml\n      - .github/workflows/*.yaml\n  - id: ai_surfaces\n    name: AI collaboration surfaces\n    artifact_type: ai_surface\n    authority_level: repository_governance\n    include_policy: bounded_sections_and_references\n    chunk_kind: markdown_summary\n    include_patterns:\n      - AGENTS.md\n      - CLAUDE.md\n      - GEMINI.md\n      - .github/copilot-instructions.md\n      - .github/instructions/**/*.md\n      - .github/prompts/**/*.md\nexclude_patterns: &exclusions\n  - .naos/**\n  - .git/**\n  - \"**/.venv/**\"\n  - \"**/venv/**\"\n  - \"**/node_modules/**\"\n  - \"**/dist/**\"\n  - build/**\n  - \"**/build/**\"\n  - \"**/coverage/**\"\n  - \"**/.coverage\"\n  - \"**/__pycache__/**\"\n  - \"**/.mypy_cache/**\"\n  - \"**/.pytest_cache/**\"\n  - \"**/.ruff_cache/**\"\n  - \"**/.tox/**\"\n  - \"**/.nox/**\"\n  - .claude/worktrees/**\n  - .naos-g1-repository-intelligence/**\n  - naos/context_index/**\n  - naos/context_queries/**\n  - \"**/engram.db\"\n  - \"**/*.sqlite\"\n  - \"**/*.db\"\n  - \"**/*.pem\"\n  - \"**/*.key\"\n  - \"**/*.crt\"\n  - \"**/*.p12\"\n  - \"**/*.pfx\"\n  - .env\n  - .env.*\ndefault_exclusions: *exclusions\nforbidden_content_categories:\n  - secrets\n  - credentials\n  - tokens\n  - private keys\n  - private memory payloads\n  - customer or tenant data unless explicitly in the approved local scope\nchunking:\n  max_artifacts: 5000\n  max_file_bytes: 2000000\n  max_relationships: 20000\n  max_chunks_per_artifact: 12\n  max_chars_per_chunk: 1600\n  include_full_source: false\n  include_full_reports: false\nfts:\n  enabled: true\n  require_executed_fts5_probe: true\n  fail_if_unavailable_for_activation: true\n  query_sanitization:\n    enabled: true\n    max_query_chars: 120\n    allowed_token_pattern: \"[A-Za-z0-9_./:-]+\"\n    strip_boolean_operators: true\n    literalize_tokens: true\ngraph:\n  runtime: networkx\n  exact_version: 3.6.1\n  format: graphml\n  directed: true\n  multigraph: true\n  activate_only_with_explicit_source_bound_relationships: true\n  read_generated_graphml_only: true\n  max_query_depth: 3\n  max_query_results: 100\nsemantic_vector:\n  status: workload_not_defined\n  sqlite_vec_enabled: false\n  embeddings_enabled: false\n  activation_requires:\n    - frozen retrieval workload\n    - deterministic vector producer and model identity\n    - source and data scope\n    - measured incremental effectiveness over exact and FTS retrieval\nprofile_review:\n  quickstart: digest_confirmation\n  lite: digest_confirmation\n  standard: digest_confirmation_and_named_review\n  assured: digest_confirmation_and_named_review\nmaturity:\n  applicability_independent_of_maturity: true\n  L0: Detect, inventory, and prepare a reviewable plan.\n  L1: Validate and activate the SQLite/FTS generation.\n  L2: Use validated NetworkX/GraphML relationships where explicit edges exist.\n  L3: Operate bounded ongoing refresh and query workflows.\n  L4: Review freshness, exclusions, ranking, and measured effectiveness.\n  L5: Maintain a governed, repeatable learning and effectiveness loop.\nongoing_use_scope:\n  - brownfield_adoption\n  - requirements_reconstruction\n  - traceability_gap_analysis\n  - task_context\n  - change_impact\n  - source_test_navigation\n  - review_preparation\nlimitations:\n  - Results are generated candidates and must be verified against current repository source.\n  - GraphML records observed deterministic relationships; it does not establish semantic truth or complete relationship coverage.\n  - Absence of a relationship is not evidence that no relationship exists.\n  - sqlite-vec remains unavailable until a concrete local workload and deterministic vector producer are approved and validated.\nnot_claimed:\n  - source of truth\n  - complete dependency graph\n  - semantic truth\n  - automatic requirements approval\n  - automatic maturity promotion\n  - compliance or readiness approval\n  - sqlite-vec effectiveness\n",
+  "sqlite_sql": "BEGIN TRANSACTION;\nCREATE TABLE artifact_chunks (\n                    chunk_id TEXT PRIMARY KEY,\n                    artifact_id TEXT NOT NULL,\n                    path TEXT NOT NULL,\n                    section_heading TEXT,\n                    chunk_kind TEXT,\n                    text_summary TEXT,\n                    bounded_excerpt TEXT,\n                    start_line INTEGER,\n                    end_line INTEGER,\n                    char_count INTEGER,\n                    confidence TEXT,\n                    limitations TEXT,\n                    scope TEXT,\n                    use_policy TEXT,\n                    review_status TEXT,\n                    source_reference TEXT,\n                    recall_trace_readiness TEXT,\n                    audit_event_readiness TEXT,\n                    related_task_ids TEXT,\n                    related_spec_refs TEXT,\n                    related_capabilities TEXT,\n                    related_code_symbols TEXT,\n                    related_tests TEXT,\n                    FOREIGN KEY(artifact_id) REFERENCES artifacts(artifact_id)\n                );\nINSERT INTO \"artifact_chunks\" VALUES('A-e7b73709522035bf-C001','A-e7b73709522035bf','docs/adopter-baseline.md','Pre-existing adopter toy','markdown_summary','# Pre-existing adopter toy\n\nA bounded local text fixture; no implementation or approval claim.','# Pre-existing adopter toy\n\nA bounded local text fixture; no implementation or approval claim.',1,3,94,'bounded_candidate','[\"candidate retrieval only\"]','project_local','candidate_reference_only','unreviewed_candidate','docs/adopter-baseline.md','metadata_available','index_run_recorded','[]','[]','[]','[]','[]');\nINSERT INTO \"artifact_chunks\" VALUES('A-7743c9b00fea2753-C001','A-7743c9b00fea2753','src/adopter_existing.py','lines_1_46','bounded_text','\"\"\"\nModule: src/adopter_existing.py\n\nPurpose:\n    Normalize a small local label with a character scanner and no external I/O.\n\nImplements: FR-001, FR-002, NFR-001, NFR-002\n    - FR-001: Produce a canonical lower-case label\n    - FR-002: Reject empty or unsupported input\n    - NFR-001: Keep output deterministic and idempotent\n    - NFR-002: Avoid external I/O\n\nTasks:\n    - T-001: Implement and test local label normalization\n\nSpecs:\n    - specs/03-requirements.md#fr-001\n    - spe [truncated]','\"\"\"\nModule: src/adopter_existing.py\n\nPurpose:\n    Normalize a small local label with a character scanner and no external I/O.\n\nImplements: FR-001, FR-002, NFR-001, NFR-002\n    - FR-001: Produce a canonical lower-case label\n    - FR-002: Reject empty or unsupported input\n    - NFR-001: Keep output deterministic and idempotent\n    - NFR-002: Avoid external I/O\n\nTasks:\n    - T-001: Implement and test local label normalization\n\nSpecs:\n    - specs/03-requirements.md#fr-001\n    - specs/03-requirements.md#fr-002\n    - specs/03-requirements.md#nfr-001\n    - specs/03-requirements.md#nfr-002\n\nRationale:\n    TEST FIXTURE ONLY: this pre-existing host-owned normalizer implements the\n    selected label requirements through an independent character scanner.\n    Separate executed tests establish this narrow mapping, not broad assurance.\n\"\"\"\n\n\ndef normalize_label(raw: str) -> str:\n    \"\"\"Scan ASCII words separated by one space or hyphen into a local label.\"\"\"\n    if isinstance(raw, str) is False:\n        raise TypeError(\"label must be text\")\n    phrase = raw.strip().lower()\n    result = []\n    word_required = True\n    for character in phrase:\n        if \"a\" <= character <= \"z\" or \"0\" <= character <= \"9\":\n            result.append(character)\n            word_required = False\n        elif character in (\" \", \"-\") and not word_required:\n            result.append(\"-\")\n            word_required = True\n        else:\n            raise ValueError(\"label requires ASCII words with single separators\")\n    if word_required:\n        raise ValueError(\"label must end with an ASCII word\")',1,46,1581,'bounded_candidate','[\"candidate retrieval only\"]','project_local','candidate_reference_only','unreviewed_candidate','src/adopter_existing.py','metadata_available','index_run_recorded','[\"T-001\"]','[\"specs/03-requirements.md#fr-001\", \"specs/03-requirements.md#fr-002\", \"specs/03-requirements.md#nfr-001\", \"specs/03-requirements.md#nfr-002\"]','[]','[]','[]');\nINSERT INTO \"artifact_chunks\" VALUES('A-7743c9b00fea2753-C002','A-7743c9b00fea2753','src/adopter_existing.py','lines_47_47','bounded_text','return \"\".join(result)','return \"\".join(result)',47,47,22,'bounded_candidate','[\"candidate retrieval only\"]','project_local','candidate_reference_only','unreviewed_candidate','src/adopter_existing.py','metadata_available','index_run_recorded','[]','[]','[]','[]','[]');\nINSERT INTO \"artifact_chunks\" VALUES('A-e3ac33afe1512502-C001','A-e3ac33afe1512502','tests/test_adopter_existing.py','lines_1_33','bounded_text','\"\"\"Executed host checks for FR-001/002 and NFR-001/002 in src/adopter_existing.py.\"\"\"\n\nfrom contextlib import ExitStack\nimport unittest\nfrom unittest.mock import patch\nfrom src.adopter_existing import normalize_label\n\n\nclass AdopterExistingTests(unittest.TestCase):\n    def test_label_table_and_fixed_points(self):\n        examples = {\"  Hello World  \": \"hello-world\", \"A-B C9\": \"a-b-c9\", \"7\": \"7\"}\n        for phrase, expected in examples.items():\n            with self.subTest(phr [truncated]','\"\"\"Executed host checks for FR-001/002 and NFR-001/002 in src/adopter_existing.py.\"\"\"\n\nfrom contextlib import ExitStack\nimport unittest\nfrom unittest.mock import patch\nfrom src.adopter_existing import normalize_label\n\n\nclass AdopterExistingTests(unittest.TestCase):\n    def test_label_table_and_fixed_points(self):\n        examples = {\"  Hello World  \": \"hello-world\", \"A-B C9\": \"a-b-c9\", \"7\": \"7\"}\n        for phrase, expected in examples.items():\n            with self.subTest(phrase=phrase):\n                first = normalize_label(phrase)\n                repeated = [normalize_label(phrase) for _ in range(3)]\n                self.assertEqual([first, normalize_label(first), *repeated], [expected] * 5)\n\n    def test_rejection_types_for_invalid_values(self):\n        invalid = [(None, TypeError), (23, TypeError), (\"\", ValueError),\n                   (\"bad/label\", ValueError), (\"hello--world\", ValueError),\n                   (\"two  spaces\", ValueError), (\"-leading\", ValueError)]\n        for supplied, exception in invalid:\n            with self.subTest(value=supplied, expected=exception.__name__):\n                with self.assertRaises(exception):\n                    normalize_label(supplied)\n\n    def test_local_execution_never_calls_io_spies(self):\n        with ExitStack() as stack:\n            spies = [stack.enter_context(patch(target))\n                     for target in (\"builtins.open\", \"socket.socket\")]\n            values = tuple(map(normalize_label, (\"Safe Label\", \"ASCII-9\")))\n            self.assertTupleEqual(values, (\"safe-label\", \"ascii-9\"))\n            for spy in spies:',1,33,1597,'bounded_candidate','[\"candidate retrieval only\"]','project_local','candidate_reference_only','unreviewed_candidate','tests/test_adopter_existing.py','metadata_available','index_run_recorded','[]','[]','[]','[]','[]');\nINSERT INTO \"artifact_chunks\" VALUES('A-e3ac33afe1512502-C002','A-e3ac33afe1512502','tests/test_adopter_existing.py','lines_34_38','bounded_text','spy.assert_not_called()\n\n\nif __name__ == \"__main__\":\n    unittest.main()','spy.assert_not_called()\n\n\nif __name__ == \"__main__\":\n    unittest.main()',34,38,72,'bounded_candidate','[\"candidate retrieval only\"]','project_local','candidate_reference_only','unreviewed_candidate','tests/test_adopter_existing.py','metadata_available','index_run_recorded','[]','[]','[]','[]','[]');\nCREATE VIRTUAL TABLE artifact_chunks_fts USING fts5(chunk_id UNINDEXED,artifact_id UNINDEXED,path UNINDEXED,section_heading,text_summary,bounded_excerpt);\nINSERT INTO \"artifact_chunks_fts\" VALUES('A-e7b73709522035bf-C001','A-e7b73709522035bf','docs/adopter-baseline.md','Pre-existing adopter toy','# Pre-existing adopter toy\n\nA bounded local text fixture; no implementation or approval claim.','# Pre-existing adopter toy\n\nA bounded local text fixture; no implementation or approval claim.');\nINSERT INTO \"artifact_chunks_fts\" VALUES('A-7743c9b00fea2753-C001','A-7743c9b00fea2753','src/adopter_existing.py','lines_1_46','\"\"\"\nModule: src/adopter_existing.py\n\nPurpose:\n    Normalize a small local label with a character scanner and no external I/O.\n\nImplements: FR-001, FR-002, NFR-001, NFR-002\n    - FR-001: Produce a canonical lower-case label\n    - FR-002: Reject empty or unsupported input\n    - NFR-001: Keep output deterministic and idempotent\n    - NFR-002: Avoid external I/O\n\nTasks:\n    - T-001: Implement and test local label normalization\n\nSpecs:\n    - specs/03-requirements.md#fr-001\n    - spe [truncated]','\"\"\"\nModule: src/adopter_existing.py\n\nPurpose:\n    Normalize a small local label with a character scanner and no external I/O.\n\nImplements: FR-001, FR-002, NFR-001, NFR-002\n    - FR-001: Produce a canonical lower-case label\n    - FR-002: Reject empty or unsupported input\n    - NFR-001: Keep output deterministic and idempotent\n    - NFR-002: Avoid external I/O\n\nTasks:\n    - T-001: Implement and test local label normalization\n\nSpecs:\n    - specs/03-requirements.md#fr-001\n    - specs/03-requirements.md#fr-002\n    - specs/03-requirements.md#nfr-001\n    - specs/03-requirements.md#nfr-002\n\nRationale:\n    TEST FIXTURE ONLY: this pre-existing host-owned normalizer implements the\n    selected label requirements through an independent character scanner.\n    Separate executed tests establish this narrow mapping, not broad assurance.\n\"\"\"\n\n\ndef normalize_label(raw: str) -> str:\n    \"\"\"Scan ASCII words separated by one space or hyphen into a local label.\"\"\"\n    if isinstance(raw, str) is False:\n        raise TypeError(\"label must be text\")\n    phrase = raw.strip().lower()\n    result = []\n    word_required = True\n    for character in phrase:\n        if \"a\" <= character <= \"z\" or \"0\" <= character <= \"9\":\n            result.append(character)\n            word_required = False\n        elif character in (\" \", \"-\") and not word_required:\n            result.append(\"-\")\n            word_required = True\n        else:\n            raise ValueError(\"label requires ASCII words with single separators\")\n    if word_required:\n        raise ValueError(\"label must end with an ASCII word\")');\nINSERT INTO \"artifact_chunks_fts\" VALUES('A-7743c9b00fea2753-C002','A-7743c9b00fea2753','src/adopter_existing.py','lines_47_47','return \"\".join(result)','return \"\".join(result)');\nINSERT INTO \"artifact_chunks_fts\" VALUES('A-e3ac33afe1512502-C001','A-e3ac33afe1512502','tests/test_adopter_existing.py','lines_1_33','\"\"\"Executed host checks for FR-001/002 and NFR-001/002 in src/adopter_existing.py.\"\"\"\n\nfrom contextlib import ExitStack\nimport unittest\nfrom unittest.mock import patch\nfrom src.adopter_existing import normalize_label\n\n\nclass AdopterExistingTests(unittest.TestCase):\n    def test_label_table_and_fixed_points(self):\n        examples = {\"  Hello World  \": \"hello-world\", \"A-B C9\": \"a-b-c9\", \"7\": \"7\"}\n        for phrase, expected in examples.items():\n            with self.subTest(phr [truncated]','\"\"\"Executed host checks for FR-001/002 and NFR-001/002 in src/adopter_existing.py.\"\"\"\n\nfrom contextlib import ExitStack\nimport unittest\nfrom unittest.mock import patch\nfrom src.adopter_existing import normalize_label\n\n\nclass AdopterExistingTests(unittest.TestCase):\n    def test_label_table_and_fixed_points(self):\n        examples = {\"  Hello World  \": \"hello-world\", \"A-B C9\": \"a-b-c9\", \"7\": \"7\"}\n        for phrase, expected in examples.items():\n            with self.subTest(phrase=phrase):\n                first = normalize_label(phrase)\n                repeated = [normalize_label(phrase) for _ in range(3)]\n                self.assertEqual([first, normalize_label(first), *repeated], [expected] * 5)\n\n    def test_rejection_types_for_invalid_values(self):\n        invalid = [(None, TypeError), (23, TypeError), (\"\", ValueError),\n                   (\"bad/label\", ValueError), (\"hello--world\", ValueError),\n                   (\"two  spaces\", ValueError), (\"-leading\", ValueError)]\n        for supplied, exception in invalid:\n            with self.subTest(value=supplied, expected=exception.__name__):\n                with self.assertRaises(exception):\n                    normalize_label(supplied)\n\n    def test_local_execution_never_calls_io_spies(self):\n        with ExitStack() as stack:\n            spies = [stack.enter_context(patch(target))\n                     for target in (\"builtins.open\", \"socket.socket\")]\n            values = tuple(map(normalize_label, (\"Safe Label\", \"ASCII-9\")))\n            self.assertTupleEqual(values, (\"safe-label\", \"ascii-9\"))\n            for spy in spies:');\nINSERT INTO \"artifact_chunks_fts\" VALUES('A-e3ac33afe1512502-C002','A-e3ac33afe1512502','tests/test_adopter_existing.py','lines_34_38','spy.assert_not_called()\n\n\nif __name__ == \"__main__\":\n    unittest.main()','spy.assert_not_called()\n\n\nif __name__ == \"__main__\":\n    unittest.main()');\nCREATE TABLE artifact_links (\n                    link_id TEXT PRIMARY KEY,\n                    source_path TEXT NOT NULL,\n                    link_type TEXT NOT NULL,\n                    reference_id TEXT NOT NULL\n                );\nINSERT INTO \"artifact_links\" VALUES('L-cddd7a237343a36f','src/adopter_existing.py','task_ref','T-001');\nINSERT INTO \"artifact_links\" VALUES('L-c5c0c22b5e62fc76','src/adopter_existing.py','spec_ref','specs/03-requirements.md#fr-001');\nINSERT INTO \"artifact_links\" VALUES('L-c25ee8469e107359','src/adopter_existing.py','spec_ref','specs/03-requirements.md#fr-002');\nINSERT INTO \"artifact_links\" VALUES('L-308fb661f197b08a','src/adopter_existing.py','spec_ref','specs/03-requirements.md#nfr-001');\nINSERT INTO \"artifact_links\" VALUES('L-735f0063c5861948','src/adopter_existing.py','spec_ref','specs/03-requirements.md#nfr-002');\nCREATE TABLE artifacts (\n                    artifact_id TEXT PRIMARY KEY,\n                    path TEXT NOT NULL,\n                    artifact_type TEXT,\n                    authority_level TEXT,\n                    profile_scope TEXT,\n                    source_hash TEXT,\n                    modified_at TEXT,\n                    indexed_at TEXT,\n                    freshness_status TEXT,\n                    provenance TEXT,\n                    include_policy TEXT,\n                    exclusion_reason TEXT,\n                    scope TEXT,\n                    use_policy TEXT,\n                    review_status TEXT,\n                    source_reference TEXT,\n                    confidence TEXT,\n                    limitations TEXT,\n                    recall_trace_readiness TEXT,\n                    audit_event_readiness TEXT\n                );\nINSERT INTO \"artifacts\" VALUES('A-e7b73709522035bf','docs/adopter-baseline.md','documentation','repository_documentation','\"all\"','1b972e68527572ade37480b032c1d9113f7a8a1b6887b4c24a3222349263dd1e',NULL,NULL,'content_hash_bound','repo_file','bounded_sections_and_references',NULL,'project_local','candidate_reference_only','unreviewed_candidate','docs/adopter-baseline.md','declared_artifact','[\"bounded summary only\", \"not authority\"]','metadata_available','index_run_recorded');\nINSERT INTO \"artifacts\" VALUES('A-7743c9b00fea2753','src/adopter_existing.py','source','current_git_state','\"all\"','8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,NULL,'content_hash_bound','repo_file','bounded_source_blocks',NULL,'project_local','candidate_reference_only','unreviewed_candidate','src/adopter_existing.py','declared_artifact','[\"bounded summary only\", \"not authority\"]','metadata_available','index_run_recorded');\nINSERT INTO \"artifacts\" VALUES('A-e3ac33afe1512502','tests/test_adopter_existing.py','test','current_git_state','\"all\"','f6e0a492fe8a95c7b449f7c9ae8595848bb24d9e34d13695fce35ba2d3ce8549',NULL,NULL,'content_hash_bound','repo_file','bounded_source_blocks',NULL,'project_local','candidate_reference_only','unreviewed_candidate','tests/test_adopter_existing.py','declared_artifact','[\"bounded summary only\", \"not authority\"]','metadata_available','index_run_recorded');\nCREATE TABLE index_runs (\n                    run_id TEXT PRIMARY KEY,\n                    generated_at TEXT NOT NULL,\n                    profile TEXT NOT NULL,\n                    rules_hash TEXT,\n                    status TEXT NOT NULL,\n                    artifact_count INTEGER NOT NULL,\n                    chunk_count INTEGER NOT NULL,\n                    limitations TEXT NOT NULL\n                );\nINSERT INTO \"index_runs\" VALUES('synthetic-public-fixture-v1','2000-01-01T00:00:00Z','assured','b4c45c86f9b496fd20a408ed3f90f74f09f7b6adba2e5610ff84c73e93f2a627','validated',3,5,'[\"Results are generated candidates and must be verified against current repository source.\", \"GraphML records observed deterministic relationships; it does not establish semantic truth or complete relationship coverage.\", \"Absence of a relationship is not evidence that no relationship exists.\", \"sqlite-vec remains unavailable until a concrete local workload and deterministic vector producer are approved and validated.\"]');\nCREATE TABLE report_summaries (\n                    path TEXT PRIMARY KEY,\n                    status TEXT,\n                    summary_json TEXT,\n                    human_review_required INTEGER\n                );\nCREATE TABLE repository_metadata (\n                    key TEXT PRIMARY KEY,\n                    value TEXT NOT NULL\n                );\nCREATE TABLE repository_relationships (\n                    relationship_id TEXT PRIMARY KEY,\n                    source_node TEXT NOT NULL,\n                    target_node TEXT NOT NULL,\n                    relationship_type TEXT NOT NULL,\n                    source_path TEXT,\n                    target_path TEXT,\n                    source_sha256 TEXT,\n                    target_sha256 TEXT,\n                    evidence_sha256 TEXT,\n                    evidence_line INTEGER,\n                    reference_id TEXT,\n                    provenance TEXT NOT NULL,\n                    confidence TEXT NOT NULL,\n                    candidate_only INTEGER NOT NULL\n                );\nINSERT INTO \"repository_relationships\" VALUES('R-fe07cbdb85501b44','artifact:A-7743c9b00fea2753','spec:specs/03-requirements.md#fr-001','spec_ref','src/adopter_existing.py',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'specs/03-requirements.md#fr-001','current_repository_source','explicit_source_reference',1);\nINSERT INTO \"repository_relationships\" VALUES('R-9f8d5754f10200b2','artifact:A-7743c9b00fea2753','spec:specs/03-requirements.md#fr-002','spec_ref','src/adopter_existing.py',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'specs/03-requirements.md#fr-002','current_repository_source','explicit_source_reference',1);\nINSERT INTO \"repository_relationships\" VALUES('R-11236abfe6f16a5d','artifact:A-7743c9b00fea2753','spec:specs/03-requirements.md#nfr-001','spec_ref','src/adopter_existing.py',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'specs/03-requirements.md#nfr-001','current_repository_source','explicit_source_reference',1);\nINSERT INTO \"repository_relationships\" VALUES('R-05546635830ba7bb','artifact:A-7743c9b00fea2753','spec:specs/03-requirements.md#nfr-002','spec_ref','src/adopter_existing.py',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'specs/03-requirements.md#nfr-002','current_repository_source','explicit_source_reference',1);\nINSERT INTO \"repository_relationships\" VALUES('R-df3572377ca94d3d','artifact:A-7743c9b00fea2753','task:T-001','task_ref','src/adopter_existing.py',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0',NULL,'T-001','current_repository_source','explicit_source_reference',1);\nINSERT INTO \"repository_relationships\" VALUES('R-51e74a4bc666e8f3','artifact:A-e3ac33afe1512502','artifact:A-7743c9b00fea2753','python_import','tests/test_adopter_existing.py','src/adopter_existing.py','f6e0a492fe8a95c7b449f7c9ae8595848bb24d9e34d13695fce35ba2d3ce8549','8e2d0eb9f2f1a78565128c187c5b4515a272fe76a600b55e1b420afdf20d94f0','f6e0a492fe8a95c7b449f7c9ae8595848bb24d9e34d13695fce35ba2d3ce8549',6,NULL,'current_repository_source','explicit_source_reference',1);\nCOMMIT;",
+  "text_files": {
+    "docs/adopter-baseline.md": "# Pre-existing adopter toy\r\n\r\nA bounded local text fixture; no implementation or approval claim.\r\n",
+    "src/adopter_existing.py": "\"\"\"\r\nModule: src/adopter_existing.py\r\n\r\nPurpose:\r\n    Normalize a small local label with a character scanner and no external I/O.\r\n\r\nImplements: FR-001, FR-002, NFR-001, NFR-002\r\n    - FR-001: Produce a canonical lower-case label\r\n    - FR-002: Reject empty or unsupported input\r\n    - NFR-001: Keep output deterministic and idempotent\r\n    - NFR-002: Avoid external I/O\r\n\r\nTasks:\r\n    - T-001: Implement and test local label normalization\r\n\r\nSpecs:\r\n    - specs/03-requirements.md#fr-001\r\n    - specs/03-requirements.md#fr-002\r\n    - specs/03-requirements.md#nfr-001\r\n    - specs/03-requirements.md#nfr-002\r\n\r\nRationale:\r\n    TEST FIXTURE ONLY: this pre-existing host-owned normalizer implements the\r\n    selected label requirements through an independent character scanner.\r\n    Separate executed tests establish this narrow mapping, not broad assurance.\r\n\"\"\"\r\n\r\n\r\ndef normalize_label(raw: str) -> str:\r\n    \"\"\"Scan ASCII words separated by one space or hyphen into a local label.\"\"\"\r\n    if isinstance(raw, str) is False:\r\n        raise TypeError(\"label must be text\")\r\n    phrase = raw.strip().lower()\r\n    result = []\r\n    word_required = True\r\n    for character in phrase:\r\n        if \"a\" <= character <= \"z\" or \"0\" <= character <= \"9\":\r\n            result.append(character)\r\n            word_required = False\r\n        elif character in (\" \", \"-\") and not word_required:\r\n            result.append(\"-\")\r\n            word_required = True\r\n        else:\r\n            raise ValueError(\"label requires ASCII words with single separators\")\r\n    if word_required:\r\n        raise ValueError(\"label must end with an ASCII word\")\r\n    return \"\".join(result)\r\n",
+    "tests/test_adopter_existing.py": "\"\"\"Executed host checks for FR-001/002 and NFR-001/002 in src/adopter_existing.py.\"\"\"\r\n\r\nfrom contextlib import ExitStack\r\nimport unittest\r\nfrom unittest.mock import patch\r\nfrom src.adopter_existing import normalize_label\r\n\r\n\r\nclass AdopterExistingTests(unittest.TestCase):\r\n    def test_label_table_and_fixed_points(self):\r\n        examples = {\"  Hello World  \": \"hello-world\", \"A-B C9\": \"a-b-c9\", \"7\": \"7\"}\r\n        for phrase, expected in examples.items():\r\n            with self.subTest(phrase=phrase):\r\n                first = normalize_label(phrase)\r\n                repeated = [normalize_label(phrase) for _ in range(3)]\r\n                self.assertEqual([first, normalize_label(first), *repeated], [expected] * 5)\r\n\r\n    def test_rejection_types_for_invalid_values(self):\r\n        invalid = [(None, TypeError), (23, TypeError), (\"\", ValueError),\r\n                   (\"bad/label\", ValueError), (\"hello--world\", ValueError),\r\n                   (\"two  spaces\", ValueError), (\"-leading\", ValueError)]\r\n        for supplied, exception in invalid:\r\n            with self.subTest(value=supplied, expected=exception.__name__):\r\n                with self.assertRaises(exception):\r\n                    normalize_label(supplied)\r\n\r\n    def test_local_execution_never_calls_io_spies(self):\r\n        with ExitStack() as stack:\r\n            spies = [stack.enter_context(patch(target))\r\n                     for target in (\"builtins.open\", \"socket.socket\")]\r\n            values = tuple(map(normalize_label, (\"Safe Label\", \"ASCII-9\")))\r\n            self.assertTupleEqual(values, (\"safe-label\", \"ascii-9\"))\r\n            for spy in spies:\r\n                spy.assert_not_called()\r\n\r\n\r\nif __name__ == \"__main__\":\r\n    unittest.main()\r\n"
+  },
+  "validation_receipt.json": {
+    "control": {
+      "candidate_only": true,
+      "component_mode": "baseline",
+      "effective_source_sha256": "354df33f04a301726ce1184973a4d11819e61c87080ee999cc3c6cf8e1d3b209",
+      "generation_content_sha256": "88a8efbeedc43443200c4986b1f2b5ac140c43120605a7181b9e573d3fdfcd62",
+      "generation_id": "RI-000000000000000000000000",
+      "implementation": {
+        "canonical_adapter_sha256": "f71993a32608617fa7502010d3e1723fa814300bf71a7da63960442dbd5f3b6e",
+        "contract_version": 1,
+        "engine_sha256": "6ac43aab2003fa0bc5868ad5cdc2dbc7ac20cf7188b4fa95102b81763dba1659",
+        "graphml_writer": "networkx.write_graphml_xml",
+        "local_context_index_sha256": "099e90a5543f9102f6a38898712db40729d5c005ebac06cd951632324423df5a",
+        "sqlite_serializer": "python_stdlib_sqlite3",
+        "windows_ri_enrollment": {
+          "canonical.py": "d7fc720d900a782274ae92394312beda4cc31e06833271b7d1a2bb5b12a4680d",
+          "repository_intelligence_windows.py": "ea599dc9160f8092af932a029c02c9676b3ea4402256d8b8c62b6adbc16c161f",
+          "repository_intelligence_windows_enrollment.py": "1f657257ede8a26edc0794ab6ba00fd32fb1e1b32984e9e7d006f22a7eff6bc5",
+          "windows_handles.py": "7bbfb324b809c91cf24e1b1c60fdaad05bf4837fa1a3923446dbb82bde0009a8"
+        },
+        "windows_ri_public": "9f2e88de8c1d7930faf9f1a5c70100287ba8284a3a171cdc7fc3a27035e7e9d6",
+        "windows_ri_runtime": {
+          "canonical.py": "ee64a74576d3c19e7514208ae80f8081ce9637e66d5aadb31280746be303fc4c",
+          "repository_intelligence_windows.py": "5ca7051cfcb4c2f247860ee1757b163d2312ff39857f7b9ee45f9d0f21653dc3",
+          "repository_intelligence_windows_enrollment.py": "d9ec21d4858dd770de9d0c613a8dd6e344c2a6d6ff60e7786cb9b264949475a6",
+          "repository_intelligence_windows_runtime.py": "6119c870415e07dc6b615ed20402fda1288931fe4c880c0359e876cd315c28a4",
+          "windows_backend.py": "20386eb198074cbe1ba471e8ef652a84ca3a667f52948ee95a15b276f284abfc",
+          "windows_coordinator.py": "240ed5a483e4dabfdfe928324be69e821749bed0197fa4f5a00ab495ddb866f9",
+          "windows_exchange.py": "a989c8efdaf61056a6001b7ae314d0e0ef77b9bd8b0fcc6ad354dfaf824736c4",
+          "windows_handles.py": "c987e0eddc9792e42a9d8dff8b588c1206951ff8b3148447aaf9bbdd2065d37e",
+          "windows_operation.py": "3d57b03cf09d49aa94b0f0a7a38f533b0e76609049a2607202cad7e91ecffe76",
+          "windows_rename_identity.py": "b24978eb421da432bae235bc5a3416537eeda5b69058d6732ff0bdfea151b63f",
+          "windows_restoring_backend.py": "e8a4eb0db1b5387dfa31dc51a64e4f471b89b706458eb9260b4d1d05125b357c"
+        }
+      },
+      "networkx_graphml": {
+        "reason": "No qualifying multi-hop cross-family relationship case was detected.",
+        "status": "not_applicable"
+      },
+      "profile": "assured",
+      "provenance_gate": {},
+      "purpose": "brownfield-onboarding",
+      "runtime": {
+        "networkx": {
+          "imported_version": null,
+          "install_extra": "naos-governance[repository-intelligence]",
+          "installed_version": null,
+          "module_sha256": null,
+          "required_version": "3.6.1",
+          "status": "prerequisite_missing",
+          "writer": "networkx.write_graphml_xml",
+          "writer_available": false
+        },
+        "platform": {
+          "implementation": "CPython",
+          "machine": "amd64",
+          "python": "3.11.0",
+          "supported_for_apply": true,
+          "supported_tuple": "windows_x86_64_cpython_3_11_to_3_13_native_handles",
+          "system": "Windows"
+        },
+        "rfc8785": {
+          "installed_version": "0.1.4",
+          "required_version": "0.1.4",
+          "status": "ready"
+        },
+        "sqlite_fts": {
+          "fts5_available": true,
+          "probe": "create_insert_match",
+          "sqlite_version": "3.0.0",
+          "status": "ready"
+        },
+        "sqlite_vec": {
+          "reason": "No frozen retrieval workload or deterministic vector producer is configured.",
+          "runtime_probed": false,
+          "status": "workload_not_defined"
+        }
+      },
+      "source_revalidated_after_generation": true,
+      "sqlite_fts": {
+        "content_identity_binding": {
+          "artifact_chunks": {
+            "count": 5,
+            "ids_sha256": "a7248c758ee95047291f96b115ac4699f2f82abfcc2abe4154b907c44f63b6b1",
+            "rows_sha256": "6be45f54fa0a19bf47393424e127e6ef4219dd138a2ca9424f2ed846b4a797dc"
+          },
+          "artifact_links": {
+            "count": 5,
+            "ids_sha256": "69f75adbcb0fd12fc51ef1010a55bdddbaaae1e318f3d1beb9bc25068ef4d824",
+            "rows_sha256": "2a0d25acf797ba9cca4da36281f7ebdee36d467329f70b6a4b069fd01df0cfc3"
+          },
+          "artifacts": {
+            "count": 3,
+            "ids_sha256": "770ff5b746c16b8be42ea1ed39a29ed22cbffff5cdd3f13f2f32f964ed2de1eb",
+            "rows_sha256": "ff912f46c9543ed829a3f58184a5c3b9ed7f17fe6965b0fccab70d6ec5efb0d5"
+          },
+          "repository_relationships": {
+            "count": 6,
+            "ids_sha256": "d963ddbb565045660cb425bbb7a064a6d676cb4b8363c6da42fb2a41d7dca7ee",
+            "rows_sha256": "80f9d7f7966e1e7900b3b74cb9478547649472e06f2c6ba8a3296d6152bf976a"
+          }
+        },
+        "fts_probe_matches": 0,
+        "fts_query_executed": true,
+        "integrity_check": "ok",
+        "relational_consistency_validated": true,
+        "required_tables": [
+          "artifact_chunks",
+          "artifact_chunks_fts",
+          "artifact_links",
+          "artifacts",
+          "index_runs",
+          "repository_metadata",
+          "repository_relationships"
+        ],
+        "source_binding_validated": true,
+        "status": "validated"
+      }
+    },
+    "not_claimed": [
+      "source authority",
+      "reviewer authentication",
+      "complete graph coverage"
+    ],
+    "receipt_sha256": "03a5ee4e73d381f9785a9d319d695acbbf1ced6245db160df2a5da16d099c4f2",
+    "schema": "naos.repository_intelligence.validation_receipt.v1",
+    "status": "validated_generation"
+  }
+}

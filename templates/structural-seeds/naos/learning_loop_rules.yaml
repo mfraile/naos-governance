@@ -97,6 +97,8 @@ integration_policy:
   llm_calls_enabled: false
   mcp_calls_enabled: false
 
+# Assured report severity cannot fall below the selected policy severity.
+# Kit reports stay advisory; lower profiles retain their configured posture.
 profile_posture:
   quickstart:
     state: advisory
@@ -118,6 +120,11 @@ profile_posture:
 known_gaps: []
 residual_risks:
   - id: RISK-LEARNING-001
+    evidence_classification: hypothesized
+    classification_scope: possible_learning_metadata_risk
+    human_review_required: true
+    hypothesis_reason: "Schema-valid learning metadata may still be semantically wrong; no particular record is asserted wrong."
+    next_review_step: "Have a human review each learning record before durable action."
     description: "Validated learning metadata can still be semantically wrong; human review remains required before durable action."
 waivers: []
 limitations:

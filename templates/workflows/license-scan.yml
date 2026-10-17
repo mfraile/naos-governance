@@ -17,39 +17,51 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.11"
 
       - name: Install dependencies
         run: |
-          pip install pip-licenses
-          pip install -r requirements.txt
+          # Adopter requirements.txt and shared-environment compatibility are prerequisites.
+          # Direct pin reviewed from primary sources; transitive dependencies remain variable.
+          python -m pip install pip-licenses==5.5.5
+          python -m pip install -r requirements.txt
+
+      - name: Collect licence metadata
+        run: pip-licenses --format=json > licenses.json
 
       - name: Check configured GPL/AGPL metadata patterns
+        shell: python
         run: |
-          echo "Scanning for GPL/AGPL licenses (LGPL permitted)..."
-          pip-licenses --format=json > licenses.json
+          import json
+          import sys
+          from pathlib import Path
 
-          # Block GPL and AGPL; allow LGPL (LGPL-2.1-only, LGPL-3.0-only, LGPLv2+, LGPLv3).
-          # Both AGPL and GPL contain "GPL" without "LGPL".
-          COPYLEFT=$(jq -r '.[] | select(
-            (.License | contains("GPL")) and (.License | contains("LGPL") | not)
-          ) | "\(.Name) - \(.License)"' licenses.json || true)
-
-          if [ -n "$COPYLEFT" ]; then
-            echo "ERROR: Configured GPL/AGPL licence-name patterns detected:"
-            echo "$COPYLEFT"
-            echo ""
-            echo "Project policy rejects these licences; obtain qualified review for your use case."
-            exit 1
-          fi
-
-          echo "No configured GPL/AGPL licence-name pattern detected."
-          echo "Metadata string matching is incomplete review evidence, not licence clearance or legal compliance."
+          rows = json.loads(Path("licenses.json").read_text(encoding="utf-8"))
+          if not isinstance(rows, list) or any(
+              not isinstance(row, dict)
+              or not isinstance(row.get("Name"), str)
+              or not isinstance(row.get("License"), str)
+              for row in rows
+          ):
+              sys.exit("ERROR: licence metadata must be an array of Name/License string records.")
+          # Preserve the configured case-sensitive string policy: block GPL/AGPL;
+          # allow LGPL. This is metadata review evidence, not licence clearance.
+          copyleft = [
+              f"{row['Name']} - {row['License']}"
+              for row in rows
+              if "GPL" in row["License"] and "LGPL" not in row["License"]
+          ]
+          if copyleft:
+              print("ERROR: Configured GPL/AGPL licence-name patterns detected:")
+              print("\n".join(copyleft))
+              sys.exit("Project policy rejects these licences; obtain qualified review for your use case.")
+          print("No configured GPL/AGPL licence-name pattern detected.")
+          print("Metadata string matching is incomplete review evidence, not licence clearance or legal compliance.")
 
       - name: Generate license report
         if: always()
@@ -58,7 +70,7 @@ jobs:
 
       - name: Upload license report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: license-report
           path: licenses_report.md

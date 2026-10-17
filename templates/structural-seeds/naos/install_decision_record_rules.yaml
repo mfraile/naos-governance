@@ -1,8 +1,12 @@
 schema: naos.install_decision_record_rules.v1
 profile: quickstart
 updated_at: null
+contract_role: descriptive_reference
+runtime_configurable: false
+# This seed documents producer behavior. Editing it does not change runtime
+# evaluation, activation boundaries or mandatory human review.
 description: >
-  Rules for install/adoption decision records. Decisions must connect intake,
+  Reference for install/adoption decision records. Decisions must connect intake,
   discovery, inventories, challenges, installation plan, activation boundary,
   and residual risk.
 required_evidence:

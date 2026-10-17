@@ -2,27 +2,48 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:naos-governance:schemas:naos:capability_maturity_report:v1",
   "title": "NAOS Capability Maturity Report",
-  "description": "Schema for the readiness report emitted by scripts/naos_capability_maturity.py. The report is advisory evaluation evidence; it does not promote, certify, approve, or prove capability maturity.",
+  "description": "Schema for maturity readiness and invalid-input reports emitted by scripts/naos_capability_maturity.py. A readiness report does not promote, certify, approve, or prove capability maturity.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schema",
-    "generated_at",
-    "profile",
-    "naos_root",
-    "project_root",
-    "state",
-    "policy",
-    "semantics",
-    "status",
-    "summary",
-    "related_evidence",
-    "capabilities",
-    "findings",
-    "limitations"
+  "required": ["schema", "status", "findings"],
+  "allOf": [
+    {
+      "if": {"properties": {"schema": {"const": "naos.capability_maturity_input_error.v1"}}, "required": ["schema"]},
+      "then": {
+        "required": ["errors", "human_review_required"],
+        "properties": {
+          "status": {"const": "invalid_input"},
+          "findings": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "status", "severity", "message", "human_review_required"],
+              "properties": {
+                "id": {"const": "capability_maturity_input_invalid"},
+                "status": {"const": "invalid_input"},
+                "severity": {"const": "blocking"},
+                "message": {"type": "string"},
+                "human_review_required": {"const": true}
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "not": {"anyOf": [{"required": ["summary"]}, {"required": ["capabilities"]}, {"required": ["state"]}]}
+      },
+      "else": {
+        "required": ["generated_at", "profile", "naos_root", "project_root", "state", "policy",
+                     "semantics", "summary", "related_evidence", "capabilities", "limitations"],
+        "properties": {"status": {"not": {"const": "invalid_input"}}},
+        "not": {"anyOf": [{"required": ["errors"]}, {"required": ["human_review_required"]}]}
+      }
+    }
   ],
   "properties": {
-    "schema": {"const": "naos.capability_maturity.v1"},
+    "schema": {"enum": ["naos.capability_maturity.v1", "naos.capability_maturity_input_error.v1"]},
+    "errors": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "human_review_required": {"const": true},
     "generated_at": {"type": "string"},
     "profile": {"type": "string", "enum": ["quickstart", "lite", "standard", "assured"]},
     "naos_root": {"type": "string"},
@@ -106,6 +127,11 @@
       "type": "array",
       "items": {
         "type": "object",
+        "properties": {
+          "evidence_results": {"type": "array", "items": {"$ref": "#/$defs/maturity_evidence_result"}},
+          "unresolved_evidence": {"type": "array", "items": {"type": "string"}},
+          "evidence_basis": {"enum": ["none", "manual", "automatic", "mixed"]}
+        },
         "required": [
           "capability_id",
           "current_maturity",
@@ -119,5 +145,41 @@
     },
     "findings": {"type": "array", "items": {"type": "object"}},
     "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "maturity_evidence_result": {
+      "type": "object",
+      "required": ["reference", "stage", "availability", "validation", "requirement_outcome", "generation_age", "claim_ceiling"],
+      "properties": {
+        "reference": {"type": "string"},
+        "stage": {"enum": ["L2", "L3", "L4"]},
+        "availability": {"type": "string"},
+        "validation": {"type": "string"},
+        "requirement_outcome": {"type": "string"},
+        "generation_age": {
+          "type": "object",
+          "required": ["status", "basis", "timestamp"],
+          "properties": {
+            "status": {"enum": ["within_window", "stale", "unknown", "not_enforced"]},
+            "basis": {"type": "string"},
+            "timestamp": {"type": ["string", "null"]}
+          }
+        },
+        "claim_ceiling": {"type": "string"},
+        "requirement_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "optional", "require_current_source", "freshness_window_days"],
+          "properties": {
+            "type": {"enum": ["report", "manual"]},
+            "optional": {"type": "boolean"},
+            "require_current_source": {"type": "boolean"},
+            "freshness_window_days": {"type": "integer", "minimum": 0}
+          }
+        },
+        "signal_tracking": {"enum": ["current_selected_projection", "unresolved"]},
+        "measurement_assurance": {"const": "not_established"}
+      }
+    }
   }
 }

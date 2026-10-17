@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Detect test functions with missing or trivial assertion evidence."""
+"""Detect test functions with missing, trivial, literal-disabled/post-return assertions, swallowed exceptions or skip/xfail syntax."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ FALLBACK_RULES = {
 def main(argv: list[str] | None = None) -> int:
     return run_report_command(
         argv=argv,
-        description="Detect Python tests with missing or trivial assertion evidence.",
+        description="Detect Python tests with missing, trivial, literal-disabled/post-return assertions, swallowed exceptions or skip/xfail syntax.",
         rules_filename="test_quality_hygiene_rules.yaml",
         report_key="test_quality_hygiene_report",
         schema="naos.test_quality_hygiene.v1",

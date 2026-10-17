@@ -39,6 +39,58 @@
           "conflict_reason": {"type": "string"},
           "compared_surface": {"type": "string"},
           "profile_impact": {"type": "string"},
+          "deprecation_evidence": {
+            "type": "object",
+            "required": [
+              "verified",
+              "marker_mentions",
+              "sample_character_limit",
+              "interpretation"
+            ],
+            "properties": {
+              "verified": {
+                "const": false
+              },
+              "marker_mentions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "marker",
+                    "locations"
+                  ],
+                  "properties": {
+                    "marker": {
+                      "enum": [
+                        "stale",
+                        "deprecated",
+                        "legacy",
+                        "archive",
+                        "old instructions"
+                      ]
+                    },
+                    "locations": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {
+                        "enum": [
+                          "path",
+                          "content"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "sample_character_limit": {
+                "const": 12000
+              },
+              "interpretation": {
+                "const": "keyword_context_does_not_establish_artifact_deprecation"
+              }
+            }
+          },
           "recommended_decision": {"enum": ["keep", "merge", "replace", "quarantine", "create", "review_required"]},
           "selected_option": {"enum": ["keep", "merge", "replace", "quarantine", "create", "review_required"]},
           "available_options": {"type": "array", "items": {"type": "string"}},

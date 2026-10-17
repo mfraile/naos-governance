@@ -21,6 +21,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from naos_resource_boundary import resource_reference, select_resource  # noqa: E402
+
 from naos_policy import (  # noqa: E402
     controlled_now_utc,
     controlled_utc_now_text,
@@ -234,12 +236,12 @@ def load_yaml_mapping(path: Path) -> tuple[dict[str, Any], bool]:
 
 def input_schema_path(root: Path) -> Path:
     project = root / "schemas" / "naos" / "aivss_assessments.schema.json"
-    return project if project.is_file() else kit_root() / "schemas" / "naos" / project.name
+    return select_resource(root, project, f"schemas/naos/{project.name}")
 
 
 def report_schema_path(root: Path) -> Path:
     project = root / "schemas" / "naos" / "aivss_arithmetic_verification_report.schema.json"
-    return project if project.is_file() else kit_root() / "schemas" / "naos" / project.name
+    return select_resource(root, project, f"schemas/naos/{project.name}")
 
 
 def schema_error_metadata(instance: Any, schema_path: Path) -> list[dict[str, str]]:
@@ -276,9 +278,9 @@ def resolve_assessments_path(
     return path, "project" if path.is_file() else "missing"
 
 
-def input_record(path: Path, root: Path, role: str) -> dict[str, str]:
+def input_record(path: Path, root: Path, role: str, *, resource_ref: str | None = None) -> dict[str, str]:
     return {
-        "path": relative_bounded_path(path, root),
+        "path": resource_ref if resource_ref is not None else relative_bounded_path(path, root),
         "role": role,
         "sha256": sha256_file(path),
     }
@@ -472,8 +474,6 @@ def build_expected_report(
 
     input_schema = input_schema_path(root)
     output_schema = report_schema_path(root)
-    relative_bounded_path(input_schema, root)
-    relative_bounded_path(output_schema, root)
     schema_errors = (
         schema_error_metadata(input_data, input_schema)
         if configured and parse_ok
@@ -506,7 +506,9 @@ def build_expected_report(
         (root / "scripts" / "naos_aivss_arithmetic_verification.py", "verifier"),
     ):
         if path.is_file():
-            inputs.append(input_record(path, root, role))
+            inputs.append(input_record(path, root, role, resource_ref=
+                resource_reference(path, root, kit_relative=f"schemas/naos/{path.name}")
+                if role in {"input_schema", "report_schema"} else None))
     inputs.sort(key=lambda item: (item["path"], item["role"]))
 
     raw_assessments = (
@@ -753,10 +755,11 @@ def main(argv: list[str] | None = None) -> int:
             "aivss_arithmetic_verification_report",
         )
     )
-    if not output.is_absolute():
+    if output is not None and not output.is_absolute():
         output = root / output
     try:
-        preflight_bounded_output(output, root)
+        if output is not None:
+            preflight_bounded_output(output, root)
         expected = build_expected_report(
             root=root,
             profile=profile,
@@ -769,7 +772,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.check:
-        if not output.is_file():
+        if output is None or not output.is_file():
             print(
                 f"NAOS AIVSS arithmetic verification: FAIL — missing report: {output}",
                 file=sys.stderr,

@@ -1,2 +1,1 @@
-date,file,function,similarity_score,similar_to,action
-# AUTO-APPENDED by `make -f Makefile.naos semantic-audit` → scripts/naos_semantic_baseline_audit.py
+timestamp,new_function,matched_function,score,method

@@ -1,5 +1,5 @@
 {
-  "schema": "naos.claude_code_hook_template.v1",
+  "schema": "naos.claude_code_hook_template.v2",
   "description": "Optional NAOS hook references for Claude Code. Review and merge manually; do not copy blindly into active settings.",
   "activation": "manual_review_required",
   "not_claimed": [
@@ -14,35 +14,101 @@
     "official Anthropic support"
   ],
   "hooks": {
-    "PreSession": [
+    "SessionStart": [
       {
-        "command": "naos/integrations/claude-code/hooks/pre-session.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "session-start"
+            ],
+            "timeout": 35
+          }
+        ]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
-        "command": "naos/integrations/claude-code/hooks/pre-tool-edit.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "pre-tool-edit"
+            ],
+            "timeout": 20
+          }
+        ]
       },
       {
-        "matcher": "Bash",
-        "command": "naos/integrations/claude-code/hooks/pre-tool-bash.sh"
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "pre-tool-bash"
+            ],
+            "timeout": 20
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
-        "command": "naos/integrations/claude-code/hooks/post-tool-write.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "post-tool-write"
+            ],
+            "timeout": 20
+          }
+        ]
       }
     ],
     "PreCompact": [
       {
-        "command": "naos/integrations/claude-code/hooks/pre-compact.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "pre-compact"
+            ],
+            "timeout": 20
+          }
+        ]
       }
     ],
-    "Stop": [
+    "SessionEnd": [
       {
-        "command": "naos/integrations/claude-code/hooks/stop.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
+              "--event",
+              "session-end"
+            ],
+            "timeout": 20
+          }
+        ]
       }
     ]
   }

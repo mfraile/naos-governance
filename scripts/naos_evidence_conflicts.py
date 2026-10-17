@@ -33,8 +33,11 @@ from naos_policy import (  # noqa: E402
     session_report_default_path,
     sessions_index_path,
     write_report_with_session,
+    validate_operator_value,
 )
 from naos_session_identity import record_session_report_reference  # noqa: E402
+from naos_evidence_contracts import local_evidence_subject  # noqa: E402
+from naos_control_plane_review import evaluate_item, resolve_rules_path  # noqa: E402
 
 
 REPORT_SCHEMA = "naos.evidence_conflict_detection.v1"
@@ -44,7 +47,7 @@ OUTCOME_MAP = {
     "approved": "approved",
     "approve": "approved",
     "accepted": "approved",
-    "acknowledged": "approved",
+    "acknowledged": "acknowledged",
     "pass": "approved",
     "passed": "approved",
     "ready": "approved",
@@ -99,6 +102,7 @@ RESIDUAL_RISKS = [
 ]
 SUPPORTED_OUTCOMES = [
     "approved",
+    "acknowledged",
     "rejected",
     "needs_changes",
     "waived",
@@ -106,6 +110,12 @@ SUPPORTED_OUTCOMES = [
     "not_reviewed",
     "unknown",
 ]
+NON_VERDICT_OUTCOMES = {"acknowledged", "not_reviewed", "unknown"}
+CONFLICT_SOURCE_TYPES = {
+    "evidence_conflict_finding", "review_outcome_conflict_finding",
+    "stale_attestation_finding", "missing_reviewer_metadata_finding",
+    "separation_of_duties_warning_finding", "unrouted_conflict_finding",
+}
 
 
 def utc_now_text() -> str:
@@ -123,8 +133,11 @@ def safe_id(value: str, fallback: str = "conflict") -> str:
 def load_yaml_mapping(path: Path | None) -> dict[str, Any]:
     if path is None or not path.exists():
         return {}
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return data if isinstance(data, dict) else {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (OSError, UnicodeError, yaml.YAMLError):
+        return {"_invalid": True, "_path": str(path)}
+    return data if isinstance(data, dict) else {"_invalid": True, "_path": str(path)}
 
 
 def load_json_mapping(path: Path | None) -> dict[str, Any]:
@@ -278,22 +291,45 @@ def attestation_hashes(item: dict[str, Any], artifact_ref: str | None) -> set[st
 def current_artifact_hash(root: Path, artifact_ref: str, manifest_by_path: dict[str, dict[str, Any]]) -> str | None:
     if artifact_ref.startswith(("group:", "hash:", "unknown_")):
         return None
+    candidate = local_evidence_subject(root, artifact_ref)
+    if candidate is None:
+        return None
     manifest_digest = manifest_by_path.get(artifact_ref, {}).get("digest")
     if manifest_digest:
         return str(manifest_digest)
-    candidate = root / artifact_ref
-    return sha256_file(candidate)
+    try:
+        return sha256_file(candidate)
+    except OSError:
+        return None
 
 
 def current_creator_for_artifact(artifact_ref: str, manifest_by_path: dict[str, dict[str, Any]]) -> str | None:
     artifact = manifest_by_path.get(artifact_ref) or {}
-    return find_first(
-        artifact.get("operator_id"),
-        artifact.get("created_by_operator_id"),
-        artifact.get("generated_by_operator_id"),
-        artifact.get("created_by"),
-        artifact.get("generated_by"),
-    )
+    if "creator_attribution" in artifact:
+        provenance = artifact["creator_attribution"]
+        generated = artifact.get("generated_by")
+        digest = artifact.get("digest")
+        if (not isinstance(provenance, dict) or not isinstance(generated, dict)
+                or provenance.get("status") != "declared"
+                or provenance.get("source") != "artifact.generated_by.operator_id"
+                or provenance.get("authenticated") is not False
+                or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
+                or provenance.get("content_sha256") != digest
+                or not isinstance(generated.get("operator_id"), str)):
+            return None
+        return validate_operator_value(generated["operator_id"], "artifact.generated_by.operator_id")[0]
+    # Preserve legacy declarations, but never turn an empty metadata object into
+    # an apparent identity. These fields remain unauthenticated local metadata.
+    values = [artifact.get(key) for key in (
+        "operator_id", "created_by_operator_id", "generated_by_operator_id", "created_by", "generated_by",
+    )]
+    for value in values:
+        if isinstance(value, dict):
+            value = next((value.get(key) for key in ("operator_id", "id", "email", "name")
+                          if isinstance(value.get(key), str) and value[key].strip()), None)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def raw_attestations(attestations_data: dict[str, Any], evidence_attestation: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
@@ -335,27 +371,40 @@ def input_source(
     }
 
 
-def route_material(*sources: Any) -> str:
-    chunks: list[str] = []
-    for source in sources:
-        try:
-            chunks.append(json.dumps(source, sort_keys=True, default=str).lower())
-        except Exception:
-            chunks.append(str(source).lower())
-    return "\n".join(chunks)
+def routed_conflict_ids(items: Any, rules: dict[str, Any]) -> set[str]:
+    """Use exact typed review references and the existing routing decision.
 
-
-def has_route(conflict: dict[str, Any], material: str) -> bool:
-    if not material.strip():
-        return False
-    needles = [
-        conflict.get("conflict_id"),
-        conflict.get("conflict_type"),
-        conflict.get("artifact_path"),
-        conflict.get("artifact_ref"),
-        *as_str_list(conflict.get("source_attestations")),
-    ]
-    return any(str(needle).lower() in material for needle in needles if needle)
+    Text mentions, artifact paths and broad conflict types do not identify a
+    route. A routed or waived declaration keeps the underlying conflict visible;
+    this function does not resolve it or authenticate the declaring reviewer.
+    """
+    if not isinstance(items, list) or rules.get("_invalid") or rules.get("enabled") is False:
+        return set()
+    rule_fields = ("required_item_fields", "source_types", "target_surfaces", "allowed_dispositions")
+    if any(not isinstance(rules.get(key), list)
+           or any(not isinstance(value, str) for value in rules[key]) for key in rule_fields):
+        return set()
+    routed: set[str] = set()
+    for item in items:
+        if (not isinstance(item, dict) or not isinstance(item.get("source_type"), str)
+                or item["source_type"] not in CONFLICT_SOURCE_TYPES):
+            continue
+        if any(not isinstance(item.get(key), str) or not item[key].strip()
+               for key in ("id", "source_type", "source_ref", "summary", "owner", "disposition")):
+            continue
+        targets = item.get("target_surfaces")
+        if not isinstance(targets, list) or not targets or any(not isinstance(value, str) for value in targets):
+            continue
+        decision, _ = evaluate_item(
+            item=item, rules=rules, severity="advisory",
+            required_fields=rules["required_item_fields"],
+            allowed_source_types=set(rules["source_types"]),
+            allowed_target_surfaces=set(rules["target_surfaces"]),
+            allowed_dispositions=set(rules["allowed_dispositions"]),
+        )
+        if decision["status"] in {"routed", "waived"}:
+            routed.add(item["source_ref"])
+    return routed
 
 
 def make_conflict(
@@ -446,14 +495,18 @@ def build_records(
             artifact_hashes = set(expected_hashes)
             if current_hash:
                 artifact_hashes.add(current_hash)
-            creator = creator_id(item) or current_creator_for_artifact(artifact_ref, manifest_by_path)
+            producer_creator = current_creator_for_artifact(artifact_ref, manifest_by_path)
+            attested_creator = creator_id(item)
+            creator_candidates = sorted({value for value in (producer_creator, attested_creator) if value})
             record = {
                 "attestation_id": item_id,
                 "artifact_ref": artifact_ref,
                 "review_outcome": outcome,
                 "reviewer": reviewer,
                 "operator": operator,
-                "creator": creator,
+                "creator": producer_creator or attested_creator,
+                "creator_candidates": creator_candidates,
+                "creator_declarations": {"artifact_manifest": producer_creator, "attestation": attested_creator},
                 "session_id": item.get("session_id") or session_id,
                 "artifact_hashes": sorted(artifact_hashes),
                 "expected_hashes": sorted(expected_hashes),
@@ -563,6 +616,8 @@ def build_report(
     audit_summary = load_json_mapping(audit_summary_path)
     operator_report = load_json_mapping(operator_report_path)
     control_plane_items = load_yaml_mapping(control_plane_items_path)
+    control_plane_rules_path, _ = resolve_rules_path(root, naos_root, policy)
+    control_plane_rules = load_yaml_mapping(control_plane_rules_path)
     session_index = load_json_mapping(session_index_path)
     events, event_files = audit_events(root, naos_root, policy)
 
@@ -581,6 +636,7 @@ def build_report(
         input_source("session_index", session_index_path, session_index, True),
         input_source("operator_attribution_report", operator_report_path, operator_report, True),
         input_source("control_plane_review_items", control_plane_items_path, control_plane_items, True),
+        input_source("control_plane_review_rules", control_plane_rules_path, control_plane_rules, True),
     ]
     unsupported_sources = [source for source in input_sources if source.get("present") and not source.get("supported")]
 
@@ -607,21 +663,13 @@ def build_report(
     for record in records:
         records_by_artifact[str(record.get("artifact_ref"))].append(record)
 
-    route_text = route_material(
-        control_plane_items.get("items") or [],
-        control_plane_items.get("known_gaps") or [],
-        control_plane_items.get("residual_risks") or [],
-        control_plane_items.get("waivers") or [],
-        evidence_attestation.get("known_gaps") or [],
-        evidence_attestation.get("residual_risks") or [],
-        evidence_attestation.get("waivers") or [],
-        audit_summary.get("findings") or [],
-    )
+    route_ids = routed_conflict_ids(control_plane_items.get("items"), control_plane_rules)
     conflicts: list[dict[str, Any]] = []
     for artifact_ref, group in sorted(records_by_artifact.items()):
-        outcomes = {str(record.get("review_outcome")) for record in group if record.get("review_outcome")}
-        reviewers = {str(record.get("reviewer") or record.get("operator")) for record in group if record.get("reviewer") or record.get("operator")}
-        if len(outcomes - {"unknown"}) > 1:
+        verdict_records = [record for record in group if record.get("review_outcome") not in NON_VERDICT_OUTCOMES]
+        outcomes = {str(record.get("review_outcome")) for record in verdict_records if record.get("review_outcome")}
+        reviewers = {str(record.get("reviewer") or record.get("operator")) for record in verdict_records if record.get("reviewer") or record.get("operator")}
+        if len(outcomes) > 1:
             conflicts.append(
                 make_conflict(
                     conflict_type="same_artifact_conflicting_review_outcome",
@@ -631,7 +679,7 @@ def build_report(
                     recommended_review_action="Compare the structured attestations and decide the review disposition manually.",
                 )
             )
-        if len(reviewers) > 1 and len(outcomes - {"unknown"}) > 1:
+        if len(reviewers) > 1 and len(outcomes) > 1:
             conflicts.append(
                 make_conflict(
                     conflict_type="same_artifact_multiple_reviewers_disagree",
@@ -642,7 +690,8 @@ def build_report(
                 )
             )
         for record in group:
-            if record.get("creator") and (record.get("creator") == record.get("operator") or record.get("creator") == record.get("reviewer")):
+            if any(creator in {record.get("operator"), record.get("reviewer")}
+                   for creator in record.get("creator_candidates", [])):
                 conflicts.append(
                     make_conflict(
                         conflict_type="same_operator_reviews_own_artifact",
@@ -697,7 +746,7 @@ def build_report(
         )
 
     for conflict in conflicts:
-        conflict["route_status"] = "routed" if has_route(conflict, route_text) else "unrouted"
+        conflict["route_status"] = "routed" if conflict["conflict_id"] in route_ids else "unrouted"
 
     unrouted_conflicts = [conflict for conflict in conflicts if conflict.get("route_status") == "unrouted"]
     findings = build_findings_from_inputs(input_sources)
@@ -731,7 +780,7 @@ def build_report(
                 "status": "review_required",
                 "message": "A detected conflict does not have a structured route/gap/risk/waiver reference.",
                 "conflict_id": conflict["conflict_id"],
-                "required_next_actions": ["Add a control-plane review item, known gap, residual risk, or waiver reference."],
+                "required_next_actions": ["Add a valid control-plane review item whose source_ref is this exact conflict_id; record any gap, risk, or waiver on that item."],
             }
         )
     for source in unsupported_sources:
@@ -741,6 +790,14 @@ def build_report(
                 "severity": "advisory",
                 "status": "advisory",
                 "message": f"Input source is visible but not parsed for conflict semantics: {source['name']}",
+                "evidence_classification": "confirmed",
+                "classification_scope": "parser_coverage_observation",
+                "source_path": source["path"],
+                "reasoning_summary": (
+                    "The input inventory observed this path and the selected parser "
+                    "declares it unsupported for conflict semantics. This confirms "
+                    "a coverage limitation, not any input assertion or review outcome."
+                ),
                 "required_next_actions": ["Use a supported structured source before expecting conflict detection coverage."],
             }
         )

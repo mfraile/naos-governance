@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:naos-governance:schemas:naos:repository_intelligence_enrollment_result:v2",
+  "title": "Windows RI Enrollment Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "project_root",
+    "project_id",
+    "governed_root",
+    "authorization_plan_sha256",
+    "reviewer",
+    "next_action",
+    "ownership_inference_used",
+    "source_artifacts_modified",
+    "record_path",
+    "record_identity",
+    "root_identity",
+    "record_bytes_sha256",
+    "native_plan_sha256",
+    "activation_eligible"
+  ],
+  "properties": {
+    "schema": {
+      "const": "naos.repository_intelligence.enrollment_result.v2"
+    },
+    "status": {
+      "const": "enrolled_without_activation"
+    },
+    "project_root": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "governed_root": {
+      "type": "string"
+    },
+    "authorization_plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "reviewer_id",
+        "identity_status",
+        "authentication_status"
+      ],
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "reviewer_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identity_status": {
+          "enum": [
+            "declared_attribution",
+            "not_required"
+          ]
+        },
+        "authentication_status": {
+          "const": "not_claimed"
+        }
+      }
+    },
+    "next_action": {
+      "type": "string"
+    },
+    "ownership_inference_used": {
+      "const": false
+    },
+    "source_artifacts_modified": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "record_path": {
+      "const": ".naos/upgrade-v1/windows-repository-intelligence.json"
+    },
+    "record_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "volume_serial_hex",
+        "file_id_hex",
+        "schema",
+        "kind",
+        "security_sha256"
+      ],
+      "properties": {
+        "volume_serial_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "file_id_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "schema": {
+          "const": "naos.repository_intelligence.windows_object_identity.v1"
+        },
+        "kind": {
+          "const": "file"
+        },
+        "security_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "root_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "volume_serial_hex",
+        "file_id_hex"
+      ],
+      "properties": {
+        "volume_serial_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "file_id_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        }
+      }
+    },
+    "record_bytes_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "native_plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "activation_eligible": {
+      "const": false
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

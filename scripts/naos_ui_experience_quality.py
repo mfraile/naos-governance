@@ -16,10 +16,11 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import sys
 from collections import Counter
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]
@@ -90,6 +91,7 @@ REASON_ORDER = [
     "human_design_review_missing",
     "user_validation_missing",
     "mcp_or_tool_mutation_attempt",
+    "unavailable_evidence_reference",
 ]
 REASON_GATES = {
     "missing_quality_brief": ["G2", "G6"],
@@ -118,6 +120,7 @@ REASON_GATES = {
     "human_design_review_missing": ["G6"],
     "user_validation_missing": ["G2", "G6"],
     "mcp_or_tool_mutation_attempt": ["G3", "G6"],
+    "unavailable_evidence_reference": ["G2", "G6"],
 }
 LOCAL_REF_FIELDS = {
     "design_quality_brief_ref": "design_quality_brief",
@@ -275,14 +278,34 @@ def path_status(root: Path, value: Any) -> tuple[str | None, bool, bool, str]:
         return text or None, False, False, "missing_or_placeholder"
     if "://" in text:
         return text, False, False, "external_reference_unverified"
-    candidate = Path(text)
-    if candidate.is_absolute() or ".." in candidate.parts:
+    parts = PurePosixPath(text).parts
+    if (not parts or "\\" in text or "\x00" in text or ":" in text
+            or text.startswith("/") or PureWindowsPath(text).drive or ".." in parts):
         return text, False, False, "unsafe_path"
-    target = (root / candidate).resolve(strict=False)
-    root_resolved = root.resolve()
-    if root_resolved not in (target, *target.parents):
+    try:
+        root_resolved = root.resolve(strict=True)
+        target = root_resolved
+        for part in parts:
+            target = target / part
+            info = target.lstat()
+            if stat.S_ISLNK(info.st_mode) or (
+                getattr(info, "st_file_attributes", 0)
+                & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+            ):
+                return text, False, False, "unsafe_path"
+        if not target.resolve(strict=True).is_relative_to(root_resolved):
+            return text, False, False, "unsafe_path"
+        if not stat.S_ISREG(info.st_mode):
+            return text, True, False, "not_regular_file"
+        with target.open("rb") as stream:
+            stream.read(1)
+    except FileNotFoundError:
+        return text, True, False, "missing"
+    except OSError:
+        return text, True, False, "unreadable"
+    except (RuntimeError, ValueError):
         return text, False, False, "unsafe_path"
-    return text, True, target.exists(), "exists" if target.exists() else "missing"
+    return text, True, True, "exists"
 
 
 def review_severity(profile: str, root: Path, naos_root: str) -> str:
@@ -839,6 +862,20 @@ def collect_evidence_refs(root: Path, screens: list[dict[str, Any]]) -> list[dic
                     "reference_status": item.get("reference_status"),
                 }
             )
+        for field in ("inspiration_refs", "external_generator_refs", "advisory_ai_critique_refs"):
+            for item in screen.get(field) or []:
+                for key in ("ref", "prompt_log_ref"):
+                    if not item.get(key):
+                        continue
+                    text, safe, exists, status = path_status(root, item[key])
+                    refs.append({"object_id": object_id, "kind": field,
+                                 "field": f"{field}.{key}", "ref": text,
+                                 "safe": safe, "exists": exists, "reference_status": status})
+        for ref in string_list(as_mapping(screen.get("human_design_review")).get("review_refs")):
+            text, safe, exists, status = path_status(root, ref)
+            refs.append({"object_id": object_id, "kind": "human_design_review",
+                         "field": "human_design_review.review_refs", "ref": text,
+                         "safe": safe, "exists": exists, "reference_status": status})
     return [item for item in refs if item.get("ref")]
 
 
@@ -854,6 +891,7 @@ def build_report(
     policy: dict[str, Any],
     declaration_path: Path,
     declaration_source: str,
+    collect_provenance: bool = True,
 ) -> dict[str, Any]:
     generated_at = utc_now_text()
     declaration = load_yaml_mapping(declaration_path)
@@ -879,6 +917,16 @@ def build_report(
                 )
 
     evidence_refs = collect_evidence_refs(root, screens)
+    unavailable_refs = [item for item in evidence_refs
+                        if item.get("reference_status") not in {"exists", "external_reference_unverified"}]
+    for item in unavailable_refs:
+        findings.append(finding(
+            f"ui_experience_quality.reference.{item['object_id']}.{item['field']}.{item['ref']}",
+            severity, "unavailable_evidence_reference",
+            "Declared local evidence must name a readable regular project file using forward slashes.",
+            object_id=item.get("object_id"), path=item.get("ref"),
+            field=item["field"], reference_status=item["reference_status"],
+        ))
     stage_counts = Counter(str(item.get("design_stage") or "unknown") for item in screens)
     summary = finding_counts(findings)
     summary.update(
@@ -887,7 +935,7 @@ def build_report(
             "ui_quality_declared": 1 if ui_quality_declared else 0,
             "screens": len(screens),
             "evidence_refs": len(evidence_refs),
-            "evidence_refs_missing": sum(1 for item in evidence_refs if item.get("reference_status") in {"missing", "unsafe_path", "missing_or_placeholder"}),
+            "evidence_refs_missing": len(unavailable_refs),
             "screens_with_fr_refs": sum(1 for item in screens if item.get("fr_refs")),
             "screens_with_task_refs": sum(1 for item in screens if item.get("task_refs")),
             "screens_with_accessibility_refs": sum(1 for item in screens if item.get("accessibility_evidence_refs")),
@@ -953,7 +1001,7 @@ def build_report(
         "limitations": LIMITATIONS,
         "not_claimed": not_claimed,
         "human_review_required": human_review_required,
-        "generated_by": build_generated_by(root, generated_at=generated_at),
+        "generated_by": build_generated_by(root, generated_at=generated_at) if collect_provenance else {},
         "summary": summary,
     }
 

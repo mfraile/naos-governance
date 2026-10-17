@@ -105,6 +105,11 @@ def canonical_sha256(value: Any) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+from naos_secret_public_literals import (external_result_id_for,
+                                        recompute_public_external_result_id,
+                                        recompute_public_external_route_id)
+
+
 def source_identity(result: dict[str, Any], tool_name: str) -> tuple[str, str, str | None]:
     guid = result.get("guid")
     if isinstance(guid, str) and guid.strip():
@@ -180,7 +185,9 @@ def run_execution_status(run: dict[str, Any]) -> str:
 def summarize_sarif(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     source_bytes = path.read_bytes()
     source_sha256 = hashlib.sha256(source_bytes).hexdigest()
-    payload = json.loads(source_bytes.decode("utf-8"))
+    # JSON byte detection supports UTF-8/16/32 with or without BOM.
+    # Identity remains the exact source-byte hash above.
+    payload = json.loads(source_bytes)
     if not isinstance(payload, dict):
         raise ValueError("SARIF root must be an object")
     version = str(payload.get("version") or "")
@@ -229,13 +236,7 @@ def summarize_sarif(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
                 affected_paths[relpath] += 1
             identity_basis, identity_stability, identity_sha256 = source_identity(result, tool_name)
             taxonomy_refs = source_declared_taxonomy_refs(result)
-            external_result_id = "sarif-" + canonical_sha256(
-                {
-                    "source_sha256": source_sha256,
-                    "run_index": index,
-                    "result_index": result_index,
-                }
-            )
+            external_result_id = external_result_id_for(source_sha256, index, result_index)
             result_records.append(
                 {
                     "external_result_id": external_result_id,
@@ -320,6 +321,12 @@ def summarize_sarif(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             "External SARIF results were ingested as unverified review evidence.",
             result_count=results_total,
             source=str(path),
+            source_sha256=source_sha256,
+            evidence_classification="confirmed",
+            classification_scope="selected_local_sarif_ingest_observation",
+            reasoning_summary="The local parser preserved this source's exact byte hash and result count; imported finding validity, coverage and adequacy remain unknown and unverified.",
+            source_path=str(Path(__file__).resolve()),
+            evidence_refs=[{"type": "local_file", "ref": str(path), "verified": False}],
         )
     ] if results_total else []
     return {
@@ -330,10 +337,55 @@ def summarize_sarif(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     }, findings
 
 
+def selected_local_source(root: Path, naos_root: str, explicit: str | None) -> tuple[str | None, dict[str, Any]]:
+    """Select only an explicit operand or the one bounded project declaration."""
+    if explicit is not None:
+        return explicit, {"basis": "explicit_source", "declaration": None, "declaration_sha256": None}
+    from naos_evidence_contracts import evidence_subject_parts, _safe_file, _json_value, _primitive_source_operand
+    parts = evidence_subject_parts(naos_root)
+    if parts is None:
+        raise ValueError("invalid_source_declaration_root")
+    declaration = root.joinpath(*parts, "external_evidence_source.json")
+    relative = declaration.relative_to(root).as_posix()
+    _primitive_source_operand(root, declaration)
+    state = _safe_file(root, declaration)
+    selection = {"basis": "no_source_declaration", "declaration": relative, "declaration_sha256": None}
+    if state == "missing":
+        return None, selection
+    if state != "available" or declaration.stat().st_size > 16384:
+        raise ValueError("invalid_source_declaration_file")
+    with declaration.open("rb") as handle:
+        raw = handle.read(16385)
+    if len(raw) > 16384:
+        raise ValueError("oversized_source_declaration")
+    data = _json_value(declaration, data=raw)
+    if (not isinstance(data, dict) or set(data) != {"schema", "source"}
+            or data.get("schema") != "naos.external_evidence_source.v1"):
+        raise ValueError("invalid_source_declaration_shape")
+    source = data.get("source")
+    if source is not None:
+        if (not isinstance(source, str) or not source or source != source.strip()
+                or any(ord(character) < 32 or character in "$`{}" for character in source)):
+            raise ValueError("invalid_declared_source")
+        source_parts = evidence_subject_parts(source)
+        if source_parts is None:
+            raise ValueError("unsafe_declared_source")
+        _primitive_source_operand(root, root.joinpath(*source_parts))
+    selection.update({"basis": "declared_local_source", "declaration_sha256": hashlib.sha256(raw).hexdigest()})
+    return source, selection
+
+
 def build_report(root: Path, profile: str, naos_root: str, policy: dict[str, Any], source: str | None, source_type: str) -> dict[str, Any]:
     severity = severity_for_profile(profile, policy)
     findings: list[dict[str, Any]] = []
+    selection_error = False
+    try:
+        source, selection = selected_local_source(root, naos_root, source)
+    except (OSError, ValueError, TypeError, UnicodeError, RecursionError):
+        source, selection_error = None, True
+        selection = {"basis": "invalid_source_declaration", "declaration": None, "declaration_sha256": None}
     scans: dict[str, Any] = {
+        "source_selection": selection,
         "source": source,
         "source_format": source_type,
         "verification_default": policy.get("claims", {}).get("external_evidence_verification_default", "unverified"),
@@ -353,8 +405,26 @@ def build_report(root: Path, profile: str, naos_root: str, policy: dict[str, Any
         "human_review_required": bool(source),
     }
 
-    if not source:
-        findings.append(finding("external_evidence_ingest.source_missing", "advisory", "not_configured", "No external SARIF source was provided; ingest remains not configured."))
+    if selection_error:
+        assessment["source_execution_status"] = "parse_error"
+        assessment["human_review_required"] = True
+        findings.append(finding(
+            "external_evidence_ingest.invalid_source_declaration", severity, "invalid_source_declaration",
+            "The selected local source declaration is invalid or unsafe; no source was ingested.",
+            evidence_classification="confirmed", classification_scope="selected_local_declaration_rejected",
+            reasoning_summary="Local declaration validation failed; this does not assess any external finding.",
+            source_path=str(Path(__file__).resolve()),
+        ))
+    elif not source:
+        findings.append(finding(
+            "external_evidence_ingest.source_missing", "advisory", "not_configured",
+            "No external SARIF source was provided; ingest remains not configured.",
+            evidence_classification="confirmed",
+            classification_scope="selected_external_source_not_configured",
+            reasoning_summary="No SARIF source was selected for this invocation; no external result was ingested or verified.",
+            source_path=str(Path(__file__).resolve()),
+            human_review_required=True,
+        ))
     else:
         source_path = Path(source)
         if not source_path.is_absolute():

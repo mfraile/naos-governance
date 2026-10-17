@@ -5,8 +5,8 @@
 #
 # Entry format:
 #   id: unique exemption ID (DEDUP-NNN)
-#   pattern: function/class name or regex pattern
-#   locations: list of allowed locations
+#   pattern: exact literal Python function/class name (no regex or globs)
+#   locations: list of exact project-relative file paths (no traversal or globs)
 #   reason: why duplication is acceptable
 #   approved_by: who approved the exemption
 #   date: YYYY-MM-DD
@@ -37,3 +37,11 @@ allowlist: []  # No exemptions by default — add as needed
 #     reason: "Module-scoped utility — different formatting requirements per module"
 #     approved_by: "[your name]"
 #     date: "YYYY-MM-DD"
+
+# Existing allowed_duplicates: {name: [relative/path.py, ...]} files remain valid.
+# Use exactly one format. Metadata such as approved_by is descriptive, not
+# authenticated approval. Missing file means no exceptions; malformed present
+# configuration produces DUPLICATE_ALLOWLIST_INVALID (exit 2).
+# Backslash path separators are normalized to forward slashes for Windows.
+# Semantic error-to-warning downgrade requires the same literal function name
+# AND both matching approved file locations. Unrelated pairs remain findings.

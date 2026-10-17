@@ -109,7 +109,7 @@
         "configuration_path": {
           "type": "string",
           "minLength": 1,
-          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000-\\u001f]+$"
+          "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)(?!\\.[gG][iI][tT](?:/|$))(?![\\s\\S]*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\:\\x00-\\x1f\\x7f]+(?:/[^/\\\\:\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
         },
         "model_field": {"type": ["string", "null"]},
         "reasoning_effort_field": {"type": ["string", "null"]},

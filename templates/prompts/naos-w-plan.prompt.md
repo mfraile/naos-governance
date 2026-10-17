@@ -79,11 +79,11 @@ After the weekly plan is accepted, start the next daily session from the selecte
 
 ```yaml
 next_action:
-	label: "Start the first planned daily session and select the active task."
-	preferred_command: "/naos-d-start"
-	preferred_agent: "@naos-plan"
-	reason: "The weekly plan sets priorities; daily bootstrap turns them into task-scoped work."
-	constraints:
-		- "Use task IDs from TASK_REGISTRY.yaml."
-		- "Re-plan before implementation if blockers or dependencies changed."
+  label: "Start the first planned daily session and select the active task."
+  preferred_command: "/naos-d-start"
+  preferred_agent: "@naos-plan"
+  reason: "The weekly plan sets priorities; daily bootstrap turns them into task-scoped work."
+  constraints:
+    - "Use task IDs from TASK_REGISTRY.yaml."
+    - "Re-plan before implementation if blockers or dependencies changed."
 ```

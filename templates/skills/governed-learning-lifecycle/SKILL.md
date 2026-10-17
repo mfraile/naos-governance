@@ -1,7 +1,8 @@
 ---
-name: "governed-learning-lifecycle"
-description: "Review and use NAOS governed learning lifecycle controls. Invoke when capturing lessons, promoting learning into active guidance, replacing stale learning, forgetting/redacting records, or changing skills/prompts/workflows/baselines/gates based on learned evidence."
-parameters: []
+name: governed-learning-lifecycle
+description: Review and use NAOS governed learning lifecycle controls. Invoke when capturing lessons, promoting learning into active guidance, replacing stale learning, forgetting/redacting records, or changing skills/prompts/workflows/baselines/gates based on learned evidence.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Governed Learning Lifecycle

@@ -1,5 +1,5 @@
 ---
-model: "[ADAPT: e.g. claude-opus-4-5 | o1]"
+# Model omitted: adopter host selection applies; this does not pin or approve a model.
 naos_model_role: conformance
 description: "Governance conformance agent — check rules and report evidence gaps"
 tools:

@@ -307,13 +307,29 @@ human_review_requirements:
 
 known_gaps:
   - id: SCL-KG-001
+    evidence_classification: confirmed
+    classification_scope: shipped_semantic_readiness_limit
+    human_review_required: true
     summary: "No semantic/vector runtime is implemented in core NAOS."
   - id: SCL-KG-002
+    evidence_classification: confirmed
+    classification_scope: shipped_semantic_readiness_limit
+    human_review_required: true
     summary: "No embedding provider, model dependency, sqlite-vec runtime, or vector table is configured by default."
 residual_risks:
   - id: SCL-RR-001
+    evidence_classification: hypothesized
+    classification_scope: possible_future_semantic_risk
+    human_review_required: true
+    hypothesis_reason: "A future ranked candidate may be over-trusted; no current candidate misuse is asserted."
+    next_review_step: "Review source path, hash, freshness, authority, and ranking explanation for future candidates."
     summary: "Future semantic candidates may be over-trusted unless source paths, hashes, freshness, authority, and ranking explanations remain visible."
   - id: SCL-RR-002
+    evidence_classification: hypothesized
+    classification_scope: possible_future_semantic_risk
+    human_review_required: true
+    hypothesis_reason: "Future embeddings could become stale or contain sensitive material; no present embedding is asserted."
+    next_review_step: "Review freshness and sensitive-content controls before enabling a project-specific runtime."
     summary: "Future embedding freshness and sensitive-content policy must be enforced before any project-specific runtime is enabled."
 waivers: []
 limitations:
@@ -334,6 +350,8 @@ not_claimed:
   - KNN
   - vec0 tables
   - extension loading
+  # These nonclaims concern semantic-candidate readiness only. Repository
+  # intelligence has a separate explicitly selected optional graph engine.
   - NetworkX
   - GraphML
   - graph traversal

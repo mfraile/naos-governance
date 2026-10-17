@@ -11,7 +11,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 ROOT = Path(os.environ.get("NAOS_TEST_KIT", Path(__file__).resolve().parents[1])).resolve()
 
@@ -90,7 +90,6 @@ class InputErrorBoundaries(unittest.TestCase):
             lambda: self.adoption.load_structured(self.path),
             lambda: self.adoption.latest_session_id(self.root, "naos", self.policy),
             lambda: self.adoption.read_small_text(self.root, "naos/fixture.json"),
-            lambda: self.adoption.ai_artifact_entry(self.root, self.path, "custom", "fixture", "review_required"),
             lambda: self.summary.load_json(self.path),
             self.summary.github_event_value,
         )
@@ -101,6 +100,20 @@ class InputErrorBoundaries(unittest.TestCase):
             for call in calls:
                 with self.subTest(call=call), self.assertRaisesRegex(RuntimeError, "unexpected reader defect"):
                     call()
+
+        # Artifact sampling uses a bounded stream read rather than read_text.
+        with (
+            patch.object(Path, "open", side_effect=RuntimeError("unexpected reader defect")),
+            self.assertRaisesRegex(RuntimeError, "unexpected reader defect"),
+        ):
+            self.adoption.ai_artifact_entry(self.root, self.path, "custom", "fixture", "review_required")
+        reader = mock_open(read_data="{}")
+        reader.return_value.read.side_effect = RuntimeError("unexpected stream defect")
+        with (
+            patch.object(Path, "open", reader),
+            self.assertRaisesRegex(RuntimeError, "unexpected stream defect"),
+        ):
+            self.adoption.ai_artifact_entry(self.root, self.path, "custom", "fixture", "review_required")
 
     def test_optional_policy_reader_does_not_hide_programming_errors(self) -> None:
         with (

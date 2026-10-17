@@ -33,6 +33,9 @@ from naos_policy import (  # noqa: E402
 )
 
 
+from naos_ai_surfaces import MCP_CONFIGURATION_PATHS, is_host_surface, checked_path, load_surface_rules, scan_files  # noqa: E402
+from validators.validator_context import has_canonical_kit_sources, load_generated_surface_contract  # noqa: E402
+
 REPORT_SCHEMA = "naos.adapter_coherence_report.v1"
 NOT_CLAIMED = [
     "live Codex plugin installation proof",
@@ -120,7 +123,8 @@ def default_propagation_state_template(filename: str = "adapter_propagation_stat
 
 def resolve_rules_path(root: Path, naos_root: str, policy: dict[str, Any], explicit: str | None = None) -> tuple[Path, str]:
     if explicit:
-        return Path(explicit), "explicit"
+        path = Path(explicit)
+        return (path if path.is_absolute() else root / path), "explicit"
     filename = str(policy.get("paths", {}).get("adapter_coherence_rules") or "adapter_coherence_rules.yaml")
     project_rules = root / naos_root / filename
     if project_rules.exists():
@@ -577,6 +581,14 @@ def inspect_propagation_links(
                     ["Review plugin/adapter impact and update target artifacts, record no-impact rationale, or accept residual risk."],
                     link_id=link_id,
                     path=path_text,
+                    expected_sha256=expected_hash,
+                    observed_sha256=actual_hash,
+                    evidence_classification="confirmed",
+                    classification_scope="generated_source_hash_mismatch_only",
+                    classification_reason=(
+                        "The stored reviewed source digest differs from the current file digest; "
+                        "plugin impact and renewed propagation review remain unresolved."
+                    ),
                 ))
 
         for path_text in target_paths:
@@ -707,37 +719,122 @@ def scan_for_claims(kit: Path, rules: dict[str, Any], severity: str) -> list[dic
     return findings
 
 
+def inspect_project_host_surfaces(root: Path, naos_root: str, profile: str,
+                                  policy: dict[str, Any], rules: dict[str, Any], severity: str):
+    """Review actual project files; a kit review ledger grants no local approval."""
+    rows: dict[str, dict[str, Any]] = {}
+    findings: list[dict[str, Any]] = []
+    scope = load_surface_rules(root, naos_root, policy)
+    paths = [] if scope["invalid_config"] else list(scope["effective_patterns"])
+    for path in string_list(rules.get("project_local_adapter_paths")):
+        paths.append(str(Path(naos_root) / path.removeprefix("naos/")) if path.startswith("naos/") else path)
+    contract_path = checked_path(root, (Path(naos_root) / "profile_generated_surface_contract.json").as_posix())
+    if contract_path.is_file():
+        try:
+            contract = load_generated_surface_contract(contract_path)
+            # Legacy schema-only records still identify a generated project;
+            # they declare no new required host paths by implication.
+            profiles = contract.get("profiles", {})
+            required = profiles.get(profile, {}).get("required_surfaces", [])
+            if not isinstance(required, list) or not all(isinstance(item, str) for item in required):
+                raise ValueError("invalid required_surfaces")
+            has_host_obligation = any(is_host_surface(relative) for relative in required)
+            if not profiles:
+                findings.append(finding("project_adapter_contract_legacy", "advisory", "legacy_host_obligations_not_declared",
+                    "Legacy schema-only identity declares no required host paths; this inspection cannot establish complete generated host obligations."))
+            elif not has_host_obligation:
+                findings.append(finding("project_adapter_contract_incomplete", severity, "incomplete_project_contract",
+                    "Selected structured profile declares no required host paths; configured files are inspected, but generated host obligations are not established."))
+            for relative in required:
+                if is_host_surface(relative):
+                    path = checked_path(root, relative)
+                    paths.append(relative)
+                    if not path.is_file():
+                        findings.append(finding("project_adapter_missing_" + stable_finding_id(relative), severity,
+                            "missing_project_surface", f"Selected profile requires project host surface: {relative}", path=relative))
+        except (OSError, ValueError, AttributeError, TypeError) as exc:
+            findings.append(finding("project_adapter_contract_invalid", severity, "invalid_project_contract", str(exc)))
+    else:
+        initialized = (root / naos_root / "TASK_REGISTRY.yaml").is_file()
+        findings.append(finding("project_adapter_contract_missing", severity if initialized else "advisory",
+            "missing_project_contract" if initialized else "project_contract_not_declared",
+            "No generated host-surface obligations are available; canonical kit propagation is not assessed."))
+    if scope["invalid_config"]:
+        findings.append(finding("project_adapter_inventory_invalid", severity, "invalid_project_inventory", "Project inventory rules are invalid.", evidence=scope["issues"]))
+    for relative in dict.fromkeys(paths):
+        files, meta = scan_files(root, relative, scope["limits"]["max_files_per_path"])
+        rows[relative] = {"path": relative, "present": meta["present"], "file_count": meta["file_count"],
+                          "scope": "project", "complete": meta["complete"], "truncated": meta["truncated"],
+                          "inspected_files": [{"path": item.relative_to(root).as_posix(), "sha256": safe_digest(item)} for item in files]}
+        if not meta["complete"]:
+            findings.append(finding("project_adapter_incomplete_" + stable_finding_id(relative), severity,
+                "incomplete_project_surface", f"Project host surface could not be completely inspected: {relative}", evidence=meta))
+        for path in files:
+            checked_path(root, path.relative_to(root).as_posix())
+            if path.relative_to(root).as_posix() not in MCP_CONFIGURATION_PATHS and path.suffix.lower() in {".md", ".mdc", ".json", ".yaml", ".yml"}:
+                content = path.read_text(encoding="utf-8", errors="replace").lower()
+                for phrase in string_list(rules.get("forbidden_claim_phrases")):
+                    if phrase.lower() in content:
+                        findings.append(finding("project_adapter_claim_" + stable_finding_id(str(path)), severity,
+                            "forbidden_claim", f"Project adapter contains forbidden claim: {phrase!r}", path=rel(path, root)))
+    return list(rows.values()), findings
+
+
 def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, int], dict[str, Any]]:
     root = Path(args.project_root).resolve()
-    policy = load_policy(Path(args.policy) if args.policy else None)
+    policy = load_policy(Path(args.policy) if args.policy else None, naos_root=args.naos_root, root=root)
     profile = normalize_profile(args.profile, policy)
-    naos_root = args.naos_root or default_naos_root(policy)
+    naos_root = args.naos_root or os.environ.get("NAOS_ROOT") or default_naos_root(policy)
+    requested_scope = getattr(args, "scope", "auto")
+    if requested_scope not in {"auto", "project", "kit"}:
+        raise ValueError("Unsupported adapter review scope")
+    if getattr(args, "kit_root", None) and requested_scope != "kit":
+        raise ValueError("--kit-root requires explicit --scope kit")
+    canonical_project = has_canonical_kit_sources(root)
+    if requested_scope == "project" and canonical_project:
+        raise ValueError("Project scope cannot suppress canonical kit validation; use --scope kit.")
+    scope = ("kit" if canonical_project or is_kit_repository(root, naos_root) else "project") if requested_scope == "auto" else requested_scope
+    kit = Path(getattr(args, "kit_root", None) or root).resolve() if scope == "kit" else None
     rules_path, rules_source = resolve_rules_path(root, naos_root, policy, args.rules)
-    rules = load_yaml_mapping(rules_path)
-    propagation_state_path, propagation_state_source = resolve_propagation_state_path(root, naos_root, policy, rules)
-    propagation_state = load_propagation_state(propagation_state_path)
+    if scope == "project" and rules_source == "template":
+        rules_path, rules_source = root / naos_root / "adapter_coherence_rules.yaml", "project_missing"
+        rules = {}
+    else:
+        if scope == "kit" and rules_source == "template":
+            rules_path = kit / "templates/structural-seeds/naos/adapter_coherence_rules.yaml"
+        rules = load_yaml_mapping(rules_path)
     posture = profile_posture(rules, profile)
     severity = severity_for_rules(root, naos_root, profile, policy, posture)
-    kit = kit_root()
-
-    findings: list[dict[str, Any]] = []
     canonical_plugins: list[dict[str, Any]] = []
-    for plugin_rules in plugin_rules_list(rules):
-        plugin_summary, plugin_findings = inspect_plugin(kit, plugin_rules, severity)
-        canonical_plugins.append(plugin_summary)
-        findings.extend(plugin_findings)
+    findings: list[dict[str, Any]] = []
+    if scope == "kit":
+        propagation_state_path, propagation_state_source = resolve_propagation_state_path(root, naos_root, policy, rules)
+        if propagation_state_source in {"template", "missing"}:
+            propagation_state_path = kit / "templates/structural-seeds/naos" / str(rules.get("propagation_state_path") or "adapter_propagation_state.yaml")
+            propagation_state_source = "template" if propagation_state_path.is_file() else "missing"
+        propagation_state = load_propagation_state(propagation_state_path)
+        for plugin_rules in plugin_rules_list(rules):
+            plugin_summary, plugin_findings = inspect_plugin(kit, plugin_rules, severity)
+            canonical_plugins.append(plugin_summary)
+            findings.extend(plugin_findings)
+        adapter_surfaces, surface_findings = inspect_adapter_surfaces(kit, rules, severity)
+        findings.extend(surface_findings)
+        project_local_adapters = inspect_project_local_adapters(root, rules)
+        propagation_links, propagation_reviews, propagation_findings = inspect_propagation_links(
+            base=kit, links=propagation_links_list(rules), state=propagation_state, severity=severity)
+        findings.extend(propagation_findings)
+        findings.extend(scan_for_claims(kit, rules, severity))
+    else:
+        propagation_state_path = root / naos_root / str(rules.get("propagation_state_path") or "adapter_propagation_state.yaml")
+        propagation_state_source = "not_assessed_project_scope"
+        adapter_surfaces = []
+        project_local_adapters, local_findings = inspect_project_host_surfaces(root, naos_root, profile, policy, rules, severity)
+        findings.extend(local_findings)
+        propagation_links = [{"id": link.get("id"), "status": "not_assessed", "scope": "kit",
+                              "reason": "Canonical kit propagation requires explicit kit scope; copied review state is not adopter evidence."}
+                             for link in propagation_links_list(rules)]
+        propagation_reviews = []
     canonical_plugin = next((item for item in canonical_plugins if item.get("id") == "codex_plugin"), canonical_plugins[0] if canonical_plugins else {})
-    adapter_surfaces, surface_findings = inspect_adapter_surfaces(kit, rules, severity)
-    findings.extend(surface_findings)
-    project_local_adapters = inspect_project_local_adapters(root, rules)
-    propagation_links, propagation_reviews, propagation_findings = inspect_propagation_links(
-        base=kit,
-        links=propagation_links_list(rules),
-        state=propagation_state,
-        severity=severity,
-    )
-    findings.extend(propagation_findings)
-    findings.extend(scan_for_claims(kit, rules, severity))
 
     summary = finding_counts(findings)
     summary.update({
@@ -766,12 +863,17 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, in
         "status": status_from_counts(summary),
         "naos_root": naos_root,
         "project_root": str(root),
+        "review_scope": scope,
+        "source_authority": {"project_root": str(root), "kit_root": str(kit) if kit is not None else None,
+                             "canonical_review": "assessed" if scope == "kit" else "not_assessed",
+                             "inherited_maintainer_review_is_adopter_evidence": False},
         "rules_path": str(rules_path),
         "rules_source": rules_source,
+        "policy_source": policy.get("_meta", {}),
         "rules_hash": safe_digest(rules_path),
         "propagation_state_path": str(propagation_state_path),
         "propagation_state_source": propagation_state_source,
-        "propagation_state_hash": safe_digest(propagation_state_path),
+        "propagation_state_hash": safe_digest(propagation_state_path) if scope == "kit" else None,
         "profile_posture": posture,
         "canonical_plugin": canonical_plugin,
         "canonical_plugins": canonical_plugins,
@@ -799,6 +901,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rules", help="Explicit adapter coherence rules path.")
     parser.add_argument("--output", help="Explicit output JSON path.")
     parser.add_argument("--json", action="store_true", help="Print report JSON to stdout.")
+    parser.add_argument("--scope", choices=("auto", "project", "kit"), default="auto", help="Project host review or canonical kit provenance review; auto uses the inspected root.")
+    parser.add_argument("--kit-root", help="Explicit canonical source root for --scope kit; never inferred from an installed/copied module.")
     parser.add_argument("--strict", action="store_true", help="Use strict profile exit policy.")
     return parser.parse_args(argv)
 

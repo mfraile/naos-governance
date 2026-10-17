@@ -9,12 +9,12 @@ Usage:
     NAOS_ROOT=pm python scripts/naos_validate_task_registry.py
 
 Schema lookup order:
-    1. $REGISTRY_SCHEMA env var (absolute or project-relative path)
-    2. $NAOS_ROOT/schemas/task_registry_schema.json
-    3. If neither exists and jsonschema is installed: YAML syntax check only
+    1. $REGISTRY_SCHEMA env var (per-entry schema; absolute or project-relative)
+    2. $NAOS_ROOT/schemas/task_registry_schema.json (legacy per-entry schema)
+    3. schemas/naos/task_registry.schema.json (shipped whole-document schema)
 
-Exits 0 on valid registry, 1 on validation errors, 2 on missing jsonschema
-when a schema file is explicitly requested via env var.
+Exits 0 on valid registry, 1 on invalid registry, 2 on missing or invalid
+schema or validation dependency.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ import yaml
 
 _HAS_JSONSCHEMA = False
 try:
-    from jsonschema import ValidationError, validate  # type: ignore[import]
+    from jsonschema import validators  # type: ignore[import]
 
     _HAS_JSONSCHEMA = True
 except ImportError:
@@ -71,21 +71,36 @@ def is_kit_source_root(root: Path) -> bool:
         and not (root / "naos" / "TASK_REGISTRY.yaml").exists()
     )
 
-# Schema: explicit env var → naos/schemas/task_registry_schema.json → None
+# Historical overrides validate each task; the shipped schema validates the document.
 _schema_env = os.getenv("REGISTRY_SCHEMA")
 if _schema_env:
     _schema_candidate = Path(_schema_env)
     if not _schema_candidate.is_absolute():
         _schema_candidate = PROJECT_ROOT / _schema_candidate
-    SCHEMA_PATH: Path | None = _schema_candidate
+    SCHEMA_PATH = _schema_candidate
+    SCHEMA_SCOPE = "entry"
 else:
-    _default_schema = NAOS_ROOT / "schemas" / "task_registry_schema.json"
-    SCHEMA_PATH = _default_schema if _default_schema.exists() else None
+    _legacy_schema = NAOS_ROOT / "schemas" / "task_registry_schema.json"
+    if _legacy_schema.exists():
+        SCHEMA_PATH = _legacy_schema
+        SCHEMA_SCOPE = "entry"
+    else:
+        SCHEMA_PATH = PROJECT_ROOT / "schemas" / "naos" / "task_registry.schema.json"
+        SCHEMA_SCOPE = "document"
 
 
 def load_registry(path: Path) -> list[dict]:
     """Load all task entries from TASK_REGISTRY.yaml."""
     return registry_tasks(load_registry_document(path), path)
+
+
+def _team_scope_value(value: object) -> bool:
+    """JSON Schema integer includes integral numeric values, but not booleans."""
+    return (
+        isinstance(value, str) and bool(value.strip())
+        or type(value) is int
+        or type(value) is float and value.is_integer()
+    )
 
 
 def validate_team_config(registry: object) -> dict[str, object]:
@@ -111,6 +126,10 @@ def validate_team_config(registry: object) -> dict[str, object]:
             "errors": ["team_config must be a mapping/object"],
         }
 
+    # Mirror the shipped structural schema without requiring jsonschema in
+    # dashboard/backlog consumers. The schema/consumer parity test guards drift.
+    for field in sorted(set(raw) - {"enabled", "assignment_mode", "teams"}, key=str):
+        errors.append(f"team_config has unknown field: {field}")
     enabled = raw.get("enabled", False)
     if not isinstance(enabled, bool):
         errors.append("team_config.enabled must be true or false")
@@ -136,6 +155,15 @@ def validate_team_config(registry: object) -> dict[str, object]:
         if not isinstance(team, dict):
             errors.append(f"{label} must be a mapping/object")
             continue
+        for field in sorted(set(team) - {"id", "label", "members", "scope"}, key=str):
+            errors.append(f"{label} has unknown field: {field}")
+        if "label" in team and not isinstance(team["label"], str):
+            errors.append(f"{label}.label must be a string")
+        if "members" in team and (
+            not isinstance(team["members"], list)
+            or any(not isinstance(member, str) for member in team["members"])
+        ):
+            errors.append(f"{label}.members must be a list of strings")
         team_id = team.get("id")
         if not isinstance(team_id, str) or not team_id.strip():
             errors.append(f"{label}.id must be a non-empty string")
@@ -146,12 +174,24 @@ def validate_team_config(registry: object) -> dict[str, object]:
         seen_ids.add(team_id)
         scope = team.get("scope", [])
         if not isinstance(scope, list) or any(
-            not isinstance(item, (str, int)) or not str(item).strip()
+            not _team_scope_value(item)
             for item in scope
         ):
             errors.append(f"{label}.scope must be a list of non-empty strings or integers")
             scope = []
-        teams.append({**team, "id": team_id, "scope": [str(item) for item in scope]})
+        teams.append({**team, "id": team_id, "scope": [str(int(item)) if type(item) is float else str(item) for item in scope]})
+
+    if enabled and not errors:
+        tasks = registry.get("tasks", [])
+        if not isinstance(tasks, list) or any(not isinstance(task, dict) for task in tasks):
+            errors.append("team_config scope validation requires a tasks list of objects")
+        else:
+            field = {"task_scope": "id", "phase_scope": "phase", "module_scope": "owner"}[assignment_mode]
+            available = {str(task[field]) for task in tasks if type(task.get(field)) in (str, int)}
+            for team in teams:
+                for entry in team["scope"]:
+                    if entry not in available:
+                        errors.append(f"team_config team {team['id']} scope reference not found for {assignment_mode}: {entry}")
 
     return {
         "valid": not errors,
@@ -179,39 +219,100 @@ def load_schema(path: Path) -> dict:
         return json.load(f)
 
 
-def normalise_entry(entry: dict) -> dict:
-    """Normalise YAML-loaded types before schema validation.
+def _reject_nonlocal_references(value: object) -> None:
+    """Keep validation local even when a supplied schema contains references."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in {"$ref", "$dynamicRef", "$recursiveRef"} and (
+                not isinstance(item, str) or not item.startswith("#")
+            ):
+                raise ValueError(f"nonlocal JSON Schema reference is not supported: {item!r}")
+            _reject_nonlocal_references(item)
+    elif isinstance(value, list):
+        for item in value:
+            _reject_nonlocal_references(item)
 
-    Converts datetime.date/datetime objects to ISO strings so jsonschema
-    can validate the 'pattern' constraint on completion_date.
-    """
-    normalised = {}
-    for k, v in entry.items():
-        if isinstance(v, (datetime.date, datetime.datetime)):
-            normalised[k] = v.isoformat()
-        else:
-            normalised[k] = v
-    return normalised
+
+def _validator_for_schema(schema: dict):
+    """Check schema validity once before validating any registry content."""
+    if not _HAS_JSONSCHEMA:
+        raise RuntimeError("jsonschema package not installed")
+    if not isinstance(schema, dict):
+        raise ValueError("JSON Schema must be an object")
+    _reject_nonlocal_references(schema)
+    validator_class = validators.validator_for(schema)
+    validator_class.check_schema(schema)
+    return validator_class(schema)
+
+
+def _normalise_dates(value: object) -> object:
+    if isinstance(value, (datetime.date, datetime.datetime)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {key: _normalise_dates(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_normalise_dates(item) for item in value]
+    return value
 
 
 def validate_registry(tasks: list[dict], schema: dict) -> list[tuple[str, str]]:
     """Validate each task entry. Returns list of (task_id, error_message) tuples."""
-    if not _HAS_JSONSCHEMA:
-        print(
-            "WARNING: jsonschema not installed — skipping schema validation.\n"
-            "Run: pip install jsonschema  to enable full validation.",
-            file=sys.stderr,
-        )
-        return []
-
+    validator = _validator_for_schema(schema)
     errors = []
-    for task in tasks:
-        task_id = task.get("id", "<unknown>")
-        try:
-            validate(instance=normalise_entry(task), schema=schema)
-        except ValidationError as exc:
-            errors.append((task_id, exc.message))
+    for index, task in enumerate(tasks, start=1):
+        task_id = task.get("id", f"<entry {index}>") if isinstance(task, dict) else f"<entry {index}>"
+        for exc in validator.iter_errors(_normalise_dates(task)):
+            errors.append((str(task_id), exc.message))
     return errors
+
+
+def validate_registry_document(registry: object, schema: dict) -> list[tuple[str, str]]:
+    """Validate the complete supported registry shape with the shipped schema."""
+    from naos_task_lifecycle import (  # Imported only for the shipped default.
+        DELIVERY_STATES,
+        LEGACY_STATUS_COMPATIBILITY,
+        LIFECYCLE_STATES,
+        VERIFICATION_STATES,
+        normalize_task_id,
+    )
+
+    validator = _validator_for_schema(schema)
+    document = _normalise_dates(registry)
+    tasks = document if isinstance(document, list) else document.get("tasks") if isinstance(document, dict) else None
+    if isinstance(tasks, list):
+        normalized_tasks = []
+        vocabularies = {
+            "status": LEGACY_STATUS_COMPATIBILITY,
+            "lifecycle_state": LIFECYCLE_STATES,
+            "delivery_state": DELIVERY_STATES,
+            "verification_state": VERIFICATION_STATES,
+        }
+        for task in tasks:
+            if not isinstance(task, dict):
+                normalized_tasks.append(task)
+                continue
+            normalized = dict(task)
+            task_id = task.get("id")
+            if isinstance(task_id, str):
+                try:
+                    normalized["id"] = normalize_task_id(task_id)
+                except ValueError:
+                    pass  # Keep unsupported input for the schema to reject.
+            for field, vocabulary in vocabularies.items():
+                raw = task.get(field)
+                if isinstance(raw, str):
+                    candidate = raw.strip().lower()
+                    if candidate in vocabulary:
+                        normalized[field] = candidate
+            normalized_tasks.append(normalized)
+        if isinstance(document, list):
+            document = normalized_tasks
+        else:
+            document = {**document, "tasks": normalized_tasks}
+    return [
+        ("TASK_REGISTRY", exc.message)
+        for exc in validator.iter_errors(document)
+    ]
 
 
 def validate_task_semantics(tasks: list[dict]) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
@@ -321,27 +422,10 @@ def print_semantic_warnings(warnings: list[tuple[str, str]]) -> None:
         print(f"  - {task_id}: {message}")
 
 
-def syntax_check_only(tasks: list[dict]) -> None:
-    """Basic YAML-level sanity checks when no schema is available."""
-    missing_id = [t for t in tasks if not t.get("id")]
-    missing_title = [t for t in tasks if not t.get("title")]
-    issues = []
-    if missing_id:
-        issues.append(f"  {len(missing_id)} task(s) missing 'id' field")
-    if missing_title:
-        issues.append(f"  {len(missing_title)} task(s) missing 'title' field")
-    if issues:
-        print("[WARN] Basic sanity issues found:")
-        for issue in issues:
-            print(issue)
-    else:
-        print(
-            f"[OK] YAML syntax valid — {len(tasks)} entries loaded "
-            f"(no schema available for full validation)"
-        )
-
-
 def main() -> None:
+    from naos_console import configure_console_output
+
+    configure_console_output()
     if not REGISTRY_PATH.exists():
         if os.getenv("NAOS_ROOT") is None and is_kit_source_root(PROJECT_ROOT):
             print(
@@ -353,8 +437,34 @@ def main() -> None:
         print(f"ERROR: TASK_REGISTRY not found: {REGISTRY_PATH}", file=sys.stderr)
         sys.exit(1)
 
-    registry = load_registry_document(REGISTRY_PATH)
+    try:
+        registry = load_registry_document(REGISTRY_PATH)
+    except (OSError, yaml.YAMLError) as exc:
+        print(f"ERROR: Cannot load TASK_REGISTRY: {exc}", file=sys.stderr)
+        sys.exit(1)
     tasks = registry_tasks(registry, REGISTRY_PATH)
+
+    if not SCHEMA_PATH.is_file():
+        print(f"ERROR: Schema not found: {SCHEMA_PATH}", file=sys.stderr)
+        sys.exit(2)
+    if not _HAS_JSONSCHEMA:
+        print("ERROR: jsonschema package not installed; cannot validate TASK_REGISTRY", file=sys.stderr)
+        sys.exit(2)
+    try:
+        schema = load_schema(SCHEMA_PATH)
+        if SCHEMA_SCOPE == "document":
+            schema_errors = validate_registry_document(registry, schema)
+        else:
+            schema_errors = validate_registry(tasks, schema)
+    except Exception as exc:
+        print(f"ERROR: Invalid or unusable schema {SCHEMA_PATH}: {exc}", file=sys.stderr)
+        sys.exit(2)
+    if any(not isinstance(task, dict) for task in tasks):
+        print("[FAIL] TASK_REGISTRY task entries must be mappings/objects")
+        for task_id, message in schema_errors:
+            print(f"  ❌  {task_id}: {message}")
+        sys.exit(1)
+
     from naos_task_lifecycle import validate_task_artifact_identity
 
     try:
@@ -369,41 +479,7 @@ def main() -> None:
         for message in team_config_result["errors"]
     )
 
-    # No schema available — run syntax-only check
-    if SCHEMA_PATH is None:
-        syntax_check_only(tasks)
-        print_semantic_warnings(semantic_warnings)
-        if semantic_errors:
-            print(
-                f"[FAIL] TASK_REGISTRY semantic validation failed — {len(semantic_errors)} issue(s):\n"
-            )
-            for task_id, message in semantic_errors:
-                print(f"  ❌  {task_id}: {message}")
-            print()
-            print("Fix the offending entries in TASK_REGISTRY.yaml, then retry.")
-            sys.exit(1)
-        sys.exit(0)
-
-    if not SCHEMA_PATH.exists():
-        if _schema_env:
-            # User explicitly requested a schema that doesn't exist
-            print(f"ERROR: Schema not found: {SCHEMA_PATH}", file=sys.stderr)
-            sys.exit(2)
-        else:
-            # Default schema path doesn't exist yet — syntax check only
-            syntax_check_only(tasks)
-            sys.exit(0)
-
-    if not _HAS_JSONSCHEMA:
-        print(
-            "ERROR: jsonschema package not installed but schema file is present.\n"
-            "Run: pip install jsonschema",
-            file=sys.stderr,
-        )
-        sys.exit(2)
-
-    schema = load_schema(SCHEMA_PATH)
-    errors = validate_registry(tasks, schema) + semantic_errors
+    errors = schema_errors + semantic_errors
     print_semantic_warnings(semantic_warnings)
 
     if errors:

@@ -4,7 +4,8 @@
 The validator is deliberately offline. It proves current document identity,
 row/document coverage, declared source metadata, bounded dispositions, and
 deterministic arithmetic. It does not re-fetch authority, reproduce private Git
-history, or make a legal conclusion.
+history, authenticate a reviewer, or make a legal conclusion. Terminal review
+validation binds receipt metadata to the canonical payload only.
 """
 
 from __future__ import annotations
@@ -208,6 +209,7 @@ def validate(
             for error in schema_errors
         ], {}
 
+    stable_payload_sha256 = _stable_payload_sha256(data)
     findings.extend(_baseline_findings(data))
     document_claims, document_findings = _document_claims()
     findings.extend(document_findings)
@@ -260,6 +262,24 @@ def validate(
     review_counts: Counter[str] = Counter()
     canonical_review = data["review_template"]
     if require_independent_pass:
+        reviewed_payload_sha256 = canonical_review["reviewed_payload_sha256"]
+        if reviewed_payload_sha256 is None:
+            findings.append(
+                _finding(
+                    "independent_review_payload_hash_missing",
+                    "Terminal validation requires the stable payload SHA-256 recorded by the review receipt.",
+                    scope="review_template",
+                )
+            )
+        elif reviewed_payload_sha256 != stable_payload_sha256:
+            findings.append(
+                _finding(
+                    "independent_review_payload_hash_mismatch",
+                    "Current stable payload differs from the payload recorded in the review receipt.",
+                    reviewed_payload_sha256=reviewed_payload_sha256,
+                    stable_payload_sha256=stable_payload_sha256,
+                )
+            )
         receipt = canonical_review["receipt"]
         if not isinstance(receipt, str) or not receipt.strip():
             findings.append(
@@ -384,7 +404,8 @@ def validate(
         "status_counts": dict(sorted(status_counts.items())),
         "review_counts": dict(sorted(review_counts.items())),
         "numeric_results": numeric_results,
-        "stable_payload_sha256": _stable_payload_sha256(data),
+        "stable_payload_sha256": stable_payload_sha256,
+        "reviewed_payload_sha256": canonical_review["reviewed_payload_sha256"],
     }
     return findings, report
 

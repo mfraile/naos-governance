@@ -29,16 +29,20 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
 
-# Recognise both spec ID conventions:
-#   AC-103.2, AC-103.2.1
-#   SCEN-1.1, SCEN-S.1, SCEN-P.1
-ID_PATTERN = re.compile(r"\b((?:AC|SCEN)-[A-Z0-9]+(?:\.[0-9]+)+)\b")
-TEST_FILE_GLOBS = ("test_*.py", "*_test.py", "*.spec.ts", "*.test.ts", "*.spec.js")
+# Reuse the completion-evidence grammar, including canonical AC-001-1 and
+# legacy AC-103.2 / SCEN-S.1 forms. Definitions and references normalize case.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from spec_header import AC_SCEN_RE as ID_PATTERN  # noqa: E402
+
+TEST_FILE_GLOBS = (
+    "test_*.py", "*_test.py", "*.spec.ts", "*.test.ts", "*.spec.js", "*.test.js",
+    "*.spec.tsx", "*.test.tsx", "*.spec.jsx", "*.test.jsx", "*_test.go",
+    "*Test.java", "*Tests.cs", "test_*.rb",
+)
 
 
 def collect_defined_ids(specs_root: Path) -> set[str]:
@@ -48,7 +52,7 @@ def collect_defined_ids(specs_root: Path) -> set[str]:
         return defined
     for md in specs_root.rglob("*.md"):
         text = md.read_text(encoding="utf-8")
-        defined.update(ID_PATTERN.findall(text))
+        defined.update(token.upper() for token in ID_PATTERN.findall(text))
     return defined
 
 
@@ -150,7 +154,7 @@ def snapshot_references(specs_root: Path, tests_root: Path) -> tuple[set[str], d
     defined: set[str] = set()
     for path, entry in current.items():
         if spec(path):
-            defined.update(ID_PATTERN.findall(contents(entry, path)))
+            defined.update(token.upper() for token in ID_PATTERN.findall(contents(entry, path)))
     # Preserve the documented greenfield no-op, but deleting the final
     # previously defined criterion is a contract edit, not initial onboarding.
     previously_configured = changed_specs and any(
@@ -159,7 +163,7 @@ def snapshot_references(specs_root: Path, tests_root: Path) -> tuple[set[str], d
     refs = {}
     for path, entry in current.items():
         if test(path) and (path in changed or changed_specs):
-            refs[Path(path)] = set(ID_PATTERN.findall(contents(entry, path)))
+            refs[Path(path)] = {token.upper() for token in ID_PATTERN.findall(contents(entry, path))}
     return defined, refs, bool(previously_configured)
 
 
@@ -168,7 +172,7 @@ def find_references(test_files: list[Path]) -> dict[Path, set[str]]:
     refs: dict[Path, set[str]] = {}
     for tf in test_files:
         text = tf.read_text(encoding="utf-8")
-        ids = set(ID_PATTERN.findall(text))
+        ids = {token.upper() for token in ID_PATTERN.findall(text)}
         if ids:
             refs[tf] = ids
     return refs

@@ -26,10 +26,12 @@ def _load_memory_config(root: Path) -> dict:
     if not path.is_file() or yaml is None:
         return {}
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except Exception:
         return {"_error": "invalid YAML"}
-    return data if isinstance(data, dict) else {}
+    if data is None:
+        return {}
+    return data if isinstance(data, dict) else {"_error": "expected a mapping"}
 
 
 def _memory_reference_files(root: Path) -> list[Path]:
@@ -71,10 +73,17 @@ def main() -> int:
     warnings: list[str] = []
 
     if config.get("_error"):
-        warnings.append("configs/naos_memory.yaml exists but is invalid YAML")
+        warnings.append(
+            "configs/naos_memory.yaml must be a mapping"
+            if config["_error"] == "expected a mapping"
+            else "configs/naos_memory.yaml exists but is invalid YAML"
+        )
         memory: dict = {}
     else:
         memory = config.get("memory", config) if config else {}
+        if not isinstance(memory, dict):
+            warnings.append("configs/naos_memory.yaml memory must be a mapping")
+            memory = {}
 
     referenced = []
     for path in _memory_reference_files(root):

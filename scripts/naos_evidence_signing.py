@@ -12,7 +12,8 @@ Modes:
           for an adopter to fill optionally) plus best-effort Git-reported HEAD signature,
           signer, and author metadata -> evidence_envelope.json.
 - verify: recompute artifact digests from disk, recompute the manifest root, compare to the
-          attestation report; report tamper_evident pass/fail, signature-entry presence, and
+          attestation report and any supplied envelope payload; report tamper_evident,
+          payload binding, signature-entry presence, and
           best-effort Git-reported HEAD metadata. No cryptographic signature validation occurs.
 
 Non-claims: not a signature by NAOS, not approval, certification, compliance proof,
@@ -55,6 +56,8 @@ from naos_policy import (  # noqa: E402
     write_report,
 )
 
+from naos_evidence_contracts import local_evidence_subject  # noqa: E402
+
 ENVELOPE_SCHEMA = "naos.evidence_envelope.v1"
 VERIFY_SCHEMA = "naos.evidence_verification.v1"
 PAYLOAD_TYPE = "application/vnd.naos.evidence+json"
@@ -64,6 +67,7 @@ LIMITATIONS = [
     "The compatibility-named identity_binding field contains best-effort Git-reported HEAD metadata only; it is not identity authentication, authorization, or non-repudiation.",
     "The compatibility-named signed field reports only whether signature entries are present; NAOS does not validate them.",
     "Digest equality covers only declared subjects. Required coverage is reported separately from integrity and remains governed by evidence attestation.",
+    "When an envelope is supplied, its decoded payload must bind the independently recomputed manifest root and artifact count; this binding does not validate its signatures. A consistent inactive v1 report with no payload is explicitly not applicable, never tamper-evident or signed.",
 ]
 NOT_CLAIMED = [
     "signature by NAOS",
@@ -122,10 +126,7 @@ def load_attestation(root: Path, naos_root: str, policy: dict[str, Any],
         seen: set[str] = set()
         for item in data["artifact_manifest"]:
             rel = item["path"]
-            candidate = Path(rel)
-            if (not rel.strip() or candidate.is_absolute() or "\\" in rel
-                    or any(part in {"", ".", ".."} for part in rel.split("/"))
-                    or not (root / candidate).resolve().is_relative_to(root.resolve())):
+            if local_evidence_subject(root, rel) is None:
                 errors.append(f"Artifact path must identify a local project file: {rel!r}")
             if rel in seen:
                 errors.append(f"Duplicate artifact subject: {rel}")
@@ -248,16 +249,20 @@ def collect_manifest(root: Path, attestation: dict[str, Any]) -> list[dict[str, 
     items: list[dict[str, Any]] = []
     for entry in attestation["artifact_manifest"]:
         rel = entry["path"]
-        abs_path = root / rel
         error = None
         recomputed = None
+        present = False
         try:
-            if abs_path.is_file():
+            abs_path = local_evidence_subject(root, rel)
+            if abs_path is None:
+                error = "Artifact no longer identifies a local project file"
+            elif abs_path.is_file():
+                present = True
                 recomputed = sha256_file(abs_path)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             error = str(exc)
         items.append({"path": rel, "recorded_digest": entry["digest"],
-                      "recomputed_digest": recomputed, "present": abs_path.is_file(),
+                      "recomputed_digest": recomputed, "present": present,
                       "read_error": error,
                       "matches": recomputed is not None and recomputed == entry["digest"]})
     return items
@@ -281,6 +286,114 @@ def base_report(schema: str, profile: str, naos_root: str, root: Path, status: s
     }
     report.update(extra)
     return report
+
+
+def strict_json(text: str) -> Any:
+    """Reject ambiguous duplicate members and non-JSON numeric constants."""
+    def members(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("Duplicate JSON member")
+            result[key] = value
+        return result
+
+    def invalid_constant(value: str) -> Any:
+        raise ValueError("Non-JSON numeric constant")
+
+    return json.loads(text, object_pairs_hook=members, parse_constant=invalid_constant)
+
+
+def verify_envelope(path: Path, *, root_digest: str | None, artifact_count: int | None,
+                    severity: str, inactive_report: dict[str, Any] | None = None,
+                    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    result: dict[str, Any] = {"envelope_supplied": False, "envelope_payload_validation": "not_supplied",
+                              "signed": False, "signature_entries_present": False}
+    findings: list[dict[str, Any]] = []
+
+    def invalid(status: str, message: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        result["envelope_payload_validation"] = "invalid"
+        findings.append(input_finding(status, message, severity))
+        return result, findings
+
+    try:
+        env = strict_json(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        if not path.is_symlink():
+            return result, findings
+        result["envelope_supplied"] = True
+        return invalid("invalid_envelope", "Supplied envelope is an unreadable symbolic link.")
+    except (OSError, ValueError):
+        result["envelope_supplied"] = True
+        return invalid("invalid_envelope", "Cannot read unambiguous UTF-8 envelope JSON.")
+    result["envelope_supplied"] = True
+    if not isinstance(env, dict):
+        return invalid("invalid_envelope", "Envelope input must be an object.")
+    if "schema" in env:
+        schema = load_json(kit_root() / "schemas" / "naos" / "evidence_envelope.schema.json")
+        if any(Draft202012Validator(schema).iter_errors(env)):
+            return invalid("invalid_envelope", "Envelope report does not match the supported v1 schema.")
+        if "envelope" in env and env["envelope"] is None:
+            if (inactive_report is not None
+                    and all(env.get(key) == value for key, value in inactive_report.items())
+                    and not any(key in env for key in ("payload", "payloadType", "signatures"))
+                    and all(env.get(key) is False for key in (
+                        "signed", "signature_entries_present", "signature_validation_performed"))):
+                result["envelope_payload_validation"] = "not_applicable"
+                return result, findings
+            return invalid("invalid_envelope", "No-payload envelope report does not match the current inactive attestation.")
+    if not any(key in env for key in ("envelope", "payload", "payloadType", "signatures")):
+        return invalid("invalid_envelope", "Input does not contain an envelope or payload.")
+    record = env.get("envelope") if "envelope" in env else env
+    if not isinstance(record, dict):
+        return invalid("invalid_envelope", "Supplied envelope must contain a payload object.")
+    signatures = record.get("signatures")
+    if not isinstance(signatures, list):
+        return invalid("invalid_signature_container", "Envelope signatures must be an array; no signature validation is performed.")
+    result.update(signed=bool(signatures), signature_entries_present=bool(signatures))
+    if (set(record) != {"payloadType", "payload", "signatures"}
+            or record["payloadType"] != PAYLOAD_TYPE or not isinstance(record["payload"], str)
+            or not all(isinstance(signature, dict) for signature in signatures)):
+        return invalid("invalid_envelope_payload", "Supplied envelope requires the supported payload type, encoded payload and signature array.")
+    try:
+        encoded = record["payload"]
+        decoded = base64.b64decode(encoded, validate=True)
+        if base64.b64encode(decoded).decode("ascii") != encoded:
+            raise ValueError("Noncanonical base64")
+        payload = strict_json(decoded.decode("utf-8"))
+    except (ValueError, UnicodeError):
+        return invalid("invalid_envelope_payload", "Envelope payload must be strict base64 containing unambiguous UTF-8 JSON.")
+    payload_schema = {
+        "type": "object", "additionalProperties": False,
+        "required": ["schema", "manifest_root_digest", "artifact_count", "profile", "generated_at", "naos_root"],
+        "properties": {
+            "schema": {"const": "naos.evidence_payload.v1"},
+            "manifest_root_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$", "minLength": 64, "maxLength": 64},
+            "artifact_count": {"type": "integer", "minimum": 0},
+            "profile": {"enum": ["quickstart", "lite", "standard", "assured"]},
+            "generated_at": {"type": "string", "minLength": 20, "maxLength": 20,
+                             "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+            "naos_root": {"type": "string", "minLength": 1},
+        },
+    }
+    if (any(Draft202012Validator(payload_schema).iter_errors(payload))
+            or type(payload.get("artifact_count")) is not int):
+        return invalid("invalid_envelope_payload", "Envelope payload does not match the supported typed v1 payload schema.")
+    try:
+        # Validate the UTC syntax emitted by utc_now_text, including calendar
+        # and clock bounds, without jsonschema's optional date-time extras.
+        datetime.strptime(payload["generated_at"], "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return invalid("invalid_envelope_payload", "Envelope payload generated_at must be a valid YYYY-MM-DDTHH:MM:SSZ UTC timestamp.")
+    if root_digest is None or artifact_count is None:
+        result["envelope_payload_validation"] = "unavailable"
+        findings.append(input_finding("envelope_binding_unavailable", "Cannot bind the supplied envelope without a complete independently checked manifest.", severity))
+    elif payload["manifest_root_digest"] != root_digest or payload["artifact_count"] != artifact_count:
+        result["envelope_payload_validation"] = "mismatch"
+        findings.append(input_finding("envelope_payload_mismatch", "Envelope payload root or artifact count differs from the independently checked current manifest.", severity))
+    else:
+        result["envelope_payload_validation"] = "valid"
+    return result, findings
 
 
 def emit(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> dict[str, Any]:
@@ -319,6 +432,7 @@ def verify(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> 
     extra: dict[str, Any] = {"tamper_evident": False, "signed": False,
                             "signature_entries_present": False, "signature_validation_performed": False,
                             "identity_binding": git_identity(root), "recorded_root": None, "recomputed_root": None}
+    checked_count = None
     if att is not None:
         findings.extend(coverage_findings(att, severity))
         if dimensions["scope_status"] not in {"disabled", "not_configured"}:
@@ -342,6 +456,8 @@ def verify(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> 
                 else:
                     dimensions["digest_validation"] = "unavailable"
             recomputed_root = manifest_root_digest([(i["path"], i["recomputed_digest"]) for i in checked])
+            if len(checked) == len(manifest):
+                checked_count = len(checked)
             recorded_root = att.get("manifest_root_digest")
             root_matches = recorded_root is not None and recomputed_root == recorded_root and len(checked) == len(manifest)
             dimensions["manifest_root_validation"] = ("not_recorded" if recorded_root is None else "valid" if root_matches else "invalid")
@@ -350,29 +466,23 @@ def verify(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> 
                                  "status": "tamper_detected", "message": "Recomputed manifest root does not match the recorded root."})
             extra.update(tamper_evident=root_matches and all(i["matches"] for i in manifest),
                          recorded_root=recorded_root, recomputed_root=recomputed_root)
-        try:
-            env = load_json(envelope_path(root, naos_root, policy))
-        except FileNotFoundError:
-            env = {}
-        except (OSError, ValueError) as exc:
-            env = {}
-            findings.append(input_finding("invalid_envelope", f"Cannot read envelope JSON: {exc}", severity))
-        if not isinstance(env, dict):
-            findings.append(input_finding("invalid_envelope", "Envelope input must be an object.", severity))
-        else:
-            envelope_record = env.get("envelope")
-            if "schema" in env:
-                schema = load_json(kit_root() / "schemas" / "naos" / "evidence_envelope.schema.json")
-                if any(Draft202012Validator(schema).iter_errors(env)):
-                    findings.append(input_finding("invalid_envelope", "Envelope report does not match the supported v1 schema.", severity))
-            elif (env and not isinstance(envelope_record, dict) and "signatures" not in env
-                  or "envelope" in env and not isinstance(envelope_record, dict)):
-                findings.append(input_finding("invalid_envelope", "Envelope input must contain a supported envelope or signatures array.", severity))
-            raw_signatures = envelope_record.get("signatures") if isinstance(envelope_record, dict) else env.get("signatures")
-            if raw_signatures is not None and not isinstance(raw_signatures, list):
-                findings.append(input_finding("invalid_signature_container", "Envelope signatures must be an array; no signature validation is performed.", severity))
-            else:
-                extra.update(signed=bool(raw_signatures), signature_entries_present=bool(raw_signatures))
+    inactive_report = None
+    if dimensions["input_validation"] == "valid" and dimensions["scope_status"] in {"disabled", "not_configured"}:
+        inactive_report = {
+            "profile": profile, "project_root": str(root), "naos_root": naos_root,
+            "status": dimensions["scope_status"],
+            **{key: dimensions[key] for key in ("scope_status", "attestation_status", "input_validation",
+                                               "artifacts_declared", "digest_validation", "required_coverage")},
+            "artifacts_checked": 0, "manifest_root_validation": "not_applicable",
+        }
+    envelope_result, envelope_findings = verify_envelope(
+        envelope_path(root, naos_root, policy), root_digest=extra["recomputed_root"],
+        artifact_count=checked_count, severity=severity, inactive_report=inactive_report,
+    )
+    extra.update(envelope_result)
+    findings.extend(envelope_findings)
+    if envelope_result["envelope_supplied"] and envelope_result["envelope_payload_validation"] != "valid":
+        extra["tamper_evident"] = False
     summary = finding_counts(findings)
     return base_report(VERIFY_SCHEMA, profile, naos_root, root, verification_status(summary, dimensions),
                        summary, findings, **dimensions, **extra)

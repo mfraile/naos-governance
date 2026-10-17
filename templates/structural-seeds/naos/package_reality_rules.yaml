@@ -1,6 +1,20 @@
 schema: naos.package_reality_rules.v1
 scan_docs_by_default: false
 require_lockfile_entries: true
+# Filename inventory only; unsupported ecosystem dependencies are not parsed.
+unsupported_manifest_roots:
+  - .
+unsupported_manifest_patterns:
+  - package.json
+  - go.mod
+  - pom.xml
+  - "build.gradle*"
+  - Cargo.toml
+  - "*.csproj"
+manifest_discovery_limits:
+  max_entries: 10000
+  max_depth: 32
+  max_manifests: 1000
 manifest_files:
   - pyproject.toml
   - requirements.txt

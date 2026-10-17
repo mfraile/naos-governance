@@ -18,6 +18,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from naos_policy import (  # noqa: E402
     controlled_now_utc,
+    controlled_utc_now_text,
     exit_code_for_summary,
     finding_counts,
     is_kit_repository,
@@ -29,7 +30,7 @@ from naos_policy import (  # noqa: E402
     status_from_counts,
     write_report,
 )
-from source_roots import resolve_source_roots  # noqa: E402
+from source_roots import resolve_source_roots, iter_function_index_modules  # noqa: E402
 
 
 def newest_source_mtime(source_roots: list[Path], policy: dict[str, Any]) -> float | None:
@@ -56,7 +57,7 @@ def count_index_entries(index_path: Path) -> int | None:
             value = data.get(key)
             if isinstance(value, list):
                 return len(value)
-        return len(data)
+        return sum(1 for _ in iter_function_index_modules(data))
     return None
 
 
@@ -159,7 +160,10 @@ def validate(
 
     return {
         "schema": "naos.function_index_health.v1",
+        "generated_at": controlled_utc_now_text(),
         "profile": profile,
+        "project_root": str(root.resolve()),
+        "naos_root": naos_root,
         "status": status,
         "index": {
             "path": str(index_path),
@@ -167,12 +171,16 @@ def validate(
             "entry_count": entry_count,
             "age_days": round(age_days, 2) if age_days is not None else None,
             "older_than_source": bool(index_mtime and source_mtime and index_mtime < source_mtime),
+            "freshness_basis": "file_mtime",
+            "source_freshness": "not_established",
         },
         "semantic_quality_snapshot": duplicate_summary,
         "summary": summary,
         "findings": findings,
         "limitations": [
             "Function-index health reports available evidence only.",
+            "Age and ordering compare local file modification times; copying or checkout can change them without changing content.",
+            "Local timestamp order does not establish source currency; regenerate the index in the receiving checkout when ordering is unresolved.",
             "It does not claim absence of duplicate or equivalent functions.",
             "Semantic duplicate detection depends on configured project tooling.",
         ],

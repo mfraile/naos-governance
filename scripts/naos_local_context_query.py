@@ -28,6 +28,7 @@ from naos_policy import (  # noqa: E402
     normalize_profile,
     report_default_path,
     report_output_path,
+    severity_for_profile,
     write_report,
 )
 
@@ -220,12 +221,42 @@ def local_context_index_paths(
     if sqlite_path is None:
         configured = str(policy.get("paths", {}).get("local_context_index_sqlite") or "context_index/local_context_index.sqlite")
         sqlite_path = root / naos_root / configured
-    return index_report, sqlite_path
+    from naos_self_check_inspection import inspection_input_path
+    return index_report, inspection_input_path(root, naos_root, sqlite_path) if sqlite_path is not None else None
 
 
 def rows_as_dicts(connection: sqlite3.Connection, query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
     connection.row_factory = sqlite3.Row
     return [dict(row) for row in connection.execute(query, params).fetchall()]
+
+
+COLLECTION_COVERAGE_SCOPE = 'configured artifact collection; capacity accounting only'
+COLLECTION_COVERAGE_LIMITATIONS = ['Capacity-deferred paths were not read or checked for secret-like content.', 'Other exclusion records include policy, size, privacy and unsafe-topology exclusions; they are not all intentional omissions.', 'Counts do not measure all discovered, eligible or content-read files, complete repository coverage, or retrieval relevance.']
+
+
+def validated_collection_coverage(value: Any, indexed_count: int | None = None) -> dict[str, Any] | None:
+    """Project finite declared capacity metadata; validation is not provenance proof."""
+    count_keys = ("max_artifacts", "indexed_artifacts", "capacity_deferred_paths", "other_exclusion_records")
+    fields = {"schema", "status", "scope", "limitations", *count_keys}
+    if not isinstance(value, dict) or set(value) != fields or value.get("schema") != "naos.local_context_collection_coverage.v1":
+        return None
+    counts = [value[key] for key in count_keys]
+    if any(type(count) is not int or count < 0 for count in counts) or counts[0] < 1 or counts[1] > counts[0]:
+        return None
+    if indexed_count is not None and counts[1] != indexed_count:
+        return None
+    if value["scope"] != COLLECTION_COVERAGE_SCOPE or value["limitations"] != COLLECTION_COVERAGE_LIMITATIONS:
+        return None
+    expected = "incomplete_capacity" if counts[2] else "complete_within_configured_bounds"
+    if value["status"] != expected:
+        return None
+    return {
+        "schema": "naos.local_context_collection_coverage.v1",
+        "status": expected,
+        **dict(zip(count_keys, counts)),
+        "scope": COLLECTION_COVERAGE_SCOPE,
+        "limitations": list(COLLECTION_COVERAGE_LIMITATIONS),
+    }
 
 
 def load_index_from_sqlite(sqlite_path: Path) -> dict[str, Any]:
@@ -238,6 +269,11 @@ def load_index_from_sqlite(sqlite_path: Path) -> dict[str, Any]:
             row["name"]
             for row in rows_as_dicts(connection, "SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual table')")
         }
+        coverage = None
+        if "index_collection_coverage" in tables:
+            rows = rows_as_dicts(connection, "SELECT CASE WHEN length(CAST(coverage_json AS BLOB)) <= 8192 THEN coverage_json END AS coverage_json FROM index_collection_coverage WHERE run_id = ? LIMIT 2", ("current",))
+            if len(rows) == 1:
+                coverage = parse_json_text(rows[0]["coverage_json"], None)
     finally:
         connection.close()
     for artifact in artifacts:
@@ -248,6 +284,7 @@ def load_index_from_sqlite(sqlite_path: Path) -> dict[str, Any]:
             chunk[key] = parse_json_text(chunk.get(key), [])
     return {
         "source": "sqlite",
+        "collection_coverage": coverage,
         "artifacts": artifacts,
         "chunks": chunks,
         "links": links,
@@ -259,6 +296,7 @@ def load_index_from_sqlite(sqlite_path: Path) -> dict[str, Any]:
 def load_index_from_report(index_report: dict[str, Any]) -> dict[str, Any]:
     return {
         "source": "report",
+        "collection_coverage": index_report.get("collection_coverage"),
         "artifacts": index_report.get("indexed_artifacts") or [],
         "chunks": index_report.get("artifact_chunks") or [],
         "links": index_report.get("artifact_links") or [],
@@ -373,6 +411,26 @@ def add_artifact_result(
     results.append(result_record(artifact, chunk, mode, reason, len(results) + 1))
 
 
+def resolve_indexed_path(value: str, indexed_paths: set[str]) -> str | None:
+    """Resolve a relative query spelling without filesystem or case normalization.
+
+    A POSIX literal backslash name and a Windows separator spelling can name
+    different indexed artifacts. Refuse that ambiguity instead of picking one.
+    """
+    portable = value.replace("\\", "/")
+    while portable.startswith("./"):
+        portable = portable[2:]
+    if (not portable or portable.startswith("/")
+            or (len(portable) > 1 and portable[1] == ":")
+            or any(part in {"", ".", ".."} for part in portable.split("/"))):
+        return None
+    literal = value
+    while literal.startswith("./"):
+        literal = literal[2:]
+    matches = {literal, portable} & indexed_paths
+    return next(iter(matches)) if len(matches) == 1 else None
+
+
 def requested_modes(args: argparse.Namespace) -> list[str]:
     modes: list[str] = []
     if args.path:
@@ -422,7 +480,7 @@ def query_index(
 
     if args.path:
         used_modes.append("exact_path_lookup")
-        normalized = args.path.strip().lstrip("./")
+        normalized = resolve_indexed_path(args.path, {str(item.get("path")) for item in artifacts})
         for artifact in candidate_artifacts():
             if str(artifact.get("path")) == normalized:
                 add_artifact_result(results, seen, artifact, first_chunk_for_artifact(chunks_by_artifact, str(artifact.get("artifact_id"))), "exact_path_lookup", "path matched exactly")
@@ -536,6 +594,8 @@ def status_from_findings(findings: list[dict[str, Any]], *, has_query: bool, ind
         return "not_configured"
     if any(item.get("severity") == "blocking" or item.get("status") == "blocked" for item in findings):
         return "blocked"
+    if any(item.get("severity") == "required" or item.get("status") == "review_required" for item in findings):
+        return "review_required"
     if findings:
         return "advisory"
     return "ready"
@@ -551,6 +611,7 @@ def markdown_for_report(report: dict[str, Any]) -> str:
         f"- Profile: `{report.get('profile')}`",
         f"- Query modes used: `{', '.join(report.get('query_mode_used') or []) or 'none'}`",
         f"- Results: `{report.get('result_count')}`",
+        f"- Collection capacity coverage: `{(report.get('collection_coverage') or {}).get('status', 'unknown')}`; deferred paths: `{(report.get('collection_coverage') or {}).get('capacity_deferred_paths', 'unknown')}`",
         f"- FTS available: `{report.get('fts_available')}`",
         "",
         "## Authority Boundary",
@@ -682,6 +743,17 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
     if index_available and not sqlite_available:
         index_data = load_index_from_report(index_report)
 
+    coverage = validated_collection_coverage(index_data.get("collection_coverage"), len(index_data.get("artifacts") or []))
+    coverage_status = coverage.get("status") if isinstance(coverage, dict) else "unknown"
+    if index_available and coverage_status != "complete_within_configured_bounds":
+        incomplete = coverage_status == "incomplete_capacity"
+        findings.append({
+            "id": "local_context_query.collection_incomplete" if incomplete else "local_context_query.collection_coverage_unknown",
+            "severity": severity_for_profile(profile, policy) if incomplete else "advisory",
+            "status": "review_required" if incomplete and profile in {"standard", "assured"} else "advisory",
+            "message": "Source collection is incomplete due to artifact capacity; a missing result does not establish source absence." if incomplete else "Source collection capacity coverage is unknown; rebuild a legacy index to obtain coverage metadata.",
+            "human_review_required": True,
+        })
     query_findings: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
     modes_used: list[str] = []
@@ -704,9 +776,17 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
                 "severity": "advisory",
                 "status": "not_configured",
                 "message": "No query mode was supplied; use --query, --path, --artifact-id, --task, --spec, --capability, or metadata filters.",
+                "evidence_classification": "confirmed",
+                "classification_scope": "invocation_input_absence",
+                "source_path": str(Path(__file__).resolve()),
+                "human_review_required": True,
             }
         )
 
+    for result in results:
+        result["collection_status"] = coverage_status
+        if coverage_status != "complete_within_configured_bounds":
+            result["limitations"] = list(dict.fromkeys((result.get("limitations") or []) + ["Source collection capacity coverage is incomplete or unknown; omitted sources may match."]))
     source_artifacts = [
         {
             "path": result.get("path"),
@@ -720,6 +800,7 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
     summary = finding_counts(findings)
     summary.update(
         {
+            "collection_status": coverage_status,
             "results": len(results),
             "modes_requested": len(modes_requested),
             "modes_used": len(modes_used),
@@ -738,7 +819,9 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
         "query": query_payload,
         "query_mode_requested": modes_requested,
         "query_mode_used": modes_used,
+        "collection_coverage": coverage,
         "source_index": {
+            "collection_coverage": coverage,
             "report_path": str(index_report_path),
             "report_status": index_report.get("status"),
             "report_hash": index_report.get("rules_hash"),
@@ -770,13 +853,18 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
         "source_artifacts": source_artifacts,
         "findings": findings,
         "known_gaps": [
-            {"id": "LCQ-KG-001", "summary": "Semantic/vector, graph, MCP, and memory-payload query modes are intentionally out of scope."}
+            {"id": "LCQ-KG-001", "summary": "Semantic/vector, graph, MCP, and memory-payload query modes are intentionally out of scope.",
+             "evidence_classification": "confirmed", "classification_scope": "shipped_local_query_limit", "source_path": str(Path(__file__).resolve()), "human_review_required": True}
         ],
         "residual_risks": [
-            {"id": "LCQ-RR-001", "summary": "Keyword and metadata queries can miss relevant artifacts or surface stale candidates."}
+            {"id": "LCQ-RR-001", "summary": "Keyword and metadata queries can miss relevant artifacts or surface stale candidates.",
+             "evidence_classification": "hypothesized", "classification_scope": "possible_local_query_risk", "source_path": str(Path(__file__).resolve()),
+             "hypothesis_reason": "Bounded lexical queries cannot establish complete relevance or freshness; no specific omission is asserted.",
+             "next_review_step": "Check returned candidates and likely omissions against current repository sources.", "human_review_required": True}
         ],
         "limitations": [
             "Query results are candidate references, not answers.",
+            "Collection capacity coverage is scoped to the queried substrate; legacy coverage is unknown and no-result queries cannot prove absence.",
             "The local context index is generated, derived, cache-like, and non-authoritative.",
             "Repository evidence and deterministic NAOS reports remain authoritative for review.",
             "FTS uses sanitized keyword search over bounded chunks when available; fallback search is simple bounded text matching.",
@@ -801,7 +889,7 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
             "automatic context injection",
             "durable memory write-back",
         ],
-        "human_review_required": any(item.get("severity") in {"required", "blocking"} or item.get("status") == "review_required" for item in findings),
+        "human_review_required": any(item.get("human_review_required") or item.get("severity") in {"required", "blocking"} or item.get("status") == "review_required" for item in findings),
         "summary": summary,
     }
 

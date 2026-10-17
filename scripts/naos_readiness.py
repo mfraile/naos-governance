@@ -9,6 +9,8 @@ work remains blocked until specs, ADAPT markers, and task/AC anchors exist.
 from __future__ import annotations
 
 import argparse
+import os
+import stat
 import re
 import sys
 from pathlib import Path
@@ -23,6 +25,9 @@ from naos_mcp_config_registry import (  # noqa: E402
     scan_mcp_configs,
     summarize_mcp_configs,
 )
+
+
+from source_roots import resolve_source_roots, source_exclusion_reason
 
 
 REQUIRED_SPECS = [
@@ -108,16 +113,18 @@ def _check_task_registry(root: Path) -> bool:
 
     req_file = root / "specs" / "03-requirements.md"
     fr_ids = _extract_fr_ids(req_file.read_text(encoding="utf-8", errors="ignore")) if req_file.is_file() else set()
-    ok = True
+    ok = bool(fr_ids)
+    _status(ok, "functional requirement anchors in specs/03", "none found" if not ok else "")
     for task in tasks:
         if not isinstance(task, dict):
             continue
         task_id = str(task.get("id", "<missing>"))
         requirement = str(task.get("requirement", "")).strip()
         if not requirement or requirement.upper() in {"TBD", "TODO", "NONE"}:
-            print(f"[WARN] task {task_id} has no concrete requirement anchor")
+            _status(False, f"task {task_id} has concrete requirement anchor", "missing or placeholder")
+            ok = False
             continue
-        if fr_ids and requirement not in fr_ids:
+        if requirement not in fr_ids:
             _status(False, f"task {task_id} requirement exists", requirement)
             ok = False
     if ok:
@@ -272,6 +279,162 @@ def _check_memory_config(root: Path, strict: bool) -> bool:
     return not (strict and issues)
 
 
+# Applicability is not detector execution, effectiveness, or a policy decision.
+LANGUAGE_SUFFIXES = {
+    ".py": "python", ".java": "java", ".kt": "kotlin", ".go": "go",
+    ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript",
+    ".cjs": "javascript", ".ts": "typescript", ".tsx": "typescript",
+    ".rs": "rust", ".cs": "csharp", ".rb": "ruby", ".php": "php",
+    ".c": "c", ".cpp": "cpp", ".swift": "swift",
+}
+PYTHON_CONTROLS = {
+    "dependency_integrity": "Python AST imports; configured scan roots/exclusions still apply",
+    "duplicate_function_hygiene": "normalized Python function bodies; configured scan roots/exclusions still apply",
+    "package_reality": "Python package declarations and PyPI components in configured local SBOM/provenance; not Java/Node/Go package verification",
+    "api_symbol_reality": "explicitly declared Python symbols in local source; an absent manifest is not symbol proof",
+}
+
+
+def language_coverage(root: Path, *, src_root: str | None = None) -> dict:
+    """Advisory source-language signals using the existing source-root contract.
+
+    Default source roots select adopter code rather than installed tool directories.
+    SRC_ROOT can select legitimate alternative adopter roots. Neither selection nor
+    a Python suffix proves a configured detector has run on that file.
+    """
+    discovery_incomplete = False
+    try:
+        roots = resolve_source_roots(root, src_root, fallback=False)
+    except OSError:
+        roots = []
+        discovery_incomplete = True
+    languages: set[str] = set()
+    incomplete = discovery_incomplete
+    exclusions = {".git", ".venv", "venv", "node_modules", "dist", "build", "__pycache__"}
+
+    def metadata(path: Path, *, optional: bool = False):
+        nonlocal incomplete
+        try:
+            observed = path.lstat()
+        except FileNotFoundError:
+            if not optional:
+                incomplete = True
+            return None
+        except OSError:
+            incomplete = True
+            return None
+        if stat.S_ISLNK(observed.st_mode) or getattr(observed, "st_file_attributes", 0) & 0x400:
+            incomplete = True
+            return None
+        return observed
+
+    def excluded(path: Path) -> bool:
+        return path.name in exclusions or source_exclusion_reason(path, root, sorted(exclusions)) is not None
+
+    def record(path: Path) -> None:
+        if excluded(path):
+            return
+        observed = metadata(path)
+        if observed is not None and stat.S_ISREG(observed.st_mode) and path.suffix.lower() in LANGUAGE_SUFFIXES:
+            languages.add(LANGUAGE_SUFFIXES[path.suffix.lower()])
+
+    # Flat layouts do not require recursively inspecting installed tools.
+    try:
+        immediate = list(root.iterdir())
+    except OSError:
+        immediate = []
+        incomplete = True
+    for path in immediate:
+        if path.suffix.lower() in LANGUAGE_SUFFIXES:
+            record(path)
+    # Python hygiene also inspects conventional test roots. Avoid is_dir(),
+    # which follows links and can fail before advisory errors are accounted for.
+    roots += [Path(name) for name in ("tests", "test")
+              if any(path.name == name for path in immediate) and Path(name) not in roots]
+
+    def walk_error(error: OSError) -> None:
+        nonlocal incomplete
+        incomplete = True
+
+    for relative in roots:
+        candidate = relative if relative.is_absolute() else root / relative
+        if source_exclusion_reason(candidate, root, []) == "outside_project":
+            incomplete = True
+            continue
+        if excluded(candidate):
+            continue
+        observed = metadata(candidate)
+        if observed is None:
+            incomplete = True
+            continue
+        try:
+            candidate.resolve().relative_to(root.resolve())
+        except (OSError, ValueError):
+            incomplete = True
+            continue
+        if stat.S_ISREG(observed.st_mode):
+            record(candidate)
+            continue
+        if not stat.S_ISDIR(observed.st_mode):
+            incomplete = True
+            continue
+        # Prune before os.walk descends. lstat catches Windows junction/reparse
+        # directories as well as symlinks. This is advisory selection, not a
+        # hostile-race filesystem guard or detector execution.
+        try:
+            for directory, directories, filenames in os.walk(candidate, topdown=True,
+                                                            onerror=walk_error, followlinks=False):
+                parent = Path(directory)
+                retained = []
+                for name in directories:
+                    child = parent / name
+                    if excluded(child):
+                        continue
+                    child_metadata = metadata(child)
+                    if child_metadata is not None and stat.S_ISDIR(child_metadata.st_mode):
+                        retained.append(name)
+                directories[:] = retained
+                for name in filenames:
+                    record(parent / name)
+        except OSError:
+            incomplete = True
+    # A greenfield archetype can have manifests before source exists.
+    for filename, language in (("pom.xml", "java"), ("build.gradle", "java"),
+                               ("build.gradle.kts", "kotlin"), ("package.json", "javascript"),
+                               ("go.mod", "go")):
+        observed = metadata(root / filename, optional=True)
+        if observed is not None and stat.S_ISREG(observed.st_mode):
+            languages.add(language)
+    observed = sorted(languages)
+    controls = []
+    for control, detail in PYTHON_CONTROLS.items():
+        applicability = {language: ("unverified" if language == "python" else "not_applicable")
+                         for language in observed}
+        status = ("unverified" if incomplete or not observed or "python" in languages
+                  else "not_applicable")
+        if control == "package_reality":
+            # Auxiliary configured PyPI evidence can exist in any stack.
+            status = "unverified"
+        controls.append({"control": control, "status": status,
+                         "supported_language": "python", "by_language": applicability,
+                         "scope": detail})
+    return {"status_dimension": "advisory_language_applicability",
+            "languages": observed, "source_roots": [path.as_posix() for path in roots],
+            "source_selection_incomplete": incomplete, "controls": controls}
+
+
+def _report_language_coverage(root: Path) -> None:
+    report = language_coverage(root)
+    print("Language coverage (advisory; no detector execution or effectiveness inferred)")
+    print("Source-language signals: " + (", ".join(report["languages"]) or "unknown"))
+    for control in report["controls"]:
+        detail = ", ".join(f"{language}={status}" for language, status in control["by_language"].items())
+        print(f"[{control['status'].upper()}] {control['control']} — {detail or 'language unknown'}; {control['scope']}")
+    if report["source_selection_incomplete"]:
+        print("[UNVERIFIED] language source selection is incomplete")
+    print("Lifecycle readiness below does not establish code-control coverage; existing detector and gate policies still apply.")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check NAOS lifecycle readiness")
     parser.add_argument("--project-root", default=".", help="Project root to inspect")
@@ -302,6 +465,7 @@ def main() -> int:
         return 2
 
     print(f"NAOS readiness check: target={args.target} project={root}")
+    _report_language_coverage(root)
     strict = not args.allow_adapt
     ok = _check_specs(root, strict)
     if args.target in {"phase2", "baseline", "drift"}:

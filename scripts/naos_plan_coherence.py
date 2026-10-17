@@ -28,8 +28,10 @@ import fnmatch
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -42,6 +44,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    controlled_utc_now_text,
     default_naos_root,
     exit_code_for_summary,
     finding_counts,
@@ -65,6 +68,9 @@ PLANNING_BASELINES_FILENAME = "PLANNING_BASELINES.yaml"
 PLANNING_BASELINES_SCHEMA_FILENAME = "planning_baselines.schema.json"
 HUMAN_DECISION_SCHEMA_FILENAME = "human_decision_record.schema.json"
 PLANNING_DECISION_DIGEST_KIND = "planning_baseline_projection_sha256_v1"
+PLANNING_TEXT_DIGEST_KIND = "text_lf_sha256_v1"
+PLANNING_FILE_DIGEST_KINDS = ("file_sha256", PLANNING_TEXT_DIGEST_KIND)
+TASK_REGISTRY_DIGEST_KIND = "task_registry_planning_projection_sha256_v1"
 TERMINAL_TASK_STATES = {"completed", "done", "verified", "deferred", "cancelled", "canceled", "absorbed", "superseded"}
 PLACEHOLDER_PREFIXES = ("[ADAPT", "[FILL", "TODO", "TBD")
 TASK_REGISTRY_RUNTIME_FIELDS = {
@@ -282,6 +288,29 @@ def task_registry_planning_sha256(path: Path) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def planning_digest_kind_supported(digest_kind: Any, *, task_registry: bool = False) -> bool:
+    allowed = (TASK_REGISTRY_DIGEST_KIND,) if task_registry else PLANNING_FILE_DIGEST_KINDS
+    return digest_kind in allowed
+
+
+def planning_binding_sha256(path: Path, digest_kind: Any, *, task_registry: bool = False) -> str:
+    """Dispatch the declared contract; never fall back to another digest kind.
+
+    text_lf_sha256_v1 requires valid UTF-8 and replaces only CRLF byte pairs
+    with LF. BOMs, lone CRs, whitespace and every other byte stay significant.
+    file_sha256 retains the historical exact-byte contract, including binary.
+    """
+    if not planning_digest_kind_supported(digest_kind, task_registry=task_registry):
+        raise ValueError(f"Unsupported planning digest kind: {digest_kind!r}")
+    if digest_kind == TASK_REGISTRY_DIGEST_KIND:
+        return task_registry_planning_sha256(path)
+    if digest_kind == "file_sha256":
+        return file_sha256(path)
+    payload = path.read_bytes()
+    payload.decode("utf-8", errors="strict")
+    return hashlib.sha256(payload.replace(b"\r\n", b"\n")).hexdigest()
+
+
 def planning_baseline_decision_sha256(baseline: dict[str, Any]) -> str:
     """Bind an attributable decision to the exact versioned baseline projection."""
     payload = json.dumps(
@@ -310,11 +339,14 @@ def planning_digest_candidates(root: Path, profile: str, baseline: dict[str, Any
             "sha256": None,
             "status": "not_applicable" if not required else "unavailable",
         }
-        if required:
+        if not planning_digest_kind_supported(binding.get("digest_kind"), task_registry=name == "task_registry"):
+            item["status"] = "unavailable"
+            item["error"] = "unsupported digest contract"
+        elif required:
             path, error = relative_regular_file(root, binding.get("path"))
             if path is not None and error is None:
                 try:
-                    item["sha256"] = task_registry_planning_sha256(path) if name == "task_registry" else file_sha256(path)
+                    item["sha256"] = planning_binding_sha256(path, binding.get("digest_kind"), task_registry=name == "task_registry")
                     item["status"] = "available"
                 except Exception as exc:
                     item["error"] = str(exc)
@@ -335,8 +367,11 @@ def planning_digest_candidates(root: Path, profile: str, baseline: dict[str, Any
         }
         path, error = relative_regular_file(root, declaration.get("path"))
         if path is not None and error is None:
-            item["sha256"] = file_sha256(path)
-            item["status"] = "available"
+            try:
+                item["sha256"] = planning_binding_sha256(path, declaration.get("digest_kind"))
+                item["status"] = "available"
+            except Exception as exc:
+                item["error"] = str(exc)
         elif error:
             item["error"] = error
         candidates.append(item)
@@ -463,7 +498,7 @@ def check_source_bindings(root: Path, profile: str, baseline: dict[str, Any], se
         path_text = str(binding.get("path") or "")
         expected_digest = binding.get("sha256")
         digest_kind = binding.get("digest_kind")
-        expected_digest_kind = "task_registry_planning_projection_sha256_v1" if name == "task_registry" else "file_sha256"
+        expected_digest_kinds = (TASK_REGISTRY_DIGEST_KIND,) if name == "task_registry" else PLANNING_FILE_DIGEST_KINDS
         applicability = binding.get("applicability") if name == "architecture" else "required_by_profile"
         required = name != "architecture" or architecture_required
         check = {
@@ -476,9 +511,11 @@ def check_source_bindings(root: Path, profile: str, baseline: dict[str, Any], se
             "digest_kind": digest_kind,
             "status": "not_applicable" if not required else "unchecked",
         }
-        if digest_kind != expected_digest_kind:
-            findings.append(planning_finding(severity, "planning_baseline_digest_kind_mismatch", "Planning source uses an unsupported digest contract.", source=name, expected=expected_digest_kind, actual=digest_kind))
+        if not planning_digest_kind_supported(digest_kind, task_registry=name == "task_registry"):
+            findings.append(planning_finding(severity, "planning_baseline_digest_kind_mismatch", "Planning source uses an unsupported digest contract.", source=name, expected=list(expected_digest_kinds), actual=digest_kind))
             check["status"] = "digest_kind_mismatch"
+            checks.append(check)
+            continue
         if name == "architecture" and applicability != expected_arch_applicability:
             findings.append(planning_finding(severity, "planning_baseline_profile_applicability_mismatch", "Architecture applicability does not match the selected profile.", source=name, expected=expected_arch_applicability, actual=applicability))
             check["status"] = "applicability_mismatch"
@@ -495,7 +532,7 @@ def check_source_bindings(root: Path, profile: str, baseline: dict[str, Any], se
             checks.append(check)
             continue
         try:
-            actual_digest = task_registry_planning_sha256(path) if name == "task_registry" else file_sha256(path)
+            actual_digest = planning_binding_sha256(path, digest_kind, task_registry=name == "task_registry")
         except Exception as exc:
             findings.append(planning_finding(severity, "planning_baseline_source_invalid", f"Required planning-baseline source could not be normalized: {path_text} ({exc}).", source=name, path=path_text))
             check["status"] = "invalid"
@@ -547,9 +584,11 @@ def check_evidence_refs(
             "source_identity_status": "unchecked",
             "live_validation_status": None,
         }
-        if digest_kind != "file_sha256":
-            findings.append(planning_finding(severity, "planning_baseline_evidence_digest_kind_mismatch", f"{name} uses an unsupported digest contract.", evidence=name, expected="file_sha256", actual=digest_kind))
+        if not planning_digest_kind_supported(digest_kind):
+            findings.append(planning_finding(severity, "planning_baseline_evidence_digest_kind_mismatch", f"{name} uses an unsupported digest contract.", evidence=name, expected=list(PLANNING_FILE_DIGEST_KINDS), actual=digest_kind))
             check["status"] = "digest_kind_mismatch"
+            checks.append(check)
+            continue
         if declared_required != should_require:
             findings.append(planning_finding(severity, "planning_baseline_evidence_applicability_mismatch", f"{name} applicability does not match profile {profile}.", evidence=name, expected=should_require, actual=declared_required))
             check["status"] = "applicability_mismatch"
@@ -562,7 +601,13 @@ def check_evidence_refs(
             check["status"] = "missing"
             checks.append(check)
             continue
-        actual_digest = file_sha256(path)
+        try:
+            actual_digest = planning_binding_sha256(path, digest_kind)
+        except Exception as exc:
+            findings.append(planning_finding(severity, "planning_baseline_evidence_invalid", f"Planning evidence could not be digested: {path_text} ({exc}).", evidence=name, path=path_text))
+            check["status"] = "invalid"
+            checks.append(check)
+            continue
         check["actual_sha256"] = actual_digest
         digest_current = expected_digest == actual_digest
         if not digest_current:
@@ -886,6 +931,11 @@ def implementation_readiness_review(root: Path, naos_root: str, policy: dict[str
         base["status"] = "review_required"
         return base, [planning_finding(severity, "planning_baseline_invalid", "Planning-baseline ledger must be a mapping.")]
     schema_findings = validate_planning_ledger_schema(root, ledger, severity)
+    if schema_findings:
+        # Lineage and digest construction require schema-valid scalar/container
+        # types. Preserve validation findings instead of coercing invalid input.
+        base["status"] = "review_required"
+        return base, schema_findings
     baselines = [item for item in ledger.get("baselines") or [] if isinstance(item, dict)]
     current_id = ledger.get("current_baseline_id")
     lineage_findings, lineage = validate_baseline_lineage(baselines, current_id, severity)
@@ -954,7 +1004,7 @@ def task_to_files(root: Path, naos_root: str, policy: dict[str, Any]) -> dict[st
         header_text, _ = mh.header_text_from_source(source)
         sections = mh.section_map(header_text)
         tokens = {tok for item in sections.get("Tasks", []) for tok in extract_task_ids(item)}
-        rel = mh.relative_text(root, path)
+        rel = Path(mh.relative_text(root, path)).as_posix()
         for tok in tokens:
             mapping.setdefault(tok, set()).add(rel)
     return mapping
@@ -1005,35 +1055,119 @@ def alignment_scope_paths(
     }
 
 
-def git_changed_files(root: Path, diff_base: str) -> tuple[list[str], str | None]:
+def _git_name_status_paths(raw: bytes) -> list[str]:
+    """Decode Git -z status records, retaining old and new rename/copy paths."""
+    if not raw:
+        return []
+    if not raw.endswith(b"\0"):
+        raise ValueError("Git changed-file output lacks its NUL terminator")
+    fields = raw.split(b"\0")[:-1]
+    paths: list[str] = []
+    index = 0
+    while index < len(fields):
+        status = fields[index].decode("ascii")
+        index += 1
+        if not re.fullmatch(r"[ACDMRTUXB]|[RCM]\d{1,3}", status):
+            raise ValueError("Unsupported Git changed-file status")
+        count = 2 if status.startswith(("R", "C")) else 1
+        if index + count > len(fields) or any(not path for path in fields[index:index + count]):
+            raise ValueError("Incomplete Git changed-file status record")
+        # Decode independently of host locale; preserve undecodable POSIX
+        # filename bytes as surrogate escapes instead of altering path text.
+        paths.extend(path.decode("utf-8", errors="surrogateescape")
+                     for path in fields[index:index + count])
+        index += count
+    return paths
+
+
+def _run_readonly_git_diff(root: Path, args: list[str], **options: Any) -> subprocess.CompletedProcess:
+    """Let Git filter stat-only differences using a disposable index copy."""
+    located = subprocess.run(
+        ["git", "--no-optional-locks", "rev-parse", "--git-path", "index"],
+        cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    if located.returncode != 0:
+        raise RuntimeError("Cannot locate Git index: " + located.stderr.decode("utf-8", errors="replace").strip())
+    name = os.fsdecode(located.stdout).removesuffix("\n")
+    if os.name == "nt":
+        name = name.removesuffix("\r")
+    if not name or "\x00" in name:
+        raise RuntimeError("Git returned an invalid index path")
+    index = Path(name)
+    if not index.is_absolute():
+        index = root / index
     try:
-        tracked = subprocess.run(
-            ["git", "diff", "--name-only", "--diff-filter=ACMRT", diff_base, "--"],
-            cwd=root,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        temp_root = Path(tempfile.gettempdir()).resolve()
+        if temp_root.is_relative_to(root.resolve()) or temp_root.is_relative_to(index.parent.resolve()):
+            raise RuntimeError("Read-only Git diff requires temporary storage outside the project and index directory")
+        scratch = tempfile.TemporaryDirectory(prefix="naos-git-diff-", dir=temp_root)
+    except OSError as exc:
+        raise RuntimeError(f"Cannot prepare private Git index: {exc}") from exc
+    with scratch as temporary:
+        private_index = Path(temporary) / "index"
+        try:
+            raw = index.read_bytes()
+        except FileNotFoundError:
+            pass  # Preserve an actually absent index as absent, not an empty file.
+        else:
+            with private_index.open("xb") as stream:
+                stream.write(raw)
+        environment = os.environ.copy()
+        environment["GIT_INDEX_FILE"] = str(private_index)
+        # Keep Git's content filter; any refresh writes only the disposable
+        # index. Disable new split-index publication in repository metadata.
+        return subprocess.run(
+            ["git", "--no-optional-locks", "-c", "core.splitIndex=false", *args],
+            cwd=root, env=environment, **options,
+        )
+
+
+def git_changed_files(root: Path, diff_base: str) -> tuple[list[str], str | None]:
+    # Resolve exactly one commit before passing it to diff. A ref supplied by an
+    # adopter must never become a diff option (notably --output=<path>).
+    if not diff_base or diff_base.startswith("-") or "\x00" in diff_base:
+        return [], "diff base must be a non-option Git commit reference"
+    try:
+        resolved = subprocess.run(
+            ["git", "rev-parse", "--verify", "--end-of-options", f"{diff_base}^{{commit}}"],
+            cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             check=False,
+        )
+        commit = resolved.stdout.strip()
+        if resolved.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit):
+            return [], resolved.stderr.strip() or "diff base did not resolve to one Git commit"
+        tracked = _run_readonly_git_diff(
+            root, ["diff", "--name-status", "-z", "-M", commit, "--"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
         )
     except FileNotFoundError:
         return [], "git executable not found"
+    except (OSError, RuntimeError) as exc:
+        return [], f"Read-only Git observation unavailable: {exc}"
     if tracked.returncode != 0:
-        return [], tracked.stderr.strip() or f"git diff failed for diff base {diff_base}"
+        return [], tracked.stderr.decode("utf-8", errors="replace").strip() or f"git diff failed for diff base {diff_base}"
 
     try:
         untracked = subprocess.run(
-            ["git", "ls-files", "--others", "--exclude-standard"],
+            ["git", "ls-files", "-z", "--others", "--exclude-standard"],
             cwd=root,
-            text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
         )
     except FileNotFoundError:
         return [], "git executable not found"
-    untracked_files = untracked.stdout.splitlines() if untracked.returncode == 0 else []
-    files = sorted({line.strip() for line in tracked.stdout.splitlines() + untracked_files if line.strip()})
-    return files, None
+    try:
+        tracked_files = _git_name_status_paths(tracked.stdout)
+        untracked_files = []
+        if untracked.returncode == 0 and untracked.stdout:
+            if not untracked.stdout.endswith(b"\0"):
+                raise ValueError("Git untracked-file output lacks its NUL terminator")
+            untracked_files = [path.decode("utf-8", errors="surrogateescape")
+                               for path in untracked.stdout.split(b"\0")[:-1] if path]
+    except (UnicodeError, ValueError) as exc:
+        return [], f"Git changed-file output could not be parsed: {exc}"
+    return sorted(set(tracked_files + untracked_files)), None
 
 
 def path_matches_declaration(path: str, declarations: list[str]) -> bool:
@@ -1275,6 +1409,7 @@ def build_report(
         known_gaps.append("pre_implementation_alignment_parse_error")
     return {
         "schema": SCHEMA,
+        "generated_at": controlled_utc_now_text(),
         "profile": profile,
         "status": status_from_counts(summary),
         "naos_root": naos_root,

@@ -13,6 +13,10 @@ if __package__ in (None, ""):
         ValidationResult,
         build_root_parser,
         candidate_files,
+        load_metadata_scope,
+        MetadataScopeError,
+        METADATA_SCOPE_PATH,
+        scoped_frontmatter_results,
         collect_markdown_targets,
         is_non_empty_string,
         parse_frontmatter,
@@ -23,6 +27,10 @@ else:  # pragma: no cover - package import path
         ValidationResult,
         build_root_parser,
         candidate_files,
+        load_metadata_scope,
+        MetadataScopeError,
+        METADATA_SCOPE_PATH,
+        scoped_frontmatter_results,
         collect_markdown_targets,
         is_non_empty_string,
         parse_frontmatter,
@@ -31,7 +39,10 @@ else:  # pragma: no cover - package import path
 
 
 def default_instruction_files(root: Path) -> list[Path]:
-    return candidate_files(root, "templates/instructions/*.instructions.md", ".github/instructions/*.instructions.md")
+    scope = load_metadata_scope(root)
+    files = candidate_files(root, "templates/instructions/*.instructions.md", ".github/instructions/*.instructions.md")
+
+    return sorted({p.resolve(): p for p in files + [p for p, k in scope.items() if k == 'instruction']}.values(), key=lambda p: p.as_posix())
 
 
 def apply_to_is_well_formed(value: Any) -> bool:
@@ -57,20 +68,20 @@ def validate_instruction_file(path: Path) -> list[ValidationResult]:
     ]
 
 
-def validate_instruction_files(paths: list[Path]) -> list[ValidationResult]:
-    instruction_files = [path for path in paths if path.name.endswith(".instructions.md")]
-    results: list[ValidationResult] = []
-    for path in instruction_files:
-        results.extend(validate_instruction_file(path))
-    return results
+def validate_instruction_files(paths: list[Path], *, root: Path | None = None) -> list[ValidationResult]:
+    files = [path for path in paths if path.name.endswith(".instructions.md")]
+    return scoped_frontmatter_results(files, root, "instruction", validate_instruction_file)
 
 
 def main() -> int:
     parser = build_root_parser("Validate NAOS *.instructions.md frontmatter")
     args = parser.parse_args()
     root = Path(args.root).resolve()
-    targets = collect_markdown_targets(args.paths, default_instruction_files(root))
-    results = validate_instruction_files(targets)
+    try:
+        targets = collect_markdown_targets(args.paths, default_instruction_files(root))
+        results = validate_instruction_files(targets, root=root)
+    except MetadataScopeError as exc:
+        results = [ValidationResult(root / METADATA_SCOPE_PATH, "metadata-scope", False, str(exc))]
     return print_results("Instruction Frontmatter", root, results)
 
 

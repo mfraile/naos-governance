@@ -103,7 +103,7 @@
         "maturity": {"type": "object"},
         "maturity_authorization_effect": {"const": "none"},
         "provenance_status": {"enum": ["valid", "enrollment_required", "scope_enrollment_required", "refused"]},
-        "recommendation": {"enum": ["capability_enrollment_then_activation", "digest_review_and_activation", "no_install_recommended", "blocked_prerequisite", "use_validated_current_generation", "refresh_and_revalidate", "recover_then_revalidate"]},
+        "recommendation": {"enum": ["capability_enrollment_then_activation", "digest_review_and_activation", "no_install_recommended", "blocked_prerequisite", "use_validated_current_generation", "refresh_and_revalidate", "restore_bound_environment_or_review_migration", "recover_then_revalidate"]},
         "required_usage_scopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "authorized_usage_scopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "usage_scope_satisfied": {"type": "boolean"},
@@ -193,7 +193,16 @@
         }
       ]
     },
-    "summary": {"type": "object"},
+    "summary": {
+      "type": "object",
+      "properties": {
+        "guidance_warning_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of advisory setup guidance strings in the top-level warnings array; finding-severity warnings remain in summary.warnings."
+        }
+      }
+    },
     "recommended_modules": {
       "type": "array",
       "items": {"$ref": "#/$defs/module_recommendation"}

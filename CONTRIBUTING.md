@@ -54,18 +54,18 @@ The kit governs other projects; it must hold itself to its own standards. Before
 1. **Run the validators** (those that apply to the kit itself):
 
    ```bash
-   python scripts/validators/validate_docs_consistency.py
-   python scripts/validators/validate_tutorial_consistency.py
-   python -m unittest discover -s tests -p 'test_*.py'
+   python -B scripts/validators/validate_docs_consistency.py
+   python -B scripts/validators/validate_tutorial_consistency.py
+   python -B -m unittest discover -s public_tests -p 'test_*.py'
    git diff --check
    test ! -d naos
    ```
 
-   The `unittest discover` command above is the canonical implementation-suite
-   command. Pytest is optional for contributors; when installed, its default
-   collection is bounded by `pyproject.toml` to `tests/test_*.py`. Validate that
-   boundary with `python -m pytest --collect-only -q` rather than treating files
-   under `dev/`, `templates/`, or `plugins/` as implementation tests.
+   The public kit ships `public_tests/`, not the maintainer `tests/` tree.
+   Pytest is optional for contributors; when installed, run `python -B -m pytest -q`.
+   The public-root `pytest.ini` selects `public_tests/test_*.py`; verify collection
+   with `python -B -m pytest --collect-only -q`. Files under `dev/`, `templates/`,
+   or `plugins/` are not public implementation tests.
 
 2. **Update affected documentation** in the same PR — `ROADMAP.md`, `docs/INDEX.md`, `docs/GLOSSARY.md`, or other public docs if you changed public behavior or vocabulary.
 3. **Keep commit messages factual** — what changed, why, and which files. The branch's commit history is the kit's own audit trail.

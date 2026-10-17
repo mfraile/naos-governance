@@ -32,7 +32,7 @@ ls naos/active/*.md   # See what's in play
 
 1. **Rule 1** — Update existing files only. Never create `draft_*.md`, `SESSION_SUMMARY_*.md`, or `ANALYSIS_*.md`.
 2. **Rule 7** — Evidence-first. Grep before assuming. Exhaustive impact search before any change.
-3. **Rule 8** — Run `make -f Makefile.naos gov-refresh` after scope changes. Individual scripts listed in full bootstrap.
+3. **Governance refresh** — Run `make -f Makefile.naos gov-refresh` after scope changes. Individual scripts listed in full bootstrap.
 4. **Rule 11** — Anti-duplication: check `naos/inventory/FUNCTION_INDEX.yaml` before creating any function.
 5. **Rule 17** — Pre-coding: `python scripts/naos_function_index_query.py --package <target>` before new code.
 

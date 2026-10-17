@@ -21,6 +21,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    normalize_boolean_settings,
     default_naos_root,
     exit_code_for_summary,
     finding_counts,
@@ -140,10 +141,43 @@ def string_list(value: Any) -> list[str]:
     return [str(item).strip() for item in as_list(value) if str(item).strip()]
 
 
+# Consumed input toggles only; derived report booleans are not configuration.
+BOOLEAN_SETTING_PATHS = (
+    "enabled",
+    "runtime_enabled",
+    "provider_calls_allowed",
+    "credentials_allowed_in_repo",
+    "can_approve",
+    "can_certify",
+    "can_prove_compliance",
+    "can_promote_maturity",
+    "runtime_routing_authority",
+    "model_quality_authority",
+    "profile_posture.*.human_review_required",
+    "roles.*.enabled",
+    "roles.*.required",
+    "roles.*.alias_allowed",
+    "roles.*.runtime_enabled",
+    "roles.*.provider_calls_allowed",
+    "roles.*.advisory_only",
+    "roles.*.human_review_required",
+    "tool_binding_policy.require_cost_tier",
+    "tool_binding_policy.require_data_exposure_level",
+    "tool_binding_policy.mutation_allowed",
+    "tool_model_bindings.*.enabled",
+    "tool_model_bindings.*.mutation_allowed",
+    "tool_model_bindings.*.human_review_required",
+    "tool_model_bindings.*.roles.*.enabled",
+    "tool_model_bindings.*.roles.*.alias_allowed",
+    "tool_model_bindings.*.roles.*.mutation_allowed",
+    "tool_model_bindings.*.roles.*.human_review_required",
+)
+
+
 def bool_value(value: Any, default: bool = False) -> bool:
     if value is None:
         return default
-    return bool(value)
+    return value if isinstance(value, bool) else False
 
 
 def is_adapt_placeholder(value: Any) -> bool:
@@ -1067,7 +1101,7 @@ def report_status(policy_source: str, profile: str, findings: list[dict[str, Any
 
 
 def build_report(root: Path, naos_root: str, profile: str, governance_policy: dict[str, Any], policy_path: Path, policy_source: str) -> dict[str, Any]:
-    model_policy = load_yaml_mapping(policy_path)
+    model_policy, invalid_booleans = normalize_boolean_settings(load_yaml_mapping(policy_path), BOOLEAN_SETTING_PATHS, prefix="model_policy")
     roles = {str(key): as_mapping(value) for key, value in as_mapping(model_policy.get("roles")).items()}
     references, duplicate_provider_details, agent_role_gaps = collect_role_references(root, naos_root)
     tool_bindings = collect_tool_model_bindings(model_policy, roles)
@@ -1083,6 +1117,8 @@ def build_report(root: Path, naos_root: str, profile: str, governance_policy: di
         agent_role_gaps,
         tool_bindings,
     )
+    if invalid_booleans:
+        findings.append(finding("boolean_setting_invalid", severity_from_posture(posture), "review_required", "Expected YAML booleans; invalid values evaluated as false: " + ", ".join(invalid_booleans)))
     summary = finding_counts(findings)
     agent_refs = [ref for ref in references if ref.get("source") == "agent_frontmatter"]
     summary.update(
@@ -1232,7 +1268,7 @@ def missing_report(root: Path, naos_root: str, profile: str, policy_path: Path) 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate model-provider policy declarations without provider calls.")
     parser.add_argument("--profile", default=None, choices=["quickstart", "lite", "standard", "assured"])
-    parser.add_argument("--naos-root", default=None)
+    parser.add_argument("--naos-root", default=None, help="Governance root; overrides NAOS_ROOT.")
     parser.add_argument("--policy", default=None, help="Optional NAOS governance policy path.")
     parser.add_argument("--project-root", default=".")
     parser.add_argument("--model-policy", default=None, help="Optional explicit model_provider_policy.yaml path.")
@@ -1242,9 +1278,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = Path(args.project_root).resolve()
-    governance_policy = load_policy(explicit_policy=args.policy, root=root)
+    requested_naos_root = args.naos_root or os.environ.get("NAOS_ROOT")
+    governance_policy = load_policy(explicit_policy=args.policy, naos_root=requested_naos_root, root=root)
     profile = normalize_profile(args.profile, governance_policy)
-    naos_root = args.naos_root or default_naos_root(governance_policy)
+    naos_root = requested_naos_root or default_naos_root(governance_policy)
     policy_path, policy_source = resolve_model_policy_path(root, naos_root, governance_policy, args.model_policy)
 
     try:

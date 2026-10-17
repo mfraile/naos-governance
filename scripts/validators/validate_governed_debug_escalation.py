@@ -26,11 +26,59 @@ PROFILE_MINIMUM = {"standard": "L2", "assured": "L3"}
 MATURITY_RANK = {f"L{level}": level for level in range(6)}
 PARENT_NAME = "naos-implement-with-debug"
 CHILD_NAME = "naos-debug"
-AGENT_TOOL_NAMES = {"agent", "agent/runSubagent"}
+# GitHub's compatible aliases are case insensitive. Map only bare aliases;
+# an arbitrary MCP server/tool suffix is not a built-in tool alias.
+_TOOL_ALIASES = {
+    "edit": "edit", "multiedit": "edit", "write": "edit", "notebookedit": "edit",
+    "agent": "agent", "custom-agent": "agent", "task": "agent",
+}
+DEBUG_TOOL_SCOPE = frozenset({
+    "read/readfile", "read/problems", "read/terminallastcommand",
+    "search/codebase", "search/textsearch", "search/filesearch",
+    "search/listdirectory", "search/changes", "execute/runinterminal",
+    "execute/testfailure", "execute/getterminaloutput", "todos",
+})
 EXPECTED_AGENT_BODY_SHA256 = {
     PARENT_NAME: "a3319b4e9a09093ba04f843d647ffaa59f25efdd4aac765d1ed1dd68f6a05aa6",
-    CHILD_NAME: "0457782e852c48bf4c0e5f34726d8eb09b8da1b7c16ab7b7e27831e62521646d",
+    CHILD_NAME: "2960477cc231ab5d5f9b583bb57ce8c1d8a2a5d341f1d667d56ec71e8212ce97",
 }
+
+
+class _AgentFrontmatterLoader(yaml.SafeLoader):
+    """Refuse ambiguous authority metadata before checking tool permissions."""
+
+
+def _construct_agent_mapping(
+    loader: _AgentFrontmatterLoader, node: yaml.MappingNode, deep: bool = False
+) -> dict[Any, Any]:
+    loader.flatten_mapping(node)
+    mapping: dict[Any, Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        try:
+            duplicate = key in mapping
+        except TypeError as exc:
+            raise yaml.constructor.ConstructorError(
+                "while constructing agent frontmatter", node.start_mark,
+                "found an unhashable mapping key", key_node.start_mark,
+            ) from exc
+        if duplicate:
+            raise yaml.constructor.ConstructorError(
+                "while constructing agent frontmatter", node.start_mark,
+                f"found duplicate key {key!r}", key_node.start_mark,
+            )
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+_AgentFrontmatterLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_agent_mapping
+)
+
+
+def load_agent_frontmatter(raw: str) -> Any:
+    """Safely load frontmatter, rejecting nested and merged duplicate keys."""
+    return yaml.load(raw, Loader=_AgentFrontmatterLoader)
 
 
 def _finding(rule_id: str, path: Path, message: str) -> dict[str, str]:
@@ -85,7 +133,7 @@ def _load_agent(
         )
         return None, text
     try:
-        metadata = yaml.safe_load(parts[1]) or {}
+        metadata = load_agent_frontmatter(parts[1]) or {}
     except yaml.YAMLError as exc:
         findings.append(_finding("invalid_frontmatter", path, str(exc)))
         return None, parts[2]
@@ -313,9 +361,51 @@ def _validate_project_profile(
         )
 
 
-def _tools(metadata: dict[str, Any]) -> list[str]:
+def tool_scope_findings(
+    metadata: dict[str, Any], role: str
+) -> list[tuple[str, str]]:
+    """Check declared tool authority, independently of agent instructions.
+
+    This shared predicate is used by installed setup and generated validation.
+    Empty lists disable tools; omission, host-valid string shortcuts and malformed
+    lists are refused under this bounded NAOS contract. Never infer MCP tool
+    semantics from a server name or suffix. Terminal access remains intentional
+    and is not a filesystem security boundary.
+    """
+    if role not in {"parent", "child", "default"}:
+        raise ValueError("unknown governed debug role")
     value = metadata.get("tools")
-    return [str(item) for item in value] if isinstance(value, list) else []
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or not item or item != item.strip()
+        for item in value
+    ):
+        return [(f"{role}_tools_shape", "tools must be an explicit list of nonblank, unpadded strings; omission may enable all host tools")]
+    normalized = [item.casefold() for item in value]
+    mapped = [_TOOL_ALIASES.get(item, item) for item in normalized]
+    wildcard = any("*" in item for item in normalized)
+    delegation = any(item == "agent" or item.startswith("agent/") for item in mapped)
+    writing = any(item == "edit" or item.startswith("edit/") for item in mapped)
+    findings = []
+    if wildcard:
+        findings.append((f"{role}_tool_wildcard", "wildcard tool authority is outside the bounded contract"))
+    if role == "child":
+        if delegation:
+            findings.append(("child_recursion", "configured debug child exposes an agent tool"))
+        if writing:
+            findings.append(("child_write", "configured debug child exposes direct edit/create tools"))
+        if any(item not in DEBUG_TOOL_SCOPE for item in normalized):
+            findings.append(("child_tool_scope", "configured debug child tools exceed the canonical diagnostic tool scope; explicit MCP tools are unreviewed, not inferred to be edit or agent aliases"))
+    elif role == "parent":
+        # The opt-in parent uses the documented VS Code token exactly. Compatible
+        # GitHub aliases are denial evidence, not permission to change that token.
+        if "agent" not in value or any(
+            (item == "agent" or item.startswith("agent/")) and raw != "agent"
+            for raw, item in zip(value, mapped)
+        ):
+            findings.append(("parent_tool", "parent must expose only the current agent tool spelling"))
+    elif delegation:
+        findings.append(("default_delegation", "the default implementation agent must remain human-mediated"))
+    return findings
 
 
 def _validate_agents(root: Path, findings: list[dict[str, str]]) -> None:
@@ -328,7 +418,7 @@ def _validate_agents(root: Path, findings: list[dict[str, str]]) -> None:
     default, _default_body = _load_agent(default_path, findings)
 
     if parent is not None:
-        parent_tools = _tools(parent)
+        findings.extend(_finding(rule, parent_path, message) for rule, message in tool_scope_findings(parent, "parent"))
         if _agent_body_sha256(parent_body) != EXPECTED_AGENT_BODY_SHA256[PARENT_NAME]:
             findings.append(
                 _finding(
@@ -353,14 +443,6 @@ def _validate_agents(root: Path, findings: list[dict[str, str]]) -> None:
                     "the top-level parent must not be available as a child",
                 )
             )
-        if "agent" not in parent_tools or "agent/runSubagent" in parent_tools:
-            findings.append(
-                _finding(
-                    "parent_tool",
-                    parent_path,
-                    "parent must expose only the current agent tool spelling",
-                )
-            )
         if parent.get("agents") != [CHILD_NAME]:
             findings.append(
                 _finding(
@@ -371,7 +453,7 @@ def _validate_agents(root: Path, findings: list[dict[str, str]]) -> None:
             )
 
     if child is not None:
-        child_tools = _tools(child)
+        findings.extend(_finding(rule, child_path, message) for rule, message in tool_scope_findings(child, "child"))
         normalized_child_body = " ".join(child_body.split())
         if _agent_body_sha256(child_body) != EXPECTED_AGENT_BODY_SHA256[CHILD_NAME]:
             findings.append(
@@ -393,14 +475,6 @@ def _validate_agents(root: Path, findings: list[dict[str, str]]) -> None:
                     "disable-model-invocation must be true",
                 )
             )
-        if AGENT_TOOL_NAMES.intersection(child_tools):
-            findings.append(
-                _finding("child_recursion", child_path, "child must have no agent tool")
-            )
-        if any(tool.startswith("edit/") or tool == "edit" for tool in child_tools):
-            findings.append(
-                _finding("child_write", child_path, "child must have no edit tool")
-            )
         if (
             "no direct edit/create or agent-invocation tools"
             not in normalized_child_body
@@ -421,14 +495,8 @@ def _validate_agents(root: Path, findings: list[dict[str, str]]) -> None:
                 )
             )
 
-    if default is not None and AGENT_TOOL_NAMES.intersection(_tools(default)):
-        findings.append(
-            _finding(
-                "default_delegation",
-                default_path,
-                "the default implementation agent must remain human-mediated",
-            )
-        )
+    if default is not None:
+        findings.extend(_finding(rule, default_path, message) for rule, message in tool_scope_findings(default, "default"))
 
 
 def build_report(root: Path, profile: str) -> dict[str, Any]:

@@ -32,7 +32,17 @@ live local plugin installation.
 
 ## Installability
 
-Validate this source before installing or publishing:
+The repo uses `.codex-plugin/plugin.json`, including its `interface` metadata.
+OpenAI's [packaging documentation](https://developers.openai.com/plugins/build/plugins)
+retains this format as a compatibility fallback. That format support does not
+establish installation or execution in an installed host version. Public directory
+[submission requirements](https://developers.openai.com/plugins/deploy/submission#listing-metadata) are a
+separate review; their listing limits do not establish local-load invalidity.
+
+Validate this source before installing or publishing. The following helper is
+available only in environments that install it; check that the file exists before
+running it. If absent, record validation as unavailable and use the current
+packaging documentation for a manual source review; do not report a validator pass:
 
 ```bash
 python3 "$CODEX_HOME/skills/.system/plugin-creator/scripts/validate_plugin.py" plugins/naos-governance

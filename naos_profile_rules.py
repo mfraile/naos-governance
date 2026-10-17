@@ -173,6 +173,75 @@ def _posture_class(posture: str) -> str:
     return "unknown"
 
 
+# H is an explicit shared human-review binding, never a claim of automated coverage.
+REVIEW_CONTRACT = '> **H: Human-review obligation**: Each `[H]` table row/heading binds the full rule and its `Review Rn [H]` evidence. Human reviewers must verify all applicable rule requirements and listed evidence, withholding approval until verified; waivers require existing project-policy authority. Deterministic triggers/refusals remain; passing checks does not prove full rule satisfaction.'
+REVIEW_EVIDENCE = {
+    1: 'Document searches; new-file justification/index; stated exceptions.',
+    2: 'Changed paths; obsolete-file removal through Git.',
+    5: 'Exploration authority; research-card gates, exclusions and artifact paths.',
+    6: 'README/change comparison and refresh before push.',
+    7: 'All seven principles and every completion-gate item.',
+    8: 'Trigger scope and executed evidence for all five migration gates.',
+    9: 'Trigger scope; impact map, alternatives, fallback and same-PR governance.',
+    10: 'Licence verification at source; copyleft-risk/unknown/custom human sign-off.',
+    11: 'Index setup, queries/searches, task-card reuse and post-creation refresh.',
+    13: 'All external/error paths: configured timeouts, jitter, fail-fast, handling.',
+    14: 'Event validation, additive changes, golden tests and breaking-version retention.',
+    18: 'Portable boundaries, model field, scope/budgets, handoffs and skill registration.',
+    19: 'Memory sensitive-content exclusions and governance authority.',
+    20: 'Import/declaration parity, exact pins and clean-environment validation.',
+    21: 'AI test paths, metadata, pre-production bias, critical HITL and UI labels.',
+    22: 'Checkpoint limits/cleanup, large-file storage and secret-loading paths.',
+    24: 'Every multi-step WI: brief ≤7 lines; prerequisites, files, goal, constraint.',
+    25: 'Sprint-close patterns/tiers and human sign-off before rule promotion.',
+    26: 'All triggers/fields/brackets and stop/handoff; supplied context is not proof.',
+    27: 'Data/LLM changes: PII storage restrictions and prompt stripping.',
+    28: 'External-change impact review and documentation adequacy.',
+    29: 'Architecture decision, diagram, migration/rollback and human sign-off.',
+}
+
+
+def _validate_blocking_review_contracts(profile: str, entry: dict[str, Any]) -> None:
+    """Fail closed unless every blocking rule binds the intact shared contract.
+
+    Rule-specific evidence complements the full requirement, never narrows it.
+    This validates the declaration, not human approval or automated coverage.
+    """
+    content = entry["content"]
+    if content.count(REVIEW_CONTRACT) != 1 or content.count("> **H: Human-review obligation**:") != 1:
+        raise ProfileRulesSourceError(f"{profile} requires exactly one intact shared human-review contract")
+    sections = list(re.finditer(r"(?m)^## (?:PGR )?Rule (\d+):[^\n]*$", content))
+    if not sections or content.index(REVIEW_CONTRACT) > sections[0].start():
+        raise ProfileRulesSourceError(f"{profile} shared review contract must precede rule sections")
+    required = set(entry["blocking_rule_ids"])
+    required.update(row["id"] for row in entry["table_rules"] if "blocking" in row["posture"].lower())
+    required.update(int(match.group(1)) for match in sections if "blocking" in match.group().lower())
+    found: set[int] = set()
+    for index, match in enumerate(sections):
+        rule_id = int(match.group(1))
+        finish = sections[index + 1].start() if index + 1 < len(sections) else len(content)
+        section = content[match.end():finish]
+        bound = "[H]" in match.group()
+        if rule_id not in required:
+            if bound or "> **Review R" in section:
+                raise ProfileRulesSourceError(f"{profile} Rule {rule_id} has an unbound blocking review obligation")
+            continue
+        found.add(rule_id)
+        if not bound:
+            raise ProfileRulesSourceError(f"{profile} Rule {rule_id} heading must bind its human-review obligation [H]")
+        evidence = REVIEW_EVIDENCE.get(rule_id)
+        expected = f"> **Review R{rule_id} [H]**: {evidence}"
+        if evidence is None or section.strip().split("\n\n", 1)[0] != expected:
+            raise ProfileRulesSourceError(f"{profile} Rule {rule_id} requires bound rule-specific review evidence")
+        if section.count("> **Review R") != 1:
+            raise ProfileRulesSourceError(f"{profile} Rule {rule_id} review obligation is duplicated or misbound")
+    if found != required:
+        raise ProfileRulesSourceError(f"{profile} blocking review obligations lack rule sections: {sorted(required - found)}")
+    for row in entry["table_rules"]:
+        if "blocking" in row["posture"].lower() and "[H]" not in row["posture"]:
+            raise ProfileRulesSourceError(f"{profile} Rule {row['id']} table blocking label must bind human-review obligation [H]")
+
+
 def _validate_profile(profile: str, entry: Any) -> None:
     if not isinstance(entry, dict):
         raise ProfileRulesSourceError(f"profiles.{profile} must be a mapping")
@@ -202,6 +271,8 @@ def _validate_profile(profile: str, entry: Any) -> None:
             raise ProfileRulesSourceError(f"{profile}.{field} must be a non-negative integer")
 
     content = entry["content"]
+    if "\r" in content:
+        raise ProfileRulesSourceError(f"{profile}.content must use LF newlines")
     raw = content.encode("utf-8")
     if not raw.endswith(b"\n"):
         raise ProfileRulesSourceError(f"{profile}.content must end with one newline")
@@ -290,6 +361,7 @@ def _validate_profile(profile: str, entry: Any) -> None:
         raise ProfileRulesSourceError(f"{profile}.adapt_rule_ids do not match ADAPT headings")
     if observed_pgr != pgr:
         raise ProfileRulesSourceError(f"{profile}.pgr_rule_ids do not match PGR headings")
+    _validate_blocking_review_contracts(profile, entry)
     if _source_path_claims(content) != claims:
         raise ProfileRulesSourceError(f"{profile}.source_path_claims do not match content")
 

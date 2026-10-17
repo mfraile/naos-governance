@@ -16,7 +16,7 @@ READS FROM:
     - NAOS_ROOT/TASK_REGISTRY.yaml (optional — for future extension)
     - specs/*.md — ID tag extraction
     - specs/03-requirements.md — requirement list (dynamic parse)
-    - SRC_ROOT/**/*.py — code headers (Implements, Task, References, Upstream)
+    - SRC_ROOT selected finite suffixes — code headers (Implements, Task, References, Upstream)
     - configs/naos_architecture_boundaries.yaml — ARCH component map (optional)
 
 WRITES TO:
@@ -35,6 +35,7 @@ USAGE:
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from collections import defaultdict
@@ -60,8 +61,8 @@ UPSTREAM_RE = re.compile(r"Upstream:\s*([^\n]+)")  # Future: {#PAIN-2.1}
 
 # Spec ID tag patterns
 PAIN_TAG_RE = re.compile(r"\{#PAIN-(\d+\.\d+)\}")  # {#PAIN-1.1}
-FR_TAG_RE = re.compile(r"\{#FR-(\d{3})-(\d{3})\}")  # {#FR-001-001}
-NFR_TAG_RE = re.compile(r"\{#NFR-(\d{3})-(\d{3})\}")  # {#NFR-001-001}
+FR_TAG_RE = re.compile(r"\{#FR-([A-Z0-9][\w-]*)\}", re.IGNORECASE)  # {#FR-001-001}
+NFR_TAG_RE = re.compile(r"\{#NFR-([A-Z0-9][\w-]*)\}", re.IGNORECASE)  # {#NFR-001-001}
 SOL_TAG_RE = re.compile(r"\{#SOL-(\d+\.\d+)\}")  # {#SOL-1.1}
 ARCH_TAG_RE = re.compile(r"\{#ARCH-(\d+\.?\d*)\}")  # {#ARCH-3.2} or {#ARCH-1}
 API_TAG_RE = re.compile(r"\{#API-(\d+\.?\d*)\}")  # {#API-2.1} or {#API-1}
@@ -71,7 +72,8 @@ import sys  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import spec_header  # noqa: E402
-from source_roots import resolve_source_roots  # noqa: E402
+from naos_console import configure_console_output  # noqa: E402
+from source_roots import resolve_source_roots, implementation_source_files, IMPLEMENTATION_SUFFIXES  # noqa: E402
 
 _REQ_HEADER_RE = spec_header.REQ_HEADER_RE
 
@@ -79,8 +81,7 @@ _REQ_HEADER_RE = spec_header.REQ_HEADER_RE
 SRC_ROOTS = resolve_source_roots(Path.cwd())
 
 REQUIREMENTS_SPEC = Path("specs/03-requirements.md")
-
-# Spec files to scan for ID tags
+# Finite canonical Spec-Kit inventory; unlisted Markdown is outside this check.
 SPEC_FILES = [
     Path("specs/01-problem.md"),
     Path("specs/02-solution.md"),
@@ -89,10 +90,14 @@ SPEC_FILES = [
     Path("specs/05-api.md"),
     Path("specs/06-acceptance.md"),
     Path("specs/07-cost-analysis.md"),
-    Path("specs/08-market-positioning.md"),
+    Path("specs/08-market-analysis.md"),
     Path("specs/09-integration-contract.md"),
     Path("specs/10-execution.md"),
 ]
+COPIED_KIT_MARKER = "# AUTO-GENERATED: Copied by naos init from the NAOS kit."
+SOURCE_SELECTION_NOTES: list[str] = []
+UNREADABLE_SOURCE_NOTES: list[str] = []
+SPEC_READ_ISSUES: list[str] = []
 
 
 def _parse_all_requirements() -> list[str]:
@@ -104,8 +109,12 @@ def _parse_all_requirements() -> list[str]:
     if not REQUIREMENTS_SPEC.exists():
         print(f"  ⚠️ {REQUIREMENTS_SPEC} not found, using empty requirement list")
         return []
-    text = REQUIREMENTS_SPEC.read_text(encoding="utf-8")
-    ids = _REQ_HEADER_RE.findall(text)
+    try:
+        text = REQUIREMENTS_SPEC.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        SPEC_READ_ISSUES.append(f"NOT_ASSESSED: {REQUIREMENTS_SPEC}: {type(error).__name__}")
+        return []
+    ids = spec_header.canonical_frs(text)
     # Sort: numeric FRs first (by number), then named FRs, then NFRs
     frs = sorted(
         [r for r in ids if r.startswith("FR-")],
@@ -119,6 +128,8 @@ def _parse_all_requirements() -> list[str]:
 
 
 # Dynamically parsed from specs — no hardcoded lists
+if __name__ == "__main__":
+    configure_console_output()
 ALL_REQUIREMENTS = _parse_all_requirements()
 
 
@@ -146,15 +157,21 @@ def extract_spec_tags() -> Dict[str, Dict[str, List[str]]]:
         if not spec_file.exists():
             continue
 
-        text = spec_file.read_text(encoding="utf-8", errors="ignore")
+        try:
+            text = spec_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as error:
+            issue = f"NOT_ASSESSED: {spec_file}: {type(error).__name__}"
+            if issue not in SPEC_READ_ISSUES:
+                SPEC_READ_ISSUES.append(issue)
+            continue
 
         for match in PAIN_TAG_RE.finditer(text):
             tags["PAIN"][match.group(1)].append(str(spec_file))
         for match in FR_TAG_RE.finditer(text):
-            tag_id = f"{match.group(1)}-{match.group(2)}"
+            tag_id = match.group(1).upper()
             tags["FR"][tag_id].append(str(spec_file))
         for match in NFR_TAG_RE.finditer(text):
-            tag_id = f"{match.group(1)}-{match.group(2)}"
+            tag_id = match.group(1).upper()
             tags["NFR"][tag_id].append(str(spec_file))
         for match in SOL_TAG_RE.finditer(text):
             tags["SOL"][match.group(1)].append(str(spec_file))
@@ -172,7 +189,7 @@ def extract_spec_tags() -> Dict[str, Dict[str, List[str]]]:
 
 
 def parse_code_files() -> List[Tuple[str, List[str], str, List[str], List[str]]]:
-    """Parse all Python files in SRC_ROOTS for header information.
+    """Parse selected supported files for declared textual header links.
 
     Returns: [(file_path, requirements, tasks, references, upstream), ...]
     """
@@ -182,46 +199,54 @@ def parse_code_files() -> List[Tuple[str, List[str], str, List[str], List[str]]]
     extra_roots = [Path("scripts"), Path("naos_tools")]
     all_roots = list(SRC_ROOTS) + [r for r in extra_roots if r not in SRC_ROOTS]
 
-    for root in all_roots:
-        if not root.exists():
+    SOURCE_SELECTION_NOTES.clear()
+    UNREADABLE_SOURCE_NOTES.clear()
+    for py in implementation_source_files(all_roots):
+        if py.name == "__init__.py":
             continue
-        for py in root.rglob("*.py"):
-            if py.name == "__init__.py":
-                continue
+        try:
+            relative = Path(os.path.abspath(py)).relative_to(Path(os.path.abspath(Path.cwd())))
+        except ValueError:
+            relative = None  # Explicit external SRC_ROOT retains its existing selection.
+        display = (relative.as_posix() if relative is not None else
+                   "[external-source:" + hashlib.sha256(os.fsencode(os.path.abspath(py))).hexdigest() + "]")
+        try:
+            text = py.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as error:
+            UNREADABLE_SOURCE_NOTES.append(f"NOT_ASSESSED: {display}: {type(error).__name__}")
+            continue
+        # A lexical copied-kit selection convention, never authentication.
+        # Host source under src/ and markers later in prose are not exempt.
+        if (relative is not None and relative.parts[0] in {"scripts", "naos_tools"}
+                and COPIED_KIT_MARKER in text.splitlines()[:2]):
+            SOURCE_SELECTION_NOTES.append(f"Copied-kit selection excluded: {relative.as_posix()}")
+            continue
+        reqs = []
+        tasks = []
+        refs = []
+        upstream = []
 
-            text = py.read_text(encoding="utf-8", errors="ignore")
-            reqs = []
-            tasks = []
-            refs = []
-            upstream = []
+        # Implements: FR-001, FR-002 (Description)
+        m1 = HEADER_RE.search(text)
+        if m1:
+            reqs = sorted(spec_header.fr_tokens(m1.group(1)))
 
-            # Implements: FR-001, FR-002 (Description)
-            m1 = HEADER_RE.search(text)
-            if m1:
-                raw_reqs = m1.group(1).split(",")
-                for req in raw_reqs:
-                    req_match = re.search(
-                        r"((?:FR|NFR)-[A-Z0-9]+(?:-ENHANCED)?)", req.strip()
-                    )
-                    if req_match:
-                        reqs.append(req_match.group(1))
+        # Task: T-001, T-002
+        m2 = TASK_RE.search(text)
+        if m2:
+            tasks = [t.strip() for t in m2.group(1).split(",")]
 
-            # Task: T-001, T-002
-            m2 = TASK_RE.search(text)
-            if m2:
-                tasks = [t.strip() for t in m2.group(1).split(",")]
+        # References: {#ARCH-3.2}, {#API-2.1} (future support)
+        m3 = REFERENCES_RE.search(text)
+        if m3:
+            refs = re.findall(r"\{#[A-Z]+-[\d\.]+\}", m3.group(1))
 
-            # References: {#ARCH-3.2}, {#API-2.1} (future support)
-            m3 = REFERENCES_RE.search(text)
-            if m3:
-                refs = re.findall(r"\{#[A-Z]+-[\d\.]+\}", m3.group(1))
+        # Upstream: {#PAIN-2.1}, {#SOL-3.1} (future support)
+        m4 = UPSTREAM_RE.search(text)
+        if m4:
+            upstream = re.findall(r"\{#[A-Z]+-[\d\.]+\}", m4.group(1))
 
-            # Upstream: {#PAIN-2.1}, {#SOL-3.1} (future support)
-            m4 = UPSTREAM_RE.search(text)
-            if m4:
-                upstream = re.findall(r"\{#[A-Z]+-[\d\.]+\}", m4.group(1))
-
-            rows.append((str(py), reqs, tasks, refs, upstream))
+        rows.append((display, reqs, tasks, refs, upstream))
 
     return rows
 
@@ -328,6 +353,11 @@ def render_enhanced_matrix(
         f"**Generated**: {generated_date}",
         f"**Requirements**: {req_summary}",
         "**ID Tagging System**: ✅ Enabled",
+        "**Coverage**: selected textual references only; not implementation or header authenticity proof.",
+        "**Spec Inventory**: finite canonical Spec-Kit files (other Markdown NOT_ASSESSED).",
+        "**Read Issues**: " + ("; ".join(SPEC_READ_ISSUES + UNREADABLE_SOURCE_NOTES) or "none"),
+        "**Source Suffixes**: " + ", ".join(sorted(IMPLEMENTATION_SUFFIXES)) + "; other suffixes NOT_ASSESSED.",
+        f"**Copied-Kit Selection Exclusions**: {len(SOURCE_SELECTION_NOTES)} (exact first-two-line marker under scripts/naos_tools; not authenticated).",
         "",
         "---",
         "",
@@ -386,7 +416,7 @@ def render_enhanced_matrix(
 
     for req in ALL_REQUIREMENTS:
         files = req_index.get(req, [])
-        status = "✅ Traced" if files else "⚠️ Not Implemented"
+        status = "✅ Traced" if files else "⚠️ Not Traced"
         files_str = "<br>".join(files[:3])
         if len(files) > 3:
             files_str += f"<br>_...and {len(files) - 3} more_"
@@ -563,11 +593,16 @@ def render_enhanced_matrix(
 
 
 def main() -> int:
+    configure_console_output()
     print("Extracting spec ID tags...")
     spec_tags = extract_spec_tags()
 
     print("Parsing code files...")
-    code_rows = parse_code_files()
+    try:
+        code_rows = parse_code_files()
+    except (OSError, ValueError) as error:
+        print(f"NOT_ASSESSED: source inventory: {type(error).__name__}")
+        return 1
 
     print("Building requirement index...")
     req_index = build_requirement_index(code_rows)
@@ -588,7 +623,7 @@ def main() -> int:
     )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(content, encoding="utf-8")
+    OUT.write_text(content, encoding="utf-8", newline="\n")
     print(f"\n✅ Wrote {OUT}")
     print(f"   - {len(code_rows)} code files analyzed")
     print(f"   - {sum(len(reqs) for _, reqs, _, _, _ in code_rows)} total linkages")
@@ -596,7 +631,7 @@ def main() -> int:
         f"   - {sum(len(tags) for tags in spec_tags.values())} spec ID tags extracted"
     )
 
-    return 0
+    return 1 if SPEC_READ_ISSUES or UNREADABLE_SOURCE_NOTES else 0
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 ---
-model: "[ADAPT: e.g. claude-sonnet-4-5 | gpt-4o]"
+# Model omitted: adopter host selection applies; this does not pin or approve a model.
 naos_model_role: triage
 description: "Issue triage agent — classify, prioritize, and create task cards"
 tools:

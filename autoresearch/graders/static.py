@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -104,12 +105,14 @@ def compact_finding(
     message: str,
     dimension_id: str | None = None,
     source: str | None = None,
+    **extra: Any,
 ) -> dict[str, Any]:
     finding = {"id": finding_id, "severity": severity, "status": status, "message": message}
     if dimension_id:
         finding["dimension_id"] = dimension_id
     if source:
         finding["source"] = source
+    finding.update(extra)
     return finding
 
 
@@ -251,10 +254,19 @@ class StaticGrader:
     ) -> dict[str, Any]:
         # Direct library callers receive the same canonical structural check as
         # the CLI. A supplied report cannot conceal malformed current events.
-        try:
-            from scripts.naos_agent_trace_validate import validate_schema_shape
-        except ImportError:
-            from naos_agent_trace_validate import validate_schema_shape
+        autoresearch_root = Path(__file__).resolve().parents[1]
+        runtime_root = autoresearch_root.parent
+        if runtime_root.name == ".github":
+            runtime_root = runtime_root.parent
+        implementation_source = Path(__file__).resolve().relative_to(runtime_root).as_posix()
+        # Full path literal participates in generated brownfield remapping.
+        validator_path = runtime_root / "scripts/naos_agent_trace_validate.py"
+        spec = importlib.util.spec_from_file_location("_naos_static_trace_validator", validator_path)
+        if spec is None or spec.loader is None:
+            raise ImportError("Shipped trace validator is unavailable")
+        validator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(validator)
+        validate_schema_shape = validator.validate_schema_shape
         declared_event_count = len(trace_events)
         current_schema_errors = [validate_schema_shape(event) for event in trace_events]
         current_invalid_count = sum(bool(errors) for errors in current_schema_errors)
@@ -398,6 +410,14 @@ class StaticGrader:
                     message="Trace events do not declare spec references; semantic/spec adequacy is not inferred.",
                     dimension_id="task_spec_capability_linkage",
                     source=str(trace_file_path) if trace_file_path else trace_source,
+                    evidence_classification="confirmed",
+                    classification_scope="selected_trace_spec_linkage_absence_observation_only",
+                    evidence_refs=([{"type": "local_file", "ref": str(trace_file_path)}] if trace_file_path
+                                   else [{"type": "generated_report", "ref": str(trace_report_path)}] if trace_report_path else []),
+                    observed_trace_event_count=len(trace_events),
+                    declared_event_count=event_count,
+                    human_review_required=True,
+                    not_claimed=["semantic adequacy", "complete trace coverage", "approval", "issue resolution"],
                 )
             )
         if event_count and not any(event.get("referenced_capabilities") for event in trace_events):
@@ -409,6 +429,14 @@ class StaticGrader:
                     message="Trace events do not declare capability references; capability linkage coverage remains limited.",
                     dimension_id="task_spec_capability_linkage",
                     source=str(trace_file_path) if trace_file_path else trace_source,
+                    evidence_classification="confirmed",
+                    classification_scope="selected_trace_capability_linkage_absence_observation_only",
+                    evidence_refs=([{"type": "local_file", "ref": str(trace_file_path)}] if trace_file_path
+                                   else [{"type": "generated_report", "ref": str(trace_report_path)}] if trace_report_path else []),
+                    observed_trace_event_count=len(trace_events),
+                    declared_event_count=event_count,
+                    human_review_required=True,
+                    not_claimed=["capability adequacy", "complete trace coverage", "approval", "issue resolution"],
                 )
             )
         if event_count and not any(event.get("evidence_refs") or event.get("reports_generated") for event in trace_events):
@@ -425,37 +453,68 @@ class StaticGrader:
 
         missing_optional_reports = [item["id"] for item in input_reports if not item.get("present")]
         if missing_optional_reports:
-            findings.append(
-                compact_finding(
-                    finding_id="STATICGRADER_MISSING_DETERMINISTIC_REPORTS",
-                    severity=advisory_severity,
-                    status="missing_deterministic_input_report",
-                    message="Some optional deterministic input reports are missing; coverage remains partial.",
-                    source=";".join(missing_optional_reports),
-                )
+            missing_finding = compact_finding(
+                finding_id="STATICGRADER_MISSING_DETERMINISTIC_REPORTS",
+                severity=advisory_severity,
+                status="missing_deterministic_input_report",
+                message="Some optional deterministic input reports are missing; coverage remains partial.",
+                source=";".join(missing_optional_reports),
             )
+            missing_inputs = [item for item in input_reports if not item.get("present")]
+            if all(item.get("source_path_exists") is False for item in missing_inputs):
+                missing_finding.update(
+                    evidence_classification="confirmed",
+                    classification_scope="optional_report_paths_absent_at_input_collection",
+                    reasoning_summary="The named optional report paths did not exist at input collection; this confirms incomplete input coverage, not behavioral performance.",
+                    source_path=implementation_source,
+                    human_review_required=True,
+                )
+            findings.append(missing_finding)
         if ai_surface_health.get("source_report_present") and ai_surface_health.get("ai_surface_health_posture") in {"warning", "degraded"}:
-            findings.append(
-                compact_finding(
-                    finding_id="STATICGRADER_AI_SURFACE_HEALTH_REVIEW",
-                    severity=advisory_severity,
-                    status="ai_surface_health_review_required",
-                    message="AI-surface context-budget posture may reduce baseline interpretability; behavioral dimensions remain not evaluated.",
-                    source=str(ai_surface_health.get("source_report_path")),
-                )
+            health_finding = compact_finding(
+                finding_id="STATICGRADER_AI_SURFACE_HEALTH_REVIEW",
+                severity=advisory_severity,
+                status="ai_surface_health_review_required",
+                message="AI-surface context-budget posture may reduce baseline interpretability; behavioral dimensions remain not evaluated.",
+                source=str(ai_surface_health.get("source_report_path")),
             )
+            health_finding.update(
+                evidence_classification="hypothesized",
+                classification_scope="possible_baseline_interpretability_effect",
+                hypothesis_reason="The input report has warning or degraded AI-surface posture, but StaticGrader does not measure its effect on baseline interpretation.",
+                next_review_step="Review the selected AI-surface report and baseline context before interpreting any result; do not infer behavioral scores.",
+                source_path=implementation_source,
+                source_report=str(ai_surface_health["source_report_path"]),
+                human_review_required=True,
+            )
+            findings.append(health_finding)
 
+        # Fixed tool-coverage declarations remain visible but are not project
+        # defects. They must not make structural readiness unreachable.
+        project_findings = list(findings)
         unsupported_findings = []
         for dimension_id in FUTURE_BEHAVIORAL_DIMENSIONS:
-            unsupported_findings.append(
-                compact_finding(
-                    finding_id=f"STATICGRADER_UNSUPPORTED_{dimension_id}",
-                    severity=advisory_severity,
-                    status="unsupported_behavioral_dimension",
-                    message=f"{dimension_id} is not evaluated by StaticGrader v1; it remains future/advisory/readiness-only.",
-                    dimension_id=dimension_id,
-                )
+            coverage_finding = compact_finding(
+                finding_id=f"STATICGRADER_UNSUPPORTED_{dimension_id}",
+                severity=advisory_severity,
+                status="unsupported_behavioral_dimension",
+                message=f"{dimension_id} is not evaluated by StaticGrader v1; it remains future/advisory/readiness-only.",
+                dimension_id=dimension_id,
             )
+            # This declaration confirms only our fixed tool-coverage limitation.
+            # It does not classify project findings or evaluate behavior.
+            coverage_finding.update(
+                classification="confirmed",
+                classification_scope="tool_coverage_limitation",
+                source_path=implementation_source,
+                reasoning_summary=(
+                    "The shipped StaticGrader lists this dimension in "
+                    "FUTURE_BEHAVIORAL_DIMENSIONS and does not evaluate it. "
+                    "Confirmed applies only to this coverage limitation."
+                ),
+                human_review_required=True,
+            )
+            unsupported_findings.append(coverage_finding)
         findings.extend(unsupported_findings)
 
         dimensions.append(
@@ -558,7 +617,14 @@ class StaticGrader:
 
         summary = finding_counts(findings)
         summary["review_status_counts"] = dict(sorted(Counter(str(event.get("review_status") or "not_reviewed") for event in trace_events).items()))
-        status = status_from_findings(profile, findings, no_trace_inputs)
+        status = status_from_findings(profile, project_findings, no_trace_inputs)
+        if status == "ready" and any(
+            item["status"] != "pass" or item["passed"] is not True
+            for item in dimensions
+        ):
+            # Absence of findings cannot turn missing or unevaluated structural
+            # evidence into readiness. Behavioral dimensions stay separate.
+            status = "advisory" if profile in {"quickstart", "lite"} else "review_required"
         deterministic_results = dimensions
 
         return {

@@ -52,7 +52,7 @@ NOT_CLAIMED = [
 
 def path_text(path: Path, root: Path) -> str:
     try:
-        return str(path.resolve().relative_to(root.resolve()))
+        return path.resolve().relative_to(root.resolve()).as_posix()
     except Exception:
         return str(path)
 
@@ -225,6 +225,7 @@ def finding(
     advisory: bool = True,
     expected: Any = None,
     actual: Any = None,
+    **extra: Any,
 ) -> dict[str, Any]:
     item: dict[str, Any] = {
         "id": f"spec_assembly_worksheet.{status}.{path or category}",
@@ -245,6 +246,7 @@ def finding(
         item["expected"] = expected
     if actual is not None:
         item["actual"] = actual
+    item.update(extra)
     return item
 
 
@@ -373,6 +375,14 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
                     message=f"No mapped evidence was found for {rel_path}; record why it is not applicable or add content.",
                     path=path_text(target, root),
                     expected="reviewed applicability decision when no evidence exists",
+                    evidence_classification="confirmed",
+                    classification_scope="selected_worksheet_mapping_absence_observation_only",
+                    evidence_refs=[{"type": "local_file", "ref": path_text(target, root)},
+                                   {"type": "local_file", "ref": path_text(manifest_path, root)},
+                                   *[{"type": "generated_report", "ref": str(evidence_inputs[key]["path"])}
+                                     for key in ("candidate_requirements", "traceability_gap_register")]],
+                    observed_mapping_counts={"candidate_requirements": len(mapped_candidates),
+                                             "traceability_gaps": len(mapped_gaps)},
                 )
             )
         else:
@@ -495,7 +505,7 @@ def format_text_report(report: dict[str, Any]) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build a review-only spec assembly worksheet from adoption evidence.")
+    parser = argparse.ArgumentParser(description="Build a review-only spec assembly worksheet from adoption evidence. Report status is advisory; successful worksheet generation exits 0.")
     parser.add_argument("project_root", nargs="?", default=".", help="Project root to inspect.")
     parser.add_argument("--profile", help="Governance profile (quickstart/lite/standard/assured).")
     parser.add_argument("--specs-root", default=os.environ.get("SPECS_ROOT") or "specs", help="Project specs root.")
@@ -503,24 +513,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--naos-root", default=os.environ.get("NAOS_ROOT"), help="NAOS governance root.")
     parser.add_argument("--policy", help="Optional policy YAML path.")
     parser.add_argument("--output", help="Optional JSON output report path.")
-    parser.add_argument("--write-markdown", action="store_true", help="Also write a Markdown worksheet.")
+    parser.add_argument("--write-markdown", action="store_true", help="Also write a Markdown worksheet. Requires --output or --markdown-output when no default report path is configured.")
     parser.add_argument("--markdown-output", help="Optional Markdown worksheet output path.")
     parser.add_argument("--json", action="store_true", help="Print JSON report to stdout.")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     report, policy = build_report(args)
     root = Path(args.project_root).resolve()
     output = Path(args.output) if args.output else report_output_path(root, report["naos_root"], policy, "spec_assembly_worksheet_report")
-    write_report(output, report)
+    markdown_output = None
     if args.write_markdown:
-        markdown_output = (
-            Path(args.markdown_output)
-            if args.markdown_output
-            else output.with_name(output.stem.replace("_worksheet", "_worksheet") + ".md")
-        )
+        if args.markdown_output:
+            markdown_output = Path(args.markdown_output)
+        elif output is not None:
+            markdown_output = output.with_suffix(".md")
+        else:
+            parser.error("--write-markdown requires --output or --markdown-output when no default report path is configured")
+    write_report(output, report)
+    if markdown_output is not None:
         markdown_output.parent.mkdir(parents=True, exist_ok=True)
         markdown_output.write_text(format_markdown(report), encoding="utf-8")
     if args.json:

@@ -22,7 +22,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml  # type: ignore[import-untyped]
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -36,10 +35,17 @@ from naos_policy import (  # noqa: E402
     is_kit_repository,
     kit_root,
     load_policy,
+    load_yaml_temporal_text,
     normalize_profile,
     report_output_path,
     status_from_counts,
     write_report,
+)
+from naos_secret_patterns import (  # noqa: E402
+    REDACTED_CREDENTIAL,
+    is_secret_field_name,
+    sanitize_report_value,
+    secret_content_reason,
 )
 
 
@@ -262,7 +268,7 @@ def is_adapt_placeholder(value: Any) -> bool:
 
 
 def is_empty_or_placeholder(value: Any) -> bool:
-    return value in (None, "") or is_adapt_placeholder(value)
+    return value in (None, "", REDACTED_CREDENTIAL) or is_adapt_placeholder(value)
 
 
 def safe_digest(path: Path) -> str | None:
@@ -276,7 +282,7 @@ def safe_digest(path: Path) -> str | None:
 
 
 def load_yaml_mapping(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = load_yaml_temporal_text(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"Expected YAML mapping: {path}")
     return data
@@ -429,7 +435,7 @@ def load_records_from_source(root: Path, source: dict[str, Any]) -> tuple[list[d
             parsed = json.loads(path.read_text(encoding="utf-8"))
             records = records_from_parsed_source(parsed, path, root)
         else:
-            parsed = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            parsed = load_yaml_temporal_text(path.read_text(encoding="utf-8")) or {}
             records = records_from_parsed_source(parsed, path, root)
     except Exception as exc:
         meta["error"] = str(exc)
@@ -482,7 +488,9 @@ def credential_fields_present(record: dict[str, Any]) -> list[str]:
     for key, value in record.items():
         if key.startswith("_"):
             continue
-        if isinstance(value, str) and SECRET_RE.search(value):
+        if is_secret_field_name(str(key)) and not is_empty_or_placeholder(value):
+            present.append(str(key))
+        if isinstance(value, str) and (secret_content_reason(value) is not None or SECRET_RE.search(value)):
             present.append(str(key))
     return sorted(set(present))
 
@@ -490,9 +498,12 @@ def credential_fields_present(record: dict[str, Any]) -> list[str]:
 def sanitized_record(record: dict[str, Any], index: int) -> dict[str, Any]:
     cost = number_value(record.get("cost_usd") if record.get("cost_usd") is not None else record.get("estimated_cost_usd"))
     latency = number_value(record.get("latency_ms"))
-    return {
+    rid = record_id(record, index)
+    if secret_content_reason(rid) is not None:
+        rid = f"record-{index}"
+    return sanitize_report_value({
         "index": index,
-        "record_id": record_id(record, index),
+        "record_id": rid,
         "source_ref": record.get("_source_ref"),
         "source_index": record.get("_source_index"),
         "timestamp": record.get("timestamp"),
@@ -516,7 +527,7 @@ def sanitized_record(record: dict[str, Any], index: int) -> dict[str, Any]:
         "policy_exception_declared": bool_value(record.get("policy_exception")) or bool(string_list(record.get("policy_exceptions"))),
         "payload_fields_present": payload_fields_present(record),
         "credential_fields_present": credential_fields_present(record),
-    }
+    })
 
 
 def review_records(
@@ -706,8 +717,20 @@ def review_records(
                     source_ref=source_ref,
                 )
             )
+        timestamp = parse_timestamp(sanitized_item.get("timestamp"))
+        if "timestamp" in record and timestamp is None:
+            findings.append(
+                finding(
+                    f"model_telemetry.invalid_timestamp.{rid}",
+                    severity,
+                    "review_required",
+                    "invalid_timestamp",
+                    "Telemetry timestamp must be an ISO date or datetime.",
+                    record_id=rid,
+                    source_ref=source_ref,
+                )
+            )
         if stale_after_days is not None:
-            timestamp = parse_timestamp(sanitized_item.get("timestamp"))
             if timestamp and (now - timestamp).days > stale_after_days:
                 findings.append(
                     finding(
@@ -839,7 +862,7 @@ def build_report(
     else:
         status = "pass"
 
-    return {
+    return sanitize_report_value({
         "schema": REPORT_SCHEMA,
         "generated_at": utc_now_text(),
         "profile": profile,
@@ -880,7 +903,7 @@ def build_report(
         "human_review_required": bool(findings) or bool_value(posture.get("human_review_required"), False),
         "generated_by": build_generated_by(root),
         "summary": summary,
-    }
+    })
 
 
 def build_expected_report(*, root: Path, profile: str, naos_root: str, policy: dict[str, Any]) -> dict[str, Any]:

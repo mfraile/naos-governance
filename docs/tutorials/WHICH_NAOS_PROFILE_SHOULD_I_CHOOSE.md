@@ -170,7 +170,10 @@ naos upgrade . --tier assured --dry-run
 Planning and `--dry-run` write nothing to the adopter project. To apply a
 managed transition, first persist an external immutable plan with
 `naos upgrade . --tier PROFILE --plan-out FILE`, review its decisions and
-`plan_sha256`, then invoke `naos upgrade . --apply-plan FILE
+approve the SHA-256 of the complete saved file for current v3 plans. Legacy
+POSIX plans instead use embedded `plan_sha256`; legacy Windows plans use
+`digest_sha256`. Follow the integral tutorial's exact digest procedure, then
+invoke `naos upgrade . --apply-plan FILE
 --expect-plan-digest SHA256`. Apply never replans, and legacy `--force` remains
 refused. Use `naos init` for a new destination; on an already managed project,
 direct `naos init --activate` routes to plan-only behavior.

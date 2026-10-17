@@ -51,7 +51,13 @@ from typing import Dict, List, Optional
 # Shared requirement-header parser (single source of truth across cascade scripts)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import spec_header  # noqa: E402
-from naos_task_lifecycle import is_task_delivered, normalize_task_states, validate_task_artifact_identity  # noqa: E402
+from naos_console import configure_console_output  # noqa: E402
+from naos_task_lifecycle import (
+    TASK_ID_FULL_PATTERN,
+    is_task_delivered,
+    normalize_task_states,
+    validate_task_artifact_identity,
+)  # noqa: E402
 
 NAOS_ROOT = Path(os.getenv("NAOS_ROOT", "naos"))
 
@@ -109,35 +115,21 @@ def build_requirement_status_map(tasks: List[dict]) -> Dict[str, str]:
 
     result: Dict[str, str] = {}
     for req_id, requirement_tasks in req_tasks.items():
-        statuses = [
-            str(t.get("status", "planned")).split("#")[0].strip().lower()
-            for t in requirement_tasks
-        ]
-        status_set = set(statuses)
-
-        # Delivered only when every task satisfies the canonical three-state contract.
-        if requirement_tasks and all(is_task_delivered(task) for task in requirement_tasks):
-            if req_id.startswith("NFR"):
-                result[req_id] = "Verified"
-            else:
-                result[req_id] = "Implemented"
-
-        # Any in progress → In Progress
-        elif status_set & IN_PROGRESS_STATUSES:
+        states = [normalize_task_states(task) for task in requirement_tasks]
+        lifecycle = {state["lifecycle_state"] for state in states}
+        if (
+            any(state["compatibility_status"] == "unsupported" for state in states)
+            or "unknown" in lifecycle
+        ):
+            result[req_id] = "Review Required"
+        elif all(is_task_delivered(task) for task in requirement_tasks):
+            result[req_id] = "Verified" if req_id.startswith("NFR") else "Implemented"
+        elif lifecycle & {"active", "implementation_complete", "completed"}:
             result[req_id] = "In Progress"
-
-        # All planned
-        elif status_set <= PLANNED_STATUSES:
-            result[req_id] = "Planned"
-
-        # All deferred
-        elif status_set <= DEFERRED_STATUSES:
+        elif lifecycle == {"deferred"}:
             result[req_id] = "Deferred"
-
-        # Mix of done + planned/deferred (no in_progress) → In Progress
-        elif any(is_task_delivered(task) for task in requirement_tasks):
-            result[req_id] = "In Progress"
-
+        elif lifecycle <= {"deferred", "cancelled", "absorbed", "superseded"}:
+            result[req_id] = "Not Delivered"
         else:
             result[req_id] = "Planned"
 
@@ -146,28 +138,22 @@ def build_requirement_status_map(tasks: List[dict]) -> Dict[str, str]:
 
 def build_task_status_map(tasks: List[dict]) -> Dict[str, str]:
     """Build mapping {task_id: display_status}."""
-    status_display = {
-        "implemented": "Implemented",
-        "verified": "Verified",
-        "done": "Done",
-        "absorbed": "Absorbed",
-        "in_progress": "In Progress",
-        "planned": "Planned",
-        "deferred": "Deferred",
-    }
     result: Dict[str, str] = {}
-    for t in tasks:
-        tid = t.get("id", "")
-        raw = str(t.get("status", "planned")).split("#")[0].strip().lower()
-        states = normalize_task_states(t)
-        if is_task_delivered(t):
-            result[tid] = "Verified"
-        elif states.get("compatibility_status") == "unsupported":
-            result[tid] = f"Unsupported Legacy Status ({states['legacy_status']})"
-        elif states["lifecycle_state"] == "implementation_complete":
-            result[tid] = "Implementation Complete"
+    for task in tasks:
+        states = normalize_task_states(task)
+        lifecycle = states["lifecycle_state"]
+        if is_task_delivered(task):
+            display = "Verified"
+        elif states["compatibility_status"] == "unsupported" or lifecycle == "unknown":
+            display = "Review Required"
+        elif lifecycle == "active":
+            display = "In Progress"
+        elif lifecycle == "completed":
+            display = "Completed (Review Required)"
         else:
-            result[tid] = status_display.get(raw, raw.title())
+            display = lifecycle.replace("_", " ").title()
+        result[task.get("id", "")] = display
+
     return result
 
 
@@ -278,7 +264,7 @@ def sync_execution_task_tables(
     # Formats:
     #   §4.1: | T-019 | Title | Req | Prio | Est | Status |     (6 cols, status is last)
     #   §5:   | T-019 | Req | Arch | API | Accept | Status |    (6 cols, status is last)
-    task_row_re = re.compile(r"^\|\s*\*{0,2}(T-\d{3})\*{0,2}\s*\|")
+    # Validate the first cell against the same grammar as the registry schema.
 
     for i, line in enumerate(lines):
         # Track marker boundaries
@@ -291,11 +277,11 @@ def sync_execution_task_tables(
         if in_marker:
             continue
 
-        match = task_row_re.match(line)
-        if not match:
+        if not line.startswith("|"):
             continue
-
-        task_id = match.group(1)
+        task_id = line.split("|", 2)[1].strip().strip("*")
+        if not TASK_ID_FULL_PATTERN.fullmatch(task_id):
+            continue
         new_status = task_status_map.get(task_id)
         if new_status is None:
             continue
@@ -374,6 +360,7 @@ def sync_execution_task_tables(
 
 
 def main() -> int:
+    configure_console_output()
     parser = argparse.ArgumentParser(
         description="Cascade task statuses from TASK_REGISTRY into spec files"
     )

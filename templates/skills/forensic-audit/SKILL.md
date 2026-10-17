@@ -1,23 +1,8 @@
 ---
-name: "forensic-audit"
-description: "Multi-pass forensic audit methodology for deep quality, security, release-readiness, claim-calibration, AI-generation, and governance review of any software project. Tool-neutral: usable from Claude Code, Codex, Gemini CLI, Cursor, Copilot, or by human auditors."
-parameters:
-  - name: target
-    description: "Audit target: repo, branch, commit range, module, release candidate, distribution package, or integration layer."
-    required: false
-    default: "repo"
-  - name: depth
-    description: "Audit depth: spot, standard, or deep. Use deep for release-readiness and security audits."
-    required: false
-    default: "deep"
-  - name: focus
-    description: "Optional focus dimensions such as api-contracts, event-contracts, migration-chain, infra-wiring, observability-coverage, network-contracts, decision-records, security, access-controls, public-export, test-coverage, wiring-integrity, ai-generation, claim-calibration, or release-verification."
-    required: false
-    default: ""
-  - name: output_mode
-    description: "Output mode: evidence-trail, final-report, or both. Deep audits should use both."
-    required: false
-    default: "both"
+name: forensic-audit
+description: 'Multi-pass forensic audit methodology for deep quality, security, release-readiness, claim-calibration, AI-generation, and governance review of any software project. Tool-neutral: usable from Claude Code, Codex, Gemini CLI, Cursor, Copilot, or by human auditors.'
+metadata:
+  naos-parameters: '[{"name":"target","description":"Audit target: repo, branch, commit range, module, release candidate, distribution package, or integration layer.","required":false,"default":"repo"},{"name":"depth","description":"Audit depth: spot, standard, or deep. Use deep for release-readiness and security audits.","required":false,"default":"deep"},{"name":"focus","description":"Optional focus dimensions such as api-contracts, event-contracts, migration-chain, infra-wiring, observability-coverage, network-contracts, decision-records, security, access-controls, public-export, test-coverage, wiring-integrity, ai-generation, claim-calibration, or release-verification.","required":false,"default":""},{"name":"output_mode","description":"Output mode: evidence-trail, final-report, or both. Deep audits should use both.","required":false,"default":"both"}]'
 ---
 
 # Forensic Audit

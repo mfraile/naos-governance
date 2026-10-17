@@ -17,7 +17,7 @@ import time
 import uuid
 from collections import Counter
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Iterable
 
 import yaml
@@ -25,6 +25,11 @@ import yaml
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+
+from naos_self_check_inspection import (
+    inspection_active, inspection_output_path, inspection_logical_path,
+    inspection_candidates, inspection_read_path, inspection_validation_root,
+)  # noqa: E402
 
 from naos_policy import (  # noqa: E402
     build_generated_by,
@@ -42,7 +47,9 @@ from naos_policy import (  # noqa: E402
     severity_for_profile,
     write_report,
 )
+from source_roots import inferred_adopter_implementation_files, native_adopter_root_aliases
 from naos_audit_log import write_audit_event  # noqa: E402
+from naos_secret_patterns import sanitize_report_value, secret_content_reason  # noqa: E402
 
 
 REPORT_SCHEMA = "naos.local_context_index.v1"
@@ -50,43 +57,8 @@ SQLITE_COORDINATION_SCHEMA = "naos.sqlite_write_coordination.v1"
 SQLITE_BUSY_TIMEOUT_MS = 5000
 SQLITE_LOCK_TIMEOUT_SECONDS = 10.0
 SQLITE_STALE_LOCK_SECONDS = 300.0
-SQLITE_REQUIRED_TABLES = ["index_runs", "artifacts", "artifact_chunks", "artifact_links", "report_summaries"]
+SQLITE_REQUIRED_TABLES = ["index_runs", "artifacts", "artifact_chunks", "artifact_links", "report_summaries", "index_collection_coverage"]
 SENSITIVE_NAME_RE = re.compile(r"(?i)(secret|token|credential|password|api[_-]?key|private[_-]?key)")
-SECRET_CONTENT_PATTERNS = (
-    ("aws_access_key_id", re.compile(rb"\bAKIA[0-9A-Z]{16}\b"), None),
-    ("openai_style_key", re.compile(rb"\bsk-[A-Za-z0-9_-]{20,}\b"), None),
-    (
-        "private_key_header",
-        re.compile(rb"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
-        None,
-    ),
-    (
-        "assigned_secret_quoted",
-        re.compile(
-            rb'''(?ix)\b["']?(?:password|passwd|pwd|secret|token|api[_-]?key|credential)["']?\s*[:=]\s*(?P<quote>["'])(?P<value>[^"'\r\n]{8,})(?P=quote)'''
-        ),
-        "value",
-    ),
-    (
-        "assigned_secret_unquoted",
-        re.compile(
-            rb'''(?im)^[ \t]*(?:-[ \t]*)?["']?(?:password|passwd|pwd|secret|token|api[_-]?key|credential)["']?[ \t]*[:=][ \t]*(?P<value>[A-Za-z0-9_./+@:-]{8,})[ \t]*(?=[#,}\]\r\n]|$)'''
-        ),
-        "value",
-    ),
-)
-PLACEHOLDER_SECRET_VALUES = {
-    b"changeme",
-    b"change-me",
-    b"example",
-    b"example-token",
-    b"example_secret",
-    b"placeholder",
-    b"replace-me",
-    b"todo",
-    b"your-api-key",
-    b"your_token_here",
-}
 TASK_ID_RE = re.compile(r"\bT-\d{3,}\b", re.IGNORECASE)
 SPEC_REF_RE = re.compile(r"(specs/[A-Za-z0-9_./-]+\.md(?:#[A-Za-z0-9_.:-]+)?)")
 CAPABILITY_RE = re.compile(r"\bCAP-[A-Za-z0-9_-]+\b", re.IGNORECASE)
@@ -124,6 +96,38 @@ TEXT_SUFFIXES = {
     ".yaml",
     ".yml",
 }
+
+
+def artifact_id_for(family_id: Any, path_text: str) -> str:
+    """Pure naming formula shared with exact stored-record rederivation."""
+    identity = f"{family_id or 'artifact'}\0{path_text}".encode("utf-8")
+    return "A-" + hashlib.sha256(identity).hexdigest()[:16]
+
+
+def chunk_id_for(artifact_id: str, chunk_index: int) -> str:
+    """Pure existing producer formula; stored labels still need parent verification."""
+    if type(artifact_id) is not str or type(chunk_index) is not int or chunk_index < 1:
+        raise ValueError("invalid_chunk_identity_operands")
+    return f"{artifact_id}-C{chunk_index:03d}"
+
+
+def recompute_public_artifact_id(record: Any) -> str | None:
+    """Recognize one recomputed label, without trusting or exempting its body."""
+    if type(record) is not dict or not {"artifact_id", "family_id", "path"} <= record.keys():
+        return None
+    family, path = record["family_id"], record["path"]
+    if (family is not None and (type(family) is not str or not 1 <= len(family) <= 256
+                               or any(ord(c) < 32 for c in family))):
+        return None
+    if (type(path) is not str or not 1 <= len(path) <= 4096 or any(ord(c) < 32 for c in path)
+            or "\\" in path or PureWindowsPath(path).drive or PureWindowsPath(path).root
+            or any(part in {"", ".", ".."} for part in path.split("/"))):
+        return None
+    try:
+        expected = artifact_id_for(family, path)
+    except UnicodeError:
+        return None
+    return expected if type(record["artifact_id"]) is str and record["artifact_id"] == expected else None
 
 
 def utc_now_text() -> str:
@@ -245,11 +249,37 @@ def latest_session_id(root: Path, naos_root: str, policy: dict[str, Any]) -> str
     return str(value) if value else None
 
 
+def _inspection_owned_output(root: Path, naos_root: str, logical: Path) -> Path:
+    physical = inspection_output_path(root, naos_root, logical)
+    if (inspection_active(root, naos_root) and physical == logical
+            and inspection_logical_path(root, naos_root, physical) == physical):
+        raise ValueError("Inspection output is not a registered owned sink")
+    return physical
+
+
+def _inspection_report_paths(root: Path, naos_root: str, value: Any) -> Any:
+    """Translate only declared path fields; bytes/stat/read operands stay physical."""
+    if not inspection_active(root, naos_root):
+        return value
+    if isinstance(value, list):
+        return [_inspection_report_paths(root, naos_root, item) for item in value]
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if key in {"path", "report_path", "target_db_path", "lock_path", "target", "source"} and isinstance(item, str) and Path(item).is_absolute():
+                result[key] = str(inspection_logical_path(root, naos_root, Path(item)))
+            else:
+                result[key] = _inspection_report_paths(root, naos_root, item)
+        return result
+    return value
+
+
 def sqlite_lock_path(root: Path, naos_root: str, policy: dict[str, Any], target_db_path: Path) -> Path:
     configured = policy.get("paths", {}).get("local_context_index_db_lock")
-    if configured:
-        return root / naos_root / str(configured)
-    return target_db_path.with_name(f"{target_db_path.name}.lock")
+    logical_target = inspection_logical_path(root, naos_root, target_db_path)
+    logical = (root / naos_root / str(configured) if configured else
+               logical_target.with_name(f"{logical_target.name}.lock"))
+    return _inspection_owned_output(root, naos_root, logical)
 
 
 def temp_db_path(target_db_path: Path, session_id: str | None) -> Path:
@@ -707,22 +737,11 @@ def should_exclude(relative_path: str, rules: dict[str, Any]) -> tuple[bool, str
     patterns = string_list(rules.get("exclude_patterns")) + string_list(rules.get("default_exclusions"))
     if match_any(rel, patterns):
         return True, "default_exclusion"
+    if secret_content_reason(rel) is not None:
+        return True, "secret_like_path"
     if is_sensitive_path(rel):
         return True, "sensitive_name_or_extension"
     return False, None
-
-
-def secret_content_reason(data: bytes) -> str | None:
-    """Return the first non-placeholder secret-content classification."""
-
-    for pattern_id, pattern, value_group in SECRET_CONTENT_PATTERNS:
-        for match in pattern.finditer(data):
-            if value_group is not None:
-                value = match.group(value_group).strip().lower()
-                if value in PLACEHOLDER_SECRET_VALUES:
-                    continue
-            return pattern_id
-    return None
 
 
 def source_topology_refusal(root: Path, path: Path) -> str | None:
@@ -768,7 +787,7 @@ def iter_pattern_matches(root: Path, pattern: str) -> list[Path]:
         paths = sorted(root.glob(pattern))
     except ValueError:
         return []
-    return paths
+    return inspection_candidates(root, pattern, paths)
 
 
 def collect_candidates(root: Path, rules: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -777,9 +796,25 @@ def collect_candidates(root: Path, rules: dict[str, Any]) -> tuple[list[dict[str
     candidates: dict[str, dict[str, Any]] = {}
     excluded: dict[str, dict[str, Any]] = {}
 
+    inferred = None
     for family in families:
         for pattern in string_list(family.get("include_patterns")):
-            for path in iter_pattern_matches(root, pattern):
+            if pattern in {"@inferred-adopter-python", "@inferred-adopter-implementation"}:
+                if inferred is None:
+                    pruned = []
+                    inferred, issues = inferred_adopter_implementation_files(root, pruned_directories=pruned)
+                    aliases = native_adopter_root_aliases(root, (path.relative_to(root).parts[0] for path in inferred if len(path.relative_to(root).parts) > 1))
+                    for item in pruned:
+                        excluded.setdefault(item["path"], {**item, "reason": "default_exclusion", "matched_family": family.get("id")})
+                    for issue in issues:
+                        excluded.setdefault(issue["path"], {"path": issue["path"], "reason": "unsafe_source_" + issue["status"], "matched_family": family.get("id")})
+                def is_test(path):
+                    return aliases.get(path.relative_to(root).parts[0]) == "tests" or path.name.startswith("test_") or path.stem.endswith("_test")
+                paths = ([path for path in inferred if path.suffix != ".py"] if pattern == "@inferred-adopter-implementation"
+                         else [path for path in inferred if path.suffix == ".py" and is_test(path) == (family.get("id") == "test_metadata")])
+            else:
+                paths = iter_pattern_matches(root, pattern)
+            for path in paths:
                 rel, root_bounded = lexical_path_under(root, path)
                 if not root_bounded:
                     excluded.setdefault(
@@ -804,7 +839,8 @@ def collect_candidates(root: Path, rules: dict[str, Any]) -> tuple[list[dict[str
                         },
                     )
                     continue
-                topology_refusal = source_topology_refusal(root, path)
+                physical = inspection_read_path(path)
+                topology_refusal = source_topology_refusal(inspection_validation_root(root, physical), physical)
                 if topology_refusal:
                     excluded.setdefault(
                         rel,
@@ -816,7 +852,7 @@ def collect_candidates(root: Path, rules: dict[str, Any]) -> tuple[list[dict[str
                     )
                     continue
                 try:
-                    size_bytes = os.lstat(path).st_size
+                    size_bytes = os.lstat(physical).st_size
                 except OSError:
                     size_bytes = max_file_bytes + 1
                 if size_bytes > max_file_bytes:
@@ -1006,6 +1042,13 @@ def chunks_for_artifact_bytes(
     max_chunks = int(family.get("max_chunks_per_artifact") or chunking.get("max_chunks_per_artifact") or 8)
     kind = str(family.get("chunk_kind") or "")
     suffix = path.suffix.lower()
+    if (family.get("include_policy") == "path_language_size_hash_only" or family.get("id") == "implementation_metadata" or "@inferred-adopter-implementation" in (family.get("include_patterns") or [])) and kind != "implementation_metadata":
+        raise ValueError("Metadata-only implementation family requires implementation_metadata chunk kind")
+    if kind == "implementation_metadata":
+        return [{"section_heading": "implementation_metadata", "chunk_kind": kind,
+                 "text": json.dumps({"filename": path.name, "suffix": path.suffix, "size_bytes": len(data),
+                                     "source_hash": hashlib.sha256(data).hexdigest(),
+                                     "analysis": "metadata_only_no_language_semantics"}, sort_keys=True)}]
     if suffix not in TEXT_SUFFIXES and kind not in {
         "bounded_text",
         "markdown_summary",
@@ -1091,7 +1134,7 @@ def build_artifact_records(
                 }
             )
             continue
-        data, metadata = secure_regular_file_snapshot(path, max_bytes=max_file_bytes)
+        data, metadata = secure_regular_file_snapshot(inspection_read_path(path), max_bytes=max_file_bytes)
         secret_reason = secret_content_reason(data)
         if secret_reason is not None:
             excluded.append(
@@ -1106,8 +1149,7 @@ def build_artifact_records(
         modified = datetime.fromtimestamp(metadata.st_mtime, UTC)
         age_days = max(0, (now.date() - modified.date()).days)
         source_hash = hashlib.sha256(data).hexdigest()
-        identity = f"{family.get('id') or 'artifact'}\0{path_text}".encode("utf-8")
-        artifact_id = f"A-{hashlib.sha256(identity).hexdigest()[:16]}"
+        artifact_id = artifact_id_for(family.get("id"), path_text)
         artifact = {
             "artifact_id": artifact_id,
             "path": path_text,
@@ -1137,7 +1179,7 @@ def build_artifact_records(
             artifact["_source_bytes"] = data
         artifact_chunks = chunks_for_artifact_bytes(path, data, family, rules)
         for chunk_index, item in enumerate(artifact_chunks, start=1):
-            chunk_id = f"{artifact_id}-C{chunk_index:03d}"
+            chunk_id = chunk_id_for(artifact_id, chunk_index)
             chunk_text = str(item.get("text") or "")
             chunk_record = {
                 "chunk_id": chunk_id,
@@ -1184,10 +1226,18 @@ def build_artifact_records(
     return artifacts, chunks, deduped_links, excluded
 
 
-def populate_sqlite_database(path: Path, report: dict[str, Any], artifacts: list[dict[str, Any]], chunks: list[dict[str, Any]], links: list[dict[str, Any]]) -> tuple[bool, list[dict[str, Any]]]:
+def populate_sqlite_database(path: Path | None, report: dict[str, Any], artifacts: list[dict[str, Any]], chunks: list[dict[str, Any]], links: list[dict[str, Any]], *, connection: sqlite3.Connection | None = None) -> tuple[bool, list[dict[str, Any]]]:
+    """Populate an owned file connection or a caller-owned in-memory connection."""
     findings: list[dict[str, Any]] = []
-    path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
+    owned_connection = connection is None
+    if owned_connection:
+        if path is None:
+            raise ValueError("A database path is required without a supplied connection")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
+    elif path is not None:
+        raise ValueError("Specify a path or a connection, not both")
+    assert connection is not None
     connection.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
     fts_available = False
     try:
@@ -1318,6 +1368,9 @@ def populate_sqlite_database(path: Path, report: dict[str, Any], artifacts: list
                     json.dumps(report.get("limitations") or [], sort_keys=True),
                 ),
             )
+            connection.execute("CREATE TABLE index_collection_coverage (run_id TEXT PRIMARY KEY, coverage_json TEXT NOT NULL)")
+            connection.execute("INSERT INTO index_collection_coverage VALUES (?, ?)",
+                               ("current", json.dumps(report.get("collection_coverage") or {}, sort_keys=True)))
             for artifact in artifacts:
                 connection.execute(
                     """
@@ -1405,7 +1458,8 @@ def populate_sqlite_database(path: Path, report: dict[str, Any], artifacts: list
                     (link.get("link_id"), link.get("source_path"), link.get("link_type"), link.get("reference_id")),
                 )
     finally:
-        connection.close()
+        if owned_connection:
+            connection.close()
     return fts_available, findings
 
 
@@ -1424,6 +1478,7 @@ def create_sqlite_artifact(
     session_id: str | None,
     generated_by: dict[str, Any],
 ) -> tuple[dict[str, Any], bool, list[dict[str, Any]], dict[str, Any]]:
+    path = _inspection_owned_output(root, naos_root, path)
     findings: list[dict[str, Any]] = []
     if path.exists() and path.is_symlink():
         raise ValueError(f"Refusing to write SQLite artifact through symlink: {path}")
@@ -1440,13 +1495,19 @@ def create_sqlite_artifact(
         session_id=session_id,
         generated_by=generated_by,
     )
-    coordination["temp_db_path"] = str(temp_path)
+    # The random operational filename is private to this write attempt. Keep
+    # diagnostic actions/results and the stable target, without publishing it.
+    coordination["temp_db_path"] = None
     coordination["findings"].append(
         finding(
             "sqlite_write_coordination.distributed_lock_not_provided",
             "advisory",
             "advisory",
             "SQLite coordination uses a local lock file only; distributed or network-filesystem locking is not claimed.",
+            evidence_classification="confirmed",
+            classification_scope="sqlite_coordination_tool_limit",
+            source_path=str(Path(__file__).resolve()),
+            human_review_required=True,
         )
     )
     if not session_id:
@@ -1456,6 +1517,11 @@ def create_sqlite_artifact(
                 "advisory",
                 "advisory",
                 "No session_id was available for the SQLite coordination report; file integrity coordination still runs.",
+                evidence_classification="confirmed",
+                classification_scope="session_identifier_unavailable_to_local_index",
+                reasoning_summary="No session identifier was supplied to this SQLite coordination run; the finding does not assess distributed locking or broader file integrity.",
+                source_path=str(Path(__file__).resolve()),
+                human_review_required=True,
             )
         )
     if not generated_by.get("operator_id"):
@@ -1503,7 +1569,7 @@ def create_sqlite_artifact(
 
         if temp_path.exists():
             temp_path.unlink()
-            coordination["cleanup_actions"].append({"action": "preexisting_temp_removed", "path": str(temp_path), "status": "removed"})
+            coordination["cleanup_actions"].append({"action": "preexisting_temp_removed", "path": None, "artifact_role": "temporary_database", "status": "removed"})
 
         try:
             fts_available, populate_findings = populate_sqlite_database(temp_path, report, artifacts, chunks, links)
@@ -1515,16 +1581,16 @@ def create_sqlite_artifact(
                     "blocking",
                     "validation_failed",
                     f"The generated temp SQLite index could not be built; the existing target DB was left unchanged. {exc}",
-                    path=str(temp_path),
+                    path=str(path), artifact_role="temporary_database",
                 )
             )
             if temp_path.exists():
                 try:
                     temp_path.unlink()
-                    coordination["cleanup_actions"].append({"action": "failed_build_temp_removed", "path": str(temp_path), "status": "removed"})
+                    coordination["cleanup_actions"].append({"action": "failed_build_temp_removed", "path": None, "artifact_role": "temporary_database", "status": "removed"})
                 except OSError as cleanup_exc:
                     coordination["cleanup_actions"].append(
-                        {"action": "failed_build_temp_cleanup", "path": str(temp_path), "status": "failed", "error": str(cleanup_exc)}
+                        {"action": "failed_build_temp_cleanup", "path": None, "artifact_role": "temporary_database", "status": "failed", "error": str(cleanup_exc)}
                     )
             artifact = {
                 "enabled": True,
@@ -1554,12 +1620,12 @@ def create_sqlite_artifact(
                     "validation_failed",
                     "The generated temp SQLite index did not include all required tables; the existing target DB was left unchanged.",
                     missing_tables=missing_tables,
-                    path=str(temp_path),
+                    path=str(path), artifact_role="temporary_database",
                 )
             )
             if temp_path.exists():
                 temp_path.unlink()
-                coordination["cleanup_actions"].append({"action": "invalid_temp_removed", "path": str(temp_path), "status": "removed"})
+                coordination["cleanup_actions"].append({"action": "invalid_temp_removed", "path": None, "artifact_role": "temporary_database", "status": "removed"})
             artifact = {
                 "enabled": True,
                 "status": "not_written",
@@ -1578,7 +1644,7 @@ def create_sqlite_artifact(
         try:
             os.replace(temp_path, path)
             coordination["atomic_replace_used"] = True
-            coordination["cleanup_actions"].append({"action": "atomic_replace", "source": str(temp_path), "target": str(path), "status": "completed"})
+            coordination["cleanup_actions"].append({"action": "atomic_replace", "source": None, "source_role": "temporary_database", "target": str(path), "status": "completed"})
         except OSError as exc:
             coordination["status"] = "replace_failed"
             coordination["findings"].append(
@@ -1593,10 +1659,10 @@ def create_sqlite_artifact(
             if temp_path.exists():
                 try:
                     temp_path.unlink()
-                    coordination["cleanup_actions"].append({"action": "failed_replace_temp_removed", "path": str(temp_path), "status": "removed"})
+                    coordination["cleanup_actions"].append({"action": "failed_replace_temp_removed", "path": None, "artifact_role": "temporary_database", "status": "removed"})
                 except OSError as cleanup_exc:
                     coordination["cleanup_actions"].append(
-                        {"action": "failed_replace_temp_cleanup", "path": str(temp_path), "status": "failed", "error": str(cleanup_exc)}
+                        {"action": "failed_replace_temp_cleanup", "path": None, "artifact_role": "temporary_database", "status": "failed", "error": str(cleanup_exc)}
                     )
                     coordination["findings"].append(
                         finding(
@@ -1604,7 +1670,7 @@ def create_sqlite_artifact(
                             "warning",
                             "advisory",
                             f"Temp DB cleanup failed after replace failure: {cleanup_exc}",
-                            path=str(temp_path),
+                            path=str(path), artifact_role="temporary_database",
                         )
                     )
             artifact = {
@@ -1638,16 +1704,16 @@ def create_sqlite_artifact(
         if temp_path.exists() and coordination.get("atomic_replace_used") is not True:
             try:
                 temp_path.unlink()
-                coordination["cleanup_actions"].append({"action": "leftover_temp_removed", "path": str(temp_path), "status": "removed"})
+                coordination["cleanup_actions"].append({"action": "leftover_temp_removed", "path": None, "artifact_role": "temporary_database", "status": "removed"})
             except OSError as exc:
-                coordination["cleanup_actions"].append({"action": "leftover_temp_cleanup", "path": str(temp_path), "status": "failed", "error": str(exc)})
+                coordination["cleanup_actions"].append({"action": "leftover_temp_cleanup", "path": None, "artifact_role": "temporary_database", "status": "failed", "error": str(exc)})
                 coordination["findings"].append(
                     finding(
                         "sqlite_write_coordination.temp_cleanup_failed",
                         "warning",
                         "advisory",
                         f"Temp DB cleanup failed: {exc}",
-                        path=str(temp_path),
+                        path=str(path), artifact_role="temporary_database",
                     )
                 )
 
@@ -1673,7 +1739,7 @@ def create_sqlite_artifact(
         "status": "written",
         "path": str(path),
         "size_bytes": stat.st_size,
-        "tables": ["index_runs", "artifacts", "artifact_chunks", "artifact_links", "report_summaries"],
+        "tables": ["index_runs", "artifacts", "artifact_chunks", "artifact_links", "report_summaries", "index_collection_coverage"],
         "fts_table": "artifact_chunks_fts" if fts_available else None,
         "rebuild_mode": "full_deterministic_rebuild",
         "role": "generated derived cache-like retrieval substrate; not authoritative evidence",
@@ -1685,14 +1751,34 @@ def create_sqlite_artifact(
 
 def sqlite_output_path(root: Path, naos_root: str, policy: dict[str, Any], rules: dict[str, Any], explicit: str | None) -> Path | None:
     if explicit:
-        return Path(explicit)
-    if is_kit_repository(root, naos_root) or not (root / naos_root).is_dir():
+        logical = Path(explicit)
+    elif is_kit_repository(root, naos_root) or not (root / naos_root).is_dir():
         return None
-    configured = policy.get("paths", {}).get("local_context_index_sqlite")
-    if configured:
-        return safe_policy_path(root / naos_root, str(configured), field="local_context_index_sqlite")
-    rules_path = str((rules.get("sqlite_artifact") or {}).get("path") or "context_index/local_context_index.sqlite")
-    return safe_policy_path(root / naos_root, rules_path, field="local_context_index.sqlite_artifact.path")
+    else:
+        configured = policy.get("paths", {}).get("local_context_index_sqlite")
+        rules_path = str(configured or (rules.get("sqlite_artifact") or {}).get("path") or "context_index/local_context_index.sqlite")
+        field = "local_context_index_sqlite" if configured else "local_context_index.sqlite_artifact.path"
+        logical = safe_policy_path(root / naos_root, rules_path, field=field)
+    return _inspection_owned_output(root, naos_root, logical)
+
+
+def collection_coverage(artifacts: list[dict[str, Any]], excluded: list[dict[str, Any]], rules: dict[str, Any]) -> dict[str, Any]:
+    """Describe capacity accounting only, never repository discovery or relevance."""
+    omitted = sum(item.get("reason") == "max_artifacts_exceeded" for item in excluded)
+    return {
+        "schema": "naos.local_context_collection_coverage.v1",
+        "status": "incomplete_capacity" if omitted else "complete_within_configured_bounds",
+        "max_artifacts": int((rules.get("chunking") or {}).get("max_artifacts") or 500),
+        "indexed_artifacts": len(artifacts),
+        "capacity_deferred_paths": omitted,
+        "other_exclusion_records": len(excluded) - omitted,
+        "scope": "configured artifact collection; capacity accounting only",
+        "limitations": [
+            "Capacity-deferred paths were not read or checked for secret-like content.",
+            "Other exclusion records include policy, size, privacy and unsafe-topology exclusions; they are not all intentional omissions.",
+            "Counts do not measure all discovered, eligible or content-read files, complete repository coverage, or retrieval relevance.",
+        ],
+    }
 
 
 def build_findings(
@@ -1707,6 +1793,19 @@ def build_findings(
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     severity = severity_for_profile(profile, policy)
+    omitted = sum(item.get("reason") == "max_artifacts_exceeded" for item in excluded_artifacts)
+    if omitted:
+        findings.append({
+            "id": "local_context_index.artifact_capacity_exceeded",
+            "severity": severity,
+            "status": "review_required" if profile in {"standard", "assured"} else "advisory",
+            "message": f"Artifact capacity omitted {omitted} configured candidate paths before content reading; collection is incomplete.",
+            "evidence_classification": "confirmed",
+            "classification_scope": "observed_artifact_capacity_omission",
+            "source_path": str(Path(__file__).resolve()),
+            "human_review_required": True,
+            "next_review_step": "Check omitted paths directly and review configured collection scope; indexed candidates do not establish complete coverage.",
+        })
     if not indexed_artifacts:
         findings.append(
             {
@@ -1750,6 +1849,10 @@ def build_findings(
                 "severity": "advisory",
                 "status": "advisory",
                 "message": "Sensitive-looking paths were excluded and remain visible for review.",
+                "evidence_classification": "confirmed",
+                "classification_scope": "observed_index_exclusion",
+                "source_path": str(Path(__file__).resolve()),
+                "human_review_required": True,
             }
         )
     if any(item.get("reason") == "secret_like_content_excluded" for item in excluded_artifacts):
@@ -1811,9 +1914,13 @@ def build_report(
     generated_at = utc_now_text()
     rules_hash = safe_digest(rules_path)
     session_id = latest_session_id(root, naos_root, policy)
-    generated_by = build_generated_by(root, session_id=session_id, generated_at=generated_at)
+    if session_id and secret_content_reason(session_id) is not None:
+        session_id = None
+    generated_by = sanitize_report_value(
+        build_generated_by(root, session_id=session_id, generated_at=generated_at)
+    )
     if not rules.get("enabled", True):
-        return {
+        return sanitize_report_value({
             "schema": REPORT_SCHEMA,
             "generated_at": generated_at,
             "profile": profile,
@@ -1861,7 +1968,7 @@ def build_report(
             "not_claimed": rules.get("not_claimed") or [],
             "human_review_required": False,
             "summary": {"status": "disabled"},
-        }
+        })
 
     artifacts, chunks, links, excluded = build_artifact_records(root, rules, generated_at)
     artifact_counts = Counter(str(item.get("artifact_type")) for item in artifacts)
@@ -1887,13 +1994,19 @@ def build_report(
     sqlite_artifact: dict[str, Any]
     fts_available = False
     sqlite_findings: list[dict[str, Any]] = []
-    provisional_report = {
+    coverage = collection_coverage(artifacts, excluded, rules)
+    source_findings = build_findings(
+        rules=rules, profile=profile, policy=policy, indexed_artifacts=artifacts,
+        excluded_artifacts=excluded, fts_available=True, sqlite_written=True,
+    )
+    provisional_report = sanitize_report_value({
         "generated_at": generated_at,
         "profile": profile,
-        "status": "ready",
+        "status": report_status(source_findings, True),
+        "collection_coverage": coverage,
         "rules_hash": rules_hash,
         "limitations": rules.get("limitations") or [],
-    }
+    })
     if sqlite_path is not None:
         sqlite_artifact, fts_available, sqlite_findings, sqlite_coordination = create_sqlite_artifact(
             sqlite_path,
@@ -1941,7 +2054,7 @@ def build_report(
     findings.extend(sqlite_findings)
     counts = finding_counts(findings)
     status = report_status(findings, True)
-    human_review_required = any(item.get("severity") in {"required", "blocking"} or item.get("status") == "review_required" for item in findings)
+    human_review_required = any(item.get("human_review_required") or item.get("severity") in {"required", "blocking"} or item.get("status") == "review_required" for item in findings)
     fts_policy = rules.get("fts") or {}
     query_sanitization = fts_policy.get("query_sanitization") or {}
     max_query_chars = int(query_sanitization.get("max_query_chars") or 120)
@@ -1967,6 +2080,7 @@ def build_report(
             "example": sanitize_fts_query('status:ready OR "secret" NEAR report', max_query_chars),
         },
         "source_families": families,
+        "collection_coverage": coverage,
         "indexed_artifacts": artifacts,
         "excluded_artifacts": excluded,
         "artifact_chunks": chunks[:200],
@@ -2004,7 +2118,8 @@ def build_report(
             "rule": "Index results are bounded candidates only; source artifacts must still be checked directly.",
         },
         "task_context_pack_integration": {
-            "status": "ready" if artifacts else "advisory",
+            "status": "ready" if artifacts and not coverage["capacity_deferred_paths"] else "advisory",
+            "collection_coverage": coverage,
             "report_path": str(report_default_path(root, naos_root, policy, "local_context_index_report")),
             "usage": "Task context packs may reference index summaries/candidates without treating them as authority.",
             "source_artifacts_remain_authoritative": True,
@@ -2018,6 +2133,8 @@ def build_report(
         "human_review_required": human_review_required,
         "summary": {
             "status": status,
+            "collection_status": coverage["status"],
+            "capacity_deferred_paths": coverage["capacity_deferred_paths"],
             "indexed_artifacts": len(artifacts),
             "excluded_artifacts": len(excluded),
             "chunks": len(chunks),
@@ -2029,7 +2146,7 @@ def build_report(
             **counts,
         },
     }
-    return report
+    return sanitize_report_value(_inspection_report_paths(root, naos_root, report))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2071,8 +2188,10 @@ def main(argv: list[str] | None = None) -> int:
     coordination = report.get("sqlite_write_coordination")
     coordination_path = report_output_path(root, naos_root, policy, "sqlite_write_coordination_report")
     if isinstance(coordination, dict):
+        if coordination_path is not None:
+            coordination_path = inspection_output_path(root, naos_root, coordination_path)
         write_report(coordination_path, coordination)
-    if args.output is None:
+    if args.output is None and not inspection_active(root, naos_root):
         write_audit_event(
             root=root,
             naos_root=naos_root,

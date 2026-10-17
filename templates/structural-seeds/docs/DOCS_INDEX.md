@@ -73,9 +73,9 @@
 
 | File | Purpose |
 | ---- | ------- |
-| `kit/README.md` | NAOS Portable Governance Kit overview |
-| `kit/INSTALLATION_MANUAL.md` | Kit installation and porting guide |
-| `kit/MAINTENANCE_PLAYBOOK.md` | Governance maintenance cadences |
+| `kit://README.md` | NAOS Portable Governance Kit overview |
+| `kit://INSTALLATION_MANUAL.md` | Kit installation and porting guide |
+| `kit://MAINTENANCE_PLAYBOOK.md` | Governance maintenance cadences |
 
 Common bounded review wrappers:
 

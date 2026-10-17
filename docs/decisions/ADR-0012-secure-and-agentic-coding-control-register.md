@@ -172,7 +172,10 @@ Absence of a finding remains absence of a finding, not proof of safety.
   projection into existing dashboard/evidence artifacts, central policy paths,
   Lite+ seeding, CLI/Make exposure, package data, tests, and Python 3.11-3.13 CI.
   The P3 report remains derived presentation and is not a new G4/G6 gate input,
-  approval signal, or composite security score.
+  approval signal, or composite security score. The reporting capability uses
+  the normal G4/G6 maturity linkage: its declared maturity and profile enforcement
+  contribute to the ordinary gate severity ceiling. This capability governance
+  relationship does not grant gate decision authority to the P3 report or producer.
 
 Each phase requires its own review. P0/P1/P2/P3 validation confirms structural,
 referential, generated-output, routing, source-contract, and bounded projection

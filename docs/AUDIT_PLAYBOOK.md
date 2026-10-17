@@ -53,13 +53,18 @@ naos learning-loop-review --profile <profile>
 naos ai-surface-budget --profile <profile>
 naos ai-surface-budget --fresh-profiles --json
 naos self-check --profile <profile>
-naos gate-status --profile <profile>
-naos gate-evaluate --profile <profile>
+naos gate-status --profile <profile> --output naos/reports/gate_status.json
+naos gate-evaluate --profile <profile> --strict-required --output naos/reports/gate_evaluation.json
 naos evidence-pack --profile <profile>
 naos dashboard --profile <profile> --json-output naos/reports/dashboard_summary.json
 naos sarif-export --profile <profile>
 naos pr-risk-classify --profile <profile>
 ```
+
+The gate commands persist review reports. `--strict-required` makes missing
+required gates exit nonzero; blocked gates also fail. Inspect the JSON findings
+and resolve missing evidence before continuing. A successful exit is review
+evidence, not approval or deployment authorization.
 
 Use `make -f Makefile.naos <target>` equivalents when the generated project
 includes `Makefile.naos`.
@@ -205,6 +210,19 @@ If AI-surface posture is `warning` or `degraded`, use the
 always-loaded prose, preserving anchors, and routing residual risk; do not hide
 the finding by inflating thresholds or auto-approving a baseline.
 
+Fresh-profile reports use `naos.ai_surface_profile_footprint_baseline.v2`.
+`deterministic: true` applies to the complete measurement projection identified
+by `determinism_scope`, not equality of full reports from separate runs.
+`measurement_payload_sha256` covers that projection: it retains every measured
+field and substitutes typed occurrence links only for validated classifier
+scan-time source-report hashes. The full findings and `raw_hash_provenance`
+retain those original hash declarations; `report_integrity_sha256` covers the
+complete report except itself. Integrity establishes report consistency, not
+original source bytes, current path contents, authenticity, or approval.
+Historical v1 artifacts retain their original `stable_payload_sha256` meaning.
+Configured footprint limits and approval requirements are unchanged; a
+repeatable measurement can still stop because it exceeds an approved limit.
+
 SARIF output is a findings export. It is not security attestation, compliance
 approval, certification, or reviewer sign-off.
 
@@ -252,3 +270,25 @@ For a reviewer-facing evidence pack:
 Do not describe the package as NAOS approval, regulator acceptance, legal
 advice, or proof that the system is compliant, safe, complete, or deployed
 correctly.
+
+### Aggregate collection format v2
+
+New evidence packs and dashboard JSON use version 2 local source references,
+with exact collected SHA256 and byte length. Include the selected original
+reports with the aggregate handoff. A reference is historical collection
+metadata, not evidence verification, approval, or proof of secret coverage.
+`read_collection_entry` preserves legacy embedded payloads and resolves new
+references only inside the supplied review root with exact collected bytes.
+Missing, changed, unsafe, malformed, or oversized originals leave details
+unavailable and requirements unresolved. No automatic retention or relocation
+map is provided; byte-identical originals at the same relative paths can be
+reviewed under a different supplied root.
+
+Classification inventories use exact count, canonical collection digest, and
+source bucket references; records remain in the original scanned report. The
+finite maturity collection witness preserves the existing stable-state and L2
+comparison, without authenticating its metadata or claiming promotion. Unknown
+aggregate or witness versions are refused. Publication above 8 MiB fails before
+replacing either aggregate output; original reports and detector/capture bounds
+are unchanged. Explicit non-policy output aliases receive no claim allowance
+without a separately established dispatch binding.

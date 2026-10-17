@@ -6,16 +6,21 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from jsonschema import Draft202012Validator, FormatChecker
 
 import yaml  # type: ignore[import-untyped]
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+
+from naos_ai_surfaces import DEFAULT_PATHS, INSTRUCTION_NAMES, discovered_surface_type, MCP_CONFIGURATION_PATHS, cursor_skill_path, checked_path, literal_path, load_surface_rules, scan_files  # noqa: E402
 
 from naos_policy import (  # noqa: E402
     controlled_utc_now_text,
@@ -24,6 +29,7 @@ from naos_policy import (  # noqa: E402
     finding_counts,
     kit_root,
     load_policy,
+    load_yaml_temporal_text,
     normalize_profile,
     report_default_path,
     report_output_path,
@@ -137,7 +143,8 @@ def parse_time(value: Any) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo is not None and parsed.utcoffset() is not None else None
     except ValueError:
         return None
 
@@ -145,9 +152,36 @@ def parse_time(value: Any) -> datetime | None:
 def age_days(value: Any, now_text: str) -> int | None:
     timestamp = parse_time(value)
     now = parse_time(now_text)
-    if timestamp is None or now is None:
+    if timestamp is None or now is None or timestamp > now:
         return None
-    return max(0, (now - timestamp).days)
+    return (now - timestamp).days
+
+
+def baseline_timestamp(baseline: dict[str, Any]) -> Any:
+    # A present but invalid override is evidence to repair, not permission to
+    # substitute an older timestamp and silently bypass freshness evaluation.
+    return baseline.get("last_behavioral_baseline_at") if "last_behavioral_baseline_at" in baseline else baseline.get("generated_at")
+
+
+def validate_baseline_metadata(baseline: dict[str, Any], now_text: str) -> list[str]:
+    issues: list[str] = []
+    if baseline.get("schema") != "naos.behavioral_baseline_state.v1":
+        issues.append("unsupported_or_missing_schema")
+    if baseline.get("profile") not in ("quickstart", "lite", "standard", "assured"):
+        issues.append("unsupported_or_missing_profile")
+    fingerprints = baseline.get("fingerprints")
+    if not isinstance(fingerprints, dict) or any(
+        not isinstance(key, str) or not key or not isinstance(value, str) or not value
+        for key, value in fingerprints.items()
+    ):
+        issues.append("fingerprints_must_map_nonempty_strings_to_nonempty_strings")
+    if parse_time(now_text) is None:
+        issues.append("comparison_time_requires_explicit_utc_offset")
+    if parse_time(baseline_timestamp(baseline)) is None:
+        issues.append("baseline_time_requires_explicit_utc_offset")
+    elif parse_time(now_text) is not None and age_days(baseline_timestamp(baseline), now_text) is None:
+        issues.append("baseline_time_is_in_the_future")
+    return issues
 
 
 def as_mapping(value: Any) -> dict[str, Any]:
@@ -175,7 +209,7 @@ def load_structured_mapping(path: Path) -> dict[str, Any]:
     if path.suffix.lower() == ".json":
         data = json.loads(path.read_text(encoding="utf-8"))
     else:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data = load_yaml_temporal_text(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"Expected mapping: {path}")
     return data
@@ -221,27 +255,31 @@ def safe_digest(path: Path) -> str | None:
 
 
 def digest_directory(path: Path, max_files: int) -> tuple[str | None, bool, int]:
-    if not path.is_dir():
-        return None, False, 0
+    digest, meta = digest_path(path, max_files)
+    return digest, meta["truncated"], meta["file_count"]
+
+
+def digest_path(path: Path, max_files: int, root: Path | None = None) -> tuple[str | None, dict[str, Any]]:
+    root = root or path.parent
+    files, meta = scan_files(root, path.relative_to(root).as_posix(), max_files)
     digest = hashlib.sha256()
-    files = [item for item in sorted(path.rglob("*")) if item.is_file()]
-    truncated = len(files) > max_files
-    for item in files[:max_files]:
-        rel = item.relative_to(path).as_posix()
-        digest.update(rel.encode("utf-8"))
-        item_hash = safe_digest(item)
-        if item_hash:
+    try:
+        for item in files:
+            checked_path(root, item.relative_to(root).as_posix())
+            item_hash = safe_digest(item)
+            if item_hash is None:
+                raise ValueError("file disappeared during fingerprinting")
+            if meta["type"] == "file":
+                return item_hash, meta
+            digest.update(item.relative_to(path).as_posix().encode("utf-8"))
             digest.update(item_hash.encode("ascii"))
-    return digest.hexdigest(), truncated, len(files)
-
-
-def digest_path(path: Path, max_files: int) -> tuple[str | None, dict[str, Any]]:
-    if path.is_file():
-        return safe_digest(path), {"type": "file", "present": True, "truncated": False, "file_count": 1}
-    if path.is_dir():
-        digest, truncated, count = digest_directory(path, max_files)
-        return digest, {"type": "directory", "present": True, "truncated": truncated, "file_count": count}
-    return None, {"type": "missing", "present": False, "truncated": False, "file_count": 0}
+    except (OSError, ValueError) as exc:
+        meta["complete"] = False
+        meta["issues"].append({"path": meta["path"], "reason": str(exc)})
+    # Partial fingerprints cannot serve as current baseline evidence.
+    if not meta["complete"] or not meta["present"]:
+        return None, meta
+    return digest.hexdigest(), meta
 
 
 def conformance_path(root: Path, naos_root: str, policy: dict[str, Any]) -> Path:
@@ -265,22 +303,109 @@ def report_path_for(root: Path, naos_root: str, policy: dict[str, Any], key: str
     return safe_policy_path(root / naos_root, key, field=key)
 
 
-def report_status(data: dict[str, Any], key: str) -> str:
-    status = data.get("status") or data.get("health_status") or data.get("readiness_status")
-    if status:
-        return str(status)
+def confirmed_absent_path(path: Path) -> bool:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
+PREREQUISITE_SCHEMAS = {
+    "static_grader_report": "static_grader_report.schema.json",
+    "grader_assessment_report": "grader_assessment.schema.json",
+    "llm_grader_readiness_report": "llm_grader_readiness.schema.json",
+}
+
+
+def finite_number(value: Any) -> bool:
+    try:
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def conformance_contract_issues(data: dict[str, Any]) -> list[str]:
+    """Check the deterministic runner's count/score contract, not behavioral grading."""
+    issues: list[str] = []
+    try:
+        datetime.fromisoformat(data.get("run_date", "").replace("Z", "+00:00"))
+    except (AttributeError, TypeError, ValueError):
+        issues.append("run_date:invalid")
+    if data.get("mode") != "conformance":
+        issues.append("mode:invalid")
+    passed = total = 0
+    for key in ("structural_checks", "frontmatter_checks", "battery_checks"):
+        section = data.get(key)
+        if not isinstance(section, dict):
+            issues.append(f"{key}:object_required")
+            continue
+        count, size = section.get("passed"), section.get("total")
+        if type(count) is not int or type(size) is not int or not 0 <= count <= size:
+            issues.append(f"{key}:invalid_counts")
+            continue
+        passed += count
+        total += size
+        expected = round(count / size, 3) if size else None
+        score = section.get("score")
+        if "score" not in section or (expected is None and score is not None) or (expected is not None and (not finite_number(score) or score != expected)):
+            issues.append(f"{key}:inconsistent_score")
+        if key == "frontmatter_checks":
+            results = section.get("results")
+            if not isinstance(results, list) or len(results) != size or any(
+                not isinstance(item, dict) or not isinstance(item.get("name"), str)
+                or type(item.get("passed")) is not bool or not isinstance(item.get("note"), str)
+                for item in results
+            ):
+                issues.append(f"{key}:invalid_results")
+            elif sum(item["passed"] for item in results) != count:
+                issues.append(f"{key}:inconsistent_results")
+    score = data.get("overall_conformance")
+    expected = round(passed / total, 3) if total else None
+    if "overall_conformance" not in data or (expected is None and score is not None) or (expected is not None and (not finite_number(score) or score != expected)):
+        issues.append("overall_conformance:inconsistent_score")
+    dimensions = data.get("dimensions")
+    names = ("D1_rule_compliance", "D2_agent_instructions", "D3_scoped_instructions", "D4_prompt_templates", "D5_efficiency", "D6_portability", "D7_session_hygiene", "D8_ai_output_quality")
+    if not isinstance(dimensions, dict) or any(name not in dimensions or (dimensions[name] is not None and (not finite_number(dimensions[name]) or not 0 <= dimensions[name] <= 1)) for name in names):
+        issues.append("dimensions:invalid")
+    if type(data.get("scenarios_run")) is not int or data["scenarios_run"] < 0:
+        issues.append("scenarios_run:invalid")
+    if not finite_number(data.get("cost_usd")) or data["cost_usd"] < 0:
+        issues.append("cost_usd:invalid")
+    return issues
+
+
+def prerequisite_contract_issues(data: dict[str, Any], key: str) -> list[str]:
     if key == "conformance_latest":
-        if "overall_conformance" not in data:
-            return "present"
-        score_value = data.get("overall_conformance")
-        if isinstance(score_value, bool):
-            return "parse_error"
-        try:
-            score = float(score_value)
-        except (TypeError, ValueError):
-            return "parse_error"
-        return "pass" if score == 1.0 else "failed"
-    return "present"
+        return conformance_contract_issues(data)
+    filename = PREREQUISITE_SCHEMAS.get(key)
+    if filename is None:
+        return ["report_contract:unavailable"]
+    try:
+        schema = json.loads((kit_root() / "schemas" / "naos" / filename).read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        validator = Draft202012Validator(schema, format_checker=FormatChecker())
+        issues = sorted({"/".join(str(part) for part in error.absolute_path) + ":" + str(error.validator) for error in validator.iter_errors(data)})
+    except Exception as exc:
+        # Missing or damaged local contracts must never silently skip validation.
+        return ["report_contract:unavailable:" + type(exc).__name__]
+    if key == "llm_grader_readiness_report":
+        cost = data.get("cost_posture")
+        if isinstance(cost, dict) and not finite_number(cost.get("cost_usd")):
+            issues.append("cost_posture/cost_usd:finite_number_required")
+    return issues
+
+
+def report_status(data: dict[str, Any], key: str) -> str:
+    if key == "conformance_latest":
+        if conformance_contract_issues(data):
+            return "invalid_contract"
+        sections = [data[name] for name in ("structural_checks", "frontmatter_checks", "battery_checks")]
+        # Rounded 1.0 alone must not hide a failed check or an empty run.
+        return "pass" if sum(item["total"] for item in sections) > 0 and all(item["passed"] == item["total"] for item in sections) else "failed"
+    return str(data.get("status") or data.get("health_status") or data.get("readiness_status") or "present")
 
 
 def load_json_report(path: Path, key: str) -> tuple[dict[str, Any], str]:
@@ -316,6 +441,10 @@ def profile_severity(profile: str, default: str = "advisory") -> str:
 def summarize_report_input(root: Path, naos_root: str, policy: dict[str, Any], key: str, required: bool) -> tuple[dict[str, Any], dict[str, Any] | None]:
     path = report_path_for(root, naos_root, policy, key)
     data, status = load_json_report(path, key)
+    issues = prerequisite_contract_issues(data, key) if data and (required or key in PREREQUISITE_SCHEMAS) else []
+    if status not in {"missing", "parse_error"} and (issues or not data):
+        status = "invalid_contract"
+        issues = issues or ["report_contract:empty"]
     item = {
         "id": key,
         "path": str(path),
@@ -325,6 +454,7 @@ def summarize_report_input(root: Path, naos_root: str, policy: dict[str, Any], k
         "schema": data.get("schema"),
         "generated_at": data.get("generated_at") or data.get("run_date"),
         "hash": safe_digest(path),
+        "contract_issues": issues,
     }
     return item, data if data else None
 
@@ -348,23 +478,23 @@ def rules_report_keys(rules: dict[str, Any], key: str, defaults: list[str]) -> l
     return result or defaults
 
 
-def configured_impacter_paths(rules: dict[str, Any]) -> list[str]:
-    values = [str(item) for item in as_list(rules.get("impacter_paths")) if str(item).strip()]
+def configured_impacter_paths(rules: dict[str, Any], naos_root: str = "naos", surfaces: list[str] | None = None) -> list[str]:
+    values = rules.get("impacter_paths", [])
+    if not isinstance(values, list):
+        raise ValueError("impacter_paths must be a list of literal relative paths")
     if values:
-        return values
-    return [
-        "naos/behavioral_governance_readiness_rules.yaml",
-        "naos/llm_grader_readiness_rules.yaml",
-        "naos/ai_surface_context_budget_rules.yaml",
-        "naos/agent_trace_events.yaml",
+        return list(dict.fromkeys(literal_path(value) for value in values))
+    return list(dict.fromkeys([
+        f"{naos_root}/behavioral_governance_readiness_rules.yaml",
+        f"{naos_root}/llm_grader_readiness_rules.yaml",
+        f"{naos_root}/ai_surface_context_budget_rules.yaml",
+        f"{naos_root}/agent_trace_events.yaml",
         "configs/naos_autoresearch.yaml",
         ".github/configs/naos_autoresearch.yaml",
         ".github/autoresearch/task_battery",
         ".github/workflows",
-        ".claude/settings.json",
-        "AGENTS.md",
-        "CLAUDE.md",
-    ]
+        *(DEFAULT_PATHS if surfaces is None else surfaces),
+    ]))
 
 
 def collect_readiness_inputs(
@@ -386,15 +516,21 @@ def collect_readiness_inputs(
         if data is not None:
             data_by_key[key] = data
         if key in required and not item["present"]:
-            findings.append(
-                finding(
-                    f"behavioral_readiness.missing_{key}",
-                    profile_severity(profile, "warning"),
-                    "not_ready",
-                    f"Required deterministic input `{key}` is missing.",
-                    evidence={"path": item["path"]},
-                )
+            missing_finding = finding(
+                f"behavioral_readiness.missing_{key}",
+                profile_severity(profile, "warning"),
+                "not_ready",
+                f"Required deterministic input `{key}` is missing.",
+                evidence={"path": item["path"]},
             )
+            if item.get("path") and confirmed_absent_path(Path(item["path"])):
+                missing_finding.update(
+                    evidence_classification="confirmed",
+                    classification_scope="selected_required_report_absent_at_readiness_check",
+                    reasoning_summary="The selected required report path did not exist at this check; this does not establish why it is absent or make the readiness input optional.",
+                    source_path=str(Path(__file__).resolve()),
+                )
+            findings.append(missing_finding)
         elif key in required and item["status"] not in REPORT_STATUS_OK:
             findings.append(
                 finding(
@@ -402,13 +538,19 @@ def collect_readiness_inputs(
                     profile_severity(profile, "warning"),
                     "not_ready",
                     f"Required deterministic input `{key}` has status `{item['status']}`.",
-                    evidence={"path": item["path"], "status": item["status"]},
+                    evidence={"path": item["path"], "status": item["status"], "contract_issues": item["contract_issues"]},
                 )
             )
 
     llm_item = next((item for item in inputs if item["id"] == "llm_grader_readiness_report"), None)
     llm_data = data_by_key.get("llm_grader_readiness_report") or {}
-    if llm_item and llm_item["present"]:
+    if llm_item and llm_item["present"] and llm_item["status"] in {"invalid_contract", "parse_error"} and not llm_item["required"]:
+        findings.append(finding(
+            "behavioral_readiness.invalid_llm_readiness_contract", "blocking", "not_ready",
+            "Present LLM readiness input cannot establish a safe posture because its contract is invalid.",
+            evidence={"path": llm_item["path"], "contract_issues": llm_item["contract_issues"]},
+        ))
+    if llm_item and llm_item["present"] and llm_item["status"] not in {"invalid_contract", "parse_error"}:
         unsafe = llm_readiness_unsafe(llm_data, str(llm_item["status"]))
         if unsafe:
             findings.append(
@@ -442,24 +584,47 @@ def collect_current_fingerprints(
         if item.get("present") and item.get("hash"):
             fingerprints[f"report:{item['id']}"] = str(item["hash"])
 
-    max_files = int(as_mapping(rules.get("path_fingerprinting")).get("max_files_per_path") or 200)
-    for rel_text in configured_impacter_paths(rules):
-        rel = Path(rel_text)
-        if rel.is_absolute() or ".." in rel.parts:
-            metadata.append({"id": f"path:{rel_text}", "present": False, "ignored": True, "reason": "unsafe_path"})
-            continue
-        path = root / rel
-        digest, meta = digest_path(path, max_files)
-        item = {"id": f"path:{rel_text}", "path": str(path), **meta}
+    try:
+        settings = rules.get("path_fingerprinting", {})
+        if not isinstance(settings, dict):
+            raise ValueError("path_fingerprinting must be a mapping")
+        max_files = settings.get("max_files_per_path", 200)
+        if type(max_files) is not int or not 1 <= max_files <= 100000:
+            raise ValueError("max_files_per_path must be an integer from 1 to 100000")
+        surfaces = list(DEFAULT_PATHS)
+        if not rules.get("impacter_paths"):
+            surface_rules = load_surface_rules(root, naos_root, policy)
+            if surface_rules["invalid_config"]:
+                raise ValueError("invalid inventory surface rules")
+            surfaces = surface_rules["effective_patterns"]
+        paths = configured_impacter_paths(rules, naos_root, surfaces)
+        if not rules.get("impacter_paths"):
+            discovered, discovery = scan_files(root, None, surface_rules["limits"]["max_discovery_files"])
+            metadata.append({"id": "instruction_discovery", **discovery})
+            paths = list(dict.fromkeys(paths + [path.relative_to(root).as_posix()
+                for path in discovered if discovered_surface_type(path.relative_to(root).as_posix(), surfaces) is not None]))
+    except (ValueError, TypeError) as exc:
+        metadata.append({"id": "path_configuration", "present": False, "ignored": True, "complete": False, "reason": str(exc)})
+        return fingerprints, metadata
+    for rel_text in paths:
+        path = root / rel_text
+        digest, meta = digest_path(path, max_files, root)
+        item = {"id": f"path:{rel_text}", "path": str(path), **meta, "host_surface": rel_text in surfaces}
         metadata.append(item)
         if digest:
             fingerprints[f"path:{rel_text}"] = digest
     return fingerprints, metadata
 
 
-def impact_severity(key: str) -> str:
+def impact_severity(key: str, host_paths: list[str] | None = None) -> str:
     if key in HIGH_IMPACT_KEYS:
         return "high"
+    if key.startswith("path:"):
+        relative = key.removeprefix("path:")
+        if Path(relative).name in INSTRUCTION_NAMES or relative in MCP_CONFIGURATION_PATHS or cursor_skill_path(relative):
+            return "medium"
+    if any(key == "path:" + path or key.startswith("path:" + path + "/") for path in (DEFAULT_PATHS if host_paths is None else host_paths)):
+        return "medium"
     if any(key.startswith(prefix) for prefix in MEDIUM_IMPACT_PREFIXES):
         return "medium"
     return "low"
@@ -471,6 +636,7 @@ def compare_baseline(
     profile: str,
     rules: dict[str, Any],
     now_text: str,
+    host_paths: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     impacters: list[dict[str, Any]] = []
@@ -493,7 +659,7 @@ def compare_baseline(
         previous = baseline_fingerprints.get(key)
         if current == previous:
             continue
-        severity = impact_severity(key)
+        severity = impact_severity(key, host_paths)
         impacters.append(
             {
                 "id": key,
@@ -505,20 +671,21 @@ def compare_baseline(
             }
         )
 
-    baseline_time = baseline.get("last_behavioral_baseline_at") or baseline.get("generated_at")
+    baseline_time = baseline_timestamp(baseline)
     days = age_days(baseline_time, now_text)
     max_age_days = int(as_mapping(rules.get("baseline_state")).get("max_age_days") or rules.get("max_age_days") or 90)
     required_age_days = int(as_mapping(rules.get("baseline_state")).get("required_after_days") or max_age_days * 2)
-    if days is None and baseline_time:
+    if days is None:
         findings.append(
             finding(
                 "behavioral_readiness.baseline_timestamp_unparseable",
                 "warning",
                 "maintenance_recommended",
-                "Baseline timestamp could not be parsed.",
+                "Baseline age is unresolved: timestamps must have explicit UTC offsets and the baseline must not be in the future.",
                 evidence={"baseline_time": baseline_time},
             )
         )
+        impacters.append({"id": "baseline_age", "category": "baseline_age", "severity": "medium", "status": "unresolved_timestamp"})
     elif days is not None and days > max_age_days:
         severity = "high" if profile == "assured" and days > required_age_days else "medium"
         impacters.append(
@@ -617,7 +784,7 @@ def recommended_next_steps(
     deterministic_refresh = [
         command_item(
             "self_check",
-            f"naos self-check --profile {profile}",
+            f"naos self-check --profile {profile} --refresh",
             "deterministic",
             "Refresh deterministic control-plane posture before relying on behavioral readiness.",
         ),
@@ -780,15 +947,31 @@ def build_report(
     if project_rules_present:
         findings.extend(input_findings)
     current_fingerprints, path_metadata = collect_current_fingerprints(root, naos_root, policy, rules_path, rules, inputs, profile)
+    if any(not item.get("complete", True) for item in path_metadata):
+        findings.append(finding(
+            "behavioral_readiness.incomplete_fingerprints", "warning", "not_ready",
+            "Configured fingerprint coverage is incomplete; resolve invalid paths, read failures or truncation before baselining.",
+            evidence={"incomplete_paths": [item["id"] for item in path_metadata if not item.get("complete", True)]},
+        ))
 
     baseline_present = baseline_path.exists()
     baseline_state: dict[str, Any] = {}
     baseline_error: str | None = None
+    baseline_validation: dict[str, Any] = {"status": "not_present", "issues": []}
     if baseline_present:
         try:
             baseline_state = load_structured_mapping(baseline_path)
+            issues = validate_baseline_metadata(baseline_state, now_text)
+            baseline_validation = {"status": "invalid" if issues else "valid", "issues": issues}
+            if issues:
+                findings.append(finding(
+                    "behavioral_readiness.baseline_metadata_invalid", "blocking", "not_ready",
+                    "Present baseline metadata is invalid; repair it through human-reviewed baseline maintenance.",
+                    evidence={"path": str(baseline_path), "issues": issues},
+                ))
         except Exception as exc:
             baseline_error = str(exc)
+            baseline_validation = {"status": "invalid", "issues": ["baseline_parse_error"]}
             findings.append(
                 finding(
                     "behavioral_readiness.baseline_parse_error",
@@ -802,8 +985,8 @@ def build_report(
     impacters: list[dict[str, Any]] = []
     baseline_findings: list[dict[str, Any]] = []
     readiness_findings = [item for item in findings if item.get("status") == "not_ready" or item.get("severity") == "blocking"]
-    if baseline_present and baseline_state and not readiness_findings:
-        impacters, baseline_findings = compare_baseline(baseline_state, current_fingerprints, profile, rules, now_text)
+    if baseline_validation["status"] == "valid" and not readiness_findings:
+        impacters, baseline_findings = compare_baseline(baseline_state, current_fingerprints, profile, rules, now_text, [item["id"][5:] for item in path_metadata if item.get("host_surface")])
         findings.extend(baseline_findings)
 
     status = status_from_state(rules_source, project_rules_present, readiness_findings, baseline_present, impacters)
@@ -848,6 +1031,7 @@ def build_report(
         **counts,
         "status": status,
         "baseline_present": baseline_present,
+        "baseline_validation_status": baseline_validation["status"],
         "total_impacters": len(impacters),
         "high_impacters": severity_counts["high"],
         "medium_impacters": severity_counts["medium"],
@@ -879,6 +1063,7 @@ def build_report(
         "baseline_state_path": str(baseline_path),
         "baseline_state_present": baseline_present,
         "baseline_state_error": baseline_error,
+        "baseline_validation": baseline_validation,
         "baseline_state": baseline_state if baseline_present else {},
         "current_fingerprints": current_fingerprints,
         "fingerprinted_paths": path_metadata,

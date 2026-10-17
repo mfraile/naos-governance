@@ -56,6 +56,7 @@
     "baseline_state_present": { "type": "boolean" },
     "baseline_state_error": { "type": ["string", "null"] },
     "baseline_state": { "type": "object" },
+    "baseline_validation": {"type": "object", "required": ["status", "issues"], "properties": {"status": {"enum": ["not_present", "valid", "invalid"]}, "issues": {"type": "array", "items": {"type": "string"}}}},
     "current_fingerprints": { "type": "object" },
     "fingerprinted_paths": { "type": "array", "items": { "type": "object" } },
     "readiness_inputs": { "type": "array", "items": { "type": "object" } },

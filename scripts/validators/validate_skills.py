@@ -14,9 +14,14 @@ if __package__ in (None, ""):
         ValidationResult,
         build_root_parser,
         candidate_files,
+        metadata_host_paths,
+        MetadataScopeError,
+        METADATA_SCOPE_PATH,
+        scoped_frontmatter_results,
         collect_markdown_targets,
         is_non_empty_string,
         parse_frontmatter,
+        skill_authoring_metadata,
         print_results,
     )
 else:  # pragma: no cover - package import path
@@ -24,11 +29,19 @@ else:  # pragma: no cover - package import path
         ValidationResult,
         build_root_parser,
         candidate_files,
+        metadata_host_paths,
+        MetadataScopeError,
+        METADATA_SCOPE_PATH,
+        scoped_frontmatter_results,
         collect_markdown_targets,
         is_non_empty_string,
         parse_frontmatter,
+        skill_authoring_metadata,
         print_results,
     )
+
+
+SKILL_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
 WHEN_TO_INVOKE_HEADING = re.compile(
@@ -38,20 +51,24 @@ WHEN_TO_INVOKE_HEADING = re.compile(
 
 
 def default_skill_files(root: Path) -> list[Path]:
-    return candidate_files(root, "templates/skills/*/SKILL.md", ".github/skills/*/SKILL.md")
+    scope = metadata_host_paths(root)
+    files = candidate_files(root, "templates/skills/*/SKILL.md", ".github/skills/*/SKILL.md")
+
+    return sorted({p.resolve(): p for p in files + [p for p, k in scope.items() if k == 'skill']}.values(), key=lambda p: p.as_posix())
 
 
-def parameters_are_well_formed(value: Any) -> bool:
-    if not isinstance(value, list):
-        return False
-    for entry in value:
-        if not isinstance(entry, dict):
-            return False
-        if not is_non_empty_string(entry.get("name")):
-            return False
-        if not is_non_empty_string(entry.get("description")):
-            return False
-    return True
+def collect_skill_targets(inputs: list[str], default_files: list[Path]) -> list[Path]:
+    if not inputs:
+        return default_files
+    targets = []
+    for raw in inputs:
+        path = Path(raw).absolute()
+        if path.is_file() or path.is_symlink():
+            targets.append(path)
+        elif path.is_dir():
+            targets.extend(sorted(path.rglob("SKILL.md")))
+    return targets
+
 
 
 def validate_skill_file(path: Path) -> list[ValidationResult]:
@@ -59,12 +76,35 @@ def validate_skill_file(path: Path) -> list[ValidationResult]:
     if document.error:
         return [ValidationResult(path, "frontmatter", False, document.error)]
 
+    try:
+        skill_authoring_metadata(document.data)
+        declaration_error = None
+    except ValueError as exc:
+        declaration_error = str(exc)
+
+    name = document.data.get("name")
+    description = document.data.get("description")
     return [
         ValidationResult(
             path,
+            "name",
+            isinstance(name, str)
+            and 1 <= len(name) <= 64
+            and SKILL_NAME.fullmatch(name) is not None
+            and name == path.parent.name,
+            "required field 'name' must match the parent directory exactly and use 1-64 lowercase ASCII letters/digits with single internal hyphens",
+        ),
+        ValidationResult(
+            path,
+            "description",
+            is_non_empty_string(description) and len(description) <= 1024,
+            "required field 'description' must be a non-empty string of at most 1024 characters",
+        ),
+        ValidationResult(
+            path,
             "parameters",
-            parameters_are_well_formed(document.data.get("parameters")),
-            "required field 'parameters' must be a list of mappings with non-empty name and description",
+            declaration_error is None,
+            declaration_error or "portable frontmatter and optional namespaced NAOS inputs are well formed",
         ),
         ValidationResult(
             path,
@@ -75,20 +115,20 @@ def validate_skill_file(path: Path) -> list[ValidationResult]:
     ]
 
 
-def validate_skill_files(paths: list[Path]) -> list[ValidationResult]:
-    skill_files = [path for path in paths if path.name == "SKILL.md"]
-    results: list[ValidationResult] = []
-    for path in skill_files:
-        results.extend(validate_skill_file(path))
-    return results
+def validate_skill_files(paths: list[Path], *, root: Path | None = None) -> list[ValidationResult]:
+    files = [path for path in paths if path.name == "SKILL.md"]
+    return scoped_frontmatter_results(files, root, "skill", validate_skill_file)
 
 
 def main() -> int:
     parser = build_root_parser("Validate NAOS SKILL.md frontmatter")
     args = parser.parse_args()
     root = Path(args.root).resolve()
-    targets = collect_markdown_targets(args.paths, default_skill_files(root))
-    results = validate_skill_files(targets)
+    try:
+        targets = collect_skill_targets(args.paths, default_skill_files(root))
+        results = validate_skill_files(targets, root=root)
+    except MetadataScopeError as exc:
+        results = [ValidationResult(root / METADATA_SCOPE_PATH, "metadata-scope", False, str(exc))]
     return print_results("Skill Frontmatter", root, results)
 
 

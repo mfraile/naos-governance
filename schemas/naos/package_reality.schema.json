@@ -39,6 +39,7 @@
     "registry_mode": {"type": "string", "enum": ["offline", "online"]},
     "network_used": {"type": "boolean"},
     "cost_posture": {"$ref": "#/$defs/cost_posture"},
+    "unsupported_manifest_inventory": {"$ref": "#/$defs/unsupported_manifest_inventory"},
     "summary": {"type": "object", "additionalProperties": true},
     "scans": {"type": "object", "additionalProperties": true},
     "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
@@ -50,6 +51,121 @@
     "human_review_required": {"type": "boolean"}
   },
   "$defs": {
+    "unsupported_manifest_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "scope",
+        "roots",
+        "patterns",
+        "excluded_dirs",
+        "entries_visited",
+        "unsupported_manifests",
+        "issues",
+        "limits"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "incomplete"
+          ]
+        },
+        "scope": {
+          "const": "selected_unsupported_manifest_inventory_only"
+        },
+        "roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excluded_dirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entries_visited": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unsupported_manifests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "matched_patterns",
+              "dependency_assessment"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "matched_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "dependency_assessment": {
+                "const": "not_assessed"
+              }
+            }
+          }
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "reason"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "max_depth": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "max_manifests": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            }
+          }
+        }
+      }
+    },
     "cost_posture": {
       "type": "object",
       "additionalProperties": false,

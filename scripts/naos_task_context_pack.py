@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,6 +19,10 @@ import yaml
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+
+from naos_self_check_inspection import (
+    inspection_active, inspection_output_path, inspection_logical_path,
+)  # noqa: E402
 
 from naos_policy import (  # noqa: E402
     controlled_now_utc,
@@ -34,6 +39,8 @@ from naos_policy import (  # noqa: E402
     severity_for_profile,
     write_report,
 )
+from naos_local_context_query import validated_collection_coverage  # noqa: E402
+import spec_header  # noqa: E402
 import naos_pre_implementation_alignment_review as pia  # noqa: E402
 from naos_task_lifecycle import (  # noqa: E402
     extract_acceptance_criteria,
@@ -46,6 +53,7 @@ from naos_task_lifecycle import (  # noqa: E402
 
 REPORT_SCHEMA = "naos.task_context_pack.v1"
 SPEC_REF_PATTERN = re.compile(r"(specs/[A-Za-z0-9_./-]+\.md(?:#[A-Za-z0-9_.:-]+)?)")
+MAX_SPEC_BYTES = 2_000_000
 DEFAULT_CARD_SECTIONS = [
     "Quick Reference",
     "Schemas to Respect",
@@ -156,6 +164,23 @@ def resolve_rules_path(root: Path, naos_root: str, policy: dict[str, Any], expli
     return default_rules_template(), "template"
 
 
+def _inspection_report_paths(root: Path, naos_root: str, value: Any) -> Any:
+    """Translate only declared path fields; bytes/stat/read operands stay physical."""
+    if not inspection_active(root, naos_root):
+        return value
+    if isinstance(value, list):
+        return [_inspection_report_paths(root, naos_root, item) for item in value]
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if key in {"path", "target_db_path", "lock_path", "target", "source"} and isinstance(item, str) and Path(item).is_absolute():
+                result[key] = str(inspection_logical_path(root, naos_root, Path(item)))
+            else:
+                result[key] = _inspection_report_paths(root, naos_root, item)
+        return result
+    return value
+
+
 def markdown_output_path(root: Path, naos_root: str, policy: dict[str, Any], task_id: str) -> Path | None:
     if not task_id or is_kit_repository(root, naos_root):
         return None
@@ -173,11 +198,14 @@ def artifact_record(
     role: str,
     freshness_days: int,
     now: datetime,
+    *,
+    naos_root: str | None = None,
 ) -> dict[str, Any]:
+    logical = inspection_logical_path(root, naos_root, path) if naos_root is not None else path
     exists = path.exists()
     record: dict[str, Any] = {
         "role": role,
-        "path": portable_artifact_ref(path, root),
+        "path": portable_artifact_ref(logical, root),
         "status": "present" if exists else "missing",
     }
     if not exists:
@@ -186,7 +214,7 @@ def artifact_record(
     if path.is_file():
         stat = path.stat()
         try:
-            external_kit_resource = not path.resolve().is_relative_to(root.resolve())
+            external_kit_resource = not logical.resolve().is_relative_to(root.resolve())
         except (OSError, RuntimeError):
             external_kit_resource = True
         if external_kit_resource:
@@ -225,12 +253,14 @@ def add_artifact(
     role: str,
     freshness_days: int,
     now: datetime,
+    *,
+    naos_root: str | None = None,
 ) -> dict[str, Any]:
     key = (role, str(path))
     if key in seen:
         return {}
     seen.add(key)
-    record = artifact_record(root, path, role, freshness_days, now)
+    record = artifact_record(root, path, role, freshness_days, now, naos_root=naos_root)
     artifacts.append(record)
     return record
 
@@ -460,26 +490,95 @@ def collect_spec_refs(task_card: dict[str, Any], registry: dict[str, Any]) -> li
     return list(dict.fromkeys(refs))
 
 
+def _spec_path(root: Path, relative: str) -> Path:
+    """Accept portable regular spec paths, without links or reparse points."""
+    parts = relative.split("/")
+    devices = {"con", "prn", "aux", "nul"} | {f"{p}{n}" for p in ("com", "lpt") for n in range(1, 10)}
+    if (len(parts) < 2 or parts[0] != "specs"
+            or any(c in relative for c in '\\:*?"<>|')
+            or any(ord(c) < 32 or ord(c) == 127 for c in relative)
+            or any(not p or p in {".", ".."} or p.endswith((".", " "))
+                   or p.split(".", 1)[0].lower() in devices for p in parts)):
+        raise ValueError("Spec reference must be a portable path beneath specs/")
+    current = root.resolve(strict=True)
+    for index, part in enumerate(parts):
+        current = current / part
+        metadata = current.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & 0x400:
+            raise ValueError("Spec links and reparse points are not read")
+        if index < len(parts) - 1:
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise ValueError("Spec ancestor is not a directory")
+        elif not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise ValueError("Spec must be a regular file with one link")
+    return current
+
+
+def _spec_snapshot(root: Path, relative: str) -> tuple[bytes, os.stat_result]:
+    path = _spec_path(root, relative)
+    expected = path.lstat()
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(path, flags)
+    with os.fdopen(fd, "rb") as handle:
+        before = os.fstat(handle.fileno())
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or (before.st_dev, before.st_ino) != (expected.st_dev, expected.st_ino)
+                or before.st_size > MAX_SPEC_BYTES):
+            raise ValueError("Spec is changed, non-regular or exceeds the 2 MB read limit")
+        data = handle.read(MAX_SPEC_BYTES + 1)
+        after = os.fstat(handle.fileno())
+        current = _spec_path(root, relative).lstat()
+        fields = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
+        # Windows can expose creation time via lstat but change time via
+        # fstat. Check each API against itself without dropping ctime guards.
+        cross_api_fields = tuple(f for f in fields if f != "st_ctime_ns")
+        if (len(data) > MAX_SPEC_BYTES or len(data) != before.st_size
+                or any(getattr(before, f) != getattr(after, f) for f in fields)
+                or any(getattr(expected, f) != getattr(current, f) for f in fields)
+                or any(getattr(before, f) != getattr(expected, f) for f in cross_api_fields)):
+            raise ValueError("Spec changed during its content snapshot")
+    return data, before
+
+
 def summarize_specs(root: Path, refs: list[str], max_chars: int, max_items: int) -> list[dict[str, Any]]:
     summaries = []
     for ref in refs[:max_items]:
         path_part, _, anchor = ref.partition("#")
-        path = root / path_part
         item: dict[str, Any] = {"ref": ref, "path": path_part, "anchor": anchor or None}
-        if path.exists():
+        try:
+            data, metadata = _spec_snapshot(root, path_part)
             item["status"] = "present"
-            text = path.read_text(encoding="utf-8", errors="replace")
-            item["excerpt"] = bounded_text(text, min(max_chars, 700))
-        else:
+            text = data.decode("utf-8", errors="replace")
+            selected = spec_header.section_for_anchor(text, anchor) if anchor else text
+            item["excerpt"] = bounded_text(selected, min(max_chars, 700))
+            item["digest"] = hashlib.sha256(data).hexdigest()
+            item["size_bytes"] = len(data)
+            item["modified_time"] = datetime.fromtimestamp(metadata.st_mtime, UTC).isoformat()
+        except FileNotFoundError:
             item["status"] = "missing"
+        except (OSError, ValueError, RuntimeError) as exc:
+            item.update(status="invalid", reason=str(exc))
         summaries.append(item)
     return summaries
+
+
+def spec_artifact_record(item: dict[str, Any], freshness_days: int, now: datetime) -> dict[str, Any]:
+    """Use the validated snapshot, never reopen a spec to obtain its digest."""
+    record = {key: item[key] for key in ("path", "ref", "anchor", "status", "digest", "size_bytes", "modified_time", "reason") if key in item}
+    record["role"] = "spec"
+    record["freshness"] = item["status"]
+    if item["status"] == "present":
+        age = max(0, (now - datetime.fromisoformat(item["modified_time"])).days)
+        record.update(age_days=age, freshness="stale" if freshness_days >= 0 and age > freshness_days else "fresh",
+                      freshness_basis="project_file_mtime")
+    return record
 
 
 def summarize_capabilities(root: Path, task_id: str, requirement: str | None, max_chars: int, max_items: int) -> list[dict[str, Any]]:
     dirs = [root / "capabilities", root / "naos" / "capabilities", kit_root() / "capabilities"]
     seen: set[Path] = set()
     matches: list[dict[str, Any]] = []
+    matched_data: list[str | None] = []
     needles = [task_id.upper()]
     if requirement:
         needles.append(str(requirement).upper())
@@ -497,6 +596,13 @@ def summarize_capabilities(root: Path, task_id: str, requirement: str | None, ma
                 continue
             haystack = text.upper()
             if any(needle and needle in haystack for needle in needles) or path.name == "task_context_pack.yaml":
+                signature = yaml.safe_dump(data, sort_keys=True) if isinstance(data, dict) and isinstance(data.get("id"), str) else None
+                if signature is not None:
+                    duplicate = next((i for i, prior in enumerate(matched_data) if prior == signature), None)
+                    if duplicate is not None:
+                        matches[duplicate].setdefault("equivalent_source_paths", []).append(str(path))
+                        continue
+                matched_data.append(signature)
                 matches.append(
                     {
                         "path": str(path),
@@ -526,6 +632,7 @@ def summarize_report(path: Path, name: str, summary_keys: list[str] | None = Non
         "path": str(path),
         "summary": summary,
         "findings_count": len(data.get("findings") or []),
+        **({"collection_coverage": validated_collection_coverage(data.get("collection_coverage"))} if name in {"local_context_index_report", "local_context_query_report"} else {}),
         "human_review_required": bool(data.get("human_review_required")),
         "not_claimed": data.get("not_claimed") or [],
         "limitations": data.get("limitations") or [],
@@ -794,6 +901,9 @@ def build_findings(
                 }
             )
     for artifact in source_artifacts:
+        if artifact.get("role") == "spec" and artifact.get("status") == "invalid":
+            findings.append({"id": "task_context_pack.invalid_spec", "severity": missing_severity,
+                             "status": "review_required", "message": f"Spec reference was refused: {artifact.get('path')}"})
         if artifact.get("freshness") == "stale" and artifact.get("role") in {"active_task_card", "task_registry", "spec", "deterministic_report"}:
             findings.append(
                 {
@@ -880,6 +990,8 @@ def build_markdown(report: dict[str, Any]) -> str:
     lines.append(f"- Function-index posture: `{function_index.get('status')}`")
     local_index = report.get("local_context_index_context") or {}
     lines.append(f"- Local context index posture: `{local_index.get('status')}` (candidate references only)")
+    coverage = local_index.get("collection_coverage") or {}
+    lines.append(f"- Collection capacity coverage: `{coverage.get('status', 'unknown')}`; deferred paths: `{coverage.get('capacity_deferred_paths', 'unknown')}`. Counts do not establish repository completeness.")
     lane = report.get("parallel_lane_context") or {}
     alignment_lane = ((lane.get("pre_implementation_alignment") or {}).get("posture") or {})
     lines.extend(["", "## Parallel Lane Context"])
@@ -1058,12 +1170,16 @@ def build_report(
 
     spec_refs = collect_spec_refs(task_card, task_registry)
     relevant_specs = summarize_specs(root, spec_refs, max_chars, max_items)
+    seen_specs: set[tuple[str, str | None]] = set()
     for item in relevant_specs:
-        add_artifact(artifacts, seen_artifacts, root, root / str(item.get("path")), "spec", freshness_days, now)
+        key = (item["path"], item["anchor"])
+        if key not in seen_specs:
+            artifacts.append(spec_artifact_record(item, freshness_days, now))
+            seen_specs.add(key)
 
     relevant_capabilities = summarize_capabilities(root, task_id, requirement, max_chars, max_items)
     for item in relevant_capabilities:
-        add_artifact(artifacts, seen_artifacts, root, Path(str(item.get("path"))), "capability_card", freshness_days, now)
+        add_artifact(artifacts, seen_artifacts, root, Path(str(item.get("path"))), "capability_card", freshness_days, now, naos_root=naos_root)
 
     reports: dict[str, dict[str, Any]] = {}
     for policy_key, role in REPORT_KEYS.items():
@@ -1076,13 +1192,13 @@ def build_report(
             reports[policy_key] = summarize_memory_use_policy_report(path)
         else:
             reports[policy_key] = summarize_report(path, role)
-        add_artifact(artifacts, seen_artifacts, root, path, "deterministic_report", freshness_days, now)
+        add_artifact(artifacts, seen_artifacts, root, path, "deterministic_report", freshness_days, now, naos_root=naos_root)
 
     source_to_test_map, source_to_test_path = load_source_to_test_map(root, naos_root, policy)
-    add_artifact(artifacts, seen_artifacts, root, source_to_test_path, "source_to_test_map", freshness_days, now)
+    add_artifact(artifacts, seen_artifacts, root, source_to_test_path, "source_to_test_map", freshness_days, now, naos_root=naos_root)
 
     function_index_path = root / naos_root / "inventory" / "FUNCTION_INDEX.yaml"
-    add_artifact(artifacts, seen_artifacts, root, function_index_path, "function_index", freshness_days, now)
+    add_artifact(artifacts, seen_artifacts, root, function_index_path, "function_index", freshness_days, now, naos_root=naos_root)
     function_index_context = reports["function_index_report"] | {
         "function_index_path": str(function_index_path),
         "function_index_present": function_index_path.exists(),
@@ -1280,7 +1396,7 @@ def build_report(
             **counts,
         },
     }
-    return report
+    return _inspection_report_paths(root, naos_root, report)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1341,9 +1457,14 @@ def main(argv: list[str] | None = None) -> int:
     if write_markdown and report.get("task_id"):
         markdown_path = markdown_output_path(root, naos_root, policy, str(report.get("task_id")))
         if markdown_path is not None:
+            logical_markdown = markdown_path
+            markdown_path = inspection_output_path(root, naos_root, logical_markdown)
+            if (inspection_active(root, naos_root) and markdown_path == logical_markdown
+                    and inspection_logical_path(root, naos_root, markdown_path) == markdown_path):
+                raise ValueError("Inspection Markdown is not a registered owned sink")
             markdown_path.parent.mkdir(parents=True, exist_ok=True)
             markdown_path.write_text(build_markdown(report), encoding="utf-8")
-            report["markdown_output"] = {"path": str(markdown_path), "status": "written"}
+            report["markdown_output"] = {"path": str(inspection_logical_path(root, naos_root, markdown_path)), "status": "written"}
             write_report(output, report)
 
     print(json.dumps(report, indent=2, sort_keys=True))

@@ -19,6 +19,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    normalize_boolean_settings,
     default_naos_root,
     exit_code_for_summary,
     finding_counts,
@@ -79,10 +80,45 @@ def as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
 
 
+# Consumed input toggles only; derived report booleans are not configuration.
+BOOLEAN_SETTING_PATHS = (
+    "enabled",
+    "explicit_link_traversal_only",
+    "graph_runtime_enabled",
+    "global_graph_scan_allowed",
+    "graph_database_allowed",
+    "networkx_enabled",
+    "graphml_enabled",
+    "graph_algorithms_enabled",
+    "profile_posture.*.human_review_required",
+    "traversal_limits.require_bounded_results",
+    "traversal_limits.require_explicit_seed_nodes",
+    "source_authority_policy.source_artifacts_remain_authoritative",
+    "source_authority_policy.graph_links_are_candidates_only",
+    "source_authority_policy.graph_links_are_not_truth",
+    "source_authority_policy.cannot_outrank_source_artifacts",
+    "stale_link_policy.required",
+    "stale_link_policy.stale_links_become_findings",
+    "sensitive_link_policy.required",
+    "sensitive_link_policy.sensitive_links_become_findings",
+    "sensitive_link_policy.link_sensitive_content_by_default",
+    "generated_artifact_feedback_loop_policy.generated_context_packs_are_graph_sources_by_default",
+    "task_scoped_traversal_policy.required",
+    "task_scoped_traversal_policy.start_from_explicit_task_spec_artifact_or_query_seed",
+    "memory_policy.graph_private_memory_payloads",
+    "memory_policy.read_engram_db",
+    "memory_policy.call_engram",
+    "memory_policy.call_mcp",
+    "memory_policy.call_memory_tools",
+    "human_review_requirements.standard_required_if_readiness_enabled",
+    "human_review_requirements.assured_required_if_readiness_enabled",
+)
+
+
 def bool_value(value: Any, default: bool = False) -> bool:
     if value is None:
         return default
-    return bool(value)
+    return value if isinstance(value, bool) else False
 
 
 def int_value(value: Any, default: int = 0) -> int:
@@ -321,9 +357,13 @@ def build_report(
     rules_path: Path,
     rules_source: str,
 ) -> dict[str, Any]:
+    rules, invalid_booleans = normalize_boolean_settings(rules, BOOLEAN_SETTING_PATHS)
     generated_at = utc_now_text()
     posture = profile_posture(rules, profile)
     findings = build_findings(rules, profile, posture)
+    if invalid_booleans:
+        severity = "blocking" if profile == "assured" else "required" if profile == "standard" else "warning"
+        findings.append(finding("boolean_setting_invalid", severity, "review_required", "Expected YAML booleans; invalid values evaluated as false: " + ", ".join(invalid_booleans)))
     status = report_status(rules, profile, posture, findings)
     limits = traversal_limits(rules)
     summary = finding_counts(findings)
@@ -339,7 +379,7 @@ def build_report(
             "graph_algorithms_enabled": bool_value(rules.get("graph_algorithms_enabled")),
             "allowed_link_types": len(as_list(rules.get("allowed_link_types"))),
             "max_hops": limits["max_hops"],
-            "human_review_required": bool_value(posture.get("human_review_required")) or any(
+            "human_review_required": bool(invalid_booleans) or bool_value(posture.get("human_review_required")) or any(
                 item.get("severity") in {"required", "blocking"} for item in findings
             ),
         }

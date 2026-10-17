@@ -35,6 +35,40 @@
     "project_root": {"type": "string"},
     "naos_root": {"type": "string"},
     "src_root": {"type": "string"},
+    "source_selection": {
+      "type": "object",
+      "properties": {
+        "supported_source_suffixes": {"type": "array", "items": {"type": "string"}},
+        "unassessed_non_python_files": {"type": "array", "items": {"type": "string"}},
+        "language_coverage": {"type": "string", "enum": ["partial", "python_scope_only"]},
+        "assessment_scope": {
+          "type": "string"
+        },
+        "candidate_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "eligible_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exclusion_reasons": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "content_read_completeness_verified": {
+          "const": false
+        }
+      },
+      "additionalProperties": false
+    },
     "source_roots": {"type": "array", "items": {"type": "string"}},
     "specs_root": {"type": "string"},
     "requirements_spec": {"type": "string"},
@@ -110,7 +144,8 @@
             "stale_status",
             "uncovered_requirement",
             "untraced_source",
-            "unresolved_source_reference"
+            "unresolved_source_reference",
+            "not_evaluated"
           ]
         },
         "category": {"type": "string"},

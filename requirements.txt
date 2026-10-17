@@ -6,8 +6,9 @@
 # function-index similarity provider. Without it, function discovery keeps its
 # deterministic token/Jaccard matching.
 
-PyYAML==6.0.1
+PyYAML==6.0.3
 jsonschema==4.19.2
+referencing==0.37.0
 rfc8785==0.1.4
 
 # Optional provider dependency for project-configured function-index similarity.

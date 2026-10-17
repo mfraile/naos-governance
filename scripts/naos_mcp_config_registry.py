@@ -8,13 +8,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+import ntpath
+import os
+import posixpath
 import stat
+import sys
 import tomllib
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
-from pathlib import Path
+from dataclasses import dataclass, replace
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 from urllib.parse import urlsplit
+
+from naos_secret_patterns import iter_secret_content_matches
 
 SECRET_KEY_MARKERS = (
     "api_key",
@@ -104,7 +110,7 @@ WORKSPACE_SERVER_CONFIGS: tuple[MCPConfigDescriptor, ...] = (
         path=".mcp.json",
         scope="workspace",
         kind="server_definition",
-        clients=("claude_code", "gemini_cli", "local_ide_agents"),
+        clients=("claude_code", "copilot_cli", "local_ide_agents"),
         server_keys=("mcpServers", "servers"),
     ),
     MCPConfigDescriptor(
@@ -112,7 +118,7 @@ WORKSPACE_SERVER_CONFIGS: tuple[MCPConfigDescriptor, ...] = (
         path=".ai/mcp.json",
         scope="workspace",
         kind="server_definition",
-        clients=("claude_code", "gemini_cli", "local_ide_agents"),
+        clients=("local_ide_agents",),
         server_keys=("servers", "mcpServers"),
     ),
     MCPConfigDescriptor(
@@ -148,6 +154,18 @@ WORKSPACE_SERVER_CONFIGS: tuple[MCPConfigDescriptor, ...] = (
         clients=("opencode", "local_ide_agents"),
         server_keys=("mcp",),
     ),
+    MCPConfigDescriptor(
+        id="copilot_workspace_mcp", path=".github/mcp.json", scope="workspace",
+        kind="server_definition", clients=("copilot_cli",), server_keys=("mcpServers",),
+    ),
+    MCPConfigDescriptor(
+        id="codex_workspace_mcp", path=".codex/config.toml", scope="workspace",
+        kind="server_definition", clients=("codex",), config_format="toml", server_keys=("mcp_servers",),
+    ),
+    MCPConfigDescriptor(
+        id="gemini_workspace_mcp", path=".gemini/settings.json", scope="workspace",
+        kind="server_definition", clients=("gemini_cli",), server_keys=("mcpServers",),
+    ),
 )
 
 WORKSPACE_PROJECT_CONFIGS: tuple[MCPConfigDescriptor, ...] = (
@@ -169,6 +187,10 @@ WORKSPACE_CLIENT_POLICY_CONFIGS: tuple[MCPConfigDescriptor, ...] = (
         scope="workspace",
         kind="client_policy",
         clients=("claude_code",),
+    ),
+    MCPConfigDescriptor(
+        id="claude_local_policy", path=".claude/settings.local.json", scope="workspace",
+        kind="client_policy", clients=("claude_code",), server_keys=(),
     ),
 )
 
@@ -296,7 +318,41 @@ USER_SERVER_CONFIGS: tuple[MCPConfigDescriptor, ...] = (
         clients=("muse",),
         server_keys=("mcp_servers",),
     ),
+    MCPConfigDescriptor(
+        id="cursor_user_mcp", path="~/.cursor/mcp.json", scope="user",
+        kind="server_definition", clients=("cursor",), server_keys=("mcpServers",),
+    ),
+    MCPConfigDescriptor(
+        id="gemini_user_mcp", path="~/.gemini/settings.json", scope="user",
+        kind="server_definition", clients=("gemini_cli",), server_keys=("mcpServers",),
+    ),
 )
+
+# File-based managed sources only. Selecting these never emulates policy
+# precedence, MDM/registry policy, remote-delivered settings or active access.
+MANAGED_CONFIG_ROOTS = {
+    "darwin": "/Library/Application Support/ClaudeCode",
+    "linux": "/etc/claude-code",
+    "win32": "C:/Program Files/ClaudeCode",
+}
+
+
+def managed_config_descriptors(platform: str | None = None) -> tuple[MCPConfigDescriptor, ...]:
+    platform = platform or sys.platform
+    base = MANAGED_CONFIG_ROOTS.get(platform)
+    if base is None:
+        return ()
+    return tuple(
+        MCPConfigDescriptor(
+            id=f"claude_managed_{kind}_{platform}", path=f"{base}/{filename}", scope="managed",
+            kind="server_definition", clients=("claude_code",), server_keys=(server_key,),
+        )
+        for kind, filename, server_key in (
+            ("mcp", "managed-mcp.json", "mcpServers"),
+            ("settings", "managed-settings.json", "managedMcpServers"),
+        )
+    )
+
 
 USER_CLIENT_POLICY_CONFIGS: tuple[MCPConfigDescriptor, ...] = (
     MCPConfigDescriptor(
@@ -314,6 +370,8 @@ def config_descriptors(
     *,
     include_user: bool = False,
     include_client_policy: bool = False,
+    include_managed: bool = False,
+    platform: str | None = None,
 ) -> tuple[MCPConfigDescriptor, ...]:
     """Return the selected immutable registry entries in deterministic order."""
 
@@ -325,10 +383,19 @@ def config_descriptors(
         selected.extend(USER_SERVER_CONFIGS)
     if include_user and include_client_policy:
         selected.extend(USER_CLIENT_POLICY_CONFIGS)
+    if include_managed:
+        selected.extend(managed_config_descriptors(platform))
     return tuple(selected)
 
 
-def _descriptor_path(descriptor: MCPConfigDescriptor, root: Path, home: Path) -> Path:
+def _descriptor_path(
+    descriptor: MCPConfigDescriptor, root: Path, home: Path,
+    *, codex_home: Path | None = None, managed_root: Path | None = None,
+) -> Path:
+    if descriptor.scope == "managed" and managed_root is not None:
+        return managed_root / descriptor.path.rsplit("/", 1)[-1]
+    if descriptor.path == "$CODEX_HOME/config.toml" and codex_home is not None:
+        return codex_home / "config.toml"
     if descriptor.scope == "workspace":
         return root / descriptor.path
     prefix = "~/"
@@ -453,18 +520,41 @@ def _secret_like_keys(keys: Iterable[Any]) -> list[str]:
     return sorted(set(result))
 
 
+def _credential_value_shape(value: Any) -> bool:
+    # Reuse finite provider/Bearer/private-key shapes, not assignment grammar.
+    return isinstance(value, str) and any(
+        value_group is None for _, _, value_group in iter_secret_content_matches(value)
+    )
+
+
+def _absolute_path_syntax(value: str) -> bool:
+    return PurePosixPath(value).is_absolute() or PureWindowsPath(value).is_absolute()
+
+
+def _project_path_key(value: str) -> tuple[str, str] | None:
+    """Normalize absolute declaration syntax without touching other projects."""
+    if PureWindowsPath(value).is_absolute():
+        return "windows", ntpath.normcase(ntpath.normpath(value))
+    if PurePosixPath(value).is_absolute():
+        # POSIX case remains significant, including case-sensitive macOS volumes.
+        return "posix", posixpath.normpath(value)
+    return None
+
+
 def _empty_row(descriptor: MCPConfigDescriptor) -> dict[str, Any]:
     if descriptor.scope == "workspace":
         path_base = "workspace"
     elif descriptor.path.startswith("~/"):
         path_base = "user_home"
+    elif descriptor.path.startswith("$CODEX_HOME/"):
+        path_base = "codex_home"
     else:
-        path_base = "absolute" if Path(descriptor.path).is_absolute() else "caller_relative"
+        path_base = "absolute" if _absolute_path_syntax(descriptor.path) else "caller_relative"
     return {
         "config_id": descriptor.id,
         "path": descriptor.path,
         "path_base": path_base,
-        "path_is_absolute": Path(descriptor.path).is_absolute(),
+        "path_is_absolute": _absolute_path_syntax(descriptor.path),
         "scope": descriptor.scope,
         "kind": descriptor.kind,
         "config_format": descriptor.config_format,
@@ -578,9 +668,9 @@ def _json_mapping(text: str, *, jsonc: bool) -> Mapping[str, Any] | None:
     return parsed if isinstance(parsed, Mapping) else None
 
 
-def _environment_mappings(server: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+def _environment_mappings(server: Mapping[str, Any]) -> list[tuple[str, Mapping[str, Any]]]:
     return [
-        value
+        (key, value)
         for key in ("env", "environment")
         if isinstance((value := server.get(key)), Mapping)
     ]
@@ -593,17 +683,67 @@ def _append_server_metadata(
     container: str,
     name: str,
     server: Mapping[str, Any],
+    scope: str | None = None,
 ) -> None:
+    effective_scope = scope or descriptor.scope
     secret_keys: list[str] = []
     projects: list[str] = []
     env_keys: list[str] = []
     is_engram = _is_engram_server(name, server)
-    for environment in _environment_mappings(server):
+    credential_value_fields: list[str] = []
+    for environment_key, environment in _environment_mappings(server):
         mapping_keys = [str(key) for key in environment]
         env_keys.extend(mapping_keys)
         secret_keys.extend(_secret_like_keys(mapping_keys))
-        if is_engram and (project := _string_value(environment.get("ENGRAM_PROJECT"))):
+        for key, value in environment.items():
+            if _credential_value_shape(value):
+                secret_keys.append(str(key))
+                credential_value_fields.append(f"{environment_key}.{key}")
+        if (is_engram and (project := _string_value(environment.get("ENGRAM_PROJECT")))
+                and not _credential_value_shape(project)):
             projects.append(project)
+
+    # Retain header name inventory without traversing structured values.
+    # Scalar known credential shapes add field-only review evidence.
+    headers = server.get("headers")
+    header_key_status = "absent"
+    if "headers" in server:
+        header_key_status = "unsupported_shape"
+        if isinstance(headers, Mapping):
+            header_key_status = "mapping_keys_only"
+            for key in headers:
+                if isinstance(key, str) and (
+                    _secret_like_keys([key.replace("-", "_")])
+                    or key.casefold() in {"authorization", "proxy-authorization"}
+                ):
+                    secret_keys.append(key)
+                value = headers[key]
+                if _credential_value_shape(value):
+                    secret_keys.append(str(key))
+                    credential_value_fields.append(f"headers.{key}")
+
+    args = server.get("args")
+    argument_status = "absent"
+    if "args" in server:
+        argument_status = "unsupported_shape"
+        if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
+            row["status"] = "parse_error"
+        if isinstance(args, list) and all(isinstance(arg, str) for arg in args):
+            argument_status = "string_list_options_only"
+            for index, arg in enumerate(args):
+                # This finite spelling heuristic is not a server option parser.
+                # Split before '=' so inline values can never become key metadata.
+                option = arg.partition("=")[0]
+                normalized = option.removeprefix("--").replace("-", "_").casefold()
+                if option.startswith("--") and normalized in {
+                    "api_key", "apikey", "token", "access_token", "auth_token",
+                    "password", "secret", "client_secret", "authorization",
+                    "connection_string", "private_key",
+                }:
+                    secret_keys.append(option)
+                if _credential_value_shape(arg):
+                    credential_value_fields.append(f"args[{index}]")
+                    secret_keys.append(f"args[{index}]")
 
     unique_projects = sorted(set(projects))
     server_secret_keys = sorted(set(secret_keys))
@@ -617,7 +757,7 @@ def _append_server_metadata(
         {
             "config_id": descriptor.id,
             "config_path": row["path"],
-            "scope": descriptor.scope,
+            "scope": effective_scope,
             "clients": list(descriptor.clients),
             "container": container,
             "name": name,
@@ -634,6 +774,9 @@ def _append_server_metadata(
             ),
             "env_keys": sorted(set(env_keys)),
             "secret_like_keys": server_secret_keys,
+            "header_credential_key_status": header_key_status,
+            "argument_credential_key_status": argument_status,
+            "credential_value_fields": sorted(set(credential_value_fields)),
             "is_engram": is_engram,
             "has_engram_project": bool(unique_projects),
             "project": unique_projects[0] if len(unique_projects) == 1 else None,
@@ -661,7 +804,7 @@ def _append_server_metadata(
         row["engram_project_declarations"].append(
             {
                 "config_path": row["path"],
-                "scope": descriptor.scope,
+                "scope": effective_scope,
                 "clients": list(descriptor.clients),
                 "server": name,
                 "project": project,
@@ -675,11 +818,14 @@ def _scan_json_servers(
     row: dict[str, Any],
     descriptor: MCPConfigDescriptor,
     parsed: Mapping[str, Any],
+    *, scope: str | None = None, container_prefix: str = "",
 ) -> None:
     seen_servers: set[tuple[str, str]] = set()
     for container in descriptor.server_keys:
         servers = parsed.get(container)
         if not isinstance(servers, Mapping):
+            if container in parsed:
+                row["status"] = "parse_error"
             continue
         for raw_name, raw_server in sorted(servers.items(), key=lambda item: str(item[0])):
             name = str(raw_name)
@@ -687,15 +833,46 @@ def _scan_json_servers(
             if identity in seen_servers:
                 continue
             seen_servers.add(identity)
+            if not isinstance(raw_server, Mapping):
+                row["status"] = "parse_error"
+                continue
             row["servers"].append(name)
-            server = raw_server if isinstance(raw_server, Mapping) else {}
+            server = raw_server
             _append_server_metadata(
                 row,
                 descriptor,
-                container=container,
+                container=container_prefix + container,
                 name=name,
                 server=server,
+                scope=scope,
             )
+
+
+def _scan_claude_local_project(
+    row: dict[str, Any], descriptor: MCPConfigDescriptor,
+    parsed: Mapping[str, Any], workspace_root: Path,
+) -> None:
+    row["project_scope_status"] = "absent"
+    if "projects" not in parsed:
+        return
+    projects = parsed.get("projects")
+    if not isinstance(projects, Mapping):
+        row["project_scope_status"] = "unsupported_shape"
+        row["status"] = "parse_error"
+        return
+    target = _project_path_key(str(workspace_root))
+    matches = [value for key, value in projects.items()
+               if isinstance(key, str) and _project_path_key(key) == target and target is not None]
+    row["project_scope_status"] = "not_found"
+    if not matches:
+        return
+    if len(matches) != 1 or not isinstance(matches[0], Mapping):
+        row["project_scope_status"] = "ambiguous" if len(matches) != 1 else "unsupported_shape"
+        row["status"] = "parse_error"
+        return
+    row["project_scope_status"] = "selected"
+    _scan_json_servers(row, descriptor, matches[0], scope="workspace",
+                       container_prefix="projects[current].")
 
 
 def _scan_toml_servers(row: dict[str, Any], descriptor: MCPConfigDescriptor, text: str) -> bool:
@@ -705,8 +882,10 @@ def _scan_toml_servers(row: dict[str, Any], descriptor: MCPConfigDescriptor, tex
         return False
     servers = parsed.get("mcp_servers")
     if not isinstance(servers, Mapping):
-        return True
+        return "mcp_servers" not in parsed
     for raw_name, raw_server in sorted(servers.items(), key=lambda item: str(item[0])):
+        if not isinstance(raw_server, Mapping):
+            return False
         name = str(raw_name)
         row["servers"].append(name)
         _append_server_metadata(
@@ -779,12 +958,36 @@ def _workspace_parent_refusal(
     return None
 
 
+def managed_config_path_refusal(path: Path) -> str | None:
+    """Refuse linked/reparse ancestors and leaf before reading a managed file.
+
+    This is a bounded pre-read check, not continuous race-proof custody.
+    Windows reparse attributes work on all supported CPython versions.
+    """
+    if not path.is_absolute():
+        return "managed_boundary_refused"
+    for parent in [*reversed(path.parents), path]:
+        try:
+            metadata = parent.lstat()
+        except FileNotFoundError:
+            break
+        except OSError:
+            return "managed_boundary_refused"
+        if (stat.S_ISLNK(metadata.st_mode)
+                or getattr(metadata, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+            return "symlink_refused"
+    return None
+
+
 def _scan_descriptor(
     descriptor: MCPConfigDescriptor,
     path: Path,
     workspace_root: Path,
 ) -> dict[str, Any]:
     row = _empty_row(descriptor)
+    if descriptor.scope == "managed" and (refusal := managed_config_path_refusal(path)):
+        row["status"] = refusal
+        return row
     if refusal := _workspace_parent_refusal(descriptor, path, workspace_root):
         row["status"] = refusal
         return row
@@ -795,7 +998,10 @@ def _scan_descriptor(
     except OSError:
         row["status"] = "metadata_error"
         return row
-    if path.is_symlink():
+    if path.is_symlink() or (
+        descriptor.scope == "managed"
+        and getattr(metadata, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    ):
         row["exists"] = True
         row["status"] = "symlink_refused"
         row["size_bytes"] = metadata.st_size
@@ -841,34 +1047,108 @@ def _scan_descriptor(
         _scan_project_identity(row, descriptor, parsed)
         return _finalize_row(row)
     if descriptor.kind == "server_definition":
-        _scan_json_servers(row, descriptor, parsed)
+        if descriptor.id in {"copilot_workspace_mcp", "workspace_mcp"} and not any(key in parsed for key in descriptor.server_keys):
+            _scan_json_servers(row, descriptor, {"mcpServers": parsed})
+        else:
+            _scan_json_servers(row, descriptor, parsed)
+        if descriptor.id == "claude_user_mcp":
+            _scan_claude_local_project(row, descriptor, parsed, workspace_root)
     return _finalize_row(row)
 
 
-def scan_mcp_configs(
-    root: Path,
-    *,
-    include_user: bool = False,
-    include_client_policy: bool = False,
-    home: Path | None = None,
-    descriptors: Sequence[MCPConfigDescriptor] | None = None,
-) -> list[dict[str, Any]]:
-    """Inspect selected config files as bounded, declaration-only metadata."""
-
+def _selected_config_sources(
+    root: Path, *, include_user: bool = False, include_client_policy: bool = False,
+    include_managed: bool = False, home: Path | None = None,
+    codex_home: Path | None = None, managed_root: Path | None = None,
+    platform: str | None = None, descriptors: Sequence[MCPConfigDescriptor] | None = None,
+) -> list[tuple[MCPConfigDescriptor, Path]]:
     project_root = root.resolve()
     user_home = (home or Path.home()).resolve()
+    # A synthetic explicit home is isolated from the process's CODEX_HOME.
+    # Callers may supply an explicit override for an isolated fixture.
+    if codex_home is None and home is None and include_user:
+        raw_codex_home = os.environ.get("CODEX_HOME")
+        if raw_codex_home:
+            codex_home = Path(raw_codex_home).expanduser()
     selected = tuple(descriptors) if descriptors is not None else config_descriptors(
         include_user=include_user,
         include_client_policy=include_client_policy,
+        include_managed=include_managed,
+        platform=platform,
     )
+    if codex_home is not None:
+        selected = tuple(replace(item, path="$CODEX_HOME/config.toml")
+                         if item.id == "codex_user_mcp" else item for item in selected)
     return [
-        _scan_descriptor(
-            descriptor,
-            _descriptor_path(descriptor, project_root, user_home),
-            project_root,
-        )
+        (descriptor, _descriptor_path(descriptor, project_root, user_home,
+                                     codex_home=codex_home, managed_root=managed_root))
         for descriptor in selected
     ]
+
+
+def _config_source_identity(descriptor: MCPConfigDescriptor, path: Path) -> str:
+    # Lexical absolute normalization binds selection without following the
+    # selected file or disclosing its pathname. Alias equivalence is not claimed.
+    return _canonical_sha256({
+        "schema": "naos.mcp_config_source.v1", "config_id": descriptor.id,
+        "scope": descriptor.scope, "path": os.path.normcase(os.path.abspath(path)),
+    })
+
+
+def mcp_config_source_identity(configs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    sources = []
+    for row in configs:
+        identity = row.get("source_identity_sha256")
+        if not isinstance(identity, str) or len(identity) != 64 or any(c not in "0123456789abcdef" for c in identity):
+            raise ValueError("MCP source identity unavailable")
+        sources.append({"config_id": row.get("config_id"), "scope": row.get("scope"), "sha256": identity})
+    sources.sort(key=lambda item: (str(item["config_id"]), str(item["scope"]), str(item["sha256"])))
+    return {"schema": "naos.mcp_config_source_identity.v1", "source_count": len(sources),
+            "sha256": _canonical_sha256(sources)}
+
+
+def expected_mcp_config_source_identity(
+    root: Path, *, config_ids: Sequence[str], include_user: bool = False,
+    include_client_policy: bool = False, include_managed: bool = False,
+) -> dict[str, Any]:
+    """Project current selected identities without reading config contents."""
+    if (not isinstance(config_ids, (list, tuple)) or not all(isinstance(item, str) for item in config_ids)
+            or len(set(config_ids)) != len(config_ids)):
+        raise ValueError("MCP descriptor selection invalid")
+    if not config_ids:
+        return mcp_config_source_identity([])
+    available = _selected_config_sources(
+        root, include_user=include_user, include_client_policy=include_client_policy,
+        include_managed=include_managed,
+    )
+    selected = [(descriptor, path) for descriptor, path in available if descriptor.id in config_ids]
+    if len(selected) != len(config_ids):
+        raise ValueError("MCP descriptor selection unavailable")
+    return mcp_config_source_identity([
+        {"config_id": descriptor.id, "scope": descriptor.scope,
+         "source_identity_sha256": _config_source_identity(descriptor, path)}
+        for descriptor, path in selected
+    ])
+
+
+def scan_mcp_configs(
+    root: Path, *, include_user: bool = False, include_client_policy: bool = False,
+    include_managed: bool = False, home: Path | None = None,
+    codex_home: Path | None = None, managed_root: Path | None = None,
+    platform: str | None = None, descriptors: Sequence[MCPConfigDescriptor] | None = None,
+) -> list[dict[str, Any]]:
+    """Inspect selected config files as bounded, declaration-only metadata."""
+    project_root = root.resolve()
+    rows = []
+    for descriptor, path in _selected_config_sources(
+        root, include_user=include_user, include_client_policy=include_client_policy,
+        include_managed=include_managed, home=home, codex_home=codex_home,
+        managed_root=managed_root, platform=platform, descriptors=descriptors,
+    ):
+        row = _scan_descriptor(descriptor, path, project_root)
+        row["source_identity_sha256"] = _config_source_identity(descriptor, path)
+        rows.append(row)
+    return rows
 
 
 def _review_declarations(configs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -1189,13 +1469,14 @@ def _project_declarations(
 ) -> list[dict[str, Any]]:
     declarations: list[dict[str, Any]] = []
     for item in configs:
-        if item.get("scope") != scope or item.get("kind") not in {
+        if item.get("kind") not in {
             "server_definition",
             "project_identity",
         }:
             continue
         for raw in item.get("engram_project_declarations", []):
-            if isinstance(raw, Mapping) and _string_value(raw.get("project")):
+            if (isinstance(raw, Mapping) and raw.get("scope", item.get("scope")) == scope
+                    and _string_value(raw.get("project"))):
                 declaration = dict(raw)
                 declaration["project"] = _string_value(raw.get("project"))
                 declarations.append(declaration)
@@ -1365,6 +1646,10 @@ __all__ = [
     "WORKSPACE_SERVER_CONFIGS",
     "MCPConfigDescriptor",
     "config_descriptors",
+    "mcp_config_source_identity",
+    "expected_mcp_config_source_identity",
+    "managed_config_descriptors",
+    "managed_config_path_refusal",
     "resolve_engram_project",
     "scan_mcp_configs",
     "summarize_mcp_configs",

@@ -30,12 +30,14 @@ if str(SCRIPT_DIR) not in sys.path:
 from naos_audit_log import write_audit_event  # noqa: E402
 from naos_policy import (  # noqa: E402
     build_generated_by,
+    controlled_utc_now_text,
     effective_enforcement,
     load_policy,
     normalize_profile as normalize_policy_profile,
     report_default_path,
     resolve_operator_attribution,
 )
+from naos_evidence_contracts import classify_evidence  # noqa: E402
 
 
 PROFILES = ("quickstart", "lite", "standard", "assured")
@@ -96,11 +98,12 @@ def load_manifest(path: Path) -> dict[str, Any]:
     return data
 
 
-def validate_manifest(data: Any) -> None:
+def validate_manifest(data: Any, *, _schema_bytes: bytes | None = None) -> None:
     """Enforce the canonical manifest shape before evaluating any gate."""
     from jsonschema import Draft202012Validator
 
-    schema = json.loads((kit_root() / "schemas/naos/gatekeeper.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads(_schema_bytes.decode("utf-8") if _schema_bytes is not None else
+                        (kit_root() / "schemas/naos/gatekeeper.schema.json").read_text(encoding="utf-8"))
     errors = sorted(Draft202012Validator(schema).iter_errors(data), key=lambda item: str(list(item.path)))
     if errors:
         detail = "; ".join(f"{'.'.join(map(str, item.path)) or '$'}: {item.message}" for item in errors)
@@ -109,6 +112,10 @@ def validate_manifest(data: Any) -> None:
     duplicate = sorted({identifier for identifier in identifiers if identifiers.count(identifier) > 1})
     if duplicate:
         raise ValueError(f"Duplicate gate identifiers: {', '.join(duplicate)}")
+    for gate in data["gates"]:
+        extra = set(gate.get("evidence_requirements", {})) - set(gate["required_evidence"])
+        if extra:
+            raise ValueError(f"Gate {gate['id']} has typed evidence requirements outside required_evidence")
 
 
 def evaluation_scope(gates: list[dict[str, Any]]) -> dict[str, Any]:
@@ -426,6 +433,21 @@ def apply_team_override(
                     }
                 )
         elif key == "enabled":
+            if profile == "assured" and base_enabled and base_severity in {"required", "blocking"} and not value:
+                item = {
+                    "id": "gatekeeper_team_override.assured_minimum_enabled",
+                    "severity": "blocking",
+                    "status": "protected_invariant_violation",
+                    "message": f"Assured profile team override for gate {gate.get('id')} cannot disable an enabled {base_severity} gate.",
+                    "gate_id": gate.get("id"),
+                    "team_id": team_id,
+                    "original_enabled": base_enabled,
+                    "requested_enabled": False,
+                    "human_review_required": True,
+                }
+                findings.append(item)
+                rejected.append(item)
+                continue
             effective["enabled"] = bool(value)
             fields_applied.append(key)
         elif key == "review_required":
@@ -467,7 +489,82 @@ def apply_team_override(
     return effective, metadata, findings, rejected
 
 
-def build_gate_maturity_map(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> dict[str, dict[str, Any]]:
+class _GateMaturityLoader(yaml.SafeLoader):
+    """Reject ambiguous explicit keys without changing other YAML readers."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._checked_mappings = set()
+
+    def flatten_mapping(self, node):
+        # PyYAML recursively flattens merge sources without constructing them.
+        # Check each original mapping here, before flattening mutates its keys.
+        # Reused aliases may already contain legitimate inherited overrides.
+        if id(node) not in self._checked_mappings:
+            seen = set()
+            merge_seen = False
+            for key_node, _ in node.value:
+                if key_node.tag == "tag:yaml.org,2002:merge":
+                    if merge_seen:
+                        raise yaml.constructor.ConstructorError(None, None, "duplicate merge key", key_node.start_mark)
+                    merge_seen = True
+                    continue  # One merge directive may contain a merge list.
+                key = self.construct_object(key_node)
+                try:
+                    duplicate = key in seen
+                    seen.add(key)
+                except TypeError as exc:
+                    raise yaml.constructor.ConstructorError(None, None, "invalid mapping key", key_node.start_mark) from exc
+                if duplicate:
+                    raise yaml.constructor.ConstructorError(None, None, "duplicate mapping key", key_node.start_mark)
+            self._checked_mappings.add(id(node))
+        return super().flatten_mapping(node)
+
+
+def _maturity_error(path: Path, reason: str) -> ValueError:
+    # Reasons describe the shape, never interpolate YAML values/parser excerpts.
+    return ValueError(f"Invalid gate maturity input {path}: {reason}")
+
+
+def _maturity_input_present(path: Path) -> bool:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise _maturity_error(path, "cannot inspect input") from exc
+    return True
+
+
+def _read_maturity_mapping(path: Path, *, _read_text=None) -> dict[str, Any]:
+    try:
+        loader = _GateMaturityLoader(_read_text(path) if _read_text is not None else
+                                     path.read_text(encoding="utf-8"))
+        try:
+            data = loader.get_single_data()
+        finally:
+            loader.dispose()
+    except (OSError, yaml.YAMLError, ValueError, TypeError, AttributeError, KeyError, OverflowError, RecursionError) as exc:
+        # Safe scalar constructors also raise built-in exceptions whose messages
+        # can contain input values (for example explicit !!int or !!timestamp).
+        raise _maturity_error(path, "cannot read unambiguous YAML mapping") from exc
+    if not isinstance(data, dict) or not data:
+        raise _maturity_error(path, "expected nonempty mapping")
+    return data
+
+
+def _check_maturity_level(data: dict[str, Any], key: str, path: Path) -> None:
+    if key in data and (not isinstance(data[key], str) or data[key] not in {"L0", "L1", "L2", "L3", "L4", "L5"}):
+        raise _maturity_error(path, f"{key} must be L0 through L5 when present")
+
+
+def _check_capability_id(value: Any, path: Path) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"CAP-[A-Z0-9-]+", value):
+        raise _maturity_error(path, "capability identifier must be a CAP identifier")
+
+
+def build_gate_maturity_map(root: Path, naos_root: str, policy: dict[str, Any], profile: str,
+                            *, _read_text=None) -> dict[str, dict[str, Any]]:
     """Derive per-gate maturity gating from capability contracts + adopter state.
 
     Inverts each contract's ``gatekeepers: [Gn]`` linkage and computes, per gate,
@@ -476,38 +573,71 @@ def build_gate_maturity_map(root: Path, naos_root: str, policy: dict[str, Any], 
     ``effective_enforcement``), so a gate can never block on an immature
     capability ("never block a scaffold"). Returns ``{}`` when no contracts/state
     are available (e.g. an adopter project without capability contracts), which
-    leaves declared gate severity unchanged.
+    leaves declared gate severity unchanged. Present malformed inputs raise an
+    input error instead of supplying a maturity downgrade. This validates the
+    consumed fields, not the entire capability/state schema.
     """
     # Resolve adopter (naos/capabilities) or kit (capabilities) layout.
-    cap_dir = next((c for c in (root / naos_root / "capabilities", root / "capabilities") if c.is_dir()), None)
+    cap_dir = None
+    for candidate in (root / naos_root / "capabilities", root / "capabilities"):
+        if _maturity_input_present(candidate):
+            if not candidate.is_dir():
+                raise _maturity_error(candidate, "expected capability directory")
+            cap_dir = candidate
+            break
     if cap_dir is None:
         return {}
     # adopter declared state (current maturity); fall back to seed defaults (L0)
     state_entries: dict[str, dict[str, Any]] = {}
     state_path = root / naos_root / str((policy.get("paths") or {}).get("capability_state") or "capability_state.yaml")
-    if state_path.exists():
-        try:
-            state_doc = yaml.safe_load(state_path.read_text(encoding="utf-8")) or {}
-            for entry in state_doc.get("capabilities") or []:
-                if isinstance(entry, dict) and entry.get("capability_id"):
-                    state_entries[str(entry["capability_id"])] = entry
-        except Exception:
-            state_entries = {}
+    if _maturity_input_present(state_path):
+        state_doc = _read_maturity_mapping(state_path, _read_text=_read_text)
+        if not isinstance(state_doc.get("capabilities"), list):
+            raise _maturity_error(state_path, "capabilities must be a list")
+        for entry in state_doc["capabilities"]:
+            if not isinstance(entry, dict):
+                raise _maturity_error(state_path, "capability state entries must be mappings")
+            cap_id = entry.get("capability_id")
+            _check_capability_id(cap_id, state_path)
+            if cap_id in state_entries:
+                raise _maturity_error(state_path, "duplicate capability state identifier")
+            _check_maturity_level(entry, "current_maturity", state_path)
+            state_entries[cap_id] = entry
 
     gate_map: dict[str, dict[str, Any]] = {}
-    for cap_path in sorted(cap_dir.glob("*.yaml")):
-        if cap_path.name.startswith("_"):
+    try:
+        cap_paths = sorted(cap_dir.iterdir())
+    except OSError as exc:
+        raise _maturity_error(cap_dir, "cannot enumerate capability directory") from exc
+    cap_ids: set[str] = set()
+    for cap_path in cap_paths:
+        if not cap_path.match("*.yaml") or cap_path.name.startswith("_"):
             continue
-        try:
-            data = yaml.safe_load(cap_path.read_text(encoding="utf-8")) or {}
-        except Exception:
+        data = _read_maturity_mapping(cap_path, _read_text=_read_text)
+        if "id" in data:
+            _check_capability_id(data["id"], cap_path)
+        cap_id = data.get("id", cap_path.stem)
+        if cap_id in cap_ids:
+            raise _maturity_error(cap_path, "duplicate capability contract identifier")
+        cap_ids.add(cap_id)
+        gatekeepers = data.get("gatekeepers", [])
+        if not isinstance(gatekeepers, list) or any(
+            not isinstance(item, str) or not re.fullmatch(r"G[0-9]+", item) for item in gatekeepers
+        ):
+            raise _maturity_error(cap_path, "gatekeepers must be a list of gate identifiers")
+        _check_maturity_level(data, "default_maturity", cap_path)
+        profiles = data.get("profiles", {})
+        if not isinstance(profiles, dict):
+            raise _maturity_error(cap_path, "profiles must be a mapping")
+        profile_block = profiles.get(profile, {})
+        if not isinstance(profile_block, dict):
+            raise _maturity_error(cap_path, "selected profile must be a mapping")
+        _check_maturity_level(profile_block, "target_maturity", cap_path)
+        declared = profile_block.get("enforcement", "advisory")
+        if not isinstance(declared, str) or declared not in {*SEVERITY_ORDER, "not_applicable"}:
+            raise _maturity_error(cap_path, "selected profile has invalid enforcement")
+        if not gatekeepers:
             continue
-        cap_id = str(data.get("id") or cap_path.stem)
-        gatekeepers = data.get("gatekeepers") or []
-        if not isinstance(gatekeepers, list) or not gatekeepers:
-            continue
-        profile_block = (data.get("profiles") or {}).get(profile) or {}
-        declared = str(profile_block.get("enforcement") or "advisory")
         target = profile_block.get("target_maturity")
         current = (state_entries.get(cap_id) or {}).get("current_maturity") or data.get("default_maturity")
         effective = effective_enforcement(declared, current, target)
@@ -632,7 +762,32 @@ def classify_gate(
     required_inputs = gate.get("required_inputs") or []
     required_evidence = gate.get("required_evidence") or []
     missing_inputs = [item for item in required_inputs if not path_exists(str(item), root=root)]
-    missing_evidence = [item for item in required_evidence if not path_exists(str(item), root=root)]
+    evidence_requirements = gate.get("evidence_requirements") or {}
+    evidence_results = [
+        classify_evidence(
+            root, str(reference), profile=profile, naos_root=naos_root, policy=policy,
+            requirement={
+                **evidence_requirements.get(reference, {
+                    "type": "report" if str(reference).lower().endswith(".json") else "manual",
+                }),
+                # Actual validated gate declarations, scoped to this consumer.
+                # Nested optionality cannot be inferred from status or parent.
+                "_self_check_gate_context": {
+                    "gate_id": gate["id"],
+                    "evidence_requirements": {
+                        str(item): evidence_requirements.get(item, {
+                            "type": "report" if str(item).lower().endswith(".json") else "manual",
+                        }) for item in required_evidence
+                    },
+                },
+            },
+        )
+        for reference in required_evidence
+    ]
+    missing_evidence = [item["reference"] for item in evidence_results
+                        if item["availability"] == "missing" and item["requirement_outcome"] == "unresolved"]
+    unresolved_evidence = [item["reference"] for item in evidence_results
+                           if item["requirement_outcome"] == "unresolved"]
     semantic_evidence = evaluate_semantic_requirements(
         gate,
         profile,
@@ -674,15 +829,14 @@ def classify_gate(
 
     has_missing = bool(
         missing_inputs
-        or missing_evidence
+        or unresolved_evidence
         or any(item.get("status") != "pass" for item in semantic_evidence)
+        or any(item.get("status") == "protected_invariant_violation" for item in team_findings)
     )
-    if not enabled:
+    if not enabled or severity == "none":
         status = "not_applicable"
     elif not has_missing:
         status = "ready"
-    elif severity == "none":
-        status = "not_applicable"
     elif severity == "advisory":
         status = "advisory_missing"
     elif severity == "warning":
@@ -698,6 +852,8 @@ def classify_gate(
         "id": gate.get("id"),
         "name": gate.get("name"),
         "status": status,
+        "readiness": "not_applicable" if status == "not_applicable" else ("unresolved" if has_missing else "ready"),
+        "evidence_available": all(item["availability"] == "available" for item in evidence_results),
         "severity": severity,
         "enabled": enabled,
         "base_gatekeeper": {
@@ -730,9 +886,13 @@ def classify_gate(
             team_findings
             or effective.get("review_required") is True
             or any(item.get("human_review_required") for item in semantic_evidence)
+            or bool(unresolved_evidence)
+            or any(item.get("human_review_required") for item in evidence_results)
         ),
         "missing_inputs": missing_inputs,
         "missing_evidence": missing_evidence,
+        "unresolved_evidence": unresolved_evidence,
+        "evidence_results": evidence_results,
         "semantic_evidence": semantic_evidence,
         "validators": validator_counts,
         "experimental": gate.get("id") in {"G7", "G8"},
@@ -2293,6 +2453,13 @@ def load_evidence_classification(root: Path, naos_root: str, policy: dict[str, A
         "policy_valid": bool(data.get("policy_valid")),
         "findings_scanned": int(data.get("findings_scanned") or 0),
         "classification_counts": data.get("classification_counts") or {},
+        **{key: data[key] for key in ("declared_classification_counts", "inferred_classification_counts")
+           if key in data},
+        "classification_count_semantics": data.get("classification_count_semantics")
+        or "legacy_unspecified_labels_not_verified_evidence",
+        **({"unclassified_context": data["unclassified_context"],
+            "unclassified_context_counts": data.get("unclassified_context_counts") or {}}
+           if "unclassified_context" in data else {}),
         "missing_classification": data.get("missing_classification") or [],
         "unknown_findings": data.get("unknown_findings") or [],
         "findings": data.get("findings") or [],
@@ -2465,9 +2632,13 @@ def evaluate_manifest(
         protected_invariant_violations
         or rejected
         or any(item.get("human_review_required") for item in team_override_findings)
+        or any(gate.get("human_review_required") for gate in gate_results)
     )
     return {
         "schema": "naos.gate_status.v1",
+        "generated_at": controlled_utc_now_text(),
+        "project_root": str(root.resolve()),
+        "naos_root": naos_root,
         "evaluation_scope": evaluation_scope(gate_results),
         "profile": profile,
         "manifest": str(manifest_location.path),
@@ -2592,10 +2763,23 @@ def print_text(report: dict[str, Any]) -> None:
     )
     for gate in report["gates"]:
         print(f"{gate['id']} {gate['status']} [{gate['severity']}] - {gate['name']}")
+        if gate.get("maturity_gated"):
+            print(
+                f"  maturity ceiling: configured={gate['pre_maturity_severity']} "
+                f"effective={gate['severity']}; mapped capability maturity limits enforcement"
+            )
         if gate["missing_inputs"]:
             print(f"  missing inputs: {', '.join(gate['missing_inputs'])}")
         if gate["missing_evidence"]:
             print(f"  missing evidence: {', '.join(gate['missing_evidence'])}")
+
+    if report.get("enforcement"):
+        enforcement = report["enforcement"]
+        print(
+            f"enforcement: transition={enforcement['transition']} "
+            f"strict={enforcement['strict']} strict_required={enforcement['strict_required']} "
+            f"reason={enforcement['reason']} exit_code={enforcement['exit_code']}"
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2604,7 +2788,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--naos-root", default=os.environ.get("NAOS_ROOT", "naos"), help="Generated project NAOS root. Default: naos")
     parser.add_argument("--policy", help="Optional policy file used for profile and report path conventions.")
     parser.add_argument("--profile", help="Profile name: quickstart, lite, standard, assured. Default: NAOS_PROFILE or policy default")
-    parser.add_argument("--team-id", default=os.environ.get("TEAM_ID") or os.environ.get("NAOS_TEAM_ID"), help="Optional filesystem-safe team id for team-scoped gatekeeper config.")
+    parser.add_argument("--team-id", default=os.environ.get("NAOS_TEAM_ID"), help="Optional filesystem-safe team id for team-scoped gatekeeper config. Defaults to NAOS_TEAM_ID.")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of text.")
     parser.add_argument("--output", help="Optional JSON output path.")
     parser.add_argument("--fail-on-blocking", action="store_true", help="Exit non-zero if any blocking gate is blocked.")

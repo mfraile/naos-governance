@@ -85,11 +85,19 @@ def render_block(
             f"`{renderer_rel}`. Do not edit this section manually."
         ),
         f"> Boundary: {boundary}",
+        "> Coverage is the register's bounded evaluation category, not a blocking decision or security proof.",
+        "> These guidance surfaces do not execute detectors. Human review remains required within the stated scope.",
         "",
     ]
     for control_id in control_ids:
         statement = str(controls[control_id]["statement"]).strip()
+        evaluation = controls[control_id]["evaluation"]
+        detectors = ", ".join(f"`{item}`" for item in evaluation["detectors"]) or "none"
         lines.append(f"- **`{control_id}`** — {statement}")
+        lines.append(
+            f"  - Register coverage: `{evaluation['coverage']}`; detectors: {detectors}; "
+            f"human review: `{evaluation['human_review']}`. {evaluation['notes'].strip()}"
+        )
     lines.extend(["", _marker(section_id, False)])
     return "\n".join(lines)
 
@@ -162,6 +170,19 @@ def build_plan(
         if control_id in controls:
             findings.append(f"duplicate control id in canonical register: {control_id}")
             continue
+        evaluation = control.get("evaluation")
+        if (
+            not isinstance(evaluation, dict)
+            or evaluation.get("coverage") not in ("none", "indirect", "partial", "direct")
+            or not isinstance(evaluation.get("detectors"), list)
+            or any(not isinstance(item, str) or not item.strip() for item in evaluation["detectors"])
+            or (evaluation["coverage"] == "none" and bool(evaluation["detectors"]))
+            or (evaluation["coverage"] != "none" and not evaluation["detectors"])
+            or any(not isinstance(evaluation.get(key), str) or not evaluation[key].strip()
+                   for key in ("human_review", "notes"))
+        ):
+            findings.append(f"control {control_id} has no valid renderable evaluation posture")
+            continue
         controls[control_id] = control
 
     targets = manifest.get("targets")
@@ -225,7 +246,7 @@ def build_plan(
         if not target_path.is_file():
             findings.append(f"render target not found: {target.get('path')}")
             continue
-        current = target_path.read_text(encoding="utf-8")
+        current = target_path.read_bytes().decode("utf-8")
         block = render_block(
             section_id=section_id,
             title=title.strip(),
@@ -236,7 +257,7 @@ def build_plan(
             renderer_rel=str(renderer_rel),
             boundary=boundary.strip(),
         )
-        expected, section_findings = replace_generated_section(current, section_id, block)
+        expected, section_findings = replace_generated_section(current.replace("\r\n", "\n").replace("\r", "\n"), section_id, block)
         findings.extend(f"{target.get('path')}: {finding}" for finding in section_findings)
         plans.append(PlannedUpdate(target_path, current, expected))
 
@@ -267,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"secure-coding control rendering is current ({len(plans)} targets)")
         return 0
     for plan in changed:
-        plan.path.write_text(plan.expected, encoding="utf-8")
+        plan.path.write_bytes(plan.expected.encode("utf-8"))
         print(f"UPDATED: {plan.path.relative_to(args.root.resolve())}")
     print(f"secure-coding control rendering complete ({len(changed)} changed, {len(plans)} targets)")
     return 0

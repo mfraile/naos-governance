@@ -47,8 +47,12 @@ objects: []
 #     changed_file_refs:
 #       - "frontend/components/checkout/PaymentForm.tsx"
 #       - "tests/frontend/checkout/payment-form.test.tsx"
+#     # String refs select nonempty local regular files. Context refs (including
+#     # deleted changed paths, commands and URLs) require a retained local artifact.
+#     # verified: true alone supplies no supporting evidence.
 #     test_evidence_refs:
-#       - "npm test -- payment-form"
+#       - ref: "npm test -- payment-form"
+#         evidence_ref: "reports/payment-form-test-output.txt"
 #     optional_design_refs:
 #       - ref: "[ADAPT: design URL, node id, or exported artifact path]"
 #         kind: "design_reference"

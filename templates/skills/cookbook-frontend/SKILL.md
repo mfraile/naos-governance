@@ -1,7 +1,8 @@
 ---
-name: "cookbook-frontend"
-description: "If-then recipes for frontend (Next.js/React or equivalent). Invoke when adding API calls, creating UI components, rendering user content, or making state-changing requests."
-parameters: []
+name: cookbook-frontend
+description: If-then recipes for frontend (Next.js/React or equivalent). Invoke when adding API calls, creating UI components, rendering user content, or making state-changing requests.
+metadata:
+  naos-parameters: '[]'
 ---
 
 # Cookbook: Frontend
