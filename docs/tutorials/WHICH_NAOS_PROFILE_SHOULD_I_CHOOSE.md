@@ -1,6 +1,6 @@
 # Which NAOS Profile Should I Choose?
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > Use this guide to select the governance profile that fits your situation.
 > Choose by project purpose. A later profile change is optional, not a maturity
@@ -9,6 +9,10 @@
 ---
 
 ## Quick Decision
+
+These are starting heuristics, not enforced team-size or industry thresholds.
+Choose the evidence and review posture your project needs; a regulated context
+alone does not establish compliance or require a particular profile.
 
 ```
 Are you evaluating NAOS or running a prototype?
@@ -37,7 +41,7 @@ Are you in a regulated industry (finance, healthcare, government) or enterprise?
 | **Traceability (FR→Task→Code→Test)** | ❌ | Partial | ✅ | ✅ |
 | **Function-index / duplicate-risk evidence** | ❌ | Advisory | Configured | Configured + stronger review |
 | **Behavioral Governance Readiness** | Optional advisory readiness | Optional advisory readiness | Recommended readiness/impacter review | Recommended readiness/impacter review |
-| **Agent instruction files** | 1 (basic) | 3 | 3 (extended) | 3 (full) |
+| **Named agent roles** | 1 (research) | 4 | 7 | 7 |
 | **Dashboard / metrics** | Advisory when generated | Basic when configured | ✅ | ✅ |
 | **Conformance mode** | Advisory/static where installed | Static where installed | Static + frontmatter checks | Static + frontmatter checks, stricter gates where configured |
 
@@ -68,8 +72,8 @@ After choosing a profile, run `naos setup-recommendations --profile <profile>` t
 **What you get**:
 - 5 governance rules (3 blocking-posture)
 - Basic pre-commit hook
-- One AI instruction file
-- No spec infrastructure
+- Shared root/host instructions and the research agent
+- No spec pack or task lifecycle prompts
 
 **What you don't get**:
 - Spec-driven development
@@ -92,9 +96,9 @@ naos-governance init . --tier quickstart --activate
 **What you get**:
 - 9 governance rules (3 blocking-posture)
 - Pre-commit hook with structural validation
-- 3 AI instruction files (Copilot, Cursor, Claude)
+- Shared root/host instructions and research, plan, implement and review agents
 - Partial spec support
-- Weekly planning prompts
+- Bounded design/task prompts; manual session opening, closing and weekly review
 
 **What you don't get**:
 - Full requirements traceability
@@ -112,7 +116,7 @@ naos-governance init . --tier lite --archetype custom --backend static_only --ac
 
 ### `standard` — Team-Grade Governance
 
-**Best for**: Teams of 3–10, production projects, projects where AI writes >30% of code.
+**Best for**: Projects needing a broader specification, task, review and cadence evidence workflow, including production teams.
 
 **What you get**:
 - 19 governance rules (13 blocking-posture)
@@ -188,7 +192,7 @@ See [Integral Tutorial: Standard → Assured Readiness and Upgrade Preview](./IN
 The assured profile has the strongest evidence and blocking posture where configured. If your team is not yet familiar with the workflow, this can cause friction before the value is visible.
 
 **❌ Staying on `quickstart` past the evaluation phase**
-Quickstart is intentionally minimal. If you are using AI for production code, move to `lite` or `standard`.
+Quickstart is intentionally minimal. Reassess whether its evaluation posture meets the evidence needs of production work; select Lite, Standard or Assured when their additional controls are needed.
 
 **❌ Installing `standard` on a solo throwaway project**
 The overhead is not worth it for projects where governance evidence is not a real concern.
@@ -200,6 +204,6 @@ The overhead is not worth it for projects where governance evidence is not a rea
 Once you have chosen a profile:
 
 - **quickstart** → [Integral Tutorial: Quickstart from Scratch](./INTEGRAL_TUTORIAL_QUICKSTART_FROM_SCRATCH.md)
-- **lite** → [Micro Tutorial 10: naos-d-start](./MICRO_TUTORIAL_10_NAOS_D_START.md)
+- **lite** → [Integral Tutorial: Lite from Scratch](./INTEGRAL_TUTORIAL_LITE_FROM_SCRATCH.md), then Micro 11–13 with their Lite fallbacks
 - **standard** → [Micro Tutorial 10: naos-d-start](./MICRO_TUTORIAL_10_NAOS_D_START.md), then [Integral Tutorial: Standard from Scratch](./INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md)
-- **assured** → Complete `standard` path first, then [Integral Tutorial: Standard → Assured](./INTEGRAL_TUTORIAL_STANDARD_TO_ASSURED.md)
+- **assured** → Select Assured directly when it fits a new project. Use the Standard concepts that apply; the [Standard → Assured tutorial](./INTEGRAL_TUTORIAL_STANDARD_TO_ASSURED.md) is for reviewing an existing Standard project transition.

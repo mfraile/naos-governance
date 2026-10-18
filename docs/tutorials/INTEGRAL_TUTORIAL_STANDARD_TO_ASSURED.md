@@ -1,6 +1,6 @@
 # Integral Tutorial — Standard to Assured Managed Upgrade
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-08-24_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **From profile**: `standard`
 > **To profile**: `assured`
@@ -45,7 +45,7 @@ Before previewing the target posture, assess your current governance evidence ba
 make -f Makefile.naos gov-refresh
 naos claims --profile standard
 naos setup-recommendations --profile standard
-naos add setup-module --recommended --profile assured --dry-run
+naos add setup-module --recommended --profile standard --dry-run
 naos memory-readiness --profile standard
 naos memory-access --profile standard
 naos memory-use-policy --profile standard
@@ -250,14 +250,14 @@ behavior does not differ merely because the selected profile name changed.
 ### Implementation
 
 ```
-@naos-implement Implement JWT token expiry enforcement per AC-1.3
+@naos-implement Implement JWT token expiry enforcement per AC-001-3
 ```
 
 When committing:
 
 ```bash
 git add src/auth/middleware.py tests/test_auth_expiry.py
-git commit -m "feat(T-002): enforce JWT expiry (AC-1.3)"
+git commit -m "feat(T-002): enforce JWT expiry (AC-001-3)"
 ```
 
 If a separately installed and configured commit or CI gate blocks, read its

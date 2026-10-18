@@ -1,6 +1,6 @@
 # MICRO TUTORIAL 31 - PAUL Runtime Guard
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 The PAUL runtime guard maps a caller-supplied cognitive-state declaration to a
 deterministic commit-time response. An agent estimates its remaining

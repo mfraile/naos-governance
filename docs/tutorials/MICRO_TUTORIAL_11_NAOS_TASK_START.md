@@ -1,12 +1,17 @@
 # Micro Tutorial 11 — naos-task-start
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Command**: `/naos-task-start`
 > **Default Agent**: `@naos-plan`
-> **Alt Agent**: `@naos-triage` (when task needs shaping before planning)
-> **Cadence**: Once per task, after `/naos-d-start`
+> **Alt Agent**: `@naos-triage` (Standard/Assured, when task needs shaping)
+> **Cadence**: Once per task, after the profile-appropriate opening review
 > **Time**: 5–10 minutes
+
+> **Availability**: Lite, Standard and Assured. Daily/cadence prompts, triage
+> and conformance agents are Standard/Assured only. Lite uses manual opening
+> and closing, `@naos-plan` for task shaping and human completion review.
+> Quickstart has no task lifecycle prompts.
 
 ---
 
@@ -55,9 +60,11 @@ an explicit handoff to `@naos-plan`.
 
 ## Step-by-Step (Default Path — `@naos-plan`)
 
-### Step 1: Confirm `/naos-d-start` has run
+### Step 1: Review opening context
 
-Complete and review the `/naos-d-start` context request before starting a task.
+Standard/Assured: complete and review `/naos-d-start`. Lite: manually read
+root `AGENTS.md`, the selected rules, registry, active card and current Git
+state as described in its integral tutorial.
 
 ### Step 2: Identify the task
 
@@ -128,7 +135,8 @@ Before coding, verify:
 /naos-task-start T-315
 ```
 
-If the registry shows the task as: `status: defined | description: vague` — switch to triage.
+For a planned task with a vague description (`status: planned`), use triage
+in Standard/Assured. In Lite, ask `@naos-plan` to clarify it before proceeding.
 
 ### Run triage
 

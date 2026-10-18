@@ -159,34 +159,17 @@ Check if the file has been partially filled (look for `[ADAPT` markers not yet r
 
 5. **What does done look like?** For the 3 most important FRs — describe a concrete scenario where a real user achieves real value. (These become acceptance scenarios in spec 06.)
 
+#### Draft links and supplied priorities
+
+Supplied priorities override examples; retain established priorities otherwise. Stop on ID/priority conflicts. Compare saved IDs, priorities and required facts with the input.
+
+Copy markers verbatim to `**Source reference**:` between document Status and Upstream; omit if none. Re-read saved values; keep original anchors.
+
+Keep source-verified inherited candidates visibly `[ADAPT: unresolved]` with provenance; otherwise retain missing findings, never invented IDs or waivers. Separate input fidelity, structural status/findings/exit and semantic readiness: exit 0 may mean `required_missing`; tokens are not bindings. Unfinished work stays Draft; scoped design may resolve it without planning/coding-readiness claims.
+
 **FR/NFR Generation**:
 
-For each identified requirement, generate a full spec entry following this structure:
-
-```markdown
-## FR-XXX: [Concise Title]
-
-**Priority**: P[0|1|2]
-**Status**: 📋 SPECIFIED
-**Dependencies**: [FR/NFR IDs]
-
-### User Story
-**As a** [role from spec 01]
-**I want** [capability]
-**So that** [outcome linked to problem from spec 01]
-
-### Acceptance Scenarios
-
-**Scenario 1: Happy Path**
-- **Given** [precondition]
-- **When** [action]
-- **Then** [expected outcome]
-
-**Scenario 2: Failure Mode**
-- **Given** [precondition]
-- **When** [edge case action]
-- **Then** [graceful handling]
-```
+Use the spec 03 template's manifest-aligned fields, IDs and anchors. Add a full user story and Given/When/Then happy-path and failure scenarios; unknown outcomes remain `[ADAPT]`.
 
 > **Collision check**: Before assigning IDs, run: `python scripts/naos_extract_spec_section.py --list-requirements`
 > If script not available, scan `specs/03-requirements.md` for the highest existing FR/NFR number.

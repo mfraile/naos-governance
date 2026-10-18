@@ -2,7 +2,7 @@
 
 **Version**: 1.1.0
 **Status**: Remediated source candidate; not a new published release
-**Last Updated**: 2026-10-17
+**Last Updated**: 2026-10-18
 
 ---
 
@@ -322,7 +322,7 @@ naos-governance init . --tier standard
 ```
 
 > **Greenfield mode** (`--new`): Lite, Standard, and Assured scaffold their
-> selected spec files with `[FILL:]` / `[ADAPT:]` markers and an empty signal
+> selected spec files with `[ADAPT: ...]` markers and an empty signal
 > set. Lite and above can then use the installed `/naos-design` prompt.
 > Quickstart intentionally scaffolds no spec pack and installs no prompts; keep
 > its project context manually. See [Minimum Tooling Requirements](#minimum-tooling-requirements)
@@ -1378,7 +1378,7 @@ loading, and feature support vary and require client-specific verification.
 If you are not using an AI coding assistant (e.g., setting up governance for a team member):
 
 1. Run `naos-governance init --new` with Lite, Standard, or Assured to scaffold that profile's spec files. Quickstart intentionally creates no spec pack.
-2. For Lite and above, open each generated spec file — required sections use `[FILL: <description>]` markers.
+2. For Lite and above, open each generated spec file — unfinished sections use `[ADAPT: ...]` markers. Keep unsupported mappings visibly unresolved and the document Draft until the necessary decisions and filled checks exist.
 3. Fill those markers manually using the generated spec files as structured templates; for Quickstart, maintain the applicable project context directly.
 4. The generated hook behaves consistently across tools when the adopter activates it. `RULES.md` supplies policy/human-review posture; only installed, configured consumers enforce executable checks.
 
@@ -1428,7 +1428,7 @@ projects without change.
 | Agent | Role | Invocation |
 | ------- | ------ | ----------- |
 | `@naos-plan` | Planning & task breakdown | `@naos-plan think deeply about...` |
-| `@naos-implement` | Code generation & editing | `@naos-implement TASK-123` |
+| `@naos-implement` | Code generation & editing | `@naos-implement T-123` (use the exact registered task ID) |
 | `@naos-review` | Code and governance-evidence review | `@naos-review the changes in...` |
 | `@naos-debug` | Debugging & root-cause analysis | `@naos-debug why is X failing` |
 | `@naos-research` | Document & codebase research | `@naos-research how does X work` |
@@ -1535,7 +1535,7 @@ The NAOS kit has two governance tiers:
 | Tier | What It Is | Works In |
 | ------ | ----------- | --------- |
 | **Portable Baseline** | Pre-commit hook plus repository prompt/instruction files | Git behavior is explicit; AI-host loading is manual or host-dependent |
-| **Claude Code Enhancement** | Session lifecycle hooks (`PreCompact`, `PostCompact`, `SessionStart`, etc.) | Claude Code only |
+| **Claude Code Enhancement** | Session lifecycle hooks (`SessionStart`, `PreCompact`, `SessionEnd`, etc.) | Claude Code only |
 
 Document applicable layers in the relevant role and integration files. Label
 Claude Code-only hooks explicitly in their instructions; NAOS does not translate

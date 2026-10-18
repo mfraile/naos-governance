@@ -1,6 +1,6 @@
 # Is NAOS Right for My Project?
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-08-27_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 > Use this document to assess whether NAOS will deliver value for your specific situation.
 > NAOS is not for every project — this guide will help you decide honestly.
 

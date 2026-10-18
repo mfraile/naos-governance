@@ -1,11 +1,14 @@
 # Micro Tutorial 21 — Monthly Cadence
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Command**: `/naos-m-review`
 > **Agent**: `@naos-review`
 > **Cadence**: Monthly — end of each calendar month
 > **Time**: 60–90 minutes
+
+> **Availability**: Standard and Assured. Lite uses manual session/cadence
+> notes in its integral tutorial; Quickstart has no lifecycle prompts.
 
 ---
 
@@ -38,7 +41,10 @@ Before the monthly review, ensure metrics are current:
 make -f Makefile.naos gov-refresh
 ```
 
-This auto-computes all derived metrics from the authoritative sources (`specs/03-requirements.md`, `naos/TASK_REGISTRY.yaml`). **Never calculate governance metrics manually** — always read from the refreshed output.
+This refreshes configured derived PM outputs from sources such as
+`specs/03-requirements.md` and `naos/TASK_REGISTRY.yaml`. It does not compute
+every metric below. For each metric, retain its definition, numerator,
+denominator, period and executed data source; missing inputs remain unknown.
 
 ### Step 2: Invoke the command
 
@@ -90,9 +96,9 @@ that particular checks ran; they cannot reconstruct past hook invocations.
 This is the most important part of the monthly review. For each pattern identified:
 
 1. **Identify the observed pattern**: "Three commit messages mention a hook bypass; inspect retained check output and ask the authors before inferring what occurred."
-2. **Root cause**: "The lint rule doesn't exclude the `generated/` directory."
-3. **Action**: Update the governance rule to exclude `generated/`.
-4. **Encode the fix**: Update `.ai/RULES.md` or the pre-commit hook configuration.
+2. **Test a cause**: Reproduce a retained failure; do not infer its cause from a commit message.
+3. **Review a remedy**: Decide whether generated files need different lint handling while retaining applicable checks.
+4. **Validate an authorized fix**: Change only the reviewed rule or configuration and preserve before/after evidence.
 
 The `naos-m-review` prompt includes a structured audit for:
 - Retained pre-commit failures and self-reported bypass-message patterns
@@ -120,7 +126,8 @@ naos evidence-pack --profile <profile>
 naos dashboard --profile <profile> --json
 ```
 
-Record the result in `naos/PROJECT_STATUS.md` under "Metrics Summary":
+Record measured results in `naos/PROJECT_STATUS.md` under "Metrics Summary".
+The numbers below are illustrative, not outputs produced by the commands above:
 
 ```markdown
 ## Metrics Summary (2026-03)
@@ -168,7 +175,9 @@ Daily Sessions
 
 ## Governance Evidence Metric — Context
 
-NAOS has published an evidence/adherence baseline from one configured codebase. Treat that as bounded evidence, not a universal benchmark. The monthly review is the mechanism for improving your own project baseline over time.
+Establish your own configured project baseline with a documented calculation
+and retained inputs. An example percentage is not a measured baseline or a
+universal benchmark. Later operating evidence can test whether changes help.
 
 The metric is not a judgment or a legal/regulatory conclusion; it is a measurement. A score below 100% means some configured governance evidence is missing, stale, waived, or not yet satisfied. The monthly review identifies the gap and drives the next improvement cycle.
 
@@ -196,9 +205,9 @@ An evidence regression is information. Investigate the cause, encode the fix, an
 
 After the monthly review:
 
-- Updated rules are active for next month's daily workflow
-- Metrics baseline is established for trend tracking
-- Next month begins with a clean governance status
+- Authorized, validated rule changes can be used in the next workflow
+- Retained metric inputs support trend tracking
+- Unresolved findings and missing evidence carry forward visibly
 
 For the next daily session:
 → [Micro Tutorial 10: naos-d-start](./MICRO_TUTORIAL_10_NAOS_D_START.md)

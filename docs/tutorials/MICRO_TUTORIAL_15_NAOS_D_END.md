@@ -1,11 +1,14 @@
 # Micro Tutorial 15 — naos-d-end
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Command**: `/naos-d-end`
 > **Agent**: `@naos-plan`
 > **Cadence**: Daily — last action of every coding session
 > **Time**: 5–10 minutes
+
+> **Availability**: Standard and Assured. Lite uses manual session/cadence
+> notes in its integral tutorial; Quickstart has no lifecycle prompts.
 
 ---
 
@@ -145,7 +148,10 @@ It also requests an applicable `CHANGELOG.md` update under `[Unreleased]`:
 - Session impact metrics
 - Commits pushed today
 
-**Do not calculate these metrics manually.** The agent reads them from the authoritative sources (`specs/03-requirements.md`, `naos/TASK_REGISTRY.yaml`).
+Use the relevant executed report or a documented calculation over retained
+inputs. Specs and the task registry supply requirement/task state; they do not
+establish which commits were pushed or every session-impact metric. Keep
+missing inputs unknown and verify any claimed remote delivery separately.
 
 ---
 
