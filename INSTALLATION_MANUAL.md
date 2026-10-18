@@ -1567,9 +1567,9 @@ Production-grade governance for team projects.
 
 | Metric | Value |
 | -------- | ------- |
-| Active-table rules | 19 |
+| Active rules | 19 (26 index rows: 19 active + seven ADAPT) |
 | Blocking-posture rules | 13 |
-| Advisory/conditional rules | 6 |
+| Advisory/conditional rules | 4 advisory + 2 conditional |
 | AI-surface budget | Measure with `naos ai-surface-budget`; no universal fixed value |
 
 **Best for**: Production services, open-source projects, consulting engagements.
@@ -1580,7 +1580,7 @@ Evidence-heavy governance profile for teams that need stronger review evidence.
 
 | Metric | Value |
 | -------- | ------- |
-| Active-table rules | Same 19 as Standard; the Assured document also includes PGR 27–29 headings |
+| Active rules | Same 19 active IDs as Standard; seven ADAPT and PGR 27–29 headings are separate |
 | Blocking-posture rules | All active rules have blocking posture |
 | Human sign-off gates | 4 (architecture decisions, new dependencies, drift regression, rule exceptions) |
 | AI-surface budget | Measure with `naos ai-surface-budget`; no universal fixed value |
