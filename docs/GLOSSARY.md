@@ -310,7 +310,10 @@ When Engram is deferred or disabled, NAOS uses degraded recovery through task ca
 ## Rules (governance rules)
 
 The numbered rules in `.ai/RULES.md`. Quickstart/Lite/Standard/Assured activate
-5/9/19/19 rows, of which 3/3/13/19 have documented blocking posture. Posture is
+5/9/19/19 active rules, of which 3/3/13/19 have unconditional documented
+blocking posture. Standard’s index has 26 rows because it also lists seven
+project-specific ADAPT entries; these are excluded from its active count.
+Assured’s separate ADAPT and PGR headings are likewise excluded. Posture is
 not a count of installed executable checks. Rules are versioned; the full
 ladder is documented in `profiles/governance-assured/.ai/RULES.md`. Adjacent
 concept: *Instinct*, which is what a rule looks like before it has been promoted.

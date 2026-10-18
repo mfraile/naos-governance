@@ -57,10 +57,10 @@
       "sha256": "ede8c87df90f320e13e3925a6412783278a24964168c4e7725ab44d9e392ff99"
     },
     {
-      "bytes": 138506,
+      "bytes": 138565,
       "mode": "0644",
       "path": "INSTALLATION_MANUAL.md",
-      "sha256": "9ac7dd07aa13671d20a54f8c70b8c429a5008528eb553a509d228ba9ba161010"
+      "sha256": "5cebb6e88e9b12d7f6e4b9010e1d6c8a4cf15ff4f28d63bf5c556555b3b20732"
     },
     {
       "bytes": 35265,
@@ -678,7 +678,7 @@
       "bytes": 145294,
       "mode": "0644",
       "path": "configs/source_modes.json",
-      "sha256": "77d250b64b13d5bcfbeb7be3fbc37a2c3e56b8b625872c60b3f88b8683551a6d"
+      "sha256": "04d4c801dc9a3efc87b0b9f10ed59f88279b1e45624e3431b41a6e433a497eda"
     },
     {
       "bytes": 5756,
@@ -801,10 +801,10 @@
       "sha256": "d041551a39316f882208094c19ef78656760e1d4f6674487034c474903e767e4"
     },
     {
-      "bytes": 26098,
+      "bytes": 26320,
       "mode": "0644",
       "path": "docs/GLOSSARY.md",
-      "sha256": "064b9b499aa74475efa8546c08b7db3e0a94baab2388ee6606e92d6658b76ef1"
+      "sha256": "2924ea14fec53d1b61adc6dec90fc44ba8f115540d01fa88c772d91748259752"
     },
     {
       "bytes": 3216,
@@ -1107,10 +1107,10 @@
       "sha256": "e267b07daa2e74a62f23ef2eafa2c75a151086fd1f7d52d8bfa9d59b69192050"
     },
     {
-      "bytes": 16862,
+      "bytes": 16972,
       "mode": "0644",
       "path": "docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md",
-      "sha256": "58a22397c645fb23d84b3f17264b913633c44dc80854ad0da4eea6f891b8685d"
+      "sha256": "3d0802cd0be275a353d49e49381895117607da45893573f89922f2cf15056ea4"
     },
     {
       "bytes": 14451,
@@ -1203,10 +1203,10 @@
       "sha256": "3b6eb46cdec9eaf274dad4372db4ae4c71793b497cec16ed72cc4c1b4ea7a695"
     },
     {
-      "bytes": 11665,
+      "bytes": 12034,
       "mode": "0644",
       "path": "docs/tutorials/WHICH_NAOS_PROFILE_SHOULD_I_CHOOSE.md",
-      "sha256": "d8b320f415d1683d8af776df2708d52bfb2f6e013699f700312c9a967ad45e72"
+      "sha256": "f4e656b6fd2fbeafbc8b826c3993b9d44786c46246a8c4ef6d2fde54e591046a"
     },
     {
       "bytes": 131530,
@@ -6209,8 +6209,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 20941909,
+  "source_bytes": 20942669,
   "source_file_count": 1033,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "39da6f980b02af197bbb258f67bf97d01bc9d495cbaeb251af0108d117122e73"
+  "tree_sha256": "c0fe9624759449055a525c6963f2e7d2060573c461c4900a2f857f2b28bd081c"
 }

@@ -10,7 +10,7 @@
 
 ## Evidence You Should Be Able to Evaluate
 
-- The generated `standard` profile and its documented 19-rule, 13-blocking-posture configuration
+- The generated `standard` profile and its 19 active rules (13 unconditional blocking postures), plus seven project-specific ADAPT rows
 - The profile-required spec structure, with completeness determined from filled project content rather than file presence
 - Task/requirement links that remain unverified until their referenced code, tests, and evidence are checked
 - Function-index and duplicate-risk review where project data exists
@@ -57,7 +57,7 @@ cd "$PROJECT"
 ### Step 2: Verify the full structure
 
 ```bash
-ls .ai/                          # RULES.md (19 rules)
+ls .ai/                          # RULES.md (26 index rows: 19 active + 7 ADAPT)
 ls .github/prompts/              # VS Code Local prompt files; verify against the generated contract
 ls naos/                         # Full PM infrastructure
 ls naos/governance/              # Governance truth table + rules
@@ -306,7 +306,7 @@ Today I'm working on: T-001 user authentication endpoint
 
 `@naos-plan` is instructed to review the relevant governance context and report
 what it actually found, including:
-- 19 rules
+- 19 active rules and seven project-specific ADAPT rows
 - `specs/03-requirements.md` (FR-001 requirements)
 - `naos/TASK_REGISTRY.yaml` (T-001 details)
 - All three AI instruction files

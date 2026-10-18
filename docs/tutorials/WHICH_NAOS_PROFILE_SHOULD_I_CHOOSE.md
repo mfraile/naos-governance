@@ -45,6 +45,12 @@ Are you in a regulated industry (finance, healthcare, government) or enterprise?
 | **Dashboard / metrics** | Advisory when generated | Basic when configured | ✅ | ✅ |
 | **Conformance mode** | Advisory/static where installed | Static where installed | Static + frontmatter checks | Static + frontmatter checks, stricter gates where configured |
 
+The Rules row counts active rules, excluding project-specific ADAPT entries.
+Standard’s index contains 26 rows: 19 active and seven ADAPT. Its 19 active
+rules comprise 13 unconditional blocking postures, four advisory and two
+conditional. Assured has 19 active table rows, with separate ADAPT and PGR
+headings in its document. These are not executable-check counts.
+
 Profile choice controls default enforcement posture. It does not mean every
 capability is mature immediately after install. Capability maturity depends on
 project readiness, configuration, validator outputs, and evidence freshness.
