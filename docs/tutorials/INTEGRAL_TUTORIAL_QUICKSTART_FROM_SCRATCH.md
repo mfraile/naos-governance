@@ -1,6 +1,6 @@
 # Integral Tutorial — Quickstart from Scratch
 
-> _Tested with NAOS kit v1.1.0 candidate · Last verified 2026-09-05_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 Quickstart is a bounded evaluation profile. It provides minimal guardrails, a
 named read-only research route, and explicit profile-aware non-applicability.

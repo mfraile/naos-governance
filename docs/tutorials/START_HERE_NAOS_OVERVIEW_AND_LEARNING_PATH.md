@@ -1,6 +1,6 @@
 # START HERE — NAOS Overview and Learning Path
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Welcome to NAOS-Governance** — *Native AI Orchestration for SDLC*.
 > This document is your entry point. Read it first, then follow the learning path that matches your situation.
@@ -33,7 +33,7 @@ NAOS includes pre-commit checks where installed, but the current model is broade
 | A replacement for your AI assistant | A governance layer on top of it |
 | A linter | A profile-aware governance control plane |
 | A code reviewer | A review/evidence support layer |
-| An opinion about which AI tool to use | A profile system compatible with all of them |
+| An opinion about which AI tool to use | A tool-neutral file/CLI workflow with host-specific discovery routes |
 | A one-size-fits-all system | A tiered governance kit you scale to your needs |
 
 ---
@@ -205,7 +205,7 @@ Both are needed. The micro-tutorials build precise understanding. The integral t
 
 ## What You Will Be Able to Do After This Tutorial Set
 
-- Install and configure NAOS for any project
+- Review installation eligibility and configure NAOS in a supported project environment
 - Run a proper daily session: start → task → implement → review → complete → end
 - Use the weekly and monthly cadence to maintain governance health
 - Produce governance evidence and reviewable metrics instead of relying on assertion

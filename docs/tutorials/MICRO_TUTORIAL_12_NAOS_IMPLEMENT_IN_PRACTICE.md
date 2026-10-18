@@ -1,10 +1,15 @@
 # Micro Tutorial 12 — Implement in Practice
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Agent**: `@naos-implement`
 > **Cadence**: Throughout every coding session, after task start
 > **Time**: Variable — the bulk of your development work happens here
+
+> **Availability**: Lite, Standard and Assured. Daily/cadence prompts, triage
+> and conformance agents are Standard/Assured only. Lite uses manual opening
+> and closing, `@naos-plan` for task shaping and human completion review.
+> Quickstart has no task lifecycle prompts.
 
 ---
 
@@ -12,7 +17,8 @@
 
 `@naos-implement` is the hands-on development agent. Its prompt refers to the
 story card created or reviewed during `/naos-task-start` and the context
-requested and checked during `/naos-d-start`.
+requested and checked during `/naos-d-start` in Standard/Assured or Lite's
+manual opening review.
 
 Unlike a general-purpose coding agent, `@naos-implement` carries governance-aware
 instructions. It is instructed to:
@@ -39,10 +45,10 @@ Use `@naos-implement` for:
 - **Configuration changes** — defined in the story card
 
 Do **not** use `@naos-implement` for:
-- Starting a session (use `/naos-d-start` → `@naos-plan`)
-- Starting a task (use `/naos-task-start` → `@naos-plan` or `@naos-triage`)
+- Starting a session (Standard/Assured: `/naos-d-start` → `@naos-plan`; Lite: manual opening)
+- Starting a task (use `/naos-task-start` → `@naos-plan`; triage only in Standard/Assured)
 - Reviewing work (use `@naos-review`)
-- Completing a task (use `/naos-task-complete` → `@naos-conformance`)
+- Completing a task (use `/naos-task-complete`; human review in Lite, conformance in Standard/Assured)
 
 ---
 
@@ -52,7 +58,7 @@ Do **not** use `@naos-implement` for:
 
 Before using `@naos-implement`:
 
-- [x] `/naos-d-start` has run this session
+- [x] Opening context reviewed: `/naos-d-start` in Standard/Assured; manual opening in Lite
 - [x] `/naos-task-start T-XXX` has run and story card is open
 - [x] Pre-coding checklist in story card is complete
 
@@ -117,6 +123,10 @@ For complex changes, use the AI-assisted pre-commit review:
 ```
 /naos-t-precommit
 ```
+
+In Lite, `/naos-t-precommit` is not installed: run the applicable local checks
+and review their results directly. Standard/Assured may invoke the prompt above;
+its presence does not prove that checks ran.
 
 > **Cumulative-context monitor (v0.9.1+).** The Standard/Assured pre-commit hook reads the caller-supplied `NAOS_CONTEXT_REMAINING_PCT`. It warns at the **DEEP** PAUL bracket (<35%) and rejects that commit attempt at **CRITICAL** (<25%). The check is a no-op when the variable is unset. It does not measure remaining context or verify a checkpoint. See Rule 26 in the selected profile's `RULES.md`, the `cognitive-checkpoint` skill template, and [MICRO_TUTORIAL_31_PAUL_RUNTIME_GUARD.md](MICRO_TUTORIAL_31_PAUL_RUNTIME_GUARD.md).
 

@@ -1,6 +1,6 @@
 # Integral Tutorial — Lite from Scratch
 
-> _Installation path reverified with NAOS kit v1.1.0 candidate · 2026-09-05_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Profile**: `lite`
 > **Effort basis**: Repository-specific; record actual install, configuration, and validation receipts
@@ -85,7 +85,7 @@ Key files installed:
 - `CLAUDE.md` — Claude Code instruction set
 - `.cursorrules` or `.cursor/rules/*.mdc` — Cursor rules
 - `naos/PROJECT_STATUS.md` — project status tracker
-- `naos/TASK_REGISTRY.yaml` — task registry (empty, ready to fill)
+- `naos/TASK_REGISTRY.yaml` — task registry with placeholder tasks T-001–T-005 to review and adapt
 - `naos/capability_state.yaml` — adopter-local maturity state declaration
 - `naos/systemic_impact_rules.yaml` — artifact-family review relationships
 - `naos/module_header_rules.yaml` — source traceability expectations
@@ -182,7 +182,7 @@ You do not need to fill all specs before using NAOS — but `01-problem.md` and 
 
 ### Step 6: Register your first task
 
-Open `naos/TASK_REGISTRY.yaml` and add an entry for the first task you plan to work on:
+Open `naos/TASK_REGISTRY.yaml` and adapt the existing T-001 placeholder for your first task. The seed already contains T-001–T-005: do not append a duplicate ID or replace unrelated tasks or top-level configuration. The fragment below illustrates that entry; fill real criteria and retain only source-backed requirement links:
 
 ```yaml
 tasks:
@@ -192,8 +192,8 @@ tasks:
     lifecycle_state: planned
     delivery_state: not_started
     verification_state: unverified
-    requirement: FR-1
-    estimated_days: 1
+    requirement: FR-001
+    estimate_days: 1
     description: |
       [Brief description of what needs to be done]
     acceptance_criteria:
@@ -245,7 +245,7 @@ When done:
 
 ```bash
 git add [files]
-git commit -m "feat(T-001): [description] (AC-1.1)"
+git commit -m "feat(T-001): [description] (AC-001-1)"
 ```
 
 The blocking-posture count shown above describes policy/human review, not hook
@@ -346,7 +346,7 @@ Ready for team-grade governance?
 Or assess the `standard` target without applying a transition:
 
 ```bash
-naos-governance upgrade . --tier standard --archetype custom --backend static_only --dry-run
+naos-governance upgrade . --tier standard --dry-run
 ```
 
 The preview writes nothing to the project and does not prove a profile

@@ -1,6 +1,6 @@
 # Integral Tutorial — Standard from Scratch
 
-> _Installation path reverified with NAOS kit v1.1.0 candidate · 2026-09-05_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Profile**: `standard`
 > **Effort basis**: Repository-specific; record actual setup, specification, task, and validation receipts
@@ -62,7 +62,7 @@ ls .github/prompts/              # VS Code Local prompt files; verify against th
 ls naos/                         # Full PM infrastructure
 ls naos/governance/              # Governance truth table + rules
 ls specs/                        # Full spec kit (01–10)
-ls templates/                    # All NAOS template files
+ls templates/                    # Profile-selected templates, not the full kit catalogue
 ls scripts/workflows/            # Workflow automation scripts
 ls .github/workflows/            # naos-control-plane-ci.yml
 ```
@@ -91,14 +91,19 @@ Test the hook:
 # In an existing repository with commits, stash unrelated changes if needed.
 # A newly initialized repository has no commit to stash against.
 git commit --allow-empty -m "test: verify pre-commit hook"
-# Should see hook output with all sections passing
+# Inspect the actual exit code and findings; unfinished seeds may warn or fail.
+# Do not bypass a failure or treat this smoke as project readiness.
 ```
 
 ---
 
 ## Part 2: Spec Kit Setup
 
-The spec kit is the foundation of spec-driven development. You need at minimum:
+Start design with the four files below. Standard installs the full 01–10 pack;
+retain its manifest, sections, IDs and anchors. Before claiming implementation
+readiness, fill and check the complete profile-required pack and resolve the
+applicable project decisions. An initial Draft or structural pass is not that
+readiness evidence:
 
 - `specs/01-problem.md` — problem statement
 - `specs/02-solution.md` — solution approach
@@ -139,27 +144,39 @@ nano specs/04-architecture.md
 
 ### FR/NFR structure in `specs/03-requirements.md`
 
-The task registry links to requirements by ID. Use this format:
+The task registry links to requirements by ID. Adapt the existing FR-001
+block in place, preserving its exact explicit anchor and other required fields.
+This fragment illustrates requirement content, not a replacement for the whole
+file. P1 is an example project decision, not a default. Leave unknown mappings
+visibly unresolved and keep the document Draft until they are supported:
 
 ```markdown
 ## Functional Requirements
 
-### FR-1: User Authentication
-**Status**: In Progress
-**Priority**: High
-**Description**: The system must authenticate users via email/password.
+### FR-001: User Authentication {#fr-001-adapt-name}
+**Priority**: P1
+**Status**: Draft
+**Linked Tasks**: [ADAPT: confirm the task assignment]
+**Linked To**: [ADAPT: confirm problem and solution mappings]
+**ARCH Components**: [ADAPT: confirm architecture mappings]
+
+#### Description
+The system must authenticate users via email/password.
 
 #### Acceptance Criteria
-- AC-1.1: Valid credentials return a JWT token
-- AC-1.2: Invalid credentials return 401 with non-enumeration message
-- AC-1.3: Tokens expire after 24 hours
+- AC-001-1: Valid credentials return a JWT token
+- AC-001-2: Invalid credentials return 401 with non-enumeration message
+- AC-001-3: Tokens expire after 24 hours
 ```
 
 ---
 
 ## Part 3: Task Registry Setup
 
-Open `naos/TASK_REGISTRY.yaml` and populate it with your initial task set:
+Adapt the existing T-001/T-002 seed entries in `naos/TASK_REGISTRY.yaml`; do
+not append duplicate IDs or discard unrelated entries and top-level controls.
+The fragment assumes FR-001 and the named ACs have been authored and the task
+assignments reviewed. Keep estimates, owner and priority project-specific:
 
 ```yaml
 tasks:
@@ -169,16 +186,16 @@ tasks:
     lifecycle_state: planned
     delivery_state: not_started
     verification_state: unverified
-    requirement: FR-1
-    estimated_days: 2
-    owner: [your name]
+    requirement: FR-001
+    estimate_days: 2
+    owner: "[your name]"
     description: |
       Implement JWT-based authentication endpoint.
       POST /auth/login validates credentials and returns JWT.
     acceptance_criteria:
-      - id: AC-1.1
+      - id: AC-001-1
         description: Valid credentials return JWT token
-      - id: AC-1.2
+      - id: AC-001-2
         description: Invalid credentials return 401 (non-enumeration message)
 
   - id: T-002
@@ -187,8 +204,8 @@ tasks:
     lifecycle_state: planned
     delivery_state: not_started
     verification_state: unverified
-    requirement: FR-1
-    estimated_days: 1
+    requirement: FR-001
+    estimate_days: 1
     dependencies: [T-001]
     description: |
       Enforce JWT expiry — reject expired tokens with 401.
@@ -273,8 +290,8 @@ ready. See [Frontmatter Conformance](../FRONTMATTER_CONFORMANCE.md).
 ```
 /naos-w-plan
 
-Week starting: 2026-03-25
-Focus areas: User authentication (FR-1)
+Week starting: 2026-03-23
+Focus areas: User authentication (FR-001)
 ```
 
 Review the daily breakdown and set priorities.
@@ -290,7 +307,7 @@ Today I'm working on: T-001 user authentication endpoint
 `@naos-plan` is instructed to review the relevant governance context and report
 what it actually found, including:
 - 19 rules
-- `specs/03-requirements.md` (FR-1 requirements)
+- `specs/03-requirements.md` (FR-001 requirements)
 - `naos/TASK_REGISTRY.yaml` (T-001 details)
 - All three AI instruction files
 
@@ -303,7 +320,7 @@ what it actually found, including:
 `@naos-plan` is instructed to perform source-grounded research:
 - Read T-001 from the registry
 - Query the function index and source for existing auth-related functions
-- Review the `specs/03-requirements.md` FR-1 section
+- Review the `specs/03-requirements.md` FR-001 section
 - Propose or update `naos/active/T-001_user-auth-endpoint.md`
 
 **Read the entire story card before coding.**
@@ -311,7 +328,7 @@ what it actually found, including:
 ### Day 1 — Implementation
 
 ```
-@naos-implement Implement the POST /auth/login endpoint per AC-1.1 and AC-1.2.
+@naos-implement Implement the POST /auth/login endpoint per AC-001-1 and AC-001-2.
 
 Story card constraints:
 - Use UserRepository from src/repositories/user_repository.py
@@ -323,7 +340,7 @@ Work through the implementation iteratively. Commit when a logical unit is compl
 
 ```bash
 git add src/auth/endpoint.py tests/test_auth.py
-git commit -m "feat(T-001): implement POST /auth/login with JWT (AC-1.1, AC-1.2)"
+git commit -m "feat(T-001): implement POST /auth/login with JWT (AC-001-1, AC-001-2)"
 ```
 
 The blocking-posture count shown above describes policy/human review, not
@@ -336,8 +353,8 @@ it contains no licence scanner.
 @naos-review Review T-001 implementation
 
 Acceptance criteria:
-- AC-1.1: Valid credentials return JWT token
-- AC-1.2: Invalid credentials return 401 (non-enumeration message)
+- AC-001-1: Valid credentials return JWT token
+- AC-001-2: Invalid credentials return 401 (non-enumeration message)
 ```
 
 In `standard` profile, the review includes:
@@ -354,7 +371,7 @@ Update the story card manually:
 
 ```markdown
 ## Completion Checklist
-- [x] All acceptance criteria satisfied (AC-1.1, AC-1.2)
+- [x] All acceptance criteria satisfied (AC-001-1, AC-001-2)
 - [x] Tests written and passing
 - [x] No schema violations introduced
 - [x] No duplicate code created
@@ -364,8 +381,8 @@ Update the story card manually:
 ## Implementation Notes
 
 2026-03-25 — Task completed (git commit abc1234)
-           ✅ AC-1.1: Valid credentials return JWT — implemented in src/auth/endpoint.py
-           ✅ AC-1.2: 401 with "Invalid email or password" — non-enumeration message
+           ✅ AC-001-1: Valid credentials return JWT — implemented in src/auth/endpoint.py
+           ✅ AC-001-2: 401 with "Invalid email or password" — non-enumeration message
            📝 Files: src/auth/endpoint.py, src/services/jwt_service.py, tests/test_auth.py
 ```
 
@@ -401,7 +418,7 @@ Run the closing commands from the agent's output.
 ```
 /naos-w-review
 
-Week of: 2026-03-25 to 2026-03-28
+Week of: 2026-03-23 to 2026-03-27
 ```
 
 ---

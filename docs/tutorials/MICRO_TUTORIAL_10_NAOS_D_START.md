@@ -1,11 +1,14 @@
 # Micro Tutorial 10 — naos-d-start
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Command**: `/naos-d-start`
 > **Agent**: `@naos-plan`
 > **Cadence**: Daily — first thing every coding session
 > **Time**: 3–5 minutes
+
+> **Availability**: Standard and Assured. Lite uses manual session/cadence
+> notes in its integral tutorial; Quickstart has no lifecycle prompts.
 
 ---
 

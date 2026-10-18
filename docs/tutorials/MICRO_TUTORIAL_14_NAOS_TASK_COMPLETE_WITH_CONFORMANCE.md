@@ -1,6 +1,6 @@
 # Micro Tutorial 14 — Native Task Completion and Conformance
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-07-17_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 Lite, Standard, and Assured generate the `/naos-task-complete` prompt and the
 native exact-ID lifecycle script. Lite does not generate the full conformance

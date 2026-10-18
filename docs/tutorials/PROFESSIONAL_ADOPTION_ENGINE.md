@@ -1,6 +1,6 @@
 # Professional Adoption Engine
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 Use the professional adoption engine when you want a connected adoption record instead of a pile of isolated setup commands. It is deterministic, file-first, and local. It produces review evidence and human decision points; it does not approve work, silently overwrite files, call providers, write memory, prove secure code, prove runtime safety, or prove legal or regulatory compliance.
 

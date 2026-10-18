@@ -1,10 +1,15 @@
 # Micro Tutorial 13 — Review in Practice
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-08-29_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Agent**: `@naos-review`
 > **Cadence**: After implementation, before task completion
 > **Time**: 10–20 minutes per task
+
+> **Availability**: Lite, Standard and Assured. Daily/cadence prompts, triage
+> and conformance agents are Standard/Assured only. Lite uses manual opening
+> and closing, `@naos-plan` for task shaping and human completion review.
+> Quickstart has no task lifecycle prompts.
 
 ---
 
@@ -150,7 +155,7 @@ Once the review is clean:
 
 **❌ Skipping review and going straight to `/naos-task-complete`**
 
-Task completion (`@naos-conformance`) requests its own checks, but those are
+Standard/Assured task completion (`@naos-conformance`) requests its own checks, but those are
 coarser. `@naos-review` is detailed pre-completion review guidance, not an
 enforcement gate. Skipping it may leave more findings for later review.
 
@@ -172,7 +177,8 @@ Some overlap is expected and acceptable — utility functions, patterns, boilerp
 
 ## Weekly and Monthly Review
 
-The `@naos-review` agent is also used for cadence reviews:
+In Standard/Assured, `@naos-review` also supports the cadence prompts below.
+Lite records a manual review instead:
 
 - `/naos-w-review` — end-of-week governance review
 - `/naos-m-review` — monthly governance metrics review

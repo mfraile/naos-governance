@@ -57,10 +57,10 @@
       "sha256": "ede8c87df90f320e13e3925a6412783278a24964168c4e7725ab44d9e392ff99"
     },
     {
-      "bytes": 138367,
+      "bytes": 138506,
       "mode": "0644",
       "path": "INSTALLATION_MANUAL.md",
-      "sha256": "3730fc338830711c870a93026b2775a7dbdd0d56fec4158e60b5f9358386247a"
+      "sha256": "9ac7dd07aa13671d20a54f8c70b8c429a5008528eb553a509d228ba9ba161010"
     },
     {
       "bytes": 35265,
@@ -81,10 +81,10 @@
       "sha256": "401bd5ca3841e7b986b92daf7fa0e7a1c922059b66011f64e464d9fb9406905b"
     },
     {
-      "bytes": 2497,
+      "bytes": 2441,
       "mode": "0644",
       "path": "MANIFEST.in",
-      "sha256": "1a8320e89c666a7cf86b664d3052356be4a0d50ea9f1f7e05d873e0c26de1765"
+      "sha256": "b7ab82652a8a0dea807550150b505015979b3543ff82ed5bcd542cddb680a5ec"
     },
     {
       "bytes": 75577,
@@ -675,10 +675,10 @@
       "sha256": "8da8b844a5088195f57893377b47fdedb70f37ade9b11f676a1856806b0d4b51"
     },
     {
-      "bytes": 145293,
+      "bytes": 145294,
       "mode": "0644",
       "path": "configs/source_modes.json",
-      "sha256": "27ef56088518974fd06b09630121f346dfbd6afd4bfe55df8fce201626a0438e"
+      "sha256": "77d250b64b13d5bcfbeb7be3fbc37a2c3e56b8b625872c60b3f88b8683551a6d"
     },
     {
       "bytes": 5756,
@@ -1095,118 +1095,118 @@
       "sha256": "25d42a96309ffae08244e94d4c18166f6509592329edec0eebd6ed830c7dbec1"
     },
     {
-      "bytes": 13836,
+      "bytes": 14121,
       "mode": "0644",
       "path": "docs/tutorials/INTEGRAL_TUTORIAL_LITE_FROM_SCRATCH.md",
-      "sha256": "e2baa63d1ac6a23975237465bab7b4565364cc5dbbb69e611e2e1ba64dec83c2"
+      "sha256": "f37e7b1b7b2b4d703ac6bc274d5de6125b93cece06ec1a8dd58a7bd56ecc85d1"
     },
     {
-      "bytes": 4344,
+      "bytes": 4400,
       "mode": "0644",
       "path": "docs/tutorials/INTEGRAL_TUTORIAL_QUICKSTART_FROM_SCRATCH.md",
-      "sha256": "c9814152652c1df55ccee4dc0aa5e7f7ba08dbcd5d305bfb22f60e3af10a20b6"
+      "sha256": "e267b07daa2e74a62f23ef2eafa2c75a151086fd1f7d52d8bfa9d59b69192050"
     },
     {
-      "bytes": 15645,
+      "bytes": 16862,
       "mode": "0644",
       "path": "docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md",
-      "sha256": "82bc6a60b002242e06bb8f8bf770f799fb1b53c44b4f049d4798ee0533e8677a"
+      "sha256": "58a22397c645fb23d84b3f17264b913633c44dc80854ad0da4eea6f891b8685d"
     },
     {
-      "bytes": 14381,
+      "bytes": 14451,
       "mode": "0644",
       "path": "docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_TO_ASSURED.md",
-      "sha256": "5ebd355753f620f47b85ef1b8af4b65f42c14191b1563fcda28de51f607c343a"
+      "sha256": "028d5dc4058e5f2eb02f3b175650077a336094d23039161b18b9f4f0acdca40b"
     },
     {
-      "bytes": 5663,
+      "bytes": 5728,
       "mode": "0644",
       "path": "docs/tutorials/IS_NAOS_RIGHT_FOR_MY_PROJECT.md",
-      "sha256": "29106ea6f8802574fd3e443d6803c0ac8f3bd876b20c8761c1e5e5a6eee642c1"
+      "sha256": "e1949bf87f3a5d34812fd706bf428d4f1ea8d2a71b2d54f2a20f994047a200f9"
     },
     {
-      "bytes": 5758,
+      "bytes": 5970,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_10_NAOS_D_START.md",
-      "sha256": "4226a6d62fb3dc25787d028c995b720c0b2db062cd17d611bd5abbc232a54fba"
+      "sha256": "8621c697d470a0573fa77fe8e4573fb74fcf648fe1423757c5a0b23944da5c99"
     },
     {
-      "bytes": 5840,
+      "bytes": 6371,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_11_NAOS_TASK_START.md",
-      "sha256": "f1726148c1a9f9d4770b20eedb3f79b6fde31a9bf6751b1a53fecfcba7aa93fe"
+      "sha256": "6c06493a8f15d16cd3b63c7e3786f631f6cf27de6910a345b38d437e41b8faee"
     },
     {
-      "bytes": 7522,
+      "bytes": 8250,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_12_NAOS_IMPLEMENT_IN_PRACTICE.md",
-      "sha256": "5569b4e91ad215bffd757060fdada22bcc194f22aad850c21238dfa9571dad77"
+      "sha256": "27acc581eaa4cd11b6fb776a9d18c2ee6bf0e77a4ccf551a9130b768ca08e7bb"
     },
     {
-      "bytes": 6902,
+      "bytes": 7314,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_13_NAOS_REVIEW_IN_PRACTICE.md",
-      "sha256": "921fd3c220feb4b7ac510d394988eb8386474fa65ee4bd3806b644a6cda49eb8"
+      "sha256": "da117703af40c858882b7eccd9670860c2642ccab927d58636b2810de660c27c"
     },
     {
-      "bytes": 3963,
+      "bytes": 4028,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_14_NAOS_TASK_COMPLETE_WITH_CONFORMANCE.md",
-      "sha256": "4ba073d58c78fc65fba97b398f56a6e527825e6ec6b18a866ccbf4a01648068a"
+      "sha256": "a16e5871102121cf918c99b69f82d51603440217e32e0e1824fe12f7209f28d3"
     },
     {
-      "bytes": 6622,
+      "bytes": 6981,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_15_NAOS_D_END.md",
-      "sha256": "fe8b80c6c72f54a332a42f118795e072e4fd12bf90a871be23fe6cde9e9248ca"
+      "sha256": "8d120a985de7298be17ef9afdf8ab52f3440cfff782083008c75842e799f2e89"
     },
     {
-      "bytes": 5155,
+      "bytes": 5401,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_20_NAOS_W_CADENCE.md",
-      "sha256": "da4d2ea7ad8ea07e283728261b3539d8f48f2b04438a359cda0d6ad5446f9022"
+      "sha256": "83c33f8e5e34659daec0a9d3c270b30e4dd41ce71d8a07e002d3be0300439e9a"
     },
     {
-      "bytes": 6946,
+      "bytes": 7446,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_21_NAOS_M_CADENCE.md",
-      "sha256": "e43e4dd9f5a6b90e9b0b5f017855d125f98e43a673cf70a42057e0ea80bce7ba"
+      "sha256": "12e87c0fb1dfcee3aa7a3b70b61db040aa63952fbb951c44c11f4b0007d5803a"
     },
     {
-      "bytes": 6850,
+      "bytes": 8032,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_30_TEST_HALLUCINATION.md",
-      "sha256": "311a4a2914e785f6b8401eb83ea908d067cc1a5d745079df61a4d2cd12940e20"
+      "sha256": "b17ad226be868b32c2252498b8a649f044ac6e85edc74f0238102305052b5df4"
     },
     {
-      "bytes": 4719,
+      "bytes": 4784,
       "mode": "0644",
       "path": "docs/tutorials/MICRO_TUTORIAL_31_PAUL_RUNTIME_GUARD.md",
-      "sha256": "91755a24b2a8e2933c72c0f9e7fb4a497af30ffddbeb80b5cd6e04575d9c6902"
+      "sha256": "516e2702345abdc157664ccdea95466b1406ace47f79ae01e1feb9a1d2fef052"
     },
     {
-      "bytes": 8872,
+      "bytes": 8937,
       "mode": "0644",
       "path": "docs/tutorials/PROFESSIONAL_ADOPTION_ENGINE.md",
-      "sha256": "794d1ae45ebb7fe0f0eba079b88cd0a57ad0096a85b109c2cbbcedcf4bbf8472"
+      "sha256": "53b103d85f08a1fa389a1667c33c24ec3d01cb1dd759a3b29c00d89ea0bf5221"
     },
     {
-      "bytes": 25361,
+      "bytes": 26294,
       "mode": "0644",
       "path": "docs/tutorials/README.md",
-      "sha256": "92754e390930e2ca2086c6e105fdcb72c5be475e6370fde63b325c9a5dcf18a9"
+      "sha256": "ac83b44c619dc36fbdd97b7d3c9fa382b23aca23e91de627ea1d37148964e2ab"
     },
     {
-      "bytes": 12498,
+      "bytes": 12630,
       "mode": "0644",
       "path": "docs/tutorials/START_HERE_NAOS_OVERVIEW_AND_LEARNING_PATH.md",
-      "sha256": "e75d890e8fbc6259c141d201b167e8ede92488c8eadb19a6418bb5e7f4a6facd"
+      "sha256": "3b6eb46cdec9eaf274dad4372db4ae4c71793b497cec16ed72cc4c1b4ea7a695"
     },
     {
-      "bytes": 10977,
+      "bytes": 11665,
       "mode": "0644",
       "path": "docs/tutorials/WHICH_NAOS_PROFILE_SHOULD_I_CHOOSE.md",
-      "sha256": "31269b2143baaa01f0d525b08d3058535851839dd344695003a8f9c0aaff2cb7"
+      "sha256": "d8b320f415d1683d8af776df2708d52bfb2f6e013699f700312c9a967ad45e72"
     },
     {
       "bytes": 131530,
@@ -1713,10 +1713,10 @@
       "sha256": "5cc1934cee3534a787d4375f1863dcc28f2b0f26ed1583b6e9e4960063f74b19"
     },
     {
-      "bytes": 5961,
+      "bytes": 5895,
       "mode": "0644",
       "path": "pyproject.toml",
-      "sha256": "f9b5b6ef487d69b902c6f010764a778b6e34ce3dc91e6b5fc5840bcf50c2e871"
+      "sha256": "c9c1d405010e3ae95e279ffa7e433169a026b47ddafc3845429d55a79ebc7845"
     },
     {
       "bytes": 893,
@@ -4089,10 +4089,10 @@
       "sha256": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94"
     },
     {
-      "bytes": 720,
+      "bytes": 1191,
       "mode": "0644",
       "path": "templates/host-adapters/portable-skill.md",
-      "sha256": "bc54bed7afef66118979ccc36c03738d886ccf5a30572d50a8692f7204675d58"
+      "sha256": "e9a75855335bde0937c5c445103278f549186c0dfb12c6e582c89ac1c45829c5"
     },
     {
       "bytes": 21666,
@@ -4515,10 +4515,10 @@
       "sha256": "748358e40f3c4e50f3975ce06c2f02b06e81365005ac910e5257d0e7a5c6bbe9"
     },
     {
-      "bytes": 19214,
+      "bytes": 19575,
       "mode": "0644",
       "path": "templates/prompts/naos-design.prompt.md",
-      "sha256": "8e02f50703d46dadb2e103f12a766d88700d5e08c589feafe4c01a21ed03ddbd"
+      "sha256": "c11d388c2498589e60f38ab6387056a76397a58c32b44fdb156f46223beeed06"
     },
     {
       "bytes": 5145,
@@ -4785,10 +4785,10 @@
       "sha256": "fb2a3d5a9f1b8c58cf4ce445967a00f3c00bd31411629c34aeab054d27d30b48"
     },
     {
-      "bytes": 4153,
+      "bytes": 7925,
       "mode": "0644",
       "path": "templates/spec-kit/specs/03-requirements.md",
-      "sha256": "2f2b199437829fa757c582ee18d4a35e9a4c8a8ddc2ddd08232e3fc355c243e2"
+      "sha256": "9db9dfdefb85f8cc951d9013f622e9e3d8712ef2b64e06ff7ce50e804783ffe2"
     },
     {
       "bytes": 3159,
@@ -4947,10 +4947,10 @@
       "sha256": "e5064e34b41bc834d2eb19cd6e5d6a0a534b374302822e25f2baaaf37a92c71c"
     },
     {
-      "bytes": 115366,
+      "bytes": 116042,
       "mode": "0644",
       "path": "templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md",
-      "sha256": "dbbcff3c79fdf982a1c873f3f0ac913838e6813bde9f7e4eaada0531e5abd8a6"
+      "sha256": "78d33e06892a4baa4bbb3da8213037c573b8828d1735993c1ab280c6aca92687"
     },
     {
       "bytes": 2473,
@@ -6209,8 +6209,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 20928800,
+  "source_bytes": 20941909,
   "source_file_count": 1033,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "212025ddfdea69fe024bbf9a3acd9bde96b12a8aa66e8d442045a06d86b2ea46"
+  "tree_sha256": "39da6f980b02af197bbb258f67bf97d01bc9d495cbaeb251af0108d117122e73"
 }

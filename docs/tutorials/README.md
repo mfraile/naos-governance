@@ -8,13 +8,27 @@ Standard/Assured install the full prompt and agent catalogue. Use a tutorial
 only when every named prompt and agent exists in the generated project, or
 follow the profile-specific fallback described by the integral tutorial.
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 > **Audience**: Developers and teams adopting NAOS governance for their AI-assisted projects.
 > **Goal**: Learn to use NAOS workflow commands, understand agent roles, and build sustainable governance habits.
 
 NAOS is now documented as a file-first control plane as well as a prompt/agent workflow. For generated projects, the seeded [NAOS Quick Reference](../../templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md) is copied into `naos/NAOS_QUICK_REFERENCE.md` and summarizes profiles, capabilities, policy, validators, gates, evidence pack, dashboard, and operational wrappers. Pair it with [CONTROL_PLANE.md](../CONTROL_PLANE.md) when you need the current control-plane model.
 
 ---
+
+## Verification scope
+
+This tutorial set describes the remediated source candidate, not every artifact
+labelled `1.1.0` or every future version. Complete artifact acquisition in the
+[installation manual](../../INSTALLATION_MANUAL.md#artifact-acquisition) first.
+The 18 October 2026 review read all 19 tutorials, checked current parser,
+generation and validator behavior, and exercised an isolated offline package
+installation and generated profile paths on macOS ARM64 with CPython 3.12.7.
+Examples of AI conversations, application code, metrics, commits and cadence
+are illustrative; they are not recorded outcomes for your project. This review
+does not requalify other native cells or demonstrate every host/model workflow.
+Use the named [platform evidence](../PLATFORM_ADAPTERS.md) and verify actual
+files, tool discovery and results in your selected environment.
 
 ## Reading Order
 

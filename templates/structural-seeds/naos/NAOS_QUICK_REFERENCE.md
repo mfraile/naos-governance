@@ -1,7 +1,7 @@
 # NAOS Quick Reference
 
 **Reference Schema Version**: 3.0
-**NAOS Kit Compatibility**: v1.0.0+
+**Runtime binding**: Remediated source candidate; use the matching source/artifact receipt described in the kit installation manual. A version string alone does not identify this command set.
 **Status**: Active generated-project reference
 **Purpose**: A practical, workflow-first front door for NAOS — how to take an idea, topic, repo, feature, or task and move it through the governed lifecycle. The complete prompt/agent/skill/CLI inventory lives in `NAOS_CATALOG.md` (a NAOS kit document, see note below); this file is the daily workflow map.
 
@@ -153,9 +153,12 @@ Advisory controls may *challenge* deterministic controls, but they may not *repl
 ## 3. Start From Your Situation
 
 Managed activation targets native macOS, Ubuntu and Windows 11 with CPython
-3.11–3.13. Darwin has local execution evidence; native Ubuntu/ext4 recovery
-probes and bounded native Windows recovery checks have run on all three Python
-versions. Final artifact and complete command-workflow qualification remain pending. Use an absent external `--preview-dir`
+3.11–3.13. The named D5 baseline dated 17 October 2026 has accepted
+installed-artifact and selected managed/receiving recovery evidence across all
+nine macOS ARM64/APFS, Ubuntu x86_64/ext4 and Windows 11 x64/NTFS cells. See
+`docs/PLATFORM_ADAPTERS.md` in the kit for the exact hashes, scenarios and
+remaining branches. Successor artifacts need their own qualification; this is
+not acceptance of every command workflow. Use an absent external `--preview-dir`
 to inspect generated content without activation. On Windows, initialize managed
 provenance before add/setup. Existing updates require an external `--plan-out`
 and a separate `naos upgrade --apply-plan` with `--expect-plan-digest`; use the
@@ -168,8 +171,8 @@ internal history consistency, not checkout ownership or permission to update.
 It does not migrate legacy history or enroll a receiving checkout. On a completed,
 same-root bound v3 history, managed `init` (including `--activate`) and `add/setup`
 are plan-only. Save an external review and apply its exact digest through `upgrade`;
-`--new` never re-enrolls an existing v3 project. Combined native qualification of
-these command routes remains pending; populated-store receiving has a separate
+`--new` never re-enrolls an existing v3 project. The named D5 results do not qualify every branch of
+these command routes; populated-store receiving has a separate
 explicit interface described below. Legacy migration has the explicit interface below, with native
 qualification in progress.
 
@@ -196,8 +199,10 @@ complete-file SHA-256 through `--apply-plan` / `--expect-plan-digest`.
 Receiving recovery additionally requires that same digest:
 `naos upgrade PROJECT --recover --expect-plan-digest SAVED_FILE_SHA256`.
 Existing edits/deletions are preserved. Never remove local evidence to force this
-route. Foreign populated stores are not covered; final native qualification of
-this new public receiving route remains pending.
+route. Foreign populated stores are not covered. The earlier 13-case absent-store
+receipt covers macOS and Windows, not Ubuntu or installed artifacts; selected
+D5 receiving scenarios have separate acceptance. See the kit platform document
+for the exact route and artifact before relying on either receipt.
 
 For a completed populated v3 store copied or moved with the checkout, preserve
 it and inspect with `naos upgrade PROJECT --inspect-receiving-store`. Plan with
@@ -207,10 +212,10 @@ Review independently selected history and the saved plan. Apply through
 recovery needs those same arguments plus `--recover`. Keep old records and any
 interrupted state. Local controls must already meet receiving-user private
 storage policy; ordinary Windows copying may lose this protection and refuse.
-Receiving does not repair ACLs or take ownership. Bounded macOS and Ubuntu
-Python 3.11–3.13 source evidence is recorded; Windows, migration-origin subsequent
-updates, cross-account secure transfer and final artifact qualification remain
-pending. See the installation manual before use.
+Receiving does not repair ACLs or take ownership. The named D5
+receiving/publication/recovery scenarios include Windows as well as macOS and
+Ubuntu on Python 3.11–3.13. They do not establish every migration-origin update,
+cross-account secure transfer or successor-artifact qualification. See the installation manual before use.
 
 Generated Git hooks use Git's Bash. On Git for Windows, set `NAOS_PYTHON` to
 the selected native interpreter's absolute path using forward slashes, for
@@ -942,8 +947,8 @@ artifact qualification limits are recorded in the platform documentation.
 
 | Command | Use when | Writes / updates | Boundary |
 | --- | --- | --- | --- |
-| Installed `naos repository-intelligence plan|enroll|apply|validate` | Qualify an existing repository before scaffold activation | external plan, then capability-owned provenance and generated intelligence | Runtime stays in installed NAOS/kit rather than the default scaffold; SQLite/FTS baseline; graph optional; does not approve adoption |
-| `naos-governance init . --tier <tier> --archetype custom --backend static_only --activate` | Managed create-only installation through the selected platform adapter (Linux qualification pending) | profile governance surface plus provenance and receipt | Unsupported tuples, collisions, and `--force` refuse; does not make seeds project-specific |
+| Installed `naos repository-intelligence plan\|enroll\|apply\|validate` | Qualify an existing repository before scaffold activation | external plan, then capability-owned provenance and generated intelligence | Runtime stays in installed NAOS/kit rather than the default scaffold; SQLite/FTS baseline; graph optional; does not approve adoption |
+| `naos-governance init . --tier <tier> --archetype custom --backend static_only --activate` | Managed create-only installation through the selected platform adapter (use the named platform/artifact evidence) | profile governance surface plus provenance and receipt | Unsupported tuples, collisions, and `--force` refuse; does not make seeds project-specific |
 | `naos upgrade . --tier <tier> --plan-out /external/plan.json` | Plan an already managed profile transition | absent external immutable plan only | Target unchanged; normal and `--dry-run` planning are identical |
 | `naos upgrade . --apply-plan /external/plan.json --expect-plan-digest SHA256` | Apply one reviewed managed transition | eligible kit-owned derived leaves, journal, receipt | Revalidates exact provenance/current/source state; adopter content is preserved; `--force` refuses |
 | `naos upgrade . --recover` | Recover an interrupted managed transaction through its platform adapter | recovery or rollback evidence | Conflicts and unknown residue are preserved; application-process recovery does not prove power-loss durability |
@@ -1015,7 +1020,7 @@ The governance completeness audit (`python scripts/naos_governance_audit.py`) co
 | Command | Use when | Writes / updates | Boundary |
 | --- | --- | --- | --- |
 | `naos claims` | Validate claims vs evidence/policy | claims report | Not certification |
-| `naos self-check` | Aggregate control-plane posture; inspect existing sessions | self-check report | Does not start/update/end sessions; other derived reports may be written; not approval |
+| `naos self-check` | Aggregate control-plane posture; inspect existing sessions | self-check report | Default inspection uses temporary derived reports and leaves project state unchanged; `--refresh` publishes evidence, while `--output` alone saves only the inspection report; not approval |
 | `naos session-id --inspect-session --json` | Inspect existing session identity | JSON on stdout | No session/index/report/audit writes; missing or invalid evidence remains visible |
 | `naos ai-surface-budget` | Check AI/governance instruction context health | `ai_surface_context_budget.json` | Not hallucination prevention or threshold tuning |
 | `naos governance-bypass-posture` | Report local hook/CI bypass posture | `governance_bypass_posture.json` | Not bypass prevention or CI proof |

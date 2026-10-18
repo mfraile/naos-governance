@@ -1,11 +1,14 @@
 # Micro Tutorial 20 — Weekly Cadence
 
-> _Tested with NAOS kit v1.0.0+ · Last verified 2026-06-26_
+> _Source-reviewed against the remediated candidate · 2026-10-18. See [verification scope](./README.md#verification-scope)._
 
 > **Commands**: `/naos-w-plan` (Monday), `/naos-w-review` (Friday)
 > **Agent**: `@naos-plan` (planning) / `@naos-review` (review)
 > **Cadence**: Weekly rhythm — plan on Monday, review on Friday
 > **Time**: 30–60 minutes per event
+
+> **Availability**: Standard and Assured. Lite uses manual session/cadence
+> notes in its integral tutorial; Quickstart has no lifecycle prompts.
 
 ---
 
@@ -37,7 +40,7 @@ Set the week's direction. Choose the right tasks. Identify risks. Create a daily
 ```
 /naos-w-plan
 
-Week starting: 2026-03-25
+Week starting: 2026-03-23
 Focus areas: Payment integration (FR-18), User management cleanup (FR-12)
 ```
 
@@ -92,7 +95,7 @@ Assess governance health at the end of the week. Measure whether the week's goal
 ```
 /naos-w-review
 
-Week of: 2026-03-25 to 2026-03-28
+Week of: 2026-03-23 to 2026-03-27
 ```
 
 ### What the Agent Produces
@@ -158,9 +161,11 @@ The weekly review feeds the monthly review. Patterns that appear in weekly revie
 
 ## Common Mistakes
 
-**❌ Running `/naos-w-plan` on Wednesday instead of Monday**
+**❌ Planning only after the work is already done**
 
-Weekly planning works because it sets direction *before* the work starts, not mid-week. A Wednesday plan is a post-hoc rationalization of what you already did.
+Plan before the team's chosen work cycle starts. Monday is an example schedule;
+a different cycle may start on Wednesday. Record a late plan as a revision, not
+as evidence that earlier work followed it.
 
 **❌ Skipping `/naos-w-review` when the week was "basically fine"**
 

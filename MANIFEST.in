@@ -46,6 +46,8 @@ exclude scripts/naos_public_export.py
 
 # Kit dependencies referenced by distributed capability cards.
 include INSTALLATION_MANUAL.md
+include SECURITY.md
+include docs/FRONTMATTER_CONFORMANCE.md
 include NAOS_CATALOG.md
 include README.md
 include ROADMAP.md
@@ -60,8 +62,6 @@ include docs/SYSTEMIC_CAPABILITY_WIRING.md
 include docs/TOOL_NEUTRAL_USAGE.md
 include docs/TASK_CONTEXT_INTEGRITY.md
 include docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
-include docs/tutorials/README.md
-include docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md
-include docs/tutorials/PROFESSIONAL_ADOPTION_ENGINE.md
+recursive-include docs/tutorials *.md
 include plugins/naos-governance/.codex-plugin/plugin.json
 include plugins/naos-governance-claude-code/.claude-plugin/plugin.json
