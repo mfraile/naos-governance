@@ -1,3 +1,5 @@
+# Optional --freeze-context / --check-context uses explicit selected file bytes.
+# No new default enforcement, host observation, or private-memory access.
 version: "1.0"
 semantics:
   rules: "Project configuration for bounded task context pack generation."

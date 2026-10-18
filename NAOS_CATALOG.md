@@ -450,6 +450,8 @@ compact files, git state, repo governance files, and deterministic reports.
 
 ### `naos task-context` — Bounded Task Handoff Context
 
+Optional `--freeze-context` / `--check-context` provide explicit selected-file byte comparison with existing task/session and completion bindings. See [Selected task-context integrity](docs/TASK_CONTEXT_INTEGRITY.md) for exact identities, exclusions, expected output changes and legacy unknown states. This does not observe host delivery or model use.
+
 ```bash
 naos task-context --task T-001 --profile standard
 naos task-context --task T-001 --profile standard --write-markdown

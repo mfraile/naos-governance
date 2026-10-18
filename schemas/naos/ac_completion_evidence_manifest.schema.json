@@ -7,6 +7,44 @@
   "additionalProperties": true,
   "required": ["schema", "completions"],
   "properties": {
+    "selected_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project_id",
+        "task_id",
+        "session_id",
+        "pack_sha256",
+        "manifest_sha256",
+        "path"
+      ],
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 8
+        },
+        "pack_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "schema": {"const": "naos.ac_completion_evidence_manifest.v1"},
     "version": {"type": "string"},
     "semantics": {"type": "object"},
@@ -21,6 +59,39 @@
       "additionalProperties": true,
       "required": ["ac_id", "status", "evidence"],
       "properties": {
+        "context_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "project_id",
+            "task_id",
+            "session_id",
+            "pack_sha256",
+            "manifest_sha256"
+          ],
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "session_id": {
+              "type": "string",
+              "minLength": 8
+            },
+            "pack_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "manifest_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
         "record_id": {
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"

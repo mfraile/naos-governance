@@ -57,10 +57,10 @@
       "sha256": "ede8c87df90f320e13e3925a6412783278a24964168c4e7725ab44d9e392ff99"
     },
     {
-      "bytes": 137985,
+      "bytes": 138367,
       "mode": "0644",
       "path": "INSTALLATION_MANUAL.md",
-      "sha256": "7e178ffc9013b873a48b07246dcff2a7c0ce170794a13419f3b29591ee714f8f"
+      "sha256": "3730fc338830711c870a93026b2775a7dbdd0d56fec4158e60b5f9358386247a"
     },
     {
       "bytes": 35265,
@@ -81,16 +81,16 @@
       "sha256": "401bd5ca3841e7b986b92daf7fa0e7a1c922059b66011f64e464d9fb9406905b"
     },
     {
-      "bytes": 2458,
+      "bytes": 2497,
       "mode": "0644",
       "path": "MANIFEST.in",
-      "sha256": "771f5261dc0fb263443141f5203692382c43b08d1c43e930f47761492bc057c9"
+      "sha256": "1a8320e89c666a7cf86b664d3052356be4a0d50ea9f1f7e05d873e0c26de1765"
     },
     {
-      "bytes": 75224,
+      "bytes": 75577,
       "mode": "0644",
       "path": "NAOS_CATALOG.md",
-      "sha256": "d554dbeb3aba3feed46195c72923c79db2ace45c75ed6c6840f8df0d9e0f23a9"
+      "sha256": "420e7c1b962b07d546c5f1f75d332761953fca5e04f5bd4127cb4d7f974c5a90"
     },
     {
       "bytes": 4239,
@@ -591,10 +591,10 @@
       "sha256": "5c9cc1e5114a9500b80f8fdd735a4f82965828923ada7de70f45e21fddee3e25"
     },
     {
-      "bytes": 56220,
+      "bytes": 56273,
       "mode": "0644",
       "path": "cli.py",
-      "sha256": "3eab0f084546049991a9d9d002ae2d6c964506c8910ea3aa66e8f268d6e51a99"
+      "sha256": "3d983b2f85f8ab57b262719aa70a69affb469d5f1261b6c5e224e29a2b3c856b"
     },
     {
       "bytes": 137,
@@ -606,7 +606,7 @@
       "bytes": 1797,
       "mode": "0644",
       "path": "configs/generated_source_recipes.json",
-      "sha256": "4c7043de5d00cea2d267c1477596199da8f9106fd2fedf19713254a066b242a5"
+      "sha256": "44be12e401320a7697d683a0226e3ec6ef54ee08783ca14995d66756a348d61f"
     },
     {
       "bytes": 22975,
@@ -675,10 +675,10 @@
       "sha256": "8da8b844a5088195f57893377b47fdedb70f37ade9b11f676a1856806b0d4b51"
     },
     {
-      "bytes": 144780,
+      "bytes": 145293,
       "mode": "0644",
       "path": "configs/source_modes.json",
-      "sha256": "99beacf43e690f539f6ce4f6e7376fead526f94a65f4ba858dc30f092ea8c008"
+      "sha256": "27ef56088518974fd06b09630121f346dfbd6afd4bfe55df8fce201626a0438e"
     },
     {
       "bytes": 5756,
@@ -891,6 +891,12 @@
       "sha256": "3d97d9d3ddbeb83098b98695d1f1624b6d2e629123010c960ab131d55ff06466"
     },
     {
+      "bytes": 7736,
+      "mode": "0644",
+      "path": "docs/TASK_CONTEXT_INTEGRITY.md",
+      "sha256": "6ee114df2e2e87c978e8c8aa4cf574e93346c57e5fef434bc3c134b25a551150"
+    },
+    {
       "bytes": 19900,
       "mode": "0644",
       "path": "docs/TOOL_NEUTRAL_USAGE.md",
@@ -1101,10 +1107,10 @@
       "sha256": "c9814152652c1df55ccee4dc0aa5e7f7ba08dbcd5d305bfb22f60e3af10a20b6"
     },
     {
-      "bytes": 15357,
+      "bytes": 15645,
       "mode": "0644",
       "path": "docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md",
-      "sha256": "1124e4ebdc6806d5f89f8bb66ebbd0857069c5781975d2a54cb172d46ab0ecf5"
+      "sha256": "82bc6a60b002242e06bb8f8bf770f799fb1b53c44b4f049d4798ee0533e8677a"
     },
     {
       "bytes": 14381,
@@ -1215,10 +1221,10 @@
       "sha256": "fe4cd0e552cd2c3b669cc3ca7c8b67778a380dfbe19543c584bc32f52aa39937"
     },
     {
-      "bytes": 293715,
+      "bytes": 293851,
       "mode": "0644",
       "path": "naos_init.py",
-      "sha256": "014aaf2e7af34bc33bb0f32c8abe299d1a0f7493f906b2227ab3281e0b54b419"
+      "sha256": "08387e3e86ecd99346994d676a0b4c4a434f59e5441e9d1b02823c482eb2c3b6"
     },
     {
       "bytes": 32838,
@@ -1557,6 +1563,12 @@
       "sha256": "f60724cd359866840373da5a6f26aa2380e543c8f72f7b4c52778265a63d2092"
     },
     {
+      "bytes": 20178,
+      "mode": "0644",
+      "path": "public_tests/test_context_integrity.py",
+      "sha256": "614d4361ce19bc0474c9c1636f71415a49610c0ea0adcdbc14b7f50a6e930246"
+    },
+    {
       "bytes": 1815,
       "mode": "0644",
       "path": "public_tests/test_dashboard_applicability_contract.py",
@@ -1701,10 +1713,10 @@
       "sha256": "5cc1934cee3534a787d4375f1863dcc28f2b0f26ed1583b6e9e4960063f74b19"
     },
     {
-      "bytes": 5923,
+      "bytes": 5961,
       "mode": "0644",
       "path": "pyproject.toml",
-      "sha256": "d46b2c24484d60eebac7af8175113af7c50e0711c353a1b8c35ab7057574f68a"
+      "sha256": "f9b5b6ef487d69b902c6f010764a778b6e34ce3dc91e6b5fc5840bcf50c2e871"
     },
     {
       "bytes": 893,
@@ -1725,10 +1737,10 @@
       "sha256": "b107f6b6f3c864fea0c92106573a696febed6197cba916afc8858818d41c8656"
     },
     {
-      "bytes": 3224,
+      "bytes": 4919,
       "mode": "0644",
       "path": "schemas/naos/ac_completion_evidence_manifest.schema.json",
-      "sha256": "f36e41a12b387a2f93dea6b18174549f2bc36fcea7d22b3d7403b1c4be6122f4"
+      "sha256": "b0da001db14b5322a689b4192d4fd135af25cbb5e65f4e3513ba803028867cbd"
     },
     {
       "bytes": 4430,
@@ -2679,10 +2691,10 @@
       "sha256": "3d7a66bcf2eadbcef34d32d14039733e0aba6efc291798f6c8057708140d8869"
     },
     {
-      "bytes": 4480,
+      "bytes": 8095,
       "mode": "0644",
       "path": "schemas/naos/session_lifecycle.schema.json",
-      "sha256": "9a770deeba9091cfea3d4fea06e87f68b2ce4b1a855768beb921267aade29380"
+      "sha256": "5f83f799a83efcd551fa01a976e9bf157bbb747a1dabde011cb2503b10853df0"
     },
     {
       "bytes": 1849,
@@ -2781,16 +2793,22 @@
       "sha256": "6c8cf8b03cf4d2dd78f11c7cf6cd59a482f6c2a704644131ba5f4f63dca8f68f"
     },
     {
-      "bytes": 6739,
+      "bytes": 12647,
       "mode": "0644",
       "path": "schemas/naos/task_context_pack.schema.json",
-      "sha256": "4ea531a86fbb5f096b88e09f198e8ffd2bd330f3860ba089bb6ef68c80d8a8b9"
+      "sha256": "53e5d96a0f83af7b86fa07a06d41d1bbcede547d75f4bf7f3b5e14c1eee2159e"
     },
     {
       "bytes": 2642,
       "mode": "0644",
       "path": "schemas/naos/task_context_pack_rules.schema.json",
       "sha256": "2f4608a22b28422b22608adcb175f96d72c29d59734d3f9d10ded0c06b017c5b"
+    },
+    {
+      "bytes": 3163,
+      "mode": "0644",
+      "path": "schemas/naos/task_context_revalidation.schema.json",
+      "sha256": "8036d38736f0d4ab6b018c68843c9991b41be0eb537ceec7b5d0e4520f734853"
     },
     {
       "bytes": 3946,
@@ -2865,10 +2883,10 @@
       "sha256": "017fcfb658f433ea550d267fae7320ad75bd8bb55f5b1ee3df4879889c0e5de3"
     },
     {
-      "bytes": 53968,
+      "bytes": 54900,
       "mode": "0644",
       "path": "scripts/naos_ac_completion_evidence.py",
-      "sha256": "ad81de596e805e65e2d0884b907e0ecafe5c665ce61cd2441576d3e60e9f4908"
+      "sha256": "81a67c20e118a68325dfbec679b5fb8df6b886f7ef04b41214e5e1728bed5e19"
     },
     {
       "bytes": 45085,
@@ -3555,10 +3573,10 @@
       "sha256": "58cc1defb92cd2a9f1446311aa6dcd05231031f1aa2970f46338c10408917355"
     },
     {
-      "bytes": 49273,
+      "bytes": 51262,
       "mode": "0644",
       "path": "scripts/naos_session_lifecycle.py",
-      "sha256": "f464190b6f38cc729294c7349f9154f5430e2f53a5a79c07e883c5acdcbefbc6"
+      "sha256": "24726871bc182663647e641d593ca5f655e1ae6f0e30a7548ff9162795a9702e"
     },
     {
       "bytes": 63299,
@@ -3615,10 +3633,16 @@
       "sha256": "0f5c759a54edf7dcea3be475f8521afb3af305ffc61a68206b61b5ace60e2a27"
     },
     {
-      "bytes": 69023,
+      "bytes": 19073,
+      "mode": "0644",
+      "path": "scripts/naos_task_context_integrity.py",
+      "sha256": "47fd4fc1077a75c536e5b0737232af00519ee4942e90df0bc7c7fa876d0023c6"
+    },
+    {
+      "bytes": 73168,
       "mode": "0644",
       "path": "scripts/naos_task_context_pack.py",
-      "sha256": "c9b27ca91e38d96b2c77108a84fa3f93ca76db128d6fc8b69fc3935e090a40a9"
+      "sha256": "e0d860e1282a58c7bf6f260857b93e9631005290692aebd29e288e19d6279b01"
     },
     {
       "bytes": 71934,
@@ -4923,10 +4947,10 @@
       "sha256": "e5064e34b41bc834d2eb19cd6e5d6a0a534b374302822e25f2baaaf37a92c71c"
     },
     {
-      "bytes": 115190,
+      "bytes": 115366,
       "mode": "0644",
       "path": "templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md",
-      "sha256": "34e9ad4b98cde832ac3f911e4098c0331f698ad1f05d6f47a829713c85c00208"
+      "sha256": "dbbcff3c79fdf982a1c873f3f0ac913838e6813bde9f7e4eaada0531e5abd8a6"
     },
     {
       "bytes": 2473,
@@ -5451,10 +5475,10 @@
       "sha256": "31ad8eb33846f76d4f513bdb63c44a70e262794a3a23eb87ade9dcbfb0d1e290"
     },
     {
-      "bytes": 266519,
+      "bytes": 266671,
       "mode": "0644",
       "path": "templates/structural-seeds/naos/setup_module_catalog.yaml",
-      "sha256": "a070f6636d7a4cd3846cc3ea9ef78c1fa9f3de280122c724d6da052a805eaeb3"
+      "sha256": "5476a6ec7f8eeac68734e3df862dea5781b9784760d19a05c13eb19bfb727979"
     },
     {
       "bytes": 286648,
@@ -5469,10 +5493,10 @@
       "sha256": "6d649bbd3581232fe5b4cf94b16eab914cb888aa2f3f4063b6d060bd29c73e2a"
     },
     {
-      "bytes": 6045,
+      "bytes": 6200,
       "mode": "0644",
       "path": "templates/structural-seeds/naos/task_context_pack_rules.yaml",
-      "sha256": "3843300ac70708f990445ebfa85af7d5ac6a035e87f404dcb258d245c00fe469"
+      "sha256": "c631be3e21efb4dfe8812a2a32b78c3fdfa502e267381a2cb601b57862a69d81"
     },
     {
       "bytes": 3724,
@@ -6185,8 +6209,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 20858081,
-  "source_file_count": 1029,
+  "source_bytes": 20928800,
+  "source_file_count": 1033,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "753ac1a7eb7703f15f4966a1152c18caaee1ac8b5c9480204b2e5b7dd33480a7"
+  "tree_sha256": "212025ddfdea69fe024bbf9a3acd9bde96b12a8aa66e8d442045a06d86b2ea46"
 }

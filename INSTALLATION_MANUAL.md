@@ -480,6 +480,8 @@ plus human review. CI has no memory access by default, cloud memory is not
 enabled by default, and NAOS does not prevent hallucinations or treat memory as
 evidence or approval.
 
+Optional selected-byte revalidation and task/session/completion joins are described in [Selected task-context integrity](docs/TASK_CONTEXT_INTEGRITY.md). Use `--freeze-context` only with an explicit selection and a new output; `--check-context` revalidates exact pack bytes without proving host delivery or model use. Existing profile policies and default packs remain compatible.
+
 Generated projects also receive `naos/task_context_pack_rules.yaml`. For a specific exact active or completed task, run `naos task-context --task <TASK-ID> --profile <profile>` and select `--recovery-mode active|completed|auto` where needed. `naos task-lifecycle --task <TASK-ID>` inspects the same canonical lifecycle identity. Add `--write-markdown` when you want the derived `naos/context_packs/<TASK-ID>.md` handoff pack. Task packs are bounded, non-authoritative context aids: repository evidence and current user instructions remain authoritative, memory references are advisory only, CI has no memory access by default, and NAOS does not inject context automatically or prevent hallucinations.
 
 Lite, standard, and assured projects also receive the native completion,

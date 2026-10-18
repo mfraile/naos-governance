@@ -675,7 +675,7 @@ _HELP_USAGE_ROWS = (
     ("naos memory-use-policy [options]", "Evaluate memory-use policy/review readiness"),
     ("naos learning-loop-review [options]", "Review governed learning lifecycle records"),
     ("naos adapter-coherence [options]", "Review Codex/plugin/adapter coherence"),
-    ("naos task-context --task T-XXX [options]", "Generate bounded task context pack"),
+    ("naos task-context --task T-XXX [options]", "Generate task context; opt-in --freeze-context / --check-context compare selected bytes"),
     ("naos task-lifecycle --task T-XXX [options]", "Inspect exact active/completed task lifecycle state"),
     ("naos task-complete --task T-XXX [options]", "Record a native task completion transition"),
     ("naos research-record RECORD [options]", "Validate a structured research record without promoting its claims"),

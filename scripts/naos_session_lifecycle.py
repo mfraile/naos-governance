@@ -46,6 +46,7 @@ from naos_session_identity import (  # noqa: E402
     validate_session_id,
 )
 from naos_audit_log import write_audit_event  # noqa: E402
+from naos_task_context_integrity import check_context  # noqa: E402
 from naos_task_lifecycle import (  # noqa: E402
     normalize_task_id,
     normalize_task_states,
@@ -1019,6 +1020,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--policy", help="Optional policy file used for path/profile conventions.")
     parser.add_argument("--rules", help="Explicit session_lifecycle_rules.yaml path.")
     parser.add_argument("--session-id", help="Use an existing filesystem-safe session id.")
+    parser.add_argument("--check-context", help="Explicit frozen pack to revalidate against this lifecycle task/session.")
+    parser.add_argument("--pack-sha256", help="Expected complete frozen pack SHA256.")
+    parser.add_argument("--project-id", help="Expected exact Git origin URL for selected context.")
     parser.add_argument("--new-session", action="store_true", help="Create a new session id instead of reusing the latest active session.")
     parser.add_argument("--close-session", action="store_true", help="Mark the selected session as closed after writing the lifecycle report.")
     parser.add_argument("--inspect-session", action="store_true", help="Inspect existing session context without starting, updating, or ending a session.")
@@ -1030,6 +1034,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if (args.pack_sha256 or args.project_id) and not args.check_context:
+        print("ERROR: context identity flags require --check-context", file=sys.stderr)
+        return 2
+    if args.check_context and (not all((args.session_id, args.pack_sha256, args.project_id)) or args.new_session or args.close_session):
+        print("ERROR: selected context requires an existing explicit session, project and pack digest; inspect/end before closing", file=sys.stderr)
+        return 2
     if args.inspect_session and (args.new_session or args.close_session or args.output):
         print("ERROR: --inspect-session is stdout-only and cannot create, close, or write a report", file=sys.stderr)
         return 2
@@ -1057,7 +1067,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         session_context = (
             inspect_session_context(root, naos_root, policy, args.session_id)
-            if args.inspect_session else
+            if args.inspect_session or args.check_context else
             ensure_session_context(
                 root=root,
                 naos_root=naos_root,
@@ -1073,6 +1083,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
+    if args.check_context:
+        selected_context = check_context(
+            root, naos_root, policy, path=args.check_context, pack_sha256=args.pack_sha256,
+            project_id=args.project_id, task_id=report.get("task_id"),
+            session_id=session_context.get("session_id"), profile=profile,
+            phase="end" if mode == "session_end" else "checkpoint",
+        )
+        report["context_revalidation"] = selected_context
+        if selected_context["status"] != "matched":
+            report["findings"].append({"id": "session_lifecycle.selected_context", "status": selected_context["status"],
+                                       "severity": severity_for_profile(profile, policy),
+                                       "message": "Selected context requires review; byte comparison does not prove host delivery."})
+            report["summary"].update(finding_counts(report["findings"]))
+            report["status"] = status_from_findings(mode, rules, report["findings"])
+            report["summary"]["status"] = report["status"]
+            report["human_review_required"] = True
     output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "session_lifecycle_report")
     if args.inspect_session:
         report["inspection_only"] = True

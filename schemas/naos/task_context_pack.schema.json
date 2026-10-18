@@ -53,6 +53,228 @@
     "summary"
   ],
   "properties": {
+    "context_integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection",
+        "manifest_sha256",
+        "status",
+        "evidence_dimensions"
+      ],
+      "properties": {
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "project_id",
+            "task_id",
+            "session_id",
+            "profile",
+            "naos_root",
+            "association_at_freeze",
+            "scope",
+            "inputs",
+            "rules",
+            "exclusions",
+            "supersedes_pack_sha256",
+            "representation"
+          ],
+          "properties": {
+            "schema": {
+              "const": "naos.task_context_selection.v1"
+            },
+            "project_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "session_id": {
+              "type": "string",
+              "minLength": 8
+            },
+            "profile": {
+              "type": "string"
+            },
+            "naos_root": {
+              "type": "string"
+            },
+            "association_at_freeze": {
+              "enum": [
+                "matched",
+                "scope_mismatch",
+                "unsafe",
+                "unknown"
+              ]
+            },
+            "scope": {
+              "const": "explicit_paths_only"
+            },
+            "inputs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "state",
+                  "sha256",
+                  "size_bytes",
+                  "expected_output"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "present",
+                      "missing",
+                      "unsafe",
+                      "unreadable",
+                      "oversized",
+                      "partial"
+                    ]
+                  },
+                  "sha256": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "size_bytes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "expected_output": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "rules": {
+              "type": "object",
+              "required": [
+                "path",
+                "state",
+                "sha256"
+              ],
+              "properties": {
+                "path": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "enum": [
+                    "present",
+                    "missing",
+                    "unsafe",
+                    "unreadable",
+                    "oversized",
+                    "partial"
+                  ]
+                },
+                "sha256": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "exclusions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "supersedes_pack_sha256": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "representation": {
+              "const": "raw_file_bytes_no_newline_or_case_folding"
+            }
+          }
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status": {
+          "enum": [
+            "matched",
+            "changed",
+            "expected_changed",
+            "missing",
+            "unsafe",
+            "unreadable",
+            "oversized",
+            "partial",
+            "scope_mismatch",
+            "superseded",
+            "unknown"
+          ]
+        },
+        "evidence_dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issuer",
+            "observable",
+            "host_delivery",
+            "model_use",
+            "behavioral_effectiveness"
+          ],
+          "properties": {
+            "issuer": {
+              "const": "local_deterministic_cli"
+            },
+            "observable": {
+              "const": "selected_bytes_at_check_time"
+            },
+            "host_delivery": {
+              "const": "not_observed"
+            },
+            "model_use": {
+              "const": "unknown"
+            },
+            "behavioral_effectiveness": {
+              "const": "not_evaluated"
+            }
+          }
+        }
+      }
+    },
     "schema": {"type": "string"},
     "generated_at": {"type": "string"},
     "profile": {"type": "string"},

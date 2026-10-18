@@ -58,6 +58,7 @@ include docs/HOOK_ACTIVATION.md
 include docs/HOST_CONTEXT_BUDGET.md
 include docs/SYSTEMIC_CAPABILITY_WIRING.md
 include docs/TOOL_NEUTRAL_USAGE.md
+include docs/TASK_CONTEXT_INTEGRITY.md
 include docs/decisions/ADR-0010-control-plane-advisory-boundaries.md
 include docs/tutorials/README.md
 include docs/tutorials/INTEGRAL_TUTORIAL_STANDARD_FROM_SCRATCH.md
