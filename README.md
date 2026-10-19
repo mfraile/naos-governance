@@ -1,4 +1,12 @@
-# NAOS-Governance — Your AI Coding Assistant Just Created a Function That Already Exists
+# NAOS-Governance — Native AI Orchestration for SDLC.
+
+**Deterministic Governance for AI-Assisted SDLC**
+
+[![Governance as Code](https://img.shields.io/badge/governance-as--code-007ec6)](docs/CONTROL_PLANE.md)
+[![Deterministic Checks](https://img.shields.io/badge/checks-deterministic-007ec6)](docs/CLAIMS_AND_LIMITATIONS.md)
+[![Human Review Required](https://img.shields.io/badge/review-human%20required-007ec6)](docs/AUDIT_PLAYBOOK.md)
+
+## Your AI Coding Assistant Just Created a Function That Already Exists
 
 > Your AI assistant is excellent. It writes clean code, follows instructions, and passes tests.
 > It also just duplicated a function that exists three directories away. Nobody caught it —
@@ -20,6 +28,14 @@ people and organizations.
 NAOS is tool-neutral by design: it works through repository files, commands,
 hooks, schemas, reports, and human-reviewed evidence rather than through a
 single assistant or IDE.
+
+**Enterprise AI Realism (Post-Hype Pragmatism).** NAOS applies
+evidence-based AI engineering to the software-development process: versioned
+policies, selected deterministic validators, configured gates and repository-local
+evidence for human review. It helps teams expose missing or stale evidence and
+unresolved governance findings early. AI-generated work and declared compliance
+metadata remain review inputs; they do not establish correctness, legal compliance
+or runtime safety.
 
 > **NAOS makes governance inspectable inside the repository.** It adds
 > deterministic conformance, traceability, validators, evidence packs, and

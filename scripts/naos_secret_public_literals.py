@@ -18,7 +18,7 @@ from typing import Any
 CATALOG_SCHEMA = "naos.secret_public_literals.v1"
 COPIED_RUNTIME_MARKER = b"# AUTO-" + b"GENERATED: Copied by naos init from the NAOS kit."
 CATALOG_FILENAME = "naos_secret_public_literals.json"
-CATALOG_SHA256 = "701c8d8a4ec733a670ea7532d28c88ef553911e11eb73ecac66c58fb64ee5800"
+CATALOG_SHA256 = "93c48765877746091641b9c0aa8eea24f0518659c044f35d08dda07e6139ac4f"
 MAX_CATALOG_BYTES = 1024 * 1024
 MAX_ENTRIES = 16_384
 MAX_GROUPS = 2048
@@ -360,7 +360,7 @@ def selected_public_audit_literals(files: list[Path], *, root: Path, naos_root: 
 
 # These schema bytes ship with both kit and copied scanner layouts. A replaced
 # adopter schema cannot expand the public operand contract.
-_REFERENCE_SCHEMAS = {'pr_risk_classification': '4c238cfdff0c214402e8435f24e825bec2ec1b21c8196bcda6270b0aa854ec4b', 'self_check': 'a8c8388efc1ea6897e96b2dccfba513f0389ff0b8fe0adde94dbf3e659364e5a', 'evidence_classification_report': '5cdb1dc62bf40054f41240b43693ee307b35dac427190d3e0f26ac19b2414e47', 'dashboard_summary': 'b6503c742ca7c9a490243b105014d5558aaee18810ca8042ca2e14491a176335', 'evidence_pack': 'dbdc24b08e8ea3a3dc8e7b0a06502348d7dc9e27611aae933586c1d495aee587', 'task_claim_report': '48a8d7b0f5631f7fb0069da715b9a3062103c808b436d5a75de0abc505e375fe', 'task_claims': '6c8cf8b03cf4d2dd78f11c7cf6cd59a482f6c2a704644131ba5f4f63dca8f68f', 'task_registry': 'c681ebafc2fb53af86f28332363ddab4cdcb97b9be7a236d247d37df3ae5d901', 'local_context_index': '9060ce868c254045b116917a3d4774343a607a4cfb10a1b56a3199ee9daee6f1', 'external_evidence_ingest': 'd96e6c9ebce6d9d1720ba4660cd64bc42f8652d9871b9fdeabde358599e3eefb', 'systemic_impact_family_review': 'afee3bdd6f0dd3cdfacfe64c9335acc71a9034bab50cb6e4d2f7fb7e6a2e3fb5'}
+_REFERENCE_SCHEMAS = {'pr_risk_classification': '4c238cfdff0c214402e8435f24e825bec2ec1b21c8196bcda6270b0aa854ec4b', 'self_check': 'a8c8388efc1ea6897e96b2dccfba513f0389ff0b8fe0adde94dbf3e659364e5a', 'evidence_classification_report': '5cdb1dc62bf40054f41240b43693ee307b35dac427190d3e0f26ac19b2414e47', 'dashboard_summary': 'c703a430008cc25b7257c597a009646a309e6308f64a5c88fd45fb926742ff67', 'evidence_pack': 'd51bb13207f8b566bccffaf43c5b62e36eeb1c7caab698bdde296395aa2304aa', 'task_claim_report': '48a8d7b0f5631f7fb0069da715b9a3062103c808b436d5a75de0abc505e375fe', 'task_claims': '6c8cf8b03cf4d2dd78f11c7cf6cd59a482f6c2a704644131ba5f4f63dca8f68f', 'task_registry': 'c681ebafc2fb53af86f28332363ddab4cdcb97b9be7a236d247d37df3ae5d901', 'local_context_index': '9060ce868c254045b116917a3d4774343a607a4cfb10a1b56a3199ee9daee6f1', 'external_evidence_ingest': 'd96e6c9ebce6d9d1720ba4660cd64bc42f8652d9871b9fdeabde358599e3eefb', 'systemic_impact_family_review': 'afee3bdd6f0dd3cdfacfe64c9335acc71a9034bab50cb6e4d2f7fb7e6a2e3fb5'}
 _TASK_PUBLIC_ID = re.compile(r"T-[0-9]{3}\Z")
 
 

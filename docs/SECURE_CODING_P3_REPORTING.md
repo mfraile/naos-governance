@@ -78,6 +78,12 @@ Projection is deliberately non-creative:
 - every configured target is preflighted before any target is changed;
 - symlink projection targets are rejected.
 
+The supported v1 and v2 dashboard-summary and evidence-pack schemas accept this
+optional projection with its five dimensions and mandatory human-review boundary.
+Reports without the projection remain valid. Projection preserves existing
+statuses, readiness findings and source-reference metadata; unrelated top-level
+fields and malformed projection payloads remain outside the report contract.
+
 Run dashboard/evidence generation before projection when those artifacts need to
 be refreshed:
 
