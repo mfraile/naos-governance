@@ -74,10 +74,10 @@
         "spec_files_required": {"type": "integer", "minimum": 0},
         "support_files_required": {"type": "integer", "minimum": 0},
         "copied": {"type": "integer", "minimum": 0},
-        "overwritten": {"type": "integer", "minimum": 0},
+        "overwritten": {"type": "integer", "minimum": 0, "description": "Historical overwrite count; new create-only runs leave this at zero."},
         "skipped_existing": {"type": "integer", "minimum": 0},
         "would_copy": {"type": "integer", "minimum": 0},
-        "would_overwrite": {"type": "integer", "minimum": 0},
+        "would_overwrite": {"type": "integer", "minimum": 0, "description": "Historical preview count; new create-only runs leave this at zero."},
         "missing_source": {"type": "integer", "minimum": 0},
         "invalid_manifest": {"type": "integer", "minimum": 0},
         "unsafe_paths": {"type": "integer", "minimum": 0},
@@ -85,7 +85,7 @@
         "copy_cleanup_failed": {
           "type": "integer",
           "minimum": 0,
-          "description": "Number of failures removing a copy temporary after its absent destination was successfully installed; the corresponding file action remains copied."
+          "description": "Historical temporary-cleanup failure count; retained for report compatibility. New direct-to-target copies have no temporary cleanup step."
         },
         "report_write_failed": {
           "type": "integer",
@@ -95,7 +95,7 @@
         "not_applied": {"type": "integer", "minimum": 0},
         "apply_refused": {
           "type": "boolean",
-          "description": "Whether spec-file apply was refused before mutation or stopped on a spec-file copy or post-install cleanup failure; false when apply completed and only later report persistence failed."
+          "description": "Whether spec-file apply was refused before mutation or stopped on a spec-file copy failure, including a reported partial target and pending copy-state marker; false when apply completed and only later report persistence failed. Historical reports may also record post-install cleanup failures."
         }
       }
     },

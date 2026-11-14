@@ -32,13 +32,13 @@ profile_footprint:
   methodology:
     warning: Any increase above the exact current fresh-profile baseline requires review and justification.
     stop: More than the minimum one-integer-unit separation above the warning boundary stops expansion pending an explicit reviewed allowance.
-    rationale: The 2026-09-16 maintainer decision approved six measured Lite, Standard and Assured token and file baselines for task and evidence contract repairs. On 2026-10-16 the maintainer explicitly approved only generated-file limits Quickstart95, Lite560, Standard696, Assured750 and Lite CLI99 in the current root chat, conditioned on two complete reproducible builds and later validation. All other token, finding and CLI limits remain unchanged. No extra headroom is approved; warn_above equals the approved baseline and stop_above equals baseline plus one. Two identical complete isolated fixed-time measurement projections on the final source and rules are required before allowance acceptance.
+    rationale: "The 2026-09-16 maintainer decision approved six measured Lite, Standard and Assured token and file baselines for task and evidence contract repairs. On 2026-10-16 the maintainer explicitly approved only generated-file limits Quickstart95, Lite560, Standard696, Assured750 and Lite CLI99 in the current root chat, conditioned on two complete reproducible builds and later validation. All other token, finding and CLI limits remain unchanged. No extra headroom is approved; warn_above equals the approved baseline and stop_above equals baseline plus one. Two identical complete isolated fixed-time measurement projections on the final source and rules are required before allowance acceptance. On 2026-10-27 the maintainer explicitly approved only measured generated-file limits Quickstart96, Lite565, Standard700 and Assured754 in the current root chat, for files already added by the repairs. All token/finding/CLI limits remain unchanged. There is no extra headroom: warn_above is the measured baseline and stop_above is baseline plus one. Acceptance requires two complete identical isolated fixed-time projections on the final measured source and rules; this decision alone does not claim their execution or accept the whole programme. It does not authenticate identity or authorize CI, publication, external action or invocation-policy changes."
     falsifier: Re-derive if the scaffold contract changes, deterministic replay differs, or the maintainer approves a different measured growth allowance.
   approval:
     status: approved
     authority_ref: templates/structural-seeds/naos/ai_surface_context_budget_rules.yaml
-    authority_basis: "Historical decision on 2026-09-16: The maintainer explicitly approved the measured Lite, Standard and Assured token and file baselines on 2026-09-16 for task and evidence contract repairs. This approval changes only those six baselines. The exact-baseline warning boundary and baseline-plus-one stop boundary remain unchanged; any further change requires explicit human review and never authorizes publication or external action. Current decision on 2026-10-16: the maintainer explicitly approved in the current root chat only generated-file limits Quickstart95, Lite560, Standard696, Assured750 and Lite CLI99, retaining all token/finding limits, other CLI limits and no extra headroom. Approval is conditioned on two complete reproducible builds plus later validation; no repeatability or acceptance is claimed here. This records the explicit maintainer decision, not authenticated identity or an invented approval hash. It never authorizes publication or external action."
-    approved_on: "2026-10-16"
+    authority_basis: "Historical decision on 2026-09-16: The maintainer explicitly approved the measured Lite, Standard and Assured token and file baselines on 2026-09-16 for task and evidence contract repairs. This approval changes only those six baselines. The exact-baseline warning boundary and baseline-plus-one stop boundary remain unchanged; any further change requires explicit human review and never authorizes publication or external action. Current decision on 2026-10-16: the maintainer explicitly approved in the current root chat only generated-file limits Quickstart95, Lite560, Standard696, Assured750 and Lite CLI99, retaining all token/finding limits, other CLI limits and no extra headroom. Approval is conditioned on two complete reproducible builds plus later validation; no repeatability or acceptance is claimed here. This records the explicit maintainer decision, not authenticated identity or an invented approval hash. It never authorizes publication or external action. On 2026-10-27 the maintainer explicitly approved only measured generated-file limits Quickstart96, Lite565, Standard700 and Assured754 in the current root chat, for files already added by the repairs. All token/finding/CLI limits remain unchanged. There is no extra headroom: warn_above is the measured baseline and stop_above is baseline plus one. Acceptance requires two complete identical isolated fixed-time projections on the final measured source and rules; this decision alone does not claim their execution or accept the whole programme. It does not authenticate identity or authorize CI, publication, external action or invocation-policy changes."
+    approved_on: "2026-10-27"
   candidate_freeze:
     status: released
     release_requires:
@@ -66,9 +66,9 @@ profile_footprint:
         basis: Exact isolated Quickstart baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 95
-        warn_above: 95
-        stop_above: 96
+        baseline: 96
+        warn_above: 96
+        stop_above: 97
         basis: Exact isolated Quickstart baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:
@@ -91,9 +91,9 @@ profile_footprint:
         basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 560
-        warn_above: 560
-        stop_above: 561
+        baseline: 565
+        warn_above: 565
+        stop_above: 566
         basis: Exact isolated Lite baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:
@@ -116,9 +116,9 @@ profile_footprint:
         basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 696
-        warn_above: 696
-        stop_above: 697
+        baseline: 700
+        warn_above: 700
+        stop_above: 701
         basis: Exact isolated Standard baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:
@@ -141,9 +141,9 @@ profile_footprint:
         basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       generated_file_count:
-        baseline: 750
-        warn_above: 750
-        stop_above: 751
+        baseline: 754
+        warn_above: 754
+        stop_above: 755
         basis: Exact isolated Assured baseline; one unit of growth warns and more than one unit stops pending an explicit reviewed allowance.
         falsifier: Re-derive on scaffold-contract change, deterministic replay mismatch, or maintainer-approved allowance change.
       cli_command_count:

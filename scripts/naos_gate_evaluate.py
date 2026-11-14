@@ -37,6 +37,7 @@ from naos_policy import (  # noqa: E402
     enforcement_transition,
     exit_code_for_summary,
     would_block_for_summary,
+    write_text_output,
 )
 
 
@@ -184,8 +185,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.output:
         output = Path(args.output)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        write_text_output(output, json.dumps(report, indent=2) + "\n")
         audit_result = write_audit_event(
             root=Path.cwd(),
             naos_root=args.naos_root,
@@ -202,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
             "event_file": audit_result.get("event_file"),
             "findings": audit_result.get("findings") or [],
         }
-        output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        write_text_output(output, json.dumps(report, indent=2) + "\n")
 
     if args.json:
         print(json.dumps(report, indent=2))

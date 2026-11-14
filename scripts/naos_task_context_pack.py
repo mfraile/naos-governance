@@ -20,9 +20,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from naos_self_check_inspection import (
+from naos_self_check_inspection import (  # noqa: E402
     inspection_active, inspection_output_path, inspection_logical_path,
-)  # noqa: E402
+)
 
 from naos_policy import (  # noqa: E402
     controlled_now_utc,
@@ -38,6 +38,7 @@ from naos_policy import (  # noqa: E402
     report_output_path,
     severity_for_profile,
     write_report,
+    write_text_output,
 )
 from naos_local_context_query import validated_collection_coverage  # noqa: E402
 import spec_header  # noqa: E402
@@ -1517,8 +1518,7 @@ def main(argv: list[str] | None = None) -> int:
             if (inspection_active(root, naos_root) and markdown_path == logical_markdown
                     and inspection_logical_path(root, naos_root, markdown_path) == markdown_path):
                 raise ValueError("Inspection Markdown is not a registered owned sink")
-            markdown_path.parent.mkdir(parents=True, exist_ok=True)
-            markdown_path.write_text(build_markdown(report), encoding="utf-8")
+            write_text_output(markdown_path, build_markdown(report), encoding="utf-8")
             report["markdown_output"] = {"path": str(inspection_logical_path(root, naos_root, markdown_path)), "status": "written"}
             write_report(output, report)
 

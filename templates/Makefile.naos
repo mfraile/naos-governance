@@ -33,7 +33,7 @@
 #   make -f Makefile.naos naos-external-evidence-ingest EXTERNAL_EVIDENCE_SOURCE=scan.sarif - summarize local SARIF evidence
 #   make -f Makefile.naos naos-evidence-attestation - generate local digest/reviewer metadata report
 #   make -f Makefile.naos naos-evidence-sign - emit adopter-signable evidence envelope
-#   make -f Makefile.naos naos-evidence-verify - verify local tamper-evidence and report signature-entry presence
+#   make -f Makefile.naos naos-evidence-verify - verify digest equality against the unsigned local baseline and report signature-entry presence
 #   make -f Makefile.naos naos-evidence-conflicts - detect deterministic evidence/review conflicts
 #   make -f Makefile.naos naos-memory-readiness - evaluate memory/context governance readiness
 #   make -f Makefile.naos naos-memory-access - evaluate declared provider/MCP posture and unverified fields
@@ -512,8 +512,8 @@ naos-evidence-sign: ## Emit adopter-signable evidence envelope over manifest roo
 		echo "    skip (evidence signing bridge not installed for this tier)"; \
 	fi
 
-naos-evidence-verify: ## Verify local tamper-evidence and report signature-entry presence
-	@echo "🔎 [naos-evidence-verify] Verifying local tamper-evidence for profile $(NAOS_PROFILE)..."
+naos-evidence-verify: ## Verify digest equality against the unsigned local baseline and report signature-entry presence
+	@echo "🔎 [naos-evidence-verify] Verifying digest equality against the unsigned local baseline for profile $(NAOS_PROFILE)..."
 	@if [ -f scripts/naos_evidence_signing.py ]; then \
 		"$(PYTHON)" scripts/naos_evidence_signing.py --mode verify $(NAOS_COMMON_ARGS) $(NAOS_STRICT_ARG); \
 	else \
@@ -1302,7 +1302,7 @@ naos-help: ## Show all NAOS governance targets
 	@echo "  make -f Makefile.naos naos-external-evidence-ingest EXTERNAL_EVIDENCE_SOURCE=scan.sarif — Summarize local SARIF evidence"
 	@echo "  make -f Makefile.naos naos-evidence-attestation — Generate local digest/reviewer metadata report"
 	@echo "  make -f Makefile.naos naos-evidence-sign — Emit adopter-signable evidence envelope"
-	@echo "  make -f Makefile.naos naos-evidence-verify — Verify local tamper-evidence and report signature-entry presence"
+	@echo "  make -f Makefile.naos naos-evidence-verify — Verify digest equality against the unsigned local baseline and report signature-entry presence"
 	@echo "  make -f Makefile.naos naos-evidence-conflicts — Detect deterministic evidence/review conflicts"
 	@echo "  make -f Makefile.naos naos-memory-readiness — Evaluate memory/context governance readiness"
 	@echo "  make -f Makefile.naos naos-memory-access — Evaluate declared provider/MCP posture and unverified fields"

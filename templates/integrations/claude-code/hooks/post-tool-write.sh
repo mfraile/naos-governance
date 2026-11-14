@@ -2,9 +2,9 @@
 set -u
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 if command -v python3 >/dev/null 2>&1; then
-  python3 "$SCRIPT_DIR/dispatch.py" --event post-tool-write
+  python3 -I -B "$SCRIPT_DIR/dispatch.py" --event post-tool-write
 elif command -v python >/dev/null 2>&1; then
-  python "$SCRIPT_DIR/dispatch.py" --event post-tool-write
+  python -I -B "$SCRIPT_DIR/dispatch.py" --event post-tool-write
 else
   printf "%s\n" "NAOS Claude hook: Python unavailable; run NAOS review manually." >&2
 fi

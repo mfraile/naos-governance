@@ -689,6 +689,7 @@ def check_evidence_refs(
                     profile=profile,
                     policy=policy,
                     mode="filled",
+                    naos_root=naos_root,
                 )
                 check["live_validation_status"] = live_report.get("status")
                 if live_report.get("status") != "pass" or live_report.get("mode") != "filled":

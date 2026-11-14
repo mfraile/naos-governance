@@ -12,7 +12,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -315,6 +314,8 @@ def _validate_config_destination(root: Path, path: Path) -> None:
             raise ValueError("memory config destination parent must be a directory")
     if (path.exists() or path.is_symlink()) and not path.is_file():
         raise ValueError("memory config destination must be a regular file")
+    if path.exists() and path.stat(follow_symlinks=False).st_nlink != 1:
+        raise ValueError("memory config destination must not be hard-linked")
     resolved_parent = path.parent.resolve(strict=False)
     if root not in (resolved_parent, *resolved_parent.parents):
         raise ValueError("memory config destination must resolve inside the project")
@@ -363,27 +364,11 @@ def _atomic_write_config(root: Path, path: Path, text: str) -> None:
     if _windows_config_writes_supported():
         _write_windows_config(path, text)
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _validate_config_destination(root, path)
-    mode = 0o600
-    if path.exists():
-        _read_regular_file(path)
-        mode = stat.S_IMODE(path.stat(follow_symlinks=False).st_mode)
-    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    temp_path = Path(temp_name)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            fd = -1
-            os.fchmod(handle.fileno(), mode)
-            handle.write(text)
-            handle.flush()
-            os.fsync(handle.fileno())
-        _validate_config_destination(root, path)
-        os.replace(temp_path, path)
-    finally:
-        if fd >= 0:
-            os.close(fd)
-        temp_path.unlink(missing_ok=True)
+        from naos_policy import write_text_output
+    except ImportError as exc:
+        raise ValueError("Memory config publication helper is unavailable") from exc
+    write_text_output(path, text, private_new_file=True, require_existing_write_access=False)
 
 
 def explain() -> int:

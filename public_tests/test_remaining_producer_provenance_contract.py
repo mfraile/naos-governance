@@ -1,5 +1,7 @@
 """Provenance for observed input states never turns an unmet gate into approval."""
 
+import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -18,6 +20,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import naos_behavioral_governance_readiness as behavioral  # noqa: E402
 import naos_pr_governance_summary as pr_summary  # noqa: E402
 import naos_session_lifecycle as lifecycle  # noqa: E402
+
+import naos_systemic_family_review as family  # noqa: E402
+import naos_systemic_impact as systemic  # noqa: E402
+from naos_policy import load_policy, report_default_path  # noqa: E402
 
 
 class RemainingProducerProvenanceContractTests(unittest.TestCase):
@@ -462,6 +468,152 @@ class RemainingProducerProvenanceContractTests(unittest.TestCase):
         self.assertEqual(matched["classification"], "confirmed")
         self.assert_real_local_ref(matched)
         self.assertEqual(code, 1)
+
+
+class CurrentProducerReviewBindingTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix="naos-current-producer-binding-")
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name).resolve()
+        for directory in ("src", "naos/reports", "naos/reviews"):
+            (self.root / directory).mkdir(parents=True, exist_ok=True)
+        (self.root / "src/code.py").write_text("VALUE = 1\n")
+        (self.root / "review.md").write_text("SYNTHETIC fixture review declaration only.\n")
+        self.policy_path = self.root / "naos/policy.yaml"
+        self.policy_path.write_text('version: "1.0"\npaths:\n  systemic_impact_family_review_record: reviews/systemic.json\n')
+        self.policy = load_policy(str(self.policy_path), "naos", self.root)
+        self.rules_path = self.root / "naos/systemic_impact_rules.yaml"
+        self.rules = {
+            "version": "1.0",
+            "defaults": {"freshness_window_days": 0, "severity_by_profile": {"standard": "required"}},
+            "review_surfaces": [{"surface_id": "docs", "name": "Docs", "kind": "artifact_review"}],
+            "artifact_families": [{
+                "family_id": "code", "name": "Code", "enabled": True,
+                "file_patterns": ["src/*.py", "naos/reports/*.json", "naos/audit_log/**/*.jsonl"],
+                "minimum_expected": ["src/code.py"], "related_families": ["docs"],
+                "required_review_outputs": ["Review documentation and record the outcome."],
+                "human_review_required": True,
+            }],
+        }
+
+    def report(self):
+        self.rules_path.write_text(yaml.safe_dump(self.rules, sort_keys=False))
+        return systemic.build_report(
+            root=self.root, profile="standard", naos_root="naos", policy=self.policy,
+            rules_path=self.rules_path, rules_source="explicit",
+        )
+
+    def complete(self):
+        record = copy.deepcopy(self.report()["aggregate_review"]["template"])
+        for row in record["reviews"]:
+            row.update(
+                disposition="reviewed_no_change", reviewer_id="synthetic-fixture-reviewer",
+                reviewed_at="2026-11-13T00:00:00Z", rationale="SYNTHETIC fixture declaration; no real approval.",
+                evidence_refs=["review.md"],
+                evidence_sha256={"review.md": hashlib.sha256((self.root / "review.md").read_bytes()).hexdigest()},
+                output_evidence=[{"requirement": "Review documentation and record the outcome.", "evidence_refs": ["review.md"]}],
+            )
+        (self.root / "naos/reviews/systemic.json").write_text(json.dumps(record))
+        self.assertEqual(self.report()["aggregate_review"]["summary"]["reviewed"], 1)
+
+    def test_current_scheduled_outputs_are_exact_declared_paths_and_unknown_files_stay_bound(self):
+        from naos_ci_readiness import PRODUCERS
+
+        commands = {
+            "failure_mode_posture_report": "failure-mode-posture",
+            "design_traceability_report": "design-traceability",
+            "ui_experience_quality_report": "ui-experience-quality",
+            "failure_mode_observations_report": "failure-mode-observations",
+        }
+        shipped = yaml.safe_load((ROOT / "templates/structural-seeds/naos/systemic_impact_rules.yaml").read_text())
+        schema = json.loads((ROOT / "schemas/naos/systemic_impact_rules.schema.json").read_text())
+        Draft202012Validator(schema).validate(shipped)
+        self.assertTrue(set(commands) <= set(shipped["review_binding"]["derived_report_keys"]))
+        self.assertTrue(set(commands) <= family.DERIVED_REPORT_KEYS)
+        self.rules["review_binding"] = {"mode": "declared_producer_inputs", "derived_report_keys": list(commands)}
+        self.policy["paths"]["reports_dir"] = "selected-results"
+        (self.root / "naos/selected-results").mkdir()
+        self.rules["artifact_families"][0]["file_patterns"].append("naos/selected-results/*.json")
+        self.complete()
+        for key, command in commands.items():
+            self.assertIn((command,), PRODUCERS)
+            path = report_default_path(self.root, "naos", self.policy, key)
+            path.write_text('{"status":"review_required","generated_at":"first"}')
+            self.assertEqual(self.report()["aggregate_review"]["summary"]["reviewed"], 1)
+            path.write_text('{"status":"review_required","generated_at":"second"}')
+            current = self.report()
+            self.assertEqual(current["aggregate_review"]["summary"]["reviewed"], 1)
+            observed = current["aggregate_review"]["producer_input_binding"]["derived_outputs"]
+            self.assertIn(key, [item["key"] for item in observed])
+        (self.root / "naos/reports/authored.json").write_text('{"authored":true}')
+        self.assertEqual(self.report()["aggregate_review"]["summary"]["reviewed"], 0)
+
+    def actual_context_event(self):
+        from naos_local_context_index import build_report
+        from naos_audit_log import build_audit_event
+
+        rules_path = ROOT / "templates/structural-seeds/naos/local_context_index_rules.yaml"
+        rules = yaml.safe_load(rules_path.read_text())
+        rules["source_families"] = []
+        report = build_report(self.root, "naos", "standard", self.policy, rules, rules_path, "explicit", no_sqlite=True)
+        path = report_default_path(self.root, "naos", self.policy, "local_context_index_report")
+        path.write_text(json.dumps(report))
+        return build_audit_event(
+            root=self.root, naos_root="naos", profile="standard", policy=self.policy,
+            event_type="context_index_generated", source_report_path=path, source_report=report,
+            generated_at="2026-11-13T00:00:00Z",
+        )
+
+    def test_actual_context_audit_summary_is_derived_but_unknown_fields_reopen_review(self):
+        from naos_audit_log import audit_log_root_path, event_file_paths
+
+        self.rules["review_binding"] = {
+            "mode": "declared_producer_inputs", "derived_report_keys": ["local_context_index_report"],
+            "derived_runtime_outputs": ["registered_audit_events"],
+        }
+        self.complete()
+        event = self.actual_context_event()
+        self.assertIn("collection_status", event["event_payload_summary"]["summary"])
+        self.assertIn("capacity_deferred_paths", event["event_payload_summary"]["summary"])
+        self.assertTrue(family._audit_output_shape(event, "local_context_index_report"))
+        path = event_file_paths(audit_log_root_path(self.root, "naos", self.policy), event)[0]
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(event) + "\n")
+        self.assertEqual(self.report()["aggregate_review"]["summary"]["reviewed"], 1)
+        event["event_payload_summary"]["summary"]["authored_note"] = "Independent authored content"
+        self.rebind_event(event)
+        path.write_text(json.dumps(event) + "\n")
+        self.assertFalse(family._audit_output_shape(event, "local_context_index_report"))
+        self.assertEqual(self.report()["aggregate_review"]["summary"]["reviewed"], 0)
+
+    @staticmethod
+    def rebind_event(event):
+        from naos_audit_log import hash_json, _assign_public_audit_event_id, recompute_public_audit_event_id
+
+        event["event_payload_hash"] = hash_json(event["event_payload_summary"])
+        _assign_public_audit_event_id(event)
+        assert recompute_public_audit_event_id(event) is not None
+        return event
+
+    def test_current_context_summary_types_legacy_shape_and_unknown_producers_remain_strict(self):
+        event = self.actual_context_event()
+        self.assertTrue(family._audit_output_shape(event, "local_context_index_report"))
+        for value in (-1, True, "0", []):
+            with self.subTest(invalid_count=value):
+                changed = copy.deepcopy(event)
+                changed["event_payload_summary"]["summary"]["capacity_deferred_paths"] = value
+                self.rebind_event(changed)
+                self.assertFalse(family._audit_output_shape(changed, "local_context_index_report"))
+        changed = copy.deepcopy(event)
+        changed["event_payload_summary"]["summary"]["collection_status"] = []
+        self.rebind_event(changed)
+        self.assertFalse(family._audit_output_shape(changed, "local_context_index_report"))
+        self.assertFalse(family._audit_output_shape(event, "unknown_producer"))
+        legacy = copy.deepcopy(event)
+        del legacy["event_payload_summary"]["summary"]["collection_status"]
+        del legacy["event_payload_summary"]["summary"]["capacity_deferred_paths"]
+        self.rebind_event(legacy)
+        self.assertTrue(family._audit_output_shape(legacy, "local_context_index_report"))
 
 
 if __name__ == "__main__":

@@ -309,7 +309,7 @@ what it actually found, including:
 - 19 active rules and seven project-specific ADAPT rows
 - `specs/03-requirements.md` (FR-001 requirements)
 - `naos/TASK_REGISTRY.yaml` (T-001 details)
-- All three AI instruction files
+- The installed AI instruction files relevant to the active host
 
 ### Day 1 — Task Start
 
@@ -357,9 +357,9 @@ Acceptance criteria:
 - AC-001-2: Invalid credentials return 401 (non-enumeration message)
 ```
 
-In `standard` profile, the review includes:
+In `standard` profile, the review guidance calls for:
 - Function-index and duplicate-intent review where evidence exists
-- Full spec alignment check
+- Profile-applicable spec alignment and unresolved-link review
 - Traceability verification
 - Documentation impact assessment
 
@@ -376,7 +376,7 @@ Update the story card manually:
 - [x] No schema violations introduced
 - [x] No duplicate code created
 - [x] Traceability headers added to new files
-- [x] Move this card to naos/completed/ when done
+- [ ] Native completion and its registry/history transition verified
 
 ## Implementation Notes
 
@@ -386,6 +386,12 @@ Update the story card manually:
            📝 Files: src/auth/endpoint.py, src/services/jwt_service.py, tests/test_auth.py
 ```
 
+Verified delivery requires existing implementation, test and evidence files plus
+an approved exact-task `task_delivery` decision; a checked checklist or agent
+review cannot replace it. Follow the
+[native completion procedure](./MICRO_TUTORIAL_14_NAOS_TASK_COMPLETE_WITH_CONFORMANCE.md)
+before requesting verified completion.
+
 Run completion:
 
 ```
@@ -394,7 +400,8 @@ Run completion:
 
 `@naos-conformance` is instructed to review the evidence and propose the
 configured lifecycle action. Verify its report and make the human-owned
-archive decision. Then:
+archive decision. Verify the resulting registry and completed history before
+marking that transition complete. Then:
 
 ```bash
 make -f Makefile.naos gov-refresh
@@ -452,7 +459,7 @@ actually improved.
 | Spec-driven development | Inspect filled project specs and unresolved markers; generated files alone are insufficient. |
 | Requirements traceability (FR→Task→Code→Test) | Validate each claimed link and its referenced evidence. |
 | Function-index and duplicate-risk evidence | Confirm reports exist and match current project data. |
-| Behavioral Governance Readiness | Treat as readiness metadata; a project-configured evaluator is required for behavior scoring. |
+| Behavioral Governance Readiness | Readiness metadata only; this kit does not include behavioral scoring/evaluator runtime. |
 | Governance dashboard and evidence metrics | Confirm current reports, gaps, stale inputs, and unknowns. |
 | Daily, weekly, and monthly cadence | Record only the cadences actually performed and reviewed. |
 | Assured profile | Not implied by this tutorial; evaluate separately only where purpose-fit. |

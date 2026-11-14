@@ -193,8 +193,9 @@ def default_exclusions(policy: dict[str, Any]) -> list[str]:
 
 
 def generated_output_exclusions(root: Path, naos_root: str, policy: dict[str, Any],
-                                output_path: Path | None = None) -> list[str]:
-    """Derived outputs cannot be subjects, including under preserved legacy rules.
+                                output_path: Path | None = None, *,
+                                source_inputs: tuple[Path, ...] = ()) -> list[str]:
+    """Keep exact attestation/proof outputs outside their own input domain.
 
     The evidence pack remains an independent configured snapshot; it is not
     silently excluded. Explicitly requiring an excluded output remains missing.
@@ -207,6 +208,18 @@ def generated_output_exclusions(root: Path, naos_root: str, policy: dict[str, An
                                 field="evidence_envelope_report")]
     if output_path is not None:
         outputs.append(output_path)
+    from naos_policy import SAFE_FALLBACK_POLICY
+    from naos_self_check_dependency_resolution import inspect_derived_receipt_endpoint
+
+    # The direct collector also supports partial policies. Normalize only path
+    # defaults for the shared endpoint inspection, without changing its caller.
+    receipt_policy = {**policy, "paths": {**SAFE_FALLBACK_POLICY["paths"], **paths}}
+    proof, _, _ = inspect_derived_receipt_endpoint(
+        root, naos_root, receipt_policy,
+        policy_path=(policy.get("_meta") or {}).get("path"),
+        extra_protected=(*source_inputs, *outputs),
+    )
+    outputs.append(proof)
     return sorted({path.resolve().relative_to(root.resolve()).as_posix() for path in outputs
                    if path.resolve().is_relative_to(root.resolve())})
 
@@ -461,13 +474,15 @@ def collect_artifacts(
     generated_at: datetime,
     naos_root: str = "naos",
     output_path: Path | None = None,
+    source_inputs: tuple[Path, ...] = (),
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     manifest_by_path: dict[str, dict[str, Any]] = {}
     missing: list[dict[str, Any]] = []
     disabled_groups: list[dict[str, Any]] = []
     base_exclusions = dedupe(default_exclusions(policy) + as_list(rules.get("excluded_paths")))
     output_exclusions = {(root / path).resolve()
-                         for path in generated_output_exclusions(root, naos_root, policy, output_path)}
+                         for path in generated_output_exclusions(
+                             root, naos_root, policy, output_path, source_inputs=source_inputs)}
     default_window = nonnegative_integer_setting(
         rules, "default_freshness_window_days", 30, context="attestation_rules",
     )
@@ -533,7 +548,7 @@ def status_from_findings(summary: dict[str, Any]) -> str:
         return "blocked"
     if summary.get("required", 0):
         return "review_required"
-    if summary.get("warning", 0):
+    if summary.get("warnings", 0):
         return "warning"
     if summary.get("missing_artifacts", 0):
         return "missing"
@@ -604,6 +619,7 @@ def build_report(
         generated_at=generated_at,
         naos_root=naos_root,
         output_path=output_path,
+        source_inputs=(rules_path, attestations_path),
     )
     stale_artifacts = [item for item in artifact_manifest if item.get("status") == "stale"]
     reviewed = reviewed_paths(attestations, artifact_manifest)
@@ -760,7 +776,9 @@ def build_report(
             "source": rules_source,
             "semantics": rules.get("semantics") or {},
             "excluded_paths": as_list(rules.get("excluded_paths")),
-            "generated_output_exclusions": generated_output_exclusions(root, naos_root, policy, output_path),
+            "generated_output_exclusions": generated_output_exclusions(
+                root, naos_root, policy, output_path,
+                source_inputs=(rules_path, attestations_path)),
         },
         "review_metadata": {
             "path": str(attestations_path),

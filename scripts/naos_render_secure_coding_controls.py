@@ -12,6 +12,8 @@ from typing import Any
 
 import yaml
 
+from naos_policy import write_text_output
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = Path("configs/secure_coding_control_render_manifest.yaml")
 SECTION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -259,7 +261,9 @@ def build_plan(
         )
         expected, section_findings = replace_generated_section(current.replace("\r\n", "\n").replace("\r", "\n"), section_id, block)
         findings.extend(f"{target.get('path')}: {finding}" for finding in section_findings)
-        plans.append(PlannedUpdate(target_path, current, expected))
+        # Containment and duplicate checks use the resolved path above. Retain
+        # the supplied spelling so publication can reject linked components.
+        plans.append(PlannedUpdate(root / Path(target["path"]), current, expected))
 
     return plans, findings
 
@@ -288,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"secure-coding control rendering is current ({len(plans)} targets)")
         return 0
     for plan in changed:
-        plan.path.write_bytes(plan.expected.encode("utf-8"))
+        write_text_output(plan.path, plan.expected, newline="\n", create_parents=False)
         print(f"UPDATED: {plan.path.relative_to(args.root.resolve())}")
     print(f"secure-coding control rendering complete ({len(changed)} changed, {len(plans)} targets)")
     return 0

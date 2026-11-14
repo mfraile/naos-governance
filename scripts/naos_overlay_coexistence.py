@@ -21,6 +21,10 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
 
 KIT_ROOT = Path(__file__).resolve().parents[1]
 REPORT_SCHEMA = "naos.overlay_coexistence.v1"
@@ -171,7 +175,12 @@ def protected_directories(target: Path) -> list[Path]:
 def report_output_allowed(path: Path, target: Path) -> bool:
     if path.is_symlink() or (path.exists() and (not path.is_file() or path.stat().st_nlink != 1)):
         return False
-    return not any(is_within(path, directory) for directory in protected_directories(target))
+    # The publisher normalizes parent navigation lexically. Check that spelling
+    # too: resolving a symlink followed by '..' can name a different directory.
+    publication_path = Path(os.path.abspath(os.fspath(path)))
+    return not any(is_within(candidate, directory)
+                   for directory in protected_directories(target)
+                   for candidate in (path, publication_path))
 
 
 def temporary_parent(target: Path) -> Path:
@@ -487,8 +496,9 @@ def main(argv: list[str] | None = None) -> int:
         if isinstance(exc, OverlayRefusal):
             report.update(exc.evidence)
     if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        from naos_policy import write_text_output
+
+        write_text_output(args.output, json.dumps(report, indent=2, sort_keys=True) + "\n")
     if args.json or not args.output:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

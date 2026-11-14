@@ -117,7 +117,11 @@ rules:
   sections, anchors, manifest-declared reference codes, and sync markers.
 - `naos spec-pack-materialize . --dry-run` previews missing profile-required
   spec-pack files, and without `--dry-run` copies missing template files while
-  skipping existing specs unless `--force` is explicit.
+  skipping existing regular files. Explicit `--force` refuses a selected existing
+  target before any copy; it does not permit replacement. A failed copy can
+  leave a partial target and hidden status marker. A rerun refuses an unfinished
+  marked target; review the partial file and marker together before cleanup and
+  retry.
 - `naos spec-assembly-worksheet .` maps adoption evidence, candidate
   requirements, and traceability gaps to manifest-declared spec files for
   human review.

@@ -213,7 +213,7 @@ class WindowsRuntime:
 
     def _policy(self) -> tuple[dict[str, Any], bytes, str]:
         drive, relative = _absolute(self.source_policy_path)
-        observed, raw = self.observer.observe(drive, relative, capture_bytes=True)
+        observed, raw = self.observer.observe(drive, relative, capture_bytes=True, policy_input=True)
         if observed is None or observed['presence'] != 'present' or raw is None:
             raise WindowsRuntimeError('Source policy is absent')
         active, _catalog = prov.policy_catalog(raw)

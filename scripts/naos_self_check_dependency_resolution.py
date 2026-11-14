@@ -11,10 +11,8 @@ from contextvars import ContextVar
 from copy import deepcopy
 import hashlib
 import json
-import os
 from pathlib import Path, PureWindowsPath
 import re
-import tempfile
 from typing import Any
 import yaml
 from naos_policy import load_operand_yaml
@@ -97,16 +95,21 @@ def _report_path(root: Path, naos_root: str, policy: dict, key: str) -> Path:
     return report_default_path(root, naos_root, policy, key)
 
 
-def receipt_path(root: Path, naos_root: str, policy: dict) -> Path:
+def receipt_output_path(root: Path, naos_root: str, policy: dict) -> Path:
+    """Select the existing receipt destination without reading its payload."""
     from naos_policy import naos_root_path, safe_policy_path, evidence_pack_output_path
     from naos_ai_surfaces import checked_path
 
     state = naos_root_path(root, naos_root)
-    selected = policy.get("paths", {}).get(
-        "self_check_dependency_resolution_report",
-        "self_check_dependency_resolution.json",
-    )
-    checked_path(root, "/".join((naos_root, policy["paths"]["reports_dir"], selected)))
+    paths = policy.get("paths")
+    if not isinstance(paths, dict):
+        _deny("invalid_receipt_path_configuration")
+    selected = paths.get("self_check_dependency_resolution_report", "self_check_dependency_resolution.json")
+    reports_dir = paths.get("reports_dir")
+    if (not isinstance(selected, str) or not selected
+            or not isinstance(reports_dir, str) or not reports_dir):
+        _deny("invalid_receipt_path_configuration")
+    checked_path(root, "/".join((naos_root, reports_dir, selected)))
     path = safe_policy_path(
         state,
         policy["paths"]["reports_dir"],
@@ -121,11 +124,97 @@ def receipt_path(root: Path, naos_root: str, policy: dict) -> Path:
     aliases.add(evidence_pack_output_path(root, naos_root, policy))
     if path in aliases or path.suffix != ".json" or path.parent == state:
         _deny("receipt_alias_or_invalid_destination", path)
+    return path
+
+
+def receipt_path(root: Path, naos_root: str, policy: dict) -> Path:
+    path = receipt_output_path(root, naos_root, policy)
     if path.exists():
         old, _ = _json(root, path)
         if old.get("schema") != SCHEMA:
             _deny("receipt_aliases_unrecognized_input", path)
     return path
+
+
+def dependency_proof_input_paths(root, state_root, policy, policy_path, naos_root):
+    """The existing acquisition source roles, shared by proof-output readers."""
+    from naos_policy import resolve_policy_path
+
+    selected_policy = resolve_policy_path(policy_path, naos_root, root)[0]
+    inputs = {state_root / "gatekeepers.yaml"}
+    if selected_policy is not None:
+        inputs.add((root / selected_policy).resolve())
+    for key, value in policy["paths"].items():
+        if (not key.endswith("_report") and isinstance(value, str)
+                and value.endswith((".json", ".yaml", ".yml"))):
+            inputs.add((state_root / value).resolve())
+    return inputs
+
+
+def inspect_derived_receipt_endpoint(
+    root: Path, naos_root: str, policy: dict, *, policy_path=None,
+    extra_protected=(),
+):
+    """Recognize a derived endpoint without accepting its proof or changing it.
+
+    An absent endpoint is permitted. Existing bytes must have the published
+    receipt shape and scope; only the ordinary proof reader establishes validity.
+    """
+    from naos_policy import naos_root_path, evidence_pack_output_path
+
+    try:
+        path = receipt_path(root, naos_root, policy)
+        protected = dependency_proof_input_paths(
+            root, naos_root_path(root, naos_root), policy, policy_path, naos_root,
+        )
+        protected.update(Path(value) for value in extra_protected)
+        protected.update(
+            _report_path(root, naos_root, policy, key)
+            for key in policy["paths"]
+            if key.endswith("_report") and key != "self_check_dependency_resolution_report"
+        )
+        pack = evidence_pack_output_path(root, naos_root, policy)
+        if pack is not None:
+            protected.add(pack)
+        if any(path == other.resolve()
+               or (path.exists() and other.exists() and path.samefile(other))
+               for other in protected):
+            _deny("receipt_aliases_protected_input_or_output", path)
+        if not path.exists():
+            return path, None, None
+        previous, digest = _json(root, path)
+        _schema(previous, "self_check_dependency_resolution.schema.json")
+        if (previous.get("status") != "resolved"
+                or previous.get("project_root") != str(root.resolve())
+                or previous.get("naos_root") != naos_root):
+            _deny("unrecognized_or_differently_scoped_receipt", path)
+        metadata = path.stat()
+    except OSError as exc:
+        _deny("receipt_endpoint_inspection_failed", exc)
+    return path, digest, (metadata.st_dev, metadata.st_ino)
+
+
+def _publish_dependency_output(path: Path, payload: bytes, *, schema: str, alias_code: str) -> None:
+    """Bind the permitted preimage and reuse held-parent publication custody."""
+    from naos_evidence_contracts import _json_value
+    from naos_trace_atomic_write import publish_trace, read_trace_source
+
+    original = None
+    with read_trace_source(path) as source:
+        if source is not None:
+            original = source.read(MAX_BYTES + 1)
+            if len(original) > MAX_BYTES:
+                _deny("unsupported_input_size", path)
+            previous = _json_value(path, data=original)
+            if not isinstance(previous, dict):
+                _deny("invalid_report_object", path)
+            if previous.get("schema") != schema:
+                _deny(alias_code, path)
+    # Legacy mkstemp publication required readable recognized inputs, used
+    # parent authority for replacement, and reset creation mode to 0600/umask.
+    publish_trace(path, payload, original, strict_parent_topology=True,
+                  require_existing_write_access=False, posix_creation_mode=0o600,
+                  preserve_existing_posix_mode=False)
 
 
 def write_resolution(
@@ -154,22 +243,10 @@ def write_resolution(
         ancestor = ancestor.parent
     if ancestor.is_symlink() or not ancestor.resolve().is_relative_to(root):
         _deny("unsafe_receipt_parent", ancestor)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=".dependency-resolution-", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(
-                json.dumps(receipt, indent=2, allow_nan=False).encode() + b"\n"
-            )
-            handle.flush()
-            os.fsync(handle.fileno())
-        receipt_path(
-            root, naos_root, policy
-        )  # repeat alias/link checks immediately before replace
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    payload = json.dumps(receipt, indent=2, allow_nan=False).encode() + b"\n"
+    receipt_path(root, naos_root, policy)
+    _publish_dependency_output(path, payload, schema=SCHEMA,
+                               alias_code="receipt_aliases_unrecognized_input")
     return path
 
 
@@ -2209,18 +2286,9 @@ def capture_dependency_inputs(root: Path, *, naos_root: str, policy: dict) -> Pa
         old, _ = _json(root, path)
         if old.get("schema") != captured["schema"]:
             _deny("collection_destination_alias")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=".self-check-collection-", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        dependency_inputs_path(root, naos_root, policy)
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    dependency_inputs_path(root, naos_root, policy)
+    _publish_dependency_output(path, data, schema=captured["schema"],
+                               alias_code="collection_destination_alias")
     return path
 
 

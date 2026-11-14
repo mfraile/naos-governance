@@ -205,9 +205,9 @@ The task registry is the authoritative source. If the task doesn't exist there, 
 The research in Step 4 reduces duplicate-implementation and schema-mismatch
 risk; it does not guarantee either outcome.
 
-**❌ Using `@naos-plan` when the task is vague**
+**❌ Starting implementation while the task is vague**
 
-If you start coding before the acceptance criteria are clear, you will likely need to redo the work. Use `@naos-triage` to get clarity first.
+Clarify acceptance criteria before coding. In Standard/Assured, use `@naos-triage`; in Lite, ask `@naos-plan` to shape the task.
 
 ---
 

@@ -10,6 +10,12 @@ from datetime import date
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
+SCRIPT_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from naos_policy import ensure_output_directory, validate_report_write_path, write_binary_output  # noqa: E402
+
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -91,30 +97,33 @@ def build_pack(root: Path, pack_date: str, output: Path | None = None) -> Path:
             f"{missing_list}"
         )
 
-    root.mkdir(parents=True, exist_ok=True)
     output_path = output or root / f"admissibility-{pack_date}.zip"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    ensure_output_directory(output_path.parent)
+    validate_report_write_path(output_path)
 
     conformance_path = _resolve(OPTIONAL_CONFORMANCE, root)
 
-    with ZipFile(output_path, "w", compression=ZIP_DEFLATED) as archive:
-        for item in REQUIRED_ARTEFACTS:
-            path = _resolve(item, root)
-            archive.write(path, _archive_name(path, root))
+    def produce(stream):
+        with ZipFile(stream, "w", compression=ZIP_DEFLATED) as archive:
+            for item in REQUIRED_ARTEFACTS:
+                path = _resolve(item, root)
+                archive.write(path, _archive_name(path, root))
 
-        if conformance_path.is_file():
-            archive.write(conformance_path, _archive_name(conformance_path, root))
-        else:
-            archive.writestr(
-                _archive_name(_resolve(MISSING_CONFORMANCE_NOTE, root), root),
-                _missing_conformance_text(root),
-            )
+            if conformance_path.is_file():
+                archive.write(conformance_path, _archive_name(conformance_path, root))
+            else:
+                archive.writestr(
+                    _archive_name(_resolve(MISSING_CONFORMANCE_NOTE, root), root),
+                    _missing_conformance_text(root),
+                )
 
-    with ZipFile(output_path, "r") as archive:
-        corrupt = archive.testzip()
-        if corrupt:
-            raise RuntimeError(f"Zip integrity check failed at {corrupt}")
+    def validate(stream):
+        with ZipFile(stream, "r") as archive:
+            corrupt = archive.testzip()
+            if corrupt:
+                raise RuntimeError(f"Zip integrity check failed at {corrupt}")
 
+    write_binary_output(output_path, produce, validate)
     return output_path
 
 
@@ -125,7 +134,7 @@ def main() -> int:
 
     try:
         pack = build_pack(root=root, pack_date=args.date, output=output)
-    except (FileNotFoundError, RuntimeError, ValueError) as error:
+    except (OSError, RuntimeError, ValueError) as error:
         print(f"admissibility-pack: ERROR: {error}", file=sys.stderr)
         return 1
 

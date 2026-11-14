@@ -156,7 +156,12 @@ class AiBudgetProvenanceContractTests(unittest.TestCase):
                                       '--output', str(self.output), '--json', expected=1)
                 data = json.loads(result.stdout)
                 self.assertEqual(data['rules']['source'], 'default_fallback')
-                self.assertFalse(data['rules']['present'])
+                self.assertEqual(data['rules']['present'], malformed)
+                if malformed:
+                    self.assertTrue(data['rules']['error'])
+                    invalid = next(item for item in data['findings'] if item['id'] == 'AI_SURFACE_RULES_INVALID')
+                    self.assertEqual(invalid['status'], 'rules_invalid')
+                    self.assertEqual(invalid['severity'], 'warning')
                 declared = [x for x in data['findings'] if x.get('evidence_classification') == 'confirmed']
                 self.assertTrue(declared)
                 for item in declared:

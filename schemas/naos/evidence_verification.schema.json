@@ -18,8 +18,7 @@
     "limitations",
     "not_claimed",
     "human_review_required",
-    "tamper_evident",
-    "signed"
+    "tamper_evident"
   ],
   "properties": {
     "schema": {"const": "naos.evidence_verification.v1"},
@@ -31,7 +30,11 @@
     "deterministic": {"const": true},
     "summary": {"type": "object", "additionalProperties": true},
     "findings": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
-    "tamper_evident": {"type": "boolean"},
+    "tamper_evident": {
+      "type": "boolean",
+      "description": "Digest equality relative to an unsigned, regenerable local attestation baseline. Rewriting both subjects and that baseline can restore equality; no authenticity is established."
+    },
+    "tamper_evidence_basis": {"const": "unsigned_local_attestation_baseline"},
     "envelope_supplied": {"type": "boolean"},
     "envelope_payload_validation": {
       "enum": ["not_supplied", "not_applicable", "valid", "invalid", "mismatch", "unavailable"],
@@ -57,7 +60,8 @@
     },
     "signed": {
       "type": "boolean",
-      "description": "Compatibility field indicating only whether signature entries are present; it is not a signature-validation result."
+      "deprecated": true,
+      "description": "Legacy input-only alias for signature-entry presence. New reports omit this field. It never establishes signature validation."
     },
     "signature_entries_present": {"type": "boolean"},
     "signature_validation_performed": {
@@ -66,7 +70,7 @@
     },
     "identity_binding": {
       "type": "object",
-      "description": "Compatibility-named best-effort Git HEAD metadata. Git may report signature status and signer text; NAOS applies no independent signature trust or acceptance policy and does not authenticate an identity.",
+      "description": "Compatibility-named best-effort Git HEAD metadata. Author email is omitted and its occurrences in author/signer text masked by default; explicit opt-in and legacy inputs can include it. Other addresses in arbitrary display metadata can remain. NAOS applies no independent signature trust or acceptance policy and does not authenticate an identity.",
       "additionalProperties": true
     },
     "limitations": {"type": "array", "items": {"type": "string"}},

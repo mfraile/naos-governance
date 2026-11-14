@@ -22,7 +22,7 @@ class GateMaturityInputContractTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="naos maturity é ")
         self.addCleanup(self.tmp.cleanup)
-        self.root = Path(self.tmp.name)
+        self.root = Path(self.tmp.name).resolve()
         self.cap_dir = self.root / "naos/capabilities"
         self.cap_dir.mkdir(parents=True)
         self.cap_path = self.cap_dir / "gatekeeper.yaml"

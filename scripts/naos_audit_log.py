@@ -26,8 +26,10 @@ from naos_policy import (  # noqa: E402
     load_policy,
     normalize_profile,
     report_output_path,
+    safe_policy_relative_path,
     sessions_index_path,
     write_report,
+    write_text_output,
 )
 
 from naos_secret_patterns import secret_content_reason, sanitize_report_value  # noqa: E402
@@ -569,45 +571,46 @@ def write_audit_event(
                 }
             ],
         }
-    event = build_audit_event(
-        root=root,
-        naos_root=naos_root,
-        profile=profile,
-        policy=policy,
-        event_type=event_type,
-        source_report_path=source_report_path,
-        source_report=source_report,
-        session_id=session_id,
-        generated_by=generated_by,
-        related_task_id=related_task_id,
-        related_capability_id=related_capability_id,
-        related_gate_id=related_gate_id,
-        related_artifacts=related_artifacts,
-    )
-    validation_findings = validate_audit_event(event)
-    blocking = [item for item in validation_findings if item.get("severity") == "blocking"]
-    if blocking:
-        return {"status": "blocked", "event_file": None, "event": event, "findings": validation_findings}
-    audit_root = audit_log_root_path(root, naos_root, policy)
-    path = event_file_path(audit_root, event)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    while path.exists():
-        event["event_nonce"] = str(uuid.uuid4().int)
-        _assign_public_audit_event_id(event)
-        path = event_file_path(audit_root, event)
-    temp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    event = None
+    validation_findings: list[dict[str, Any]] = []
     try:
-        with temp_path.open("w", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, sort_keys=True) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temp_path, path)
-    except OSError as exc:
-        try:
-            if temp_path.exists():
-                temp_path.unlink()
-        except OSError:
-            pass
+        # Resolve only the project root. Keep managed components lexical so the
+        # held-parent publisher can refuse links without following them first.
+        managed = safe_policy_relative_path(naos_root, field="naos_root")
+        configured = safe_policy_relative_path(
+            policy.get("paths", {}).get("audit_log_root") or "audit_log", field="audit_log_root",
+        )
+        audit_root = root.resolve() / managed / configured
+        event = build_audit_event(
+            root=root,
+            naos_root=naos_root,
+            profile=profile,
+            policy=policy,
+            event_type=event_type,
+            source_report_path=source_report_path,
+            source_report=source_report,
+            session_id=session_id,
+            generated_by=generated_by,
+            related_task_id=related_task_id,
+            related_capability_id=related_capability_id,
+            related_gate_id=related_gate_id,
+            related_artifacts=related_artifacts,
+        )
+        validation_findings = validate_audit_event(event)
+        blocking = [item for item in validation_findings if item.get("severity") == "blocking"]
+        if blocking:
+            return {"status": "blocked", "event_file": None, "event": event, "findings": validation_findings}
+        for _ in range(8):
+            path = event_file_path(audit_root, event)
+            try:
+                write_text_output(path, json.dumps(event, sort_keys=True) + "\n", create_only=True)
+                break
+            except FileExistsError:
+                event["event_nonce"] = str(uuid.uuid4().int)
+                _assign_public_audit_event_id(event)
+        else:
+            raise FileExistsError("Cannot allocate a unique audit event destination")
+    except (OSError, ValueError, RuntimeError) as exc:
         return {
             "status": "advisory",
             "event_file": None,

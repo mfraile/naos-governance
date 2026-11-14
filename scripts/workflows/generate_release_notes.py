@@ -12,8 +12,13 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 NAOS_ROOT = Path(os.getenv("NAOS_ROOT", "naos"))
 
@@ -50,8 +55,9 @@ def load_prev() -> dict[str, str]:
 
 
 def save_current(cur: dict[str, str]) -> None:
-    CACHE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE.write_text(json.dumps(cur, indent=2), encoding="utf-8")
+    from naos_policy import write_text_output
+
+    write_text_output(CACHE, json.dumps(cur, indent=2))
 
 
 def main() -> int:
@@ -66,10 +72,11 @@ def main() -> int:
             changes.append(f"- {tid}: (new) {status}")
     if changes:
         stamp = datetime.now(UTC).strftime("%Y-%m-%d")
-        REL_NOTES.parent.mkdir(parents=True, exist_ok=True)
         rel = REL_NOTES.read_text(encoding="utf-8") if REL_NOTES.exists() else ""
         rel += f"\n## {stamp}\n" + "\n".join(changes) + "\n"
-        REL_NOTES.write_text(rel, encoding="utf-8")
+        from naos_policy import write_text_output
+
+        write_text_output(REL_NOTES, rel)
     save_current(cur)
     print(f"Release notes updated with {len(changes)} changes")
     return 0

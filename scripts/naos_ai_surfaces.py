@@ -103,7 +103,7 @@ IGNORED_PARTS = {
     ".mypy_cache",
     ".ruff_cache",
 }
-DEFAULT_LIMITS = {"max_files_per_path": 50, "max_discovery_files": 5000}
+DEFAULT_LIMITS = {"max_files_per_path": 128, "max_discovery_files": 5000}
 MAX_ENTRIES = 100000
 
 

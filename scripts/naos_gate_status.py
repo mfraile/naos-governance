@@ -36,6 +36,7 @@ from naos_policy import (  # noqa: E402
     normalize_profile as normalize_policy_profile,
     report_default_path,
     resolve_operator_attribution,
+    write_text_output,
 )
 from naos_evidence_contracts import classify_evidence  # noqa: E402
 
@@ -135,8 +136,7 @@ def emit_input_error(exc: Exception, *, output: str | None, json_output: bool) -
     }
     if output:
         path = Path(output)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(error, indent=2) + "\n", encoding="utf-8")
+        write_text_output(path, json.dumps(error, indent=2) + "\n")
     print(json.dumps(error, indent=2) if json_output else f"ERROR: {exc}")
     return 2
 
@@ -2809,8 +2809,7 @@ def main(argv: list[str] | None = None) -> int:
     output = None
     if args.output:
         output = Path(args.output)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        write_text_output(output, json.dumps(report, indent=2) + "\n")
         audit_result = write_audit_event(
             root=Path.cwd(),
             naos_root=args.naos_root,
@@ -2827,7 +2826,7 @@ def main(argv: list[str] | None = None) -> int:
             "event_file": audit_result.get("event_file"),
             "findings": audit_result.get("findings") or [],
         }
-        output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        write_text_output(output, json.dumps(report, indent=2) + "\n")
 
     if args.json:
         print(json.dumps(report, indent=2))

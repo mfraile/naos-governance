@@ -600,9 +600,14 @@ def collect_current_fingerprints(
         paths = configured_impacter_paths(rules, naos_root, surfaces)
         if not rules.get("impacter_paths"):
             discovered, discovery = scan_files(root, None, surface_rules["limits"]["max_discovery_files"])
-            metadata.append({"id": "instruction_discovery", **discovery})
-            paths = list(dict.fromkeys(paths + [path.relative_to(root).as_posix()
-                for path in discovered if discovered_surface_type(path.relative_to(root).as_posix(), surfaces) is not None]))
+            discovered_instructions = [path.relative_to(root).as_posix()
+                for path in discovered if discovered_surface_type(path.relative_to(root).as_posix(), surfaces) is not None]
+            discovery_coverage = {key: value for key, value in discovery.items() if key != "file_count"}
+            metadata.append({"id": "instruction_discovery", **discovery_coverage,
+                "selection_basis": "discovered_instruction_files",
+                "selected_file_count": len(discovered_instructions),
+                "discovery_file_limit": surface_rules["limits"]["max_discovery_files"]})
+            paths = list(dict.fromkeys(paths + discovered_instructions))
     except (ValueError, TypeError) as exc:
         metadata.append({"id": "path_configuration", "present": False, "ignored": True, "complete": False, "reason": str(exc)})
         return fingerprints, metadata

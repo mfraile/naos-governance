@@ -438,10 +438,28 @@ def build_report(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
             else:
                 normalized_events.append(event)
 
+    batch_ids: set[str] = set()
+    duplicate_batch_ids: set[str] = set()
+    for event in normalized_events:
+        event_id = str(event.get("event_id"))
+        if event_id in batch_ids:
+            duplicate_batch_ids.add(event_id)
+        batch_ids.add(event_id)
+    if duplicate_batch_ids:
+        findings.append(
+            finding(
+                "harness_trace_import.duplicate_event_ids",
+                severity,
+                "duplicate_event_ids",
+                "Imported events contain duplicate ids within this batch; no trace events were written.",
+                duplicate_event_ids=sorted(duplicate_batch_ids),
+            )
+        )
+
     trace_data: dict[str, Any] = {"version": 1, "events": []}
     existing_events: list[dict[str, Any]] = []
     written = False
-    if args.write_events and target_trace_file is not None and not any(item.get("status") in {"source_outside_project", "target_outside_project", "source_missing", "source_not_file", "unsupported_source_format", "invalid_jsonl_record", "normalized_event_invalid"} for item in findings):
+    if args.write_events and target_trace_file is not None and not any(item.get("status") in {"source_outside_project", "target_outside_project", "source_missing", "source_not_file", "unsupported_source_format", "invalid_jsonl_record", "normalized_event_invalid", "duplicate_event_ids"} for item in findings):
         trace_data, existing_events, load_error = load_existing_trace_file(target_trace_file)
         if load_error:
             findings.append(

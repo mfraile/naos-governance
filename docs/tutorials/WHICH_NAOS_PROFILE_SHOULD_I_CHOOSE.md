@@ -57,9 +57,12 @@ project readiness, configuration, validator outputs, and evidence freshness.
 The posture counts are not counts of executable hook checks. The generated
 hook and installed workflows define automation; no licence scanner is
 installed by default.
-Run `python scripts/validators/validate_profile_generated_surfaces.py` for
-reproducible surface parity; the guide does not publish universal file-count,
-setup-time, cost-saving, or ROI values.
+From the acquired NAOS kit source root, maintainers can run
+`python scripts/validators/validate_profile_generated_surfaces.py` for
+source-level surface parity. In a generated project, inspect
+`naos/profile_generated_surface_contract.json` and its declared files instead.
+Neither check alone establishes project readiness. The guide does not publish
+universal file-count, setup-time, cost-saving, or ROI values.
 
 > **See also.** For task-level recommendations (greenfield vs. long-horizon debugging vs. spec extraction, etc.), the **Task-Capability Matrix** in `CLAUDE.md` and `.github/copilot-instructions.md` maps task archetypes to recommended profile + PAUL bracket + preferred skills. Use the profile chooser here for repo-level posture; use the matrix for per-task selection.
 

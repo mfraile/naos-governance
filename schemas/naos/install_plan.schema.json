@@ -23,6 +23,17 @@
     "known_gaps": {"type": "array"},
     "residual_risks": {"type": "array"},
     "summary": {"type": "object"},
+    "activation_plan": {
+      "type": "object", "additionalProperties": true,
+      "properties": {
+        "init_command": {"type": "string"},
+        "init_command_is_template": {"type": "boolean"},
+        "required_owner_choices": {"type": "array", "items": {"enum": ["--archetype", "--backend"]}},
+        "activate_after_review_command": {"type": "string"},
+        "hook_ci_boundary": {"type": "string"},
+        "write_posture": {"type": "string"}
+      }
+    },
     "repository_intelligence": {"type": ["object", "null"]}
   }
 }

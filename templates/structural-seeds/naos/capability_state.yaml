@@ -279,9 +279,9 @@ capabilities:
     accountable_reviewer: "@unassigned"
     parameters:
       default_make_mode: "Dry-run unless SPEC_PACK_MATERIALIZE_ARGS is overridden."
-      overwrite_policy: "Existing regular specs are skipped unless --force is explicit; force never relaxes path or file-type checks."
+      overwrite_policy: "Existing regular specs are skipped; explicit --force refuses a selected existing target before copying and never relaxes path or file-type checks."
       refusal_policy: "Invalid manifests, missing/unsafe sources, unsafe report sinks, out-of-project/symlink/non-regular targets, and apply requests outside native macOS/Linux/Windows with CPython 3.11-3.13 block before any spec file is changed."
-      transaction_model: "Each leaf uses a same-directory temporary install; if post-install cleanup fails, the target stays counted as copied and the residue is blocking evidence. Executed evidence is macOS-local, and a multi-file run is sequential with no rollback."
+      transaction_model: "Each absent final leaf is created exclusively and written through its held handle; a failed copy may leave a clearly reported partial target and pending hidden per-target marker. An unfinished marked target blocks reruns until the operator reviews and removes it and its marker together. Multi-file runs are sequential with no rollback; native qualification is operation-specific."
     evidence_roots:
       - naos/reports
       - specs
@@ -295,7 +295,7 @@ capabilities:
       requires_approval: true
       approval_owner: "@unassigned"
     waivers: []
-    notes: "Materialization copies missing template files only after complete preflight; requested report sinks receive a basic writability probe, while post-install cleanup failure, late report failure, multi-file rollback, Linux/Windows behavior, hostile concurrency, and crash consistency remain bounded or unproven."
+    notes: "Materialization copies missing template files only after complete preflight; requested report sinks receive a basic writability probe. Failed direct copies may leave reported partial targets and pending status markers; markers are recovery cues, not attestations. Late report failure, multi-file rollback, native route qualification, hostile concurrency, and crash consistency remain bounded or unproven."
     criteria:
       L1:
         - "Local template source and spec-pack manifest are available."

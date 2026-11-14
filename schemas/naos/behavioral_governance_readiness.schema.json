@@ -58,7 +58,11 @@
     "baseline_state": { "type": "object" },
     "baseline_validation": {"type": "object", "required": ["status", "issues"], "properties": {"status": {"enum": ["not_present", "valid", "invalid"]}, "issues": {"type": "array", "items": {"type": "string"}}}},
     "current_fingerprints": { "type": "object" },
-    "fingerprinted_paths": { "type": "array", "items": { "type": "object" } },
+    "fingerprinted_paths": {
+      "type": "array",
+      "description": "Per-path fingerprint coverage retains file_count. The instruction_discovery record uses selection_basis=discovered_instruction_files, selected_file_count for the instruction paths selected from bounded discovery, and discovery_file_limit for its effective file budget; complete, truncated and issues still describe the full discovery scan. Historical v1 records with a raw discovery file_count remain readable but need regeneration to match the current producer.",
+      "items": { "type": "object" }
+    },
     "readiness_inputs": { "type": "array", "items": { "type": "object" } },
     "impacter_review": { "type": "object" },
     "cost_posture": { "type": "object" },

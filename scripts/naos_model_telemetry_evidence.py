@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -258,9 +259,33 @@ def number_value(value: Any) -> float | None:
     if value in (None, ""):
         return None
     try:
-        return float(value)
-    except (TypeError, ValueError):
+        number = float(value)
+        return number if math.isfinite(number) else None
+    except (TypeError, ValueError, OverflowError):
         return None
+
+
+def nonfinite_number(value: Any) -> bool:
+    if value in (None, ""):
+        return False
+    try:
+        return not math.isfinite(float(value))
+    except OverflowError:
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def finite_report_projection(value: Any) -> tuple[Any, bool]:
+    if isinstance(value, float) and not math.isfinite(value):
+        return None, True
+    if isinstance(value, dict):
+        children = {key: finite_report_projection(item) for key, item in value.items()}
+        return {key: item[0] for key, item in children.items()}, any(item[1] for item in children.values())
+    if isinstance(value, list):
+        children = [finite_report_projection(item) for item in value]
+        return [item[0] for item in children], any(item[1] for item in children)
+    return value, False
 
 
 def is_adapt_placeholder(value: Any) -> bool:
@@ -545,10 +570,19 @@ def review_records(
     evidence_refs: list[dict[str, Any]] = []
     declared_roles, policy_refs = load_declared_model_roles(root, naos_root, policy)
     thresholds = as_mapping(declaration.get("thresholds"))
-    cost_threshold = number_value(thresholds.get("cost_usd_review_threshold") or thresholds.get("max_cost_usd"))
-    latency_threshold = number_value(thresholds.get("latency_ms_review_threshold") or thresholds.get("max_latency_ms"))
+    cost_value = thresholds.get("cost_usd_review_threshold") if thresholds.get("cost_usd_review_threshold") is not None else thresholds.get("max_cost_usd")
+    latency_value = thresholds.get("latency_ms_review_threshold") if thresholds.get("latency_ms_review_threshold") is not None else thresholds.get("max_latency_ms")
+    cost_threshold = number_value(cost_value)
+    latency_threshold = number_value(latency_value)
     stale_after_days = number_value(thresholds.get("stale_after_days"))
     require_policy_ref = bool_value(as_mapping(declaration.get("policy_linkage")).get("require_policy_ref"), True)
+
+    if any(nonfinite_number(value) for value in (cost_value, latency_value, thresholds.get("stale_after_days"))):
+        findings.append(finding(
+            "model_telemetry.invalid_numeric_thresholds", severity, "review_required",
+            "model_telemetry_review_required",
+            "Telemetry thresholds contain non-finite numeric values; affected comparisons could not be evaluated.",
+        ))
 
     for source in source_metas:
         if source.get("error"):
@@ -572,6 +606,15 @@ def review_records(
         rid = str(sanitized_item["record_id"])
         source_ref = str(sanitized_item.get("source_ref") or "")
         related_refs = [ref for ref in [source_ref, *policy_refs] if ref]
+
+        raw_cost = record.get("cost_usd") if record.get("cost_usd") is not None else record.get("estimated_cost_usd")
+        if nonfinite_number(raw_cost) or nonfinite_number(record.get("latency_ms")):
+            findings.append(finding(
+                f"model_telemetry.invalid_numeric_values.{rid}", severity, "review_required",
+                "model_telemetry_review_required",
+                "Telemetry cost or latency is not a finite number; invalid values are reported as null and cannot establish a passed threshold check.",
+                record_id=rid, source_ref=source_ref,
+            ))
 
         if sanitized_item["payload_fields_present"]:
             findings.append(
@@ -862,7 +905,7 @@ def build_report(
     else:
         status = "pass"
 
-    return sanitize_report_value({
+    report = sanitize_report_value({
         "schema": REPORT_SCHEMA,
         "generated_at": utc_now_text(),
         "profile": profile,
@@ -904,6 +947,18 @@ def build_report(
         "generated_by": build_generated_by(root),
         "summary": summary,
     })
+    report, replaced_nonfinite = finite_report_projection(report)
+    if replaced_nonfinite and not any(item["id"].startswith("model_telemetry.invalid_numeric") for item in report["findings"]):
+        report["findings"].append(finding(
+            "model_telemetry.invalid_numeric_metadata", severity, "review_required",
+            "model_telemetry_review_required",
+            "Non-finite numeric metadata was replaced with null in the report projection; review the original local evidence.",
+        ))
+        report["reason_code_counts"]["model_telemetry_review_required"] += 1
+        report["summary"].update(finding_counts(report["findings"]))
+        report["status"] = status_from_counts(report["summary"]) if enabled and telemetry_declared else "not_configured"
+        report["human_review_required"] = True
+    return report
 
 
 def build_expected_report(*, root: Path, profile: str, naos_root: str, policy: dict[str, Any]) -> dict[str, Any]:

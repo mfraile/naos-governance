@@ -48,10 +48,11 @@ naos task-complete \
 # Re-run the same command without --dry-run after reviewing the preview.
 ```
 
-Native completion atomically preserves the card content and digest, moves the
-card from `naos/active/` to `naos/completed/`, appends
-`naos/completed_history.yaml`, and updates `TASK_REGISTRY.yaml` with explicit
-lifecycle, delivery, and verification states.
+On success, native completion preserves the card bytes and digest, publishes
+the completed card, registry and history with explicit lifecycle, delivery and
+verification states, then removes the active card. These operations are
+sequential, with rollback attempted on handled errors; they are not a
+crash-atomic multi-file transaction.
 
 For `--verification-state verified`, all three supplied references must resolve
 to existing regular files under the project root or configured NAOS root. The
@@ -59,8 +60,10 @@ decision YAML must validate against `naos.human_decision_record.v1` with
 `decision_type: task_delivery`, `outcome: approved`, the exact task in
 `subject_refs`, a non-placeholder decision-maker, timestamp, rationale,
 authority scope, and a link to at least one supplied evidence artifact. A
-reviewer report is not a substitute. Both an invalid dry run and an invalid
-execution return non-zero with `mutated: false`.
+reviewer report is not a substitute. Preflight-invalid dry runs and execution
+requests return non-zero with `mutated: false`. Runtime failures attempt
+rollback; incomplete rollback reports `mutated: true` and identifies the
+remaining-state problem. Inspect the reported state before retrying.
 
 Only `completed + delivered + verified` with a satisfied prerequisite receipt
 counts as delivered. The validator establishes structural attribution, not

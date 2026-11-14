@@ -27,7 +27,8 @@ _SCHEMAS = _PLAN_SCHEMAS | {
     'naos.upgrade.managed_content_manifest.v1', 'naos.upgrade.managed_content_manifest.v2',
     'naos.upgrade.managed_content_receipt.v1', 'naos.upgrade.managed_content_receipt.v2',
     'naos.upgrade.create_only_transaction.v1', 'naos.upgrade.content_transaction.v2',
-    transaction._COMPACT_JOURNAL_SCHEMA, 'naos.metadata.creation_identity.v1',
+    transaction._COMPACT_JOURNAL_SCHEMA, transaction._CREATE_ONLY_COMPACT_JOURNAL_SCHEMA,
+    'naos.metadata.creation_identity.v1',
     'naos.metadata.darwin_create_only.v1', 'naos.metadata.darwin_source.v1',
     'naos.metadata.linux_create_only.v1', 'naos.metadata.linux_source.v1',
 }
@@ -70,7 +71,8 @@ def _walk(value, digests, *, schema=None, path=()):
     if not isinstance(value, dict):
         return value
     if 'schema' in value:
-        schema = value['schema']; path = ()
+        schema = value['schema']
+        path = ()
     if 'schema' in value and schema not in _SCHEMAS:
         raise ReplayProjectionError('Unsupported source schema: ' + str(schema))
     result = {}
@@ -94,7 +96,8 @@ def _typed(value, *, decode=False, schema=None, path=()):
     if not isinstance(value, dict):
         return value
     if 'schema' in value:
-        schema = value['schema']; path = ()
+        schema = value['schema']
+        path = ()
     if 'schema' in value and schema not in _SCHEMAS:
         raise ReplayProjectionError('Unsupported derived schema: ' + str(schema))
     result = {}
@@ -200,7 +203,8 @@ def build(archive_bytes, lineage, **kwargs):
         transformed = _walk(value, digests)
         if path.endswith('/plan.json'):
             projected[path] = canonical_bytes(transformed) + b'\n'
-        elif value.get('schema') == transaction._COMPACT_JOURNAL_SCHEMA:
+        elif value.get('schema') in {transaction._COMPACT_JOURNAL_SCHEMA,
+                                    transaction._CREATE_ONLY_COMPACT_JOURNAL_SCHEMA}:
             sidecar = path.removesuffix('journal.json') + 'plan.json'
             transformed['plan_ref'] = transaction._compact_plan_reference(projected[sidecar])
             projected[path] = canonical_bytes(_rehash(transformed))

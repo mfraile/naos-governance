@@ -28,6 +28,35 @@ MAX_CAPTURED_BYTES = 256 * 1024 * 1024
 MAX_INVENTORY_READ_BYTES = 256 * 1024 * 1024
 
 
+def render_copied_script_text(
+    source: Path, text: str, *, kit_root: Path, policy_path: Path,
+    native_windows: bool,
+) -> str | None:
+    """Return the init producer's exact derived text, or None for a raw copy.
+
+    This rendering grants no ownership, currentness or mutation authority.
+    Keep byte parity with naos_init._copy_generated_script; its existing
+    producer and static-recipe bindings remain unchanged.
+    """
+    if "# AUTO-GENERATED" in text[:2048]:
+        return None
+    if (native_windows and source.resolve() == (
+            kit_root / "scripts" / "naos_secret_managed_operands.py").resolve()
+            and policy_path.resolve() == (
+                kit_root / "configs" / "upgrade_source_policy.yaml").resolve()):
+        slot = "COPIED_SOURCE_POLICY_PATH_SHA256 = None\n"
+        if text.count(slot) != 1:
+            raise SourceModeError("Copied Windows scanner has no unique source-policy role slot")
+        policy_label = "\\".join(policy_path.parts[1:])
+        pin = hashlib.sha256(policy_label.encode("utf-8")).hexdigest()
+        text = text.replace(slot, f"COPIED_SOURCE_POLICY_PATH_SHA256 = {pin!r}\n")
+    marker = "# AUTO-GENERATED: Copied by naos init from the NAOS kit.\n"
+    if text.startswith("#!"):
+        first_line, _, rest = text.partition("\n")
+        return f"{first_line}\n{marker}{rest}"
+    return f"{marker}{text}"
+
+
 @dataclass(frozen=True)
 class GeneratedSourceInventory:
     rows: tuple[dict[str, object], ...]

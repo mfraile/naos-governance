@@ -52,6 +52,7 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import spec_header  # noqa: E402
 from naos_console import configure_console_output  # noqa: E402
+from naos_policy import write_text_output  # noqa: E402
 from naos_task_lifecycle import (
     TASK_ID_FULL_PATTERN,
     is_task_delivered,
@@ -222,7 +223,7 @@ def sync_requirements_spec(
             current_req = None
 
     if changes and not dry_run:
-        REQUIREMENTS_PATH.write_text("".join(lines), encoding="utf-8")
+        write_text_output(REQUIREMENTS_PATH, "".join(lines))
         print(f"   ✅ Updated {changes} requirement statuses")
     elif changes:
         print(f"   🔍 Would update {changes} requirement statuses (dry-run)")
@@ -346,7 +347,7 @@ def sync_execution_task_tables(
                 changes += 1
 
     if changes and not dry_run:
-        EXECUTION_PATH.write_text("".join(lines), encoding="utf-8")
+        write_text_output(EXECUTION_PATH, "".join(lines))
         print(f"   ✅ Updated {changes} task statuses in execution spec")
     elif changes:
         print(f"   🔍 Would update {changes} task statuses (dry-run)")

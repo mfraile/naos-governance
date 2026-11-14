@@ -87,11 +87,15 @@ Record the output. You want to know:
 Check current project policy and rules for warning-level or required-missing findings that would block in `assured`:
 
 ```bash
-# Check the governance rules file for current warning-level rules
-grep -A3 "blocking: false" .ai/RULES.md
+# Review advisory/conditional entries in the current rule index
+grep -n "ADVISORY" .ai/RULES.md
 ```
 
-For each warning-level rule:
+The rule index describes review posture, not measured violations or an
+executable warning predicate. Use actual producer reports and gate evaluation
+to determine the findings and configured target severity.
+
+For each actual warning or required-missing finding relevant to that target:
 - How many violations in the last 30 days?
 - Are they systemic or one-off?
 - Will fixing them require code changes or only workflow changes?
@@ -269,6 +273,11 @@ shipped hook alone emits a warning for this traceability-header case.
 Task completion guidance in `assured` asks `@naos-conformance` to review the
 configured strict posture:
 
+Before requesting verified delivery, prepare the implementation, test and
+evidence references and an approved exact-task `task_delivery` decision using
+the [native completion procedure](./MICRO_TUTORIAL_14_NAOS_TASK_COMPLETE_WITH_CONFORMANCE.md).
+An agent review or checklist is not a substitute for those prerequisites.
+
 ```
 /naos-task-complete T-002
 ```
@@ -279,7 +288,9 @@ configured strict posture:
 - Any governance rule violation is outstanding
 - TASK_REGISTRY.yaml is not updated
 
-Fix findings, document an approved waiver, or record residual risk before the story card is archived.
+Fix findings, document an approved waiver, or record residual risk before the
+story card is archived. These records do not turn unverified criteria into
+verified delivery; only a satisfied native completion contract counts as such.
 
 ---
 
@@ -294,13 +305,11 @@ fixed outcome.
 
 **Missing traceability headers in older files**
 
-Files written before NAOS was installed may not have traceability headers. When you touch these files in a task, add the header:
-
-```python
-# NAOS Traceability
-# Task: T-XXX (retroactive)
-# Requirement: [FR or "legacy code"]
-```
+Files written before NAOS was installed may not have traceability headers. When
+you touch them, use the [canonical module header](../../templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md#canonical-module-header)
+with the exact registered task ID and only source-backed FR/NFR links. Keep
+unknown historical mappings visible for review; do not invent retroactive IDs
+or use `legacy code` as a requirement identifier.
 
 **Documentation not updated**
 

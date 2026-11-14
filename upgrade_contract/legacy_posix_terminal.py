@@ -171,7 +171,8 @@ def validate_posix_terminal_archive(archive_bytes, lineage, *, directory_paths,
             elif schema == 'naos.upgrade.content_transaction.v2':
                 plan = transaction._validate_journal_v2_record(journal, validate_plan=validate_plan)
                 version = 'v2'
-            elif schema == transaction._COMPACT_JOURNAL_SCHEMA:
+            elif schema in {transaction._COMPACT_JOURNAL_SCHEMA,
+                            transaction._CREATE_ONLY_COMPACT_JOURNAL_SCHEMA}:
                 sidecar_path = _TRANSACTIONS + txid + '/' + transaction._COMPACT_PLAN_NAME
                 plan_raw = archive.get(sidecar_path)
                 if type(plan_raw) is not bytes or len(plan_raw) > _MAX_RECORD:
@@ -179,9 +180,13 @@ def validate_posix_terminal_archive(archive_bytes, lineage, *, directory_paths,
                 total += len(plan_raw)
                 if total > _MAX_JOURNAL_BYTES:
                     raise LegacyPosixTerminalError('Terminal journal byte budget exceeded')
-                plan = transaction._validate_compact_journal_record(
+                validator = (transaction._validate_compact_journal_record
+                             if schema == transaction._COMPACT_JOURNAL_SCHEMA
+                             else transaction._validate_create_only_compact_journal_record)
+                plan = validator(
                     journal, plan_raw, validate_plan=validate_plan)
-                version = 'compact_v1'
+                version = ('compact_v1' if schema == transaction._COMPACT_JOURNAL_SCHEMA
+                           else 'create_only_compact_v1')
                 checked.add(sidecar_path)
             else:
                 raise LegacyPosixTerminalError('Unsupported terminal journal schema')

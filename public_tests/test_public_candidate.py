@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import configparser
+import ast
 import hashlib
 import json
 import re
@@ -99,8 +100,16 @@ class PublicCandidateTests(unittest.TestCase):
         self.assertFalse((ROOT / "tests").exists())
 
     def test_release_identity_and_repository_urls_are_current(self) -> None:
-        metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-        self.assertEqual(metadata["version"], "1.1.0")
+        document = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        metadata = document["project"]
+        self.assertNotIn("version", metadata)
+        self.assertEqual(metadata["dynamic"], ["version"])
+        self.assertEqual(document["tool"]["setuptools"]["dynamic"]["version"],
+                         {"attr": "naos_governance.__version__"})
+        source = ast.parse((ROOT / "__init__.py").read_text(encoding="utf-8"))
+        assignments = [node for node in source.body if isinstance(node, ast.Assign)]
+        self.assertEqual(len(assignments), 1)
+        self.assertEqual(ast.literal_eval(assignments[0].value), "1.1.0")
         self.assertEqual(metadata["requires-python"], ">=3.11")
         self.assertEqual(metadata["urls"]["Homepage"], PUBLIC_REPOSITORY)
         self.assertEqual(metadata["urls"]["Repository"], PUBLIC_REPOSITORY)

@@ -37,6 +37,7 @@ from naos_policy import (  # noqa: E402
     validate_report_write_path,
     validate_operator_value,
     write_report,
+    write_text_output,
 )
 from naos_audit_log import write_audit_event  # noqa: E402
 
@@ -738,7 +739,10 @@ def guarded_effective_policy_path(root: Path, path: Path) -> Path:
     """Reuse existing policy path guards for a requested YAML output path."""
     base = Path(path.anchor) if path.is_absolute() else root.resolve()
     relative = path.relative_to(base) if path.is_absolute() else path
-    target = safe_path_under(base, relative, field="effective_policy_output")
+    safe_path_under(base, relative, field="effective_policy_output")
+    # Keep junction/reparse spelling for the native publisher even when the
+    # policy containment check resolves it without reporting a symlink.
+    target = base / relative
     validate_report_write_path(target)
     return target
 
@@ -1072,14 +1076,15 @@ def build_merge_report(
     effective_policy_written = False
     if write_effective_policy and not (schema_invalid or protected_invalid):
         try:
+            supplied_path = effective_policy_path
             if effective_policy_path is None:
                 effective_policy_path = report_default_path(root, naos_root, policy, "effective_policy")
-            target = guarded_effective_policy_path(root, effective_policy_path)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            # Recheck existing guards after parent creation. This retains the
-            # existing direct YAML-write contract; no recovery is claimed.
-            target = guarded_effective_policy_path(root, effective_policy_path)
-            target.write_text(
+                paths = policy.get("paths", {})
+                supplied_path = (root / naos_root / str(paths.get("reports_dir") or "reports")
+                                 / str(paths.get("effective_policy") or "effective_policy"))
+            target = guarded_effective_policy_path(root, supplied_path)
+            write_text_output(
+                target,
                 "# Derived NAOS effective policy. Source is selected policy plus validated static overlays.\n"
                 + yaml.safe_dump(effective, sort_keys=True), encoding="utf-8",
             )
@@ -1278,7 +1283,15 @@ def main(argv: list[str] | None = None) -> int:
         effective_policy_path=effective_policy_path,
     )
 
-    output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "policy_override_merge_report")
+    try:
+        output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "policy_override_merge_report")
+    except (OSError, ValueError, RuntimeError) as exc:
+        if report["status"] != "blocked":
+            raise
+        # Preserve the existing blocked result if its diagnostic destination
+        # has the same unsafe topology as the refused effective-policy path.
+        print(f"ERROR: merge report destination refused: {exc}", file=sys.stderr)
+        output = None
     if output is not None:
         write_report(output, report)
         if not inspection_active(root, naos_root):

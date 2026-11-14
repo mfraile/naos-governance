@@ -1,0 +1,142 @@
+name: Release build provenance (manual)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm_commit:
+        description: Exact 40-character commit approved for this build
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  provenance:
+    if: >-
+      ${{ github.repository == 'mfraile/naos-governance' &&
+          github.event.repository.private == false &&
+          (github.ref == 'refs/heads/main' || github.ref_type == 'tag') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out the event commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+      - name: Verify approved source and version
+        id: source
+        env:
+          CONFIRM_COMMIT: ${{ inputs.confirm_commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+
+          commit = os.environ["GITHUB_SHA"]
+          if not re.fullmatch(r"[0-9a-f]{40}", commit):
+              raise SystemExit("Invalid event commit")
+          if os.environ["CONFIRM_COMMIT"] != commit:
+              raise SystemExit("Approved commit does not match the event commit")
+          if os.environ["GITHUB_REPOSITORY"] != "mfraile/naos-governance":
+              raise SystemExit("This workflow is restricted to the public distribution")
+          ref_type = os.environ["GITHUB_REF_TYPE"]
+          ref_name = os.environ["GITHUB_REF_NAME"]
+          ref = os.environ["GITHUB_REF"]
+          if not (ref == "refs/heads/main" and ref_type == "branch" and ref_name == "main"):
+              if ref_type != "tag" or ref != "refs/tags/" + ref_name:
+                  raise SystemExit("Use main for a candidate or a reviewed release tag")
+          actual = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          if actual != commit:
+              raise SystemExit("Checkout does not match the event commit")
+          tree = ast.parse(Path("__init__.py").read_text(encoding="utf-8"))
+          versions = [ast.literal_eval(node.value) for node in tree.body
+              if isinstance(node, ast.Assign) and any(
+                  isinstance(target, ast.Name) and target.id == "__version__"
+                  for target in node.targets)]
+          if len(versions) != 1 or not isinstance(versions[0], str):
+              raise SystemExit("Version source is ambiguous")
+          if ref_type == "tag" and ref_name not in (versions[0], "v" + versions[0]):
+              raise SystemExit("Release tag does not match the package version")
+          if os.path.lexists("dist"):
+              raise SystemExit("Build output must start absent")
+          print("Source commit and declared version context match")
+          PY
+      - name: Install hash-locked build dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --require-hashes
+          --only-binary=:all: -r requirements-build.txt
+      - name: Build exactly one wheel and source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m build --no-isolation --sdist --wheel
+          python - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+          import stat
+
+          files = sorted(Path("dist").iterdir())
+          if len(files) != 2 or not all(stat.S_ISREG(path.lstat().st_mode) for path in files):
+              raise SystemExit("Expected exactly two built artifacts")
+          if sum(path.name.endswith(".whl") for path in files) != 1:
+              raise SystemExit("Expected one wheel")
+          if sum(path.name.endswith(".tar.gz") for path in files) != 1:
+              raise SystemExit("Expected one source archive")
+          if sum(path.stat().st_size for path in files) > 48 * 1024 * 1024:
+              raise SystemExit("Built artifacts exceed the 48 MiB preparation limit")
+          lines = []
+          for path in files:
+              with path.open("rb") as source:
+                  digest = hashlib.file_digest(source, "sha256").hexdigest()
+              lines.append(digest + "  " + path.name)
+          target = Path(os.environ["RUNNER_TEMP"]) / "naos-release-SHA256SUMS"
+          with target.open("x", encoding="utf-8") as output:
+              output.write("\n".join(lines) + "\n")
+          PY
+      - name: Attest the built artifacts
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Collect and recheck the same artifact bytes
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -- "$BUNDLE_PATH" dist/provenance.sigstore.json
+          cp -- "$RUNNER_TEMP/naos-release-SHA256SUMS" dist/SHA256SUMS
+          python - <<'PY_GUARD'
+          from pathlib import Path
+          import stat
+
+          files = sorted(Path("dist").iterdir())
+          if len(files) != 4 or not all(stat.S_ISREG(path.lstat().st_mode) for path in files):
+              raise SystemExit("Expected two packages, checksums and the attestation bundle")
+          if sum(path.stat().st_size for path in files) > 50 * 1024 * 1024:
+              raise SystemExit("Retained artifact exceeds the 50 MiB storage limit")
+          PY_GUARD
+          (cd dist && sha256sum --check SHA256SUMS)
+      - name: Retain the build and attestation for release review
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: naos-release-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7

@@ -136,22 +136,16 @@ its presence does not prove that checks ran.
 
 ## Traceability Headers
 
-All new source files must include a traceability header under this workflow. `@naos-implement` is instructed to propose one, but host/model behavior is not guaranteed; verify or add it explicitly:
+Use the [canonical module header](../../templates/structural-seeds/naos/NAOS_QUICK_REFERENCE.md#canonical-module-header)
+with the actual module path, purpose, source-backed requirement/task/spec links
+and rationale. Keep unknown mappings unresolved rather than inventing IDs.
+`@naos-implement` is instructed to propose the header; verify the resulting
+source explicitly.
 
-```python
-# NAOS Traceability
-# Task: T-202
-# Requirement: FR-15
-# Spec: specs/03-requirements.md L145
-```
-
-Or for other languages:
-
-```javascript
-// NAOS Traceability
-// Task: T-202
-// Requirement: FR-15
-```
+For Python, run `naos module-headers` and review its findings and coverage.
+The current validator evaluates Python only; headers in other languages still
+need review under the project's language conventions and receive no automated
+passing-coverage claim.
 
 ---
 
@@ -174,12 +168,14 @@ This triggers the structured test failure investigation: root cause analysis, bl
 **Your responsibility**: keep the session scoped to the story card. If you discover work that needs to be done but is outside the current task, note it in the story card under "Discovered Work" and create a new task in the registry — do not implement it now.
 
 For declared lanes, keep changed files inside the lane's planned paths and
-record tests/checks as you go. At lane completion, block, or review handoff,
-fill `naos/lane_handoffs/_TEMPLATE.yaml`, run
+record tests/checks as you go. Lite installs
+`naos/lane_handoffs/_TEMPLATE.yaml` for manual review, without the handoff script.
+At lane completion, block, or review handoff, Standard/Assured can fill a
+lane-specific copy of that template, run
 `python scripts/naos_parallel_lane_handoff.py --handoff naos/lane_handoffs/<lane>.yaml`,
-then run `naos control-plane-review`. This produces local review evidence only;
-it does not approve, merge, close, dispatch, release, certify, attest, or prove
-compliance.
+then run `naos control-plane-review`. The resulting report is local review
+evidence only; it does not approve, merge, close, dispatch, release, certify,
+attest, or prove compliance.
 
 ---
 
@@ -191,7 +187,7 @@ Without the story card, the agent has no schema constraints, no list of existing
 
 **❌ Accepting code without reviewing the governance checklist**
 
-The agent produces correct code most of the time. But "most of the time" is not a governance standard. Review each implementation output.
+An agent's proposed code can still miss the task's requirements. Review each implementation output.
 
 **❌ Committing without running the pre-commit hook**
 

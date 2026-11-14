@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 import uuid
-from contextlib import contextmanager, nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -39,6 +39,7 @@ from naos_policy import (  # noqa: E402
     sessions_index_path,
     validate_operator_value,
     write_report_with_session,
+    write_text_output,
 )
 from naos_session_identity import record_session_report_reference  # noqa: E402
 
@@ -62,85 +63,134 @@ class ClaimLockError(RuntimeError):
 
 def _regular_lock_stat(path: Path) -> os.stat_result:
     info = path.lstat()
-    if not stat.S_ISREG(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
-        raise ClaimLockError("Task claims lock must be a regular file, not a link or reparse point.")
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or getattr(info, "st_file_attributes", 0) & 0x400:
+        raise ClaimLockError("Task claims lock must be a single-link regular file, not a link or reparse point.")
     return info
 
 
 @contextmanager
 def claim_transaction(claims_path: Path, *, timeout: float = LOCK_TIMEOUT_SECONDS):
-    """Serialize cooperating local callers; keep the lock inode after release.
+    """Serialize local callers through one persistent, no-follow lock object.
 
-    The OS releases the lock after process death. This is not an authorization
-    boundary or a distributed lock for separate clones/network filesystems.
+    Keep the inode on release and process death. This is cooperative local
+    coordination, not authorization or a distributed filesystem lock.
     """
     lock_path = claims_path.with_name(claims_path.name + ".lock")
-    fd = None
-    acquired = False
-    try:
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + timeout
+
+    def wait_for_contention(error):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ClaimLockError("Task claims lock timed out; no claims or shared reports were changed.") from error
+        time.sleep(min(0.05, remaining))
+
+    with ExitStack() as stack:
+        acquired = False
         try:
-            _regular_lock_stat(lock_path)
-        except FileNotFoundError:
-            pass
-        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
-        fd = os.open(lock_path, flags, 0o600)
-        opened = os.fstat(fd)
+            if os.name == "nt":
+                import naos_windows_report as native
 
-        def check_identity():
-            live = _regular_lock_stat(lock_path)
-            if not stat.S_ISREG(opened.st_mode) or (live.st_dev, live.st_ino) != (opened.st_dev, opened.st_ino):
-                raise ClaimLockError("Task claims lock path changed; retry only after repository activity is stable.")
+                absolute = os.path.abspath(os.fspath(lock_path))
+                native.wh.validate_root_path(absolute)
+                handles = native.wh.WindowsHandles()
+                parent, name = native._parent(handles, stack, absolute)
+                try:
+                    _regular_lock_stat(lock_path)
+                except FileNotFoundError:
+                    pass
+                while True:
+                    try:
+                        held = handles.open_child(parent, name, kind="file", for_lock=True, shared_lock=True)
+                        stack.enter_context(held)
+                        break
+                    except native.wh.WindowsHandleError as exc:
+                        if exc.operation == "NtCreateFile" and exc.ntstatus == native.MISSING:
+                            try:
+                                with handles.create_report_child(parent, name, kind="file"):
+                                    pass
+                            except native.wh.WindowsHandleError as collision:
+                                if collision.ntstatus != native.COLLISION:
+                                    raise
+                            continue
+                        if exc.operation == "NtCreateFile" and exc.winerror in {32, 33}:
+                            wait_for_contention(exc)
+                            continue
+                        raise
+                opened = lock_path.lstat()
+                identity = held.info().identity
 
-        check_identity()
-        if os.name == "nt":
-            import msvcrt
+                def check_identity():
+                    live = _regular_lock_stat(lock_path)
+                    with handles.open_child(parent, name, kind="file") as current:
+                        if (current.info().identity != identity or held.info().identity != identity
+                                or (live.st_dev, live.st_ino) != (opened.st_dev, opened.st_ino)):
+                            raise ClaimLockError("Task claims lock path changed; retry only after repository activity is stable.")
 
-            def acquire():
-                os.lseek(fd, 0, os.SEEK_SET)
-                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
+                def acquire():
+                    held.lock_exclusive(nonblocking=True)
 
-            def acquire():
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                def release():
+                    held.unlock()
 
-        deadline = time.monotonic() + timeout
-        while True:
-            try:
-                acquire()
-                acquired = True
-                break
-            except OSError as exc:
-                if exc.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
-                    raise
-                if time.monotonic() >= deadline:
-                    raise ClaimLockError("Task claims lock timed out; no claims or shared reports were changed.") from exc
-                time.sleep(min(0.05, max(0, deadline - time.monotonic())))
-        check_identity()
-    except OSError as exc:
-        if fd is not None:
-            os.close(fd)
-            fd = None
-        raise ClaimLockError(f"Task claims lock unavailable: {exc}") from exc
-    except BaseException:
-        if fd is not None:
-            os.close(fd)
-            fd = None
-        raise
-    try:
-        yield
-    finally:
-        if fd is not None:
-            try:
-                if acquired:
-                    if os.name == "nt":
-                        os.lseek(fd, 0, os.SEEK_SET)
-                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-                    else:
-                        fcntl.flock(fd, fcntl.LOCK_UN)
-            finally:
-                os.close(fd)
+                def contended(exc):
+                    return (isinstance(exc, native.wh.WindowsHandleError)
+                            and exc.operation == "LockFileEx" and exc.winerror == 33)
+            else:
+                from naos_policy import _open_report_parent_fd, _secure_directory_fd_writes_supported
+
+                if not _secure_directory_fd_writes_supported():
+                    raise ClaimLockError("Safe task claims lock parent primitives unavailable.")
+                parent, name = _open_report_parent_fd(lock_path, strict_parent_topology=True)
+                stack.callback(os.close, parent)
+                try:
+                    _regular_lock_stat(lock_path)
+                except FileNotFoundError:
+                    pass
+                flags = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+                flags |= getattr(os, "O_CLOEXEC", 0)
+                fd = os.open(name, flags, 0o600, dir_fd=parent)
+                stack.callback(os.close, fd)
+                opened = os.fstat(fd)
+                import fcntl
+
+                def check_identity():
+                    live = _regular_lock_stat(lock_path)
+                    current = os.fstat(fd)
+                    if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1
+                            or (live.st_dev, live.st_ino) != (current.st_dev, current.st_ino)
+                            or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)):
+                        raise ClaimLockError("Task claims lock path changed; retry only after repository activity is stable.")
+
+                def acquire():
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+                def release():
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+
+                def contended(exc):
+                    return exc.errno in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}
+
+            check_identity()
+            while True:
+                try:
+                    acquire()
+                    acquired = True
+                    break
+                except OSError as exc:
+                    if not contended(exc):
+                        raise
+                    wait_for_contention(exc)
+            check_identity()
+        except (OSError, ValueError) as exc:
+            raise ClaimLockError(f"Task claims lock unavailable: {exc}") from exc
+
+        # Body failures keep their original type; only acquisition is translated.
+        try:
+            yield
+        finally:
+            if acquired:
+                release()
+
 
 LIMITATIONS = [
     "Task claims are coordination metadata only; they are not authorization, approval, ownership proof, task completion, or a security boundary.",
@@ -329,13 +379,7 @@ def load_claims(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
 
 
 def atomic_write_yaml(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
-    with temp_path.open("w", encoding="utf-8") as handle:
-        handle.write(yaml.safe_dump(data, sort_keys=False))
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(temp_path, path)
+    write_text_output(path, yaml.safe_dump(data, sort_keys=False), require_existing_write_access=False)
 
 
 def claim_status_for(claim: dict[str, Any], now: datetime, ttl_hours: int) -> str:

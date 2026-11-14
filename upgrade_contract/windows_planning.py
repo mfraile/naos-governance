@@ -116,7 +116,10 @@ class WindowsReadObserver:
                 raise UnsafeWindowsPath("Project root is not a directory")
             return _identity(info)
 
-    def observe(self, root: str, relative: str, *, capture_bytes: bool = False) -> tuple[dict[str, Any] | None, bytes | None]:
+    def observe(self, root: str, relative: str, *, capture_bytes: bool = False,
+                policy_input: bool = False) -> tuple[dict[str, Any] | None, bytes | None]:
+        if type(policy_input) is not bool or policy_input and not capture_bytes:
+            raise ValueError("Source-policy input requires a captured read-only observation")
         drive, root_parts = _parts(root)
         leaf_parts = _relative_parts(relative)
         if not leaf_parts:
@@ -154,7 +157,8 @@ class WindowsReadObserver:
                          "missing_suffix": list(missing_suffix)}, None)
             try:
                 leaf = stack.enter_context(self.handles.open_child(parent, leaf_parts[-1],
-                                               kind="file", pin_for_read=True))
+                                               kind="file", pin_for_read=True,
+                                               **({"for_policy_read": True} if policy_input else {})))
             except WindowsHandleError as exc:
                 if exc.operation == "NtCreateFile" and exc.ntstatus == _MISSING_LEAF:
                     for (name, handle), expected in zip(held, ancestors):
@@ -166,7 +170,8 @@ class WindowsReadObserver:
                              "missing_suffix": [leaf_parts[-1]]}, None)
                 raise
             before = leaf.info()
-            if before.directory or before.links != 1 or before.size < 0:
+            if (before.directory or before.links < 1
+                    or before.links != 1 and not policy_input or before.size < 0):
                 raise UnsafeWindowsPath("Managed leaf is not a single-link regular file")
             if capture_bytes and before.size > MAX_BASE_ARCHIVE_BYTES:
                 raise UnsafeWindowsPath("Captured Windows source exceeds the 64 MiB limit")
@@ -269,7 +274,7 @@ def build_windows_plan(observer: Any, *, project_root: str, candidate_root: str,
     for path in paths:
         _relative_parts(path)
     policy_observation, raw_policy = observer.observe(policy_root, policy_relative,
-                                                       capture_bytes=True)
+                                                     capture_bytes=True, policy_input=True)
     if policy_observation is None or policy_observation["presence"] != "present" or raw_policy is None:
         raise WindowsPlanningError("Source policy is absent")
     snapshot_id, snapshot_digest, policy = _policy(raw_policy)

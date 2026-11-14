@@ -54,7 +54,7 @@ class TaskIdentityDecisionTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="naos-identity-regression-")
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
         for name in ("NAOS_ROOT", "NAOS_PROFILE"):
             self.env.pop(name, None)
@@ -358,7 +358,7 @@ class HealthTest(unittest.TestCase):
         before = protected(root)
         with (
             patch(
-                "naos_task_lifecycle.os.replace",
+                "naos_task_lifecycle._publish_completion_file",
                 side_effect=OSError("fixture write failure"),
             ),
             self.assertRaises(OSError),

@@ -263,14 +263,101 @@
                 }
               },
               "sample_character_limit": {
-                "const": 12000
+                "enum": [0, 12000]
               },
               "interpretation": {
                 "const": "keyword_context_does_not_establish_artifact_deprecation"
               }
             }
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "deprecation_evidence"
+              ],
+              "properties": {
+                "deprecation_evidence": {
+                  "required": [
+                    "sample_character_limit"
+                  ],
+                  "properties": {
+                    "sample_character_limit": {
+                      "const": 0
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "content_handling"
+              ],
+              "properties": {
+                "content_handling": {
+                  "const": "raw_hash_only_sensitive_configuration"
+                }
+              },
+              "oneOf": [
+                {
+                  "required": [
+                    "path",
+                    "artifact_type",
+                    "detected_source"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": ".cursor/mcp.json"
+                    },
+                    "detected_source": {
+                      "const": "cursor_mcp_configuration"
+                    },
+                    "artifact_type": {
+                      "const": "cursor_mcp_configuration"
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "path",
+                    "artifact_type",
+                    "detected_source"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": ".vscode/mcp.json"
+                    },
+                    "detected_source": {
+                      "const": "vscode_mcp_configuration"
+                    },
+                    "artifact_type": {
+                      "const": "vscode_mcp_configuration"
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "path",
+                    "artifact_type",
+                    "detected_source"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": ".mcp.json"
+                    },
+                    "detected_source": {
+                      "const": "workspace_mcp_configuration"
+                    },
+                    "artifact_type": {
+                      "const": "workspace_mcp_configuration"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
       }
     },
     "artifact_counts": {

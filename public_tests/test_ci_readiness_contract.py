@@ -24,7 +24,7 @@ class CiReadinessContractTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix='naos readiness ü ')
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        self.root = Path(temporary.name).resolve()
         self.state = self.root / 'naos'
         self.state.mkdir()
         self.policy_path = self.root / 'policy.yaml'

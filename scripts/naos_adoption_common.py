@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -42,6 +43,7 @@ from naos_policy import (  # noqa: E402
     severity_for_profile,
     validate_report_write_path,
     write_report_with_session,
+    write_text_output,
 )
 
 try:
@@ -332,8 +334,7 @@ def load_structured(path: Path) -> dict[str, Any]:
 
 
 def write_yaml(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    write_text_output(path, yaml.safe_dump(data, sort_keys=False))
 
 
 def report_path(root: Path, naos_root: str, policy: dict[str, Any], spec_key: str, explicit: str | None = None) -> Path | None:
@@ -816,8 +817,7 @@ def write_decision_markdown(path: Path, report: dict[str, Any]) -> None:
             "This record captures human-review inputs and residual risk. It is not approval, certification, legal or regulatory compliance evidence, runtime safety proof, or requirements completeness proof.",
         ]
     )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_text_output(path, "\n".join(lines) + "\n")
 
 
 def build_preflight(args: argparse.Namespace, root: Path, profile: str, policy: dict[str, Any]) -> dict[str, Any]:
@@ -2279,8 +2279,13 @@ def build_install_plan(args: argparse.Namespace, root: Path, profile: str, polic
         {"id": "profile_recommendation", "recommendation": profile, "rationale": "Selected profile is retained; human may override with recorded residual risk.", "human_review_required": True},
         {"id": "module_recommendation", "recommendation": "run setup-recommendations", "rationale": "Module recommendations remain deterministic and optional.", "human_review_required": True},
     ]
+    selection = "" if profile == "quickstart" else " --archetype CHOOSE_ARCHETYPE --backend CHOOSE_REVIEW_POLICY"
+    command = f"naos init . --tier {profile}{selection}"
     activation = {
-        "init_command": f"naos init . --tier {profile} --activate",
+        "init_command": command + " --dry-run",
+        "init_command_is_template": bool(selection),
+        "required_owner_choices": [] if profile == "quickstart" else ["--archetype", "--backend"],
+        "activate_after_review_command": command + " --activate",
         "hook_ci_boundary": "Hooks, CI, provider/API runtime, memory write-back, and hidden context injection are not auto-enabled.",
         "write_posture": "preview_first_explicit_activation",
     }
@@ -2673,6 +2678,90 @@ def project_evidence_paths(root: Path, paths: list[str]) -> list[str]:
     ]
 
 
+def reconstruction_test_path(path: str) -> bool:
+    parts = Path(path).parts
+    return (
+        any(part in {"test", "tests"} for part in parts[:-1])
+        or Path(path).name.startswith("test_")
+        or path.endswith(("_test.py", ".test.ts", ".test.tsx", ".test.js", ".spec.ts", ".spec.js"))
+    )
+
+
+def reconstruction_content_cue(path: str, text: str, kind: str) -> tuple[str | None, bool]:
+    """One representative content cue, never a semantic requirement assertion."""
+    def excerpt(value: str) -> str:
+        lines = redact_sensitive_text(value).splitlines()
+        return lines[0][:160] if lines else ""
+
+    if not text.strip():
+        return None, False
+    if path.endswith(".py"):
+        try:
+            module = ast.parse(text)
+        except (SyntaxError, ValueError, RecursionError):
+            return None, True  # Includes incomplete character-prefix samples.
+        if not module.body:
+            return None, False
+        functions = []
+        for node in module.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith("_"):
+                functions.append((node.name, node))
+            elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
+                functions.extend(
+                    (f"{node.name}.{child.name}", child) for child in node.body
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and not child.name.startswith("_")
+                )
+        if functions:
+            name, function = functions[0]
+            doc = ast.get_docstring(function)
+            suffix = f": {excerpt(doc)}" if doc else ""
+            return f"callable {name}{suffix}", True
+        doc = ast.get_docstring(module)
+        return (f"module docstring: {excerpt(doc)}" if doc else None), True
+    if kind == "docs":
+        headings = []
+        fence = None
+        for line in text.splitlines():
+            marker = re.match(r"^\s{0,3}(`{3,}|~{3,})", line)
+            if marker:
+                value = marker.group(1)
+                if fence is None:
+                    fence = value
+                elif value[0] == fence[0] and len(value) >= len(fence):
+                    fence = None
+                continue
+            heading = re.match(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$", line)
+            if fence is None and heading:
+                headings.append((len(heading.group(1)), heading.group(2)))
+        if headings:
+            heading = next((title for level, title in headings if level > 1), headings[0][1])
+            return f"document section {excerpt(heading)}", True
+        return f"document excerpt: {excerpt(text.strip())}", True
+    # Conservative lexical hints for explicit declarations; no language execution.
+    declarations = {
+        ".js": r"^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(",
+        ".ts": r"^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(",
+        ".go": r"^\s*func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)\s*\(",
+        ".java": r"^\s*public\s+(?:static\s+)?[\w<>\[\]]+\s+([A-Za-z_]\w*)\s*\(",
+    }
+    pattern = declarations.get(Path(path).suffix)
+    if pattern and (match := re.search(pattern, text, re.MULTILINE)):
+        return f"callable declaration {match.group(1)}", True
+    if kind == "workflow":
+        try:
+            workflow = yaml.safe_load(text)
+        except (ValueError, yaml.YAMLError, RecursionError):
+            return None, True
+        if isinstance(workflow, dict):
+            jobs = workflow.get("jobs")
+            if isinstance(jobs, dict) and jobs:
+                return f"workflow job {excerpt(str(next(iter(jobs))))}", True
+            if isinstance(workflow.get("name"), str):
+                return f"workflow name {excerpt(workflow['name'])}", True
+    return None, True
+
+
 def reconstruction_discovery(root: Path, *, max_files: int = 5000) -> tuple[dict[str, list[str]], dict[str, Any], list[str]]:
     """One deterministic local path scan; completeness is only within this scope."""
     paths, discovery = scan_files(root, None, max_files, ignored_parts=IGNORED_PARTS)
@@ -2680,9 +2769,11 @@ def reconstruction_discovery(root: Path, *, max_files: int = 5000) -> tuple[dict
     matches = {
         "docs": [p for p in files if p.lower().endswith((".md", ".rst", ".txt")) and (p.startswith(("docs/", "specs/")) or p.lower() == "readme.md")],
         "source": [p for p in files if p.startswith(("src/", "app/", "lib/")) or p.endswith((".py", ".ts", ".tsx", ".js", ".go", ".java"))],
-        "tests": [p for p in files if p.startswith("tests/") or "/test_" in p or p.endswith("_test.py")],
+        "tests": [p for p in files if reconstruction_test_path(p)],
         "workflows": [p for p in files if p.startswith((".github/workflows/", ".gitlab/"))],
     }
+    other_paths = set(matches["docs"] + matches["tests"] + matches["workflows"])
+    matches["source"] = [p for p in matches["source"] if p not in other_paths]
     limits = {"docs": 50, "source": 80, "tests": 50, "workflows": 30}
     categories = {key: {"matched": len(values), "selected": min(len(values), limits[key]),
                         "limit": limits[key], "truncated": len(values) > limits[key]}
@@ -2776,11 +2867,15 @@ def build_requirements_reconstruct(args: argparse.Namespace, root: Path, profile
                 ]
             )
         )
+    tests = list(dict.fromkeys([*tests, *[p for p in source if reconstruction_test_path(p)]]))
+    test_workflows = list(dict.fromkeys([*tests, *workflows]))
+    other_paths = set(docs + test_workflows)
+    source = [path for path in dict.fromkeys(source) if path not in other_paths]
     evidence_limit = 100 if repository_candidates else 12
     coverage["evidence_selection"] = {
         key: {"available": len(paths), "selected": min(len(paths), evidence_limit),
               "limit": evidence_limit, "truncated": len(paths) > evidence_limit}
-        for key, paths in {"docs": docs, "source": source, "tests_and_workflows": tests + workflows}.items()
+        for key, paths in {"docs": docs, "source": source, "tests_and_workflows": test_workflows}.items()
     }
     coverage["local_path_selection_complete"] = (
         coverage["discovery"]["complete"]
@@ -2794,11 +2889,14 @@ def build_requirements_reconstruct(args: argparse.Namespace, root: Path, profile
     for index, path in enumerate(docs[:evidence_limit], start=1):
         confidence = confidence_for_source(path, "docs")
         text = read_small_text(root, path)
+        cue, meaningful = reconstruction_content_cue(path, text, "docs")
+        if not meaningful:
+            continue
         candidates.append(
             candidate(
                 f"FR-DOC-{index:03d}",
                 "FR",
-                f"Candidate functional requirement from {path}",
+                f"Candidate review of {cue} in {path}",
                 f"Local documentation was detected at {path}; reviewers should confirm any described behavior before promotion.",
                 [path],
                 confidence,
@@ -2821,18 +2919,22 @@ def build_requirements_reconstruct(args: argparse.Namespace, root: Path, profile
             )
     for index, path in enumerate(source[:evidence_limit], start=1):
         text = read_small_text(root, path)
-        candidates.append(
-            candidate(
-                f"FR-CODE-{index:03d}",
-                "FR",
-                f"Candidate behavior inferred from source file {path}",
-                f"Source file {path} indicates behavior that may need a formal requirement, but code evidence is not requirements authority.",
-                [path],
-                "inferred_from_code",
-                "source_code",
-                ["Does this source behavior reflect intended product behavior or incidental implementation?"],
+        cue, meaningful = reconstruction_content_cue(path, text, "source")
+        if not meaningful:
+            continue
+        if cue:
+            candidates.append(
+                candidate(
+                    f"FR-CODE-{index:03d}",
+                    "FR",
+                    f"Candidate review of {cue} in {path}",
+                    f"Source file {path} indicates behavior that may need a formal requirement, but code evidence is not requirements authority.",
+                    [path],
+                    "inferred_from_code",
+                    "source_code",
+                    ["Does this source behavior reflect intended product behavior or incidental implementation?"],
+                )
             )
-        )
         if nfr_supported(path, text):
             candidates.append(
                 candidate(
@@ -2846,20 +2948,24 @@ def build_requirements_reconstruct(args: argparse.Namespace, root: Path, profile
                     ["Does this code indicator represent an intended security/privacy/operational requirement?"],
                 )
             )
-    for index, path in enumerate((tests + workflows)[:evidence_limit], start=1):
+    for index, path in enumerate(test_workflows[:evidence_limit], start=1):
         text = read_small_text(root, path)
-        candidates.append(
-            candidate(
-                f"FR-TEST-{index:03d}",
-                "FR",
-                f"Candidate behavior inferred from test or workflow file {path}",
-                f"Test or workflow evidence at {path} suggests an expected behavior, but it must be reviewed before becoming a requirement.",
-                [path],
-                "inferred_from_tests",
-                "tests_or_ci",
-                ["Is this test or workflow evidence intentionally required behavior?"],
+        cue, meaningful = reconstruction_content_cue(path, text, "workflow" if path in workflows else "tests")
+        if not meaningful:
+            continue
+        if cue:
+            candidates.append(
+                candidate(
+                    f"FR-TEST-{index:03d}",
+                    "FR",
+                    f"Candidate review of {cue} in {path}",
+                    f"Test or workflow evidence at {path} suggests an expected behavior, but it must be reviewed before becoming a requirement.",
+                    [path],
+                    "inferred_from_tests",
+                    "tests_or_ci",
+                    ["Is this test or workflow evidence intentionally required behavior?"],
+                )
             )
-        )
         if nfr_supported(path, text):
             candidates.append(
                 candidate(
@@ -2897,12 +3003,18 @@ def build_requirements_reconstruct(args: argparse.Namespace, root: Path, profile
         confidence = retrieval_confidence.get(family_id)
         if confidence is None or source_record.get("source_revalidated") is not True:
             continue
+        cue_kind = "docs" if family_id in {"documentation", "specifications"} else "source"
+        if path.startswith((".github/workflows/", ".gitlab/")):
+            cue_kind = "workflow"
+        cue, meaningful = reconstruction_content_cue(path, read_small_text(root, path), cue_kind)
+        if not meaningful or not cue:
+            continue
         stable_suffix = hashlib.sha256(path.encode("utf-8")).hexdigest()[:16].upper()
         candidates.append(
             candidate(
                 f"FR-RETRIEVAL-{stable_suffix}",
                 "FR",
-                f"Candidate behavior surfaced by repository retrieval from {path}",
+                f"Candidate review of {cue} surfaced by repository retrieval from {path}",
                 (
                     f"Source-bound repository retrieval ranked {path} outside the normal "
                     "bounded evidence prefix; reviewers must inspect the source before "

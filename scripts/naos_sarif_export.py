@@ -27,6 +27,7 @@ from naos_policy import (  # noqa: E402
     report_output_path,
     safe_policy_path,
     write_report,
+    write_text_output,
 )
 
 
@@ -779,8 +780,7 @@ def main(argv: list[str] | None = None) -> int:
 
     output = Path(args.output) if args.output else default_sarif_output_path(root, naos_root, policy)
     if output is not None:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(sarif, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        write_text_output(output, json.dumps(sarif, indent=2, sort_keys=True) + "\n")
         summary["output_path"] = str(output)
 
     if output is None:

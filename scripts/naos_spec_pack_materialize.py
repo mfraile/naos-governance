@@ -4,20 +4,22 @@
 This command copies missing manifest-required spec-pack files from the kit's
 template pack into an adopter project's ``specs/`` directory. It is a bounded
 setup helper: it does not fill specs, approve specs, promote requirements,
-prove readiness, or overwrite existing files unless ``--force`` is explicit.
+prove readiness, or overwrite existing files. Explicit ``--force`` refuses
+selected existing targets.
 """
 
 from __future__ import annotations
 
 import argparse
 import errno
+import hashlib
 import json
 import os
 import re
 import shutil
 import stat
 import sys
-import tempfile
+from contextlib import ExitStack
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,7 @@ from jsonschema import Draft202012Validator
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from naos_policy import (  # noqa: E402
+    _open_report_parent_fd,
     default_naos_root,
     finding_counts,
     load_policy,
@@ -41,6 +44,8 @@ from naos_policy import (  # noqa: E402
 SCHEMA_ID = "naos.spec_pack_materialization.v2"
 MANIFEST_SCHEMA_ID = "naos.spec_pack_manifest.v1"
 DEFAULT_MANIFEST_NAME = "spec_manifest.yaml"
+STATE_MARKER_PREFIX = ".naos-spec-copy-state-"
+_MARKER_NOT_PRECHECKED = object()
 MANIFEST_SCHEMA_RELATIVE = Path("schemas/naos/spec_pack_manifest.schema.json")
 SUPPORT_FILENAMES = {"README.md", "spec_manifest.yaml"}
 SAFE_MANIFEST_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -55,12 +60,13 @@ WINDOWS_DEVICE_NAMES = {
 LIMITATIONS = [
     "Spec-pack materialization copies missing profile-required template files only.",
     "It does not fill, approve, validate, implement, test, certify, or prove specifications.",
-    "Existing files are skipped unless --force is explicit.",
+    "Existing files are skipped; --force refuses an existing target because safe replacement is unavailable.",
     "Invalid manifests and unsafe source or destination paths block before spec files are changed.",
     "Apply implements native macOS, Linux and Windows leaf operations on CPython 3.11-3.13; other runtime families fail closed.",
     "Requested report paths receive in-project ancestor, regular single-link leaf, and basic writability preflight, but a later report-write failure can occur after spec files were copied; stdout then carries the blocked evidence.",
-    "POSIX copies permission bits; Windows copies the read-only attribute and inherits destination-directory ACLs. Existing Windows read-only destinations are not made writable for --force.",
-    "Multi-file materialization is sequential and has no rollback; a runtime filesystem or post-install cleanup failure can leave the current and earlier same-directory leaf copies in place.",
+    "POSIX copies permission bits; Windows copies the read-only attribute and inherits destination-directory ACLs.",
+    "Multi-file materialization is sequential and has no rollback; a runtime filesystem failure can leave earlier leaf copies or a clearly reported partial target for review.",
+    "Each new copy has a hidden per-target status marker; an unfinished marked target blocks reruns until the operator reviews and removes the partial file and marker together. A deleted completed target can be recopied only when the marker remains writable. This marker is a recovery cue, not an attestation. Crash consistency is not proven.",
     "Qualification is bounded to the recorded native test hosts; network filesystems, hostile concurrent ancestor changes, and crash recovery are not proven.",
 ]
 NOT_CLAIMED = [
@@ -139,16 +145,20 @@ class MissingSource(MaterializationRefusal):
     """A required source file is absent."""
 
 
-class PublishedCopyCleanupFailure(MaterializationRefusal):
-    """A new target was installed but its source temporary could not be removed."""
+class RetainedSpecPartial(MaterializationRefusal):
+    """A failed new copy may have left the exclusively created target in place."""
 
-    def __init__(self, *, target: Path, residue: Path, cause: OSError) -> None:
-        super().__init__(
-            f"Installed {target}, but temporary cleanup failed; inspect and remove residue "
-            f"{residue}: {cause}"
-        )
+    def __init__(self, *, target: Path, identified: bool, cause: Exception) -> None:
+        if identified:
+            detail = f"possibly incomplete target retained for review at {target}"
+        else:
+            detail = (
+                f"no deletion attempted; last selected name {target}; "
+                "possible partial target location unresolved"
+            )
+        super().__init__(f"Spec copy failed ({cause}); {detail}")
         self.target = target
-        self.residue = residue
+        self.identified = identified
 
 
 def lstat_or_none(path: Path) -> os.stat_result | None:
@@ -289,6 +299,28 @@ def inspect_target_file(
     return True, file_identity(state)
 
 
+def copy_state_marker(project_root: Path, target: Path) -> Path:
+    """Give each selected target one stable, hidden recovery marker name."""
+    relative = require_within(target, project_root, field="Target")
+    digest = hashlib.sha256("/".join(relative.parts).encode("utf-8")).hexdigest()
+    return target.with_name(f"{STATE_MARKER_PREFIX}{digest}")
+
+
+def inspect_copy_state_marker(
+    project_root: Path, target: Path,
+) -> tuple[int | None, tuple[int, int, int, int, int, int] | None]:
+    """Size zero means pending; size one means the held copy was verified."""
+    marker = copy_state_marker(project_root, target)
+    validate_directory_chain(project_root, marker.parent, field="Copy state", allow_missing=True)
+    state = lstat_or_none(marker)
+    if state is None:
+        return None, None
+    if (is_link_or_reparse(state) or not stat.S_ISREG(state.st_mode)
+            or state.st_nlink != 1 or state.st_size not in {0, 1}):
+        raise MaterializationRefusal(f"Copy state marker has unsafe type, links, or size: {marker}")
+    return state.st_size, file_identity(state)
+
+
 def validate_report_output(
     output: Path | None,
     *,
@@ -332,6 +364,10 @@ def validate_report_output(
         resolved_target_root = target_root.resolve(strict=False) if target_root is not None else None
     except (OSError, RuntimeError) as exc:
         raise MaterializationRefusal(f"Unable to resolve report output safely: {output}: {exc}") from exc
+    if mapped_output is not None and resolved_output != mapped_output:
+        raise MaterializationRefusal(
+            f"In-project report output changed during resolution: {output}"
+        )
     protected_roots = [(resolved_source_root, "source spec root")]
     if resolved_target_root is not None:
         protected_roots.append((resolved_target_root, "target spec root"))
@@ -341,31 +377,36 @@ def validate_report_output(
     return resolved_output, output_identity
 
 
-def ensure_report_parent(parent: Path) -> None:
-    """Create a canonical report directory chain without following new symlinks."""
-    missing: list[Path] = []
-    current = parent
-    while lstat_or_none(current) is None:
-        missing.append(current)
-        if current == current.parent:
-            break
-        current = current.parent
-    state = lstat_or_none(current)
-    if state is None or is_link_or_reparse(state) or not stat.S_ISDIR(state.st_mode):
-        raise MaterializationRefusal(f"Report output ancestor must be a non-symlink directory: {current}")
-    for directory in reversed(missing):
-        try:
-            directory.mkdir()
-        except FileExistsError:
-            pass
-        state = lstat_or_none(directory)
-        if state is None or is_link_or_reparse(state) or not stat.S_ISDIR(state.st_mode):
-            raise MaterializationRefusal(
-                f"Report output directory chain became unsafe: {directory}"
-            )
-    parent_state = lstat_or_none(parent)
-    if parent_state is None or is_link_or_reparse(parent_state) or not stat.S_ISDIR(parent_state.st_mode):
-        raise MaterializationRefusal(f"Report output parent must be a non-symlink directory: {parent}")
+def ensure_report_parent(parent: Path) -> tuple[Any, Any]:
+    """Create the canonical parent under held, no-follow directory handles."""
+    if os.name == "nt":
+        from naos_windows_report import ensure_report_directory
+
+        return ensure_report_directory(parent)
+    descriptor, _name = _open_report_parent_fd(
+        parent / ".naos-spec-pack-parent-probe", strict_parent_topology=True,
+    )
+    try:
+        state = os.fstat(descriptor)
+        return state.st_dev, state.st_ino
+    finally:
+        os.close(descriptor)
+
+
+def report_parent_identity(output: Path) -> tuple[Any, Any]:
+    """Observe the visible output parent without following a new link."""
+    if os.name == "nt":
+        from naos_windows_report import report_parent_identity as native_identity
+
+        return native_identity(output)
+    descriptor, _name = _open_report_parent_fd(
+        output, strict_parent_topology=True, create_parents=False,
+    )
+    try:
+        state = os.fstat(descriptor)
+        return state.st_dev, state.st_ino
+    finally:
+        os.close(descriptor)
 
 
 def probe_report_output(
@@ -375,7 +416,7 @@ def probe_report_output(
     project_input_root: Path,
     source_root: Path,
     target_root: Path | None,
-) -> tuple[Path, tuple[int, int, int, int, int, int] | None]:
+) -> tuple[Path, tuple[int, int, int, int, int, int] | None, tuple[Any, Any]]:
     canonical_output, expected_identity = validate_report_output(
         output,
         project_root=project_root,
@@ -385,7 +426,7 @@ def probe_report_output(
     )
     if canonical_output is None:  # pragma: no cover - guarded by the caller
         raise MaterializationRefusal("A report output path is required for preflight.")
-    ensure_report_parent(canonical_output.parent)
+    prepared_parent_identity = ensure_report_parent(canonical_output.parent)
     canonical_output, confirmed_identity = validate_report_output(
         canonical_output,
         project_root=project_root,
@@ -395,32 +436,51 @@ def probe_report_output(
     )
     if confirmed_identity != expected_identity:
         raise MaterializationRefusal(f"Report output changed during preflight: {canonical_output}")
-    descriptor = -1
-    temporary: Path | None = None
-    try:
-        if expected_identity is None:
-            descriptor, temporary_name = tempfile.mkstemp(
-                prefix=".naos-spec-pack-report-probe-",
-                dir=canonical_output.parent,
-            )
-            temporary = Path(temporary_name)
-        else:
-            flags = os.O_WRONLY
-            if hasattr(os, "O_CLOEXEC"):
-                flags |= os.O_CLOEXEC
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            descriptor = os.open(canonical_output, flags)
-        current_state = lstat_or_none(canonical_output)
-        current_identity = file_identity(current_state) if current_state is not None else None
-        if current_identity != expected_identity:
-            raise MaterializationRefusal(f"Report output changed during preflight: {canonical_output}")
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        if temporary is not None:
-            temporary.unlink()
-    return canonical_output, expected_identity
+    if os.name == "nt":
+        from naos_windows_report import probe_strict_report_output
+
+        observed_parent_identity = probe_strict_report_output(
+            canonical_output, expect_absent=expected_identity is None,
+        )
+    else:
+        parent_fd, name = _open_report_parent_fd(
+            canonical_output, strict_parent_topology=True, create_parents=False,
+        )
+        descriptor = -1
+        try:
+            state = os.fstat(parent_fd)
+            observed_parent_identity = (state.st_dev, state.st_ino)
+            if observed_parent_identity != prepared_parent_identity:
+                raise MaterializationRefusal(f"Report parent changed during preflight: {canonical_output.parent}")
+            try:
+                current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                current = None
+            if (file_identity(current) if current is not None else None) != expected_identity:
+                raise MaterializationRefusal(f"Report output changed during preflight: {canonical_output}")
+            if not os.access(
+                ".", os.W_OK | os.X_OK, dir_fd=parent_fd,
+                effective_ids=True, follow_symlinks=False,
+            ):
+                raise MaterializationRefusal(f"Report parent is not writable: {canonical_output.parent}")
+            if expected_identity is not None:
+                flags = os.O_WRONLY | os.O_NOFOLLOW
+                if hasattr(os, "O_CLOEXEC"):
+                    flags |= os.O_CLOEXEC
+                descriptor = os.open(name, flags, dir_fd=parent_fd)
+                if file_identity(os.fstat(descriptor)) != expected_identity:
+                    raise MaterializationRefusal(f"Report output changed during preflight: {canonical_output}")
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+            os.close(parent_fd)
+    if observed_parent_identity != prepared_parent_identity:
+        raise MaterializationRefusal(f"Report parent changed during preflight: {canonical_output.parent}")
+    current_state = lstat_or_none(canonical_output)
+    current_identity = file_identity(current_state) if current_state is not None else None
+    if current_identity != expected_identity or report_parent_identity(canonical_output) != prepared_parent_identity:
+        raise MaterializationRefusal(f"Report output changed during preflight: {canonical_output}")
+    return canonical_output, expected_identity, prepared_parent_identity
 
 
 def load_manifest_schema() -> dict[str, Any]:
@@ -673,6 +733,431 @@ def safe_mkdir_chain(root: Path, directory: Path) -> None:
             raise MaterializationRefusal(f"Target directory chain became unsafe: {current}")
 
 
+def _open_spec_parent_posix(
+    project_root: Path, target: Path, expected_root: tuple[int, int],
+) -> tuple[int, str]:
+    """Create and hold the target parent relative to the expected project root."""
+    relative = require_within(target, project_root, field="Target")
+    if any(part in {"", ".", ".."} for part in relative.parts):
+        raise MaterializationRefusal(f"Target contains an unsafe path segment: {target}")
+    search = getattr(os, "O_PATH", None) if sys.platform == "linux" else 0x40000000
+    if search is None:
+        raise MaterializationRefusal("Search-only POSIX directory handles are unavailable")
+    flags = search | os.O_DIRECTORY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    current = os.open(project_root, flags)
+    try:
+        root_state = os.fstat(current)
+        if (not stat.S_ISDIR(root_state.st_mode)
+                or (root_state.st_dev, root_state.st_ino) != expected_root):
+            raise MaterializationRefusal(f"Project root changed after preflight: {project_root}")
+        for part in relative.parts[:-1]:
+            try:
+                child = os.open(part, flags, dir_fd=current)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(part, dir_fd=current)
+                except FileExistsError:
+                    pass
+                child = os.open(part, flags, dir_fd=current)
+            except OSError as exc:
+                if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+                    raise MaterializationRefusal(f"Target directory chain became unsafe: {target.parent}") from exc
+                raise
+            os.close(current)
+            current = child
+        return current, relative.name
+    except BaseException:
+        os.close(current)
+        raise
+
+
+def _spec_target_matches(parent_fd: int, name: str, target_fd: int) -> bool:
+    """Check whether the final name still denotes the held, single-link file."""
+    try:
+        named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        held = os.fstat(target_fd)
+    except OSError:
+        return False
+    return (stat.S_ISREG(named.st_mode) and named.st_nlink == 1
+            and stat.S_ISREG(held.st_mode) and held.st_nlink == 1
+            and (named.st_dev, named.st_ino) == (held.st_dev, held.st_ino))
+
+
+def _spec_target_path_matches(
+    project_root: Path, target: Path, expected_root: tuple[int, int],
+    parent_fd: int, name: str, target_fd: int,
+) -> bool:
+    """Identify a retained partial only while its public path is still bound."""
+    try:
+        validate_directory_chain(
+            project_root, target.parent, field="Target", allow_missing=False,
+        )
+        root = project_root.lstat()
+        parent = target.parent.lstat()
+        held_parent = os.fstat(parent_fd)
+    except (OSError, MaterializationRefusal):
+        return False
+    return ((root.st_dev, root.st_ino) == expected_root
+            and not is_link_or_reparse(root)
+            and not is_link_or_reparse(parent)
+            and (parent.st_dev, parent.st_ino) == (held_parent.st_dev, held_parent.st_ino)
+            and _spec_target_matches(parent_fd, name, target_fd))
+
+
+def _copy_template_file_posix(
+    *, project_root: Path, source: Path, target: Path,
+    source_identity: tuple[int, int, int, int, int, int],
+    target_identity: tuple[int, int, int, int, int, int] | None,
+    marker_identity: tuple[int, int, int, int, int, int] | None,
+    project_identity: tuple[int, int] | None,
+) -> None:
+    root_state = project_root.lstat()
+    expected_root = project_identity or (root_state.st_dev, root_state.st_ino)
+    if (is_link_or_reparse(root_state) or not stat.S_ISDIR(root_state.st_mode)
+            or (root_state.st_dev, root_state.st_ino) != expected_root):
+        raise MaterializationRefusal(f"Project root changed after preflight: {project_root}")
+    parent_fd, target_name = _open_spec_parent_posix(project_root, target, expected_root)
+    marker = copy_state_marker(project_root, target)
+    marker_name = marker.name
+    source_fd = -1
+    target_fd = -1
+    marker_fd = -1
+    try:
+        _, current_identity = inspect_target_file(project_root, target)
+        if current_identity != target_identity:
+            raise MaterializationRefusal(f"Target changed after preflight: {target}")
+        if current_identity is not None:
+            raise MaterializationRefusal(f"Existing target cannot be replaced safely: {target}")
+        source_leaf = lstat_or_none(source)
+        if (source_leaf is None or is_link_or_reparse(source_leaf)
+                or file_identity(source_leaf) != source_identity):
+            raise MaterializationRefusal(f"Source changed after preflight: {source}")
+        source_flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        if hasattr(os, "O_CLOEXEC"):
+            source_flags |= os.O_CLOEXEC
+        source_flags |= os.O_NOFOLLOW
+        try:
+            source_fd = os.open(source, source_flags)
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise MaterializationRefusal(f"Source became a symbolic link after preflight: {source}") from exc
+            raise
+        source_state = os.fstat(source_fd)
+        if (not stat.S_ISREG(source_state.st_mode)
+                or file_identity(source_state) != source_identity):
+            raise MaterializationRefusal(f"Source changed after preflight: {source}")
+
+        marker_state, current_marker_identity = inspect_copy_state_marker(project_root, target)
+        if current_marker_identity != marker_identity:
+            raise MaterializationRefusal(f"Copy state marker changed after preflight: {marker}")
+        marker_flags = os.O_WRONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+        if hasattr(os, "O_CLOEXEC"):
+            marker_flags |= os.O_CLOEXEC
+        if marker_state is None:
+            try:
+                marker_fd = os.open(
+                    marker_name, marker_flags | os.O_CREAT | os.O_EXCL,
+                    0o600, dir_fd=parent_fd,
+                )
+            except FileExistsError as exc:
+                raise MaterializationRefusal(f"Copy state marker appeared before create: {marker}") from exc
+        else:
+            marker_fd = os.open(marker_name, marker_flags, dir_fd=parent_fd)
+            held_marker = os.fstat(marker_fd)
+            if (file_identity(held_marker) != marker_identity
+                    or not stat.S_ISREG(held_marker.st_mode)
+                    or held_marker.st_nlink != 1
+                    or held_marker.st_size not in {0, 1}):
+                raise MaterializationRefusal(f"Copy state marker changed before reuse: {marker}")
+            if marker_state == 1:
+                if not _spec_target_path_matches(
+                    project_root, marker, expected_root, parent_fd, marker_name, marker_fd,
+                ):
+                    raise MaterializationRefusal(f"Copy state marker name changed: {marker}")
+                os.ftruncate(marker_fd, 0)
+        os.fsync(marker_fd)
+        if (os.fstat(marker_fd).st_size != 0
+                or not _spec_target_path_matches(
+                    project_root, marker, expected_root, parent_fd, marker_name, marker_fd,
+                )):
+            raise MaterializationRefusal(f"Pending copy state marker is not bound: {marker}")
+
+        target_flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            target_flags |= os.O_CLOEXEC
+        try:
+            target_fd = os.open(target_name, target_flags, 0o600, dir_fd=parent_fd)
+        except FileExistsError as exc:
+            raise MaterializationRefusal(f"Target appeared before exclusive copy: {target}") from exc
+        with os.fdopen(source_fd, "rb") as source_handle:
+            source_fd = -1
+            with os.fdopen(os.dup(target_fd), "wb") as target_handle:
+                shutil.copyfileobj(source_handle, target_handle)
+                if file_identity(os.fstat(source_handle.fileno())) != source_identity:
+                    raise MaterializationRefusal(f"Source changed while copying: {source}")
+                os.fchmod(target_handle.fileno(), stat.S_IMODE(source_state.st_mode))
+                target_handle.flush()
+                os.fsync(target_handle.fileno())
+                source_digest = hashlib.sha256()
+                target_digest = hashlib.sha256()
+                for descriptor, digest in (
+                    (source_handle.fileno(), source_digest), (target_fd, target_digest),
+                ):
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    while block := os.read(descriptor, 1024 * 1024):
+                        digest.update(block)
+                if source_digest.digest() != target_digest.digest():
+                    raise MaterializationRefusal(f"Copied spec bytes differ from source: {target}")
+                if file_identity(os.fstat(source_handle.fileno())) != source_identity:
+                    raise MaterializationRefusal(f"Source changed during copy verification: {source}")
+        os.utime(target_fd, ns=(source_state.st_atime_ns, source_state.st_mtime_ns))
+
+        live_root = project_root.lstat()
+        live_parent = target.parent.lstat()
+        held_parent = os.fstat(parent_fd)
+        if ((live_root.st_dev, live_root.st_ino) != expected_root
+                or is_link_or_reparse(live_root)
+                or is_link_or_reparse(live_parent)
+                or (live_parent.st_dev, live_parent.st_ino)
+                != (held_parent.st_dev, held_parent.st_ino)):
+            raise MaterializationRefusal(f"Target parent changed while copying: {target.parent}")
+        if not _spec_target_matches(parent_fd, target_name, target_fd):
+            raise MaterializationRefusal(f"Target changed while copying: {target}")
+        if not _spec_target_path_matches(
+            project_root, marker, expected_root, parent_fd, marker_name, marker_fd,
+        ):
+            raise MaterializationRefusal(f"Copy state marker changed while copying: {marker}")
+        if os.write(marker_fd, b"C") != 1:
+            raise MaterializationRefusal(f"Unable to complete copy state marker: {marker}")
+        os.fsync(marker_fd)
+        if os.fstat(marker_fd).st_size != 1:
+            raise MaterializationRefusal(f"Completed copy state marker has wrong size: {marker}")
+    except Exception as exc:
+        if target_fd >= 0:
+            raise RetainedSpecPartial(
+                target=target,
+                identified=_spec_target_path_matches(
+                    project_root, target, expected_root, parent_fd, target_name, target_fd,
+                ),
+                cause=exc,
+            ) from exc
+        if marker_fd >= 0:
+            raise MaterializationRefusal(
+                f"Copy failed before final target creation; pending state marker remains at {marker}: {exc}"
+            ) from exc
+        raise
+    finally:
+        if source_fd >= 0:
+            os.close(source_fd)
+        if target_fd >= 0:
+            os.close(target_fd)
+        if marker_fd >= 0:
+            os.close(marker_fd)
+        os.close(parent_fd)
+
+
+def _copy_template_file_windows(
+    *,
+    project_root: Path,
+    source: Path,
+    target: Path,
+    source_identity: tuple[int, int, int, int, int, int],
+    target_identity: tuple[int, int, int, int, int, int] | None,
+    marker_identity: tuple[int, int, int, int, int, int] | None,
+    project_identity: tuple[int, int] | None,
+) -> None:
+    """Stream and publish a spec leaf beneath held, no-reparse Windows parents."""
+    from naos_windows_report import _parent, wh
+
+    require_within(target, project_root, field="Target")
+    root_state = project_root.lstat()
+    expected_root = project_identity or (root_state.st_dev, root_state.st_ino)
+    if (is_link_or_reparse(root_state) or not stat.S_ISDIR(root_state.st_mode)
+            or (root_state.st_dev, root_state.st_ino) != expected_root):
+        raise MaterializationRefusal(f"Project root changed after preflight: {project_root}")
+    absolute = os.path.abspath(os.fspath(target))
+    wh.validate_root_path(absolute)
+    handles = wh.WindowsSpecCopyHandles()
+    with ExitStack() as stack:
+        parent, name = _parent(handles, stack, absolute)
+        held_parent = parent.info().identity
+        path_parent_state = target.parent.lstat()
+        if is_link_or_reparse(path_parent_state) or not stat.S_ISDIR(path_parent_state.st_mode):
+            raise MaterializationRefusal(f"Target parent became unsafe: {target.parent}")
+        path_parent_identity = (path_parent_state.st_dev, path_parent_state.st_ino)
+        root_state = project_root.lstat()
+        if ((root_state.st_dev, root_state.st_ino) != expected_root
+                or is_link_or_reparse(root_state)):
+            raise MaterializationRefusal(f"Project root changed after preflight: {project_root}")
+        _, current_identity = inspect_target_file(project_root, target)
+        if current_identity != target_identity:
+            raise MaterializationRefusal(f"Target changed after preflight: {target}")
+
+        if current_identity is not None:
+            raise MaterializationRefusal(f"Existing target cannot be replaced safely: {target}")
+
+        source_leaf = lstat_or_none(source)
+        if (source_leaf is None or is_link_or_reparse(source_leaf)
+                or file_identity(source_leaf) != source_identity):
+            raise MaterializationRefusal(f"Source changed after preflight: {source}")
+        source_fd = os.open(source, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+        try:
+            source_state = os.fstat(source_fd)
+            if (not stat.S_ISREG(source_state.st_mode)
+                    or file_identity(source_state) != source_identity):
+                raise MaterializationRefusal(f"Source changed after preflight: {source}")
+
+            marker = copy_state_marker(project_root, target)
+            marker_state, current_marker_identity = inspect_copy_state_marker(project_root, target)
+            if current_marker_identity != marker_identity:
+                raise MaterializationRefusal(f"Copy state marker changed after preflight: {marker}")
+            try:
+                if marker_state is None:
+                    state_handle = stack.enter_context(
+                        handles.create_report_child(parent, marker.name, kind="file")
+                    )
+                else:
+                    state_handle = stack.enter_context(
+                        handles.open_child(parent, marker.name, kind="file", for_write=True)
+                    )
+                    if file_identity(marker.lstat()) != marker_identity:
+                        raise MaterializationRefusal(f"Copy state marker changed before reuse: {marker}")
+                    state_info = state_handle.info()
+                    if state_info.directory or state_info.links != 1 or state_info.size != marker_state:
+                        raise MaterializationRefusal(f"Copy state marker has unsafe native metadata: {marker}")
+                    if marker_state == 1:
+                        handles.reset_spec_copy_marker(state_handle)
+                state_handle.flush()
+                if state_handle.info().size != 0:
+                    raise MaterializationRefusal(f"Pending copy state marker has wrong size: {marker}")
+                state_identity = state_handle.info().identity
+                marker_path_state = marker.lstat()
+                if (is_link_or_reparse(marker_path_state)
+                        or not stat.S_ISREG(marker_path_state.st_mode)
+                        or marker_path_state.st_nlink != 1):
+                    raise MaterializationRefusal(f"Pending copy state marker changed type: {marker}")
+                marker_path_identity = (marker_path_state.st_dev, marker_path_state.st_ino)
+            except Exception as exc:
+                raise MaterializationRefusal(
+                    f"Unable to prepare copy state marker; it may remain at {marker}: {exc}"
+                ) from exc
+
+            def state_marker_still_named() -> bool:
+                try:
+                    live_root = project_root.lstat()
+                    live_parent = target.parent.lstat()
+                    live_marker = marker.lstat()
+                    if ((live_root.st_dev, live_root.st_ino) != expected_root
+                            or is_link_or_reparse(live_root)
+                            or (live_parent.st_dev, live_parent.st_ino) != path_parent_identity
+                            or is_link_or_reparse(live_parent)
+                            or (live_marker.st_dev, live_marker.st_ino) != marker_path_identity
+                            or is_link_or_reparse(live_marker)):
+                        return False
+                    with handles.open_child(parent, marker.name, kind="file") as named:
+                        return named.info().identity == state_identity
+                except (OSError, wh.WindowsHandleError, wh.UnsafeWindowsPath):
+                    return False
+
+            if not state_marker_still_named():
+                raise MaterializationRefusal(f"Pending copy state marker is not bound: {marker}")
+
+            try:
+                created = stack.enter_context(handles.create_report_child(parent, name, kind="file"))
+            except Exception as exc:
+                if isinstance(exc, wh.WindowsHandleError) and exc.ntstatus == 0xC0000035:
+                    raise MaterializationRefusal(f"Target appeared before exclusive copy: {target}") from exc
+                # Native creation can succeed and then fail its own metadata
+                # validation before returning a handle. Its exact child may
+                # remain; without that handle we cannot claim its identity.
+                raise RetainedSpecPartial(target=target, identified=False, cause=exc) from exc
+            created_identity = None
+            created_path_identity: tuple[int, int] | None = None
+
+            def created_target_still_named() -> bool:
+                try:
+                    if (created_identity is None
+                            or created_path_identity != file_identity(target.lstat())[:2]):
+                        return False
+                    with handles.open_child(parent, name, kind="file") as named:
+                        return named.info().identity == created_identity
+                except (OSError, wh.WindowsHandleError, wh.UnsafeWindowsPath):
+                    return False
+
+            try:
+                created_identity = created.info().identity
+                created_path_identity = file_identity(target.lstat())[:2]
+                source_digest = hashlib.sha256()
+
+                class SourceReader:
+                    def __init__(self, handle):
+                        self.handle = handle
+
+                    def read(self, size):
+                        block = self.handle.read(size)
+                        source_digest.update(block)
+                        return block
+
+                class TargetWriter:
+                    def write(self, block):
+                        created.write_all(block)
+                        return len(block)
+
+                with os.fdopen(source_fd, "rb") as source_handle:
+                    source_fd = -1
+                    shutil.copyfileobj(SourceReader(source_handle), TargetWriter())
+                    if file_identity(os.fstat(source_handle.fileno())) != source_identity:
+                        raise MaterializationRefusal(f"Source changed while copying: {source}")
+                created.flush()
+                if created.info().size != source_state.st_size:
+                    raise MaterializationRefusal(f"Copied spec size differs from source: {target}")
+                created.seek(0)
+                target_digest = hashlib.sha256()
+                remaining = source_state.st_size
+                while remaining:
+                    block = created.read(min(remaining, 1024 * 1024))
+                    if not block:
+                        raise MaterializationRefusal(f"Copied spec ended early: {target}")
+                    target_digest.update(block)
+                    remaining -= len(block)
+                if target_digest.digest() != source_digest.digest():
+                    raise MaterializationRefusal(f"Copied spec bytes differ from source: {target}")
+
+                handles.set_spec_copy_metadata(
+                    created,
+                    access_ns=source_state.st_atime_ns,
+                    write_ns=source_state.st_mtime_ns,
+                    readonly=not bool(source_state.st_mode & stat.S_IWRITE),
+                )
+                created.flush()
+                if parent.info().identity != held_parent:
+                    raise MaterializationRefusal(f"Target parent changed while copying: {target.parent}")
+                live_root = project_root.lstat()
+                if ((live_root.st_dev, live_root.st_ino) != expected_root
+                        or is_link_or_reparse(live_root)):
+                    raise MaterializationRefusal(f"Project root changed while copying: {project_root}")
+                if not created_target_still_named():
+                    raise MaterializationRefusal(f"Target changed while copying: {target}")
+                if not state_marker_still_named():
+                    raise MaterializationRefusal(f"Copy state marker changed while copying: {marker}")
+                state_handle.seek(0)
+                state_handle.write_all(b"C")
+                state_handle.flush()
+                if state_handle.info().size != 1 or not state_marker_still_named():
+                    raise MaterializationRefusal(f"Completed copy state marker is not bound: {marker}")
+            except BaseException as primary:
+                if isinstance(primary, Exception):
+                    raise RetainedSpecPartial(
+                        target=target, identified=created_target_still_named(), cause=primary,
+                    ) from primary
+                raise
+        finally:
+            if source_fd >= 0:
+                os.close(source_fd)
+
+
 def copy_template_file(
     *,
     project_root: Path,
@@ -680,107 +1165,31 @@ def copy_template_file(
     target: Path,
     source_identity: tuple[int, int, int, int, int, int],
     target_identity: tuple[int, int, int, int, int, int] | None,
+    marker_identity: tuple[int, int, int, int, int, int] | None | object = _MARKER_NOT_PRECHECKED,
+    project_identity: tuple[int, int] | None = None,
 ) -> None:
-    """Copy one file through a same-directory temporary and atomic leaf install."""
-    safe_mkdir_chain(project_root, target.parent)
-    _, current_target_identity = inspect_target_file(project_root, target)
-    if current_target_identity != target_identity:
-        raise MaterializationRefusal(f"Target changed after preflight: {target}")
-
-    source_leaf = lstat_or_none(source)
-    if (source_leaf is None or is_link_or_reparse(source_leaf)
-            or file_identity(source_leaf) != source_identity):
-        raise MaterializationRefusal(f"Source changed after preflight: {source}")
-    source_flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
-    if hasattr(os, "O_CLOEXEC"):
-        source_flags |= os.O_CLOEXEC
-    if hasattr(os, "O_NOFOLLOW"):
-        source_flags |= os.O_NOFOLLOW
-    try:
-        source_fd = os.open(source, source_flags)
-    except OSError as exc:
-        if exc.errno == errno.ELOOP:
-            raise MaterializationRefusal(f"Source became a symbolic link after preflight: {source}") from exc
-        raise
-    source_state = os.fstat(source_fd)
-    if not stat.S_ISREG(source_state.st_mode) or file_identity(source_state) != source_identity:
-        os.close(source_fd)
-        raise MaterializationRefusal(f"Source changed after preflight: {source}")
-
-    temp_fd = -1
-    temp_path: Path | None = None
-    try:
-        temp_fd, temp_name = tempfile.mkstemp(prefix=".naos-spec-pack-", dir=target.parent)
-        temp_path = Path(temp_name)
-        validate_directory_chain(project_root, target.parent, field="Target", allow_missing=False)
-        with os.fdopen(source_fd, "rb") as source_handle, os.fdopen(temp_fd, "wb") as target_handle:
-            source_fd = -1
-            temp_fd = -1
-            shutil.copyfileobj(source_handle, target_handle)
-            if os.name == "posix":
-                os.fchmod(target_handle.fileno(), stat.S_IMODE(source_state.st_mode))
-            target_handle.flush()
-            os.fsync(target_handle.fileno())
-        os.utime(
-            temp_path,
-            ns=(source_state.st_atime_ns, source_state.st_mtime_ns),
-            # Windows 3.11 cannot set timestamps with follow_symlinks=False.
-            # This is our unpublished temporary, never the existing target.
-            follow_symlinks=(os.name == "nt"),
+    """Exclusively create an absent target and stream through its held handle."""
+    if marker_identity is _MARKER_NOT_PRECHECKED:
+        _, marker_identity = inspect_copy_state_marker(project_root, target)
+    if os.name == "nt":
+        return _copy_template_file_windows(
+            project_root=project_root, source=source, target=target,
+            source_identity=source_identity, target_identity=target_identity,
+            marker_identity=marker_identity,
+            project_identity=project_identity,
         )
-
-        if os.name == "nt":
-            # Windows chmod preserves only the read-only attribute. ACLs are
-            # inherited by the same-directory temporary, not copied from source.
-            os.chmod(temp_path, stat.S_IMODE(source_state.st_mode))
-        _, current_target_identity = inspect_target_file(project_root, target)
-        if current_target_identity != target_identity:
-            raise MaterializationRefusal(f"Target changed while copying: {target}")
-        if target_identity is None:
-            try:
-                if os.name == "nt":
-                    # Unlike POSIX rename, Windows rename refuses any existing
-                    # destination. No hardlink/unlink pair for read-only files.
-                    os.rename(temp_path, target)
-                else:
-                    os.link(temp_path, target, follow_symlinks=False)
-            except FileExistsError as exc:
-                raise MaterializationRefusal(f"Target appeared while copying: {target}") from exc
-            try:
-                if os.name != "nt":
-                    temp_path.unlink()
-            except OSError as exc:
-                residue = temp_path
-                temp_path = None
-                raise PublishedCopyCleanupFailure(
-                    target=target,
-                    residue=residue,
-                    cause=exc,
-                ) from exc
-        else:
-            os.replace(temp_path, target)
-        temp_path = None
-    finally:
-        if source_fd >= 0:
-            os.close(source_fd)
-        if temp_fd >= 0:
-            os.close(temp_fd)
-        if temp_path is not None:
-            try:
-                if os.name == "nt" and temp_path.exists():
-                    # Only the unpublished temporary; never clear destination
-                    # read-only protection to make --force succeed.
-                    os.chmod(temp_path, stat.S_IREAD | stat.S_IWRITE)
-                temp_path.unlink(missing_ok=True)
-            except OSError as exc:
-                raise MaterializationRefusal(
-                    f"Temporary copy cleanup failed; inspect and remove residue {temp_path}: {exc}"
-                ) from exc
+    return _copy_template_file_posix(
+        project_root=project_root, source=source, target=target,
+        source_identity=source_identity, target_identity=target_identity,
+        marker_identity=marker_identity,
+        project_identity=project_identity,
+    )
 
 
 def build_report(
     args: argparse.Namespace,
-) -> tuple[dict[str, Any], dict[str, Any], tuple[int, int, int, int, int, int] | None]:
+) -> tuple[dict[str, Any], dict[str, Any],
+           tuple[tuple[int, int, int, int, int, int] | None, tuple[Any, Any] | None]]:
     project_input_root = Path(args.project_root).expanduser().absolute()
     root = project_input_root.resolve(strict=True)
     root_state = root.lstat()
@@ -813,6 +1222,7 @@ def build_report(
     manifest_valid = False
     report_output: Path | None = None
     report_output_identity: tuple[int, int, int, int, int, int] | None = None
+    report_output_parent_identity: tuple[Any, Any] | None = None
     report_write_allowed = False
 
     def add_finding(
@@ -948,7 +1358,7 @@ def build_report(
                     allow_missing=True,
                 )
         if report_output is not None:
-            report_output, report_output_identity = probe_report_output(
+            report_output, report_output_identity, report_output_parent_identity = probe_report_output(
                 report_output,
                 project_root=root,
                 project_input_root=project_input_root,
@@ -1001,6 +1411,15 @@ def build_report(
                 validate_profile_graph(manifest)
                 required_files = resolve_profile_manifest(profile, manifest)
                 validate_manifest_inventory(manifest, required_files)
+                if target_root_safe:
+                    selected_targets = {target_root / rel_path for rel_path in required_files}
+                    selected_markers = {
+                        copy_state_marker(root, target) for target in selected_targets
+                    }
+                    if selected_targets & selected_markers:
+                        raise MaterializationRefusal(
+                            "A selected spec path conflicts with a copy state marker path"
+                        )
                 manifest_valid = True
             except Exception as exc:
                 add_finding(
@@ -1018,6 +1437,8 @@ def build_report(
             target = target_root / rel_path
             source_identity: tuple[int, int, int, int, int, int] | None = None
             target_identity: tuple[int, int, int, int, int, int] | None = None
+            marker_identity: tuple[int, int, int, int, int, int] | None = None
+            marker_state: int | None = None
             source_safe = True
             target_safe = target_root_safe
             existed_before = lstat_or_none(target) is not None if target_root_safe else False
@@ -1050,6 +1471,7 @@ def build_report(
             if target_root_safe:
                 try:
                     existed_before, target_identity = inspect_target_file(root, target)
+                    marker_state, marker_identity = inspect_copy_state_marker(root, target)
                 except (MaterializationRefusal, OSError) as exc:
                     target_safe = False
                     action = "unsafe_path"
@@ -1061,6 +1483,31 @@ def build_report(
                     )
             else:
                 action = "not_applied"
+
+            if target_safe and existed_before and marker_state == 0:
+                target_safe = False
+                action = "unsafe_path"
+                marker = copy_state_marker(root, target)
+                add_finding(
+                    status="unsafe_path",
+                    category="incomplete_prior_copy",
+                    message=(f"A previous spec copy did not finish: {target}. Review the file; "
+                             f"remove the partial file and its state marker together before retrying."),
+                    path=target,
+                    actual={"state_marker": path_text(marker, root)},
+                )
+
+            if (target_root_safe and report_write_allowed and report_output is not None
+                    and report_output == copy_state_marker(root, target)):
+                report_write_allowed = False
+                target_safe = False
+                action = "unsafe_path"
+                add_finding(
+                    status="unsafe_path",
+                    category="report_output_alias",
+                    message=f"Report output aliases a spec copy state marker: {report_output}",
+                    path=report_output,
+                )
 
             if report_write_allowed and source_identity is not None and report_output_identity == source_identity:
                 report_write_allowed = False
@@ -1111,10 +1558,19 @@ def build_report(
                     )
 
             if source_safe and target_safe:
-                if existed_before and not args.force:
-                    action = "skipped_existing"
+                if existed_before:
+                    if args.force:
+                        action = "unsafe_path"
+                        add_finding(
+                            status="unsafe_path",
+                            category="existing_target_force_refused",
+                            message=f"Existing target cannot be replaced safely: {target}",
+                            path=target,
+                        )
+                    else:
+                        action = "skipped_existing"
                 else:
-                    action = "pending_overwrite" if existed_before else "pending_copy"
+                    action = "pending_copy"
                     operations.append(
                         {
                             "file_index": len(files),
@@ -1122,6 +1578,7 @@ def build_report(
                             "target": target,
                             "source_identity": source_identity,
                             "target_identity": target_identity,
+                            "marker_identity": marker_identity,
                         }
                     )
 
@@ -1160,15 +1617,27 @@ def build_report(
                     target=operation["target"],
                     source_identity=operation["source_identity"],
                     target_identity=operation["target_identity"],
+                    marker_identity=operation["marker_identity"],
+                    project_identity=(root_state.st_dev, root_state.st_ino),
                 )
-            except PublishedCopyCleanupFailure as exc:
-                file_item["action"] = "copied"
+            except RetainedSpecPartial as exc:
+                file_item["action"] = "copy_failed"
                 add_finding(
-                    status="copy_cleanup_failed",
-                    category="temporary_cleanup_after_publish",
-                    message=str(exc),
-                    path=exc.residue,
-                    actual=path_text(exc.target, root),
+                    status="copy_failed",
+                    category="filesystem_write",
+                    message=f"Unable to copy {file_item['filename']}: {exc}",
+                    path=exc.target,
+                    actual={
+                        "partial_target_path_selected": path_text(exc.target, root),
+                        "state_marker_path_selected": path_text(
+                            copy_state_marker(root, exc.target), root,
+                        ),
+                        "partial_target_identity_at_failure": (
+                            "owned_target" if exc.identified else "unresolved"
+                        ),
+                        **({"partial_target_path_observed": path_text(exc.target, root)}
+                           if exc.identified else {}),
+                    },
                 )
                 for pending in operations[operation_index + 1 :]:
                     files[pending["file_index"]]["action"] = "not_applied"
@@ -1181,13 +1650,16 @@ def build_report(
                     category="filesystem_write",
                     message=f"Unable to copy {file_item['filename']}: {exc}",
                     path=operation["target"],
+                    actual={"state_marker_path_selected": path_text(
+                        copy_state_marker(root, operation["target"]), root,
+                    )},
                 )
                 for pending in operations[operation_index + 1 :]:
                     files[pending["file_index"]]["action"] = "not_applied"
                 apply_refused = True
                 break
             else:
-                file_item["action"] = "overwritten" if operation["target_identity"] is not None else "copied"
+                file_item["action"] = "copied"
 
     counts = finding_counts(findings)
     summary: dict[str, Any] = {
@@ -1241,7 +1713,7 @@ def build_report(
         "not_claimed": NOT_CLAIMED,
         "human_review_required": True,
     }
-    return report, summary, report_output_identity
+    return report, summary, (report_output_identity, report_output_parent_identity)
 
 
 def mark_report_write_failure(report: dict[str, Any], exc: Exception) -> None:
@@ -1318,7 +1790,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--policy", help="Optional policy YAML path.")
     parser.add_argument("--output", help="Optional output report path.")
     parser.add_argument("--dry-run", action="store_true", help="Preview copies without writing spec files.")
-    parser.add_argument("--force", action="store_true", help="Overwrite existing spec files.")
+    parser.add_argument("--force", action="store_true", help="Refuse existing spec files; replacement is unsafe.")
     parser.add_argument("--json", action="store_true", help="Print JSON report to stdout.")
     return parser
 
@@ -1326,13 +1798,16 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        report, summary, expected_output_identity = build_report(args)
+        report, summary, output_preflight = build_report(args)
     except Exception as exc:
         print(f"spec-pack-materialize: {exc}", file=sys.stderr)
         return 1
     output = Path(report["report_output"]) if report.get("report_output") else None
     if report["report_write_allowed"] and output is not None:
         try:
+            expected_output_identity, expected_parent_identity = output_preflight
+            if expected_parent_identity is None:
+                raise MaterializationRefusal("Report parent preflight identity is missing")
             current_output_state = lstat_or_none(output)
             if current_output_state is not None and (
                 is_link_or_reparse(current_output_state)
@@ -1344,7 +1819,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             if current_output_identity != expected_output_identity:
                 raise MaterializationRefusal(f"Report output changed after preflight: {output}")
-            write_report(output, report)
+            write_report(
+                output, report, strict_parent_topology=True,
+                expected_parent_identity=expected_parent_identity,
+                expect_absent=expected_output_identity is None,
+            )
+            if report_parent_identity(output) != expected_parent_identity:
+                raise MaterializationRefusal(f"Report parent changed during publication: {output.parent}")
         except Exception as exc:
             mark_report_write_failure(report, exc)
             print(f"spec-pack-materialize: unable to commit report: {exc}", file=sys.stderr)

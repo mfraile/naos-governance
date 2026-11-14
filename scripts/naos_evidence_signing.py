@@ -12,7 +12,8 @@ Modes:
           for an adopter to fill optionally) plus best-effort Git-reported HEAD signature,
           signer, and author metadata -> evidence_envelope.json.
 - verify: recompute artifact digests from disk, recompute the manifest root, compare to the
-          attestation report and any supplied envelope payload; report tamper_evident,
+          unsigned local attestation baseline and any supplied envelope payload;
+          report tamper_evident relative to that regenerable baseline,
           payload binding, signature-entry presence, and
           best-effort Git-reported HEAD metadata. No cryptographic signature validation occurs.
 
@@ -27,6 +28,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -63,9 +65,9 @@ VERIFY_SCHEMA = "naos.evidence_verification.v1"
 PAYLOAD_TYPE = "application/vnd.naos.evidence+json"
 LIMITATIONS = [
     "NAOS emits signable envelopes and recomputes local evidence digests; it does not sign, validate envelope signatures, hold keys, authenticate identities, or issue certificates.",
-    "Tamper-evidence detects post-hoc edits to covered artifacts; it is not a signature or proof of authorship.",
+    "Tamper-evidence compares covered artifacts with an unsigned, regenerable local attestation baseline. Rewriting both artifacts and that baseline can restore equality; this is not a signature or proof of authorship.",
     "The compatibility-named identity_binding field contains best-effort Git-reported HEAD metadata only; it is not identity authentication, authorization, or non-repudiation.",
-    "The compatibility-named signed field reports only whether signature entries are present; NAOS does not validate them.",
+    "signature_entries_present reports only whether signature entries are present; NAOS does not validate entries or emit a signed success field.",
     "Digest equality covers only declared subjects. Required coverage is reported separately from integrity and remains governed by evidence attestation.",
     "When an envelope is supplied, its decoded payload must bind the independently recomputed manifest root and artifact count; this binding does not validate its signatures. A consistent inactive v1 report with no payload is explicitly not applicable, never tamper-evident or signed.",
 ]
@@ -196,7 +198,7 @@ def envelope_path(root: Path, naos_root: str, policy: dict[str, Any]) -> Path:
                             field="evidence_envelope_report")
 
 
-def git_identity(root: Path) -> dict[str, Any]:
+def git_identity(root: Path, *, include_author_email: bool = False) -> dict[str, Any]:
     """Return best-effort Git-reported HEAD metadata. Graceful, never raises."""
     unavailable = {
         "available": False,
@@ -216,7 +218,7 @@ def git_identity(root: Path) -> dict[str, Any]:
                 str(root),
                 "log",
                 "-1",
-                "--pretty=format:%H%x1f%G?%x1f%GS%x1f%an%x1f%ae",
+                "--pretty=format:%H%x00%G?%x00%GS%x00%an%x00%ae",
             ],
             capture_output=True, text=True, timeout=10,
         )
@@ -224,20 +226,30 @@ def git_identity(root: Path) -> dict[str, Any]:
         return unavailable
     if out.returncode != 0 or not out.stdout.strip():
         return unavailable
-    commit, gsig, signer, author_name, author_email = (
-        out.stdout.split("\x1f") + ["", "", "", "", ""]
-    )[:5]
+    # Git display names can contain U+001F; NUL cannot occur in its C-string
+    # identity fields. Refuse ambiguous framing rather than redact a wrong value.
+    parts = out.stdout.split("\0")
+    if len(parts) != 5:
+        return unavailable
+    commit, gsig, signer, author_name, author_email = parts
     status_map = {"G": "good", "B": "bad", "U": "good_unknown_validity", "X": "expired",
                   "Y": "expired_key", "R": "revoked_key", "E": "cannot_check", "N": "unsigned"}
+    signer, author_name, author_email = signer.strip(), author_name.strip(), author_email.strip()
+    if not include_author_email and author_email:
+        # Minimize this source-known address, including aliases in Git display
+        # text. This is not a generic address/PII detector for arbitrary metadata.
+        pattern = re.compile(re.escape(author_email), re.IGNORECASE)
+        signer = pattern.sub("[author email omitted]", signer)
+        author_name = pattern.sub("[author email omitted]", author_name)
+    author = {"name": author_name}
+    if include_author_email:
+        author["email"] = author_email
     return {
         "available": True,
         "commit": commit,
         "signature_status": status_map.get(gsig.strip(), "unsigned" if gsig.strip() in ("", "N") else gsig.strip()),
-        "signer": signer.strip() or None,
-        "author": {
-            "name": author_name.strip(),
-            "email": author_email.strip(),
-        },
+        "signer": signer or None,
+        "author": author,
         "signature_validation_performed_by_naos": False,
         "identity_authentication_performed": False,
         "claim_ceiling": IDENTITY_CLAIM_CEILING,
@@ -308,7 +320,7 @@ def verify_envelope(path: Path, *, root_digest: str | None, artifact_count: int 
                     severity: str, inactive_report: dict[str, Any] | None = None,
                     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     result: dict[str, Any] = {"envelope_supplied": False, "envelope_payload_validation": "not_supplied",
-                              "signed": False, "signature_entries_present": False}
+                              "signature_entries_present": False}
     findings: list[dict[str, Any]] = []
 
     def invalid(status: str, message: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -337,8 +349,9 @@ def verify_envelope(path: Path, *, root_digest: str | None, artifact_count: int 
             if (inactive_report is not None
                     and all(env.get(key) == value for key, value in inactive_report.items())
                     and not any(key in env for key in ("payload", "payloadType", "signatures"))
+                    and ("signed" not in env or env["signed"] is False)
                     and all(env.get(key) is False for key in (
-                        "signed", "signature_entries_present", "signature_validation_performed"))):
+                        "signature_entries_present", "signature_validation_performed"))):
                 result["envelope_payload_validation"] = "not_applicable"
                 return result, findings
             return invalid("invalid_envelope", "No-payload envelope report does not match the current inactive attestation.")
@@ -350,7 +363,7 @@ def verify_envelope(path: Path, *, root_digest: str | None, artifact_count: int 
     signatures = record.get("signatures")
     if not isinstance(signatures, list):
         return invalid("invalid_signature_container", "Envelope signatures must be an array; no signature validation is performed.")
-    result.update(signed=bool(signatures), signature_entries_present=bool(signatures))
+    result.update(signature_entries_present=bool(signatures))
     if (set(record) != {"payloadType", "payload", "signatures"}
             or record["payloadType"] != PAYLOAD_TYPE or not isinstance(record["payload"], str)
             or not all(isinstance(signature, dict) for signature in signatures)):
@@ -396,11 +409,12 @@ def verify_envelope(path: Path, *, root_digest: str | None, artifact_count: int 
     return result, findings
 
 
-def emit(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> dict[str, Any]:
+def emit(root: Path, naos_root: str, policy: dict[str, Any], profile: str,
+         *, include_author_email: bool = False) -> dict[str, Any]:
     severity = "advisory" if is_kit_repository(root, naos_root) else severity_for_profile(profile, policy)
     att, findings, validation = load_attestation(root, naos_root, policy, severity)
     dimensions = attestation_dimensions(att, validation)
-    extra: dict[str, Any] = {"envelope": None, "identity_binding": git_identity(root), "signed": False,
+    extra: dict[str, Any] = {"envelope": None, "identity_binding": git_identity(root, include_author_email=include_author_email),
                             "signature_entries_present": False, "signature_validation_performed": False,
                             "adopter_signing_required": False}
     if att is not None:
@@ -425,13 +439,16 @@ def emit(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> di
     return base_report(ENVELOPE_SCHEMA, profile, naos_root, root, status, summary, findings, **dimensions, **extra)
 
 
-def verify(root: Path, naos_root: str, policy: dict[str, Any], profile: str) -> dict[str, Any]:
+def verify(root: Path, naos_root: str, policy: dict[str, Any], profile: str,
+           *, include_author_email: bool = False) -> dict[str, Any]:
     severity = "advisory" if is_kit_repository(root, naos_root) else severity_for_profile(profile, policy)
     att, findings, validation = load_attestation(root, naos_root, policy, severity)
     dimensions = attestation_dimensions(att, validation)
-    extra: dict[str, Any] = {"tamper_evident": False, "signed": False,
+    extra: dict[str, Any] = {"tamper_evident": False,
+                            "tamper_evidence_basis": "unsigned_local_attestation_baseline",
                             "signature_entries_present": False, "signature_validation_performed": False,
-                            "identity_binding": git_identity(root), "recorded_root": None, "recomputed_root": None}
+                            "identity_binding": git_identity(root, include_author_email=include_author_email),
+                            "recorded_root": None, "recomputed_root": None}
     checked_count = None
     if att is not None:
         findings.extend(coverage_findings(att, severity))
@@ -515,6 +532,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--strict", action="store_true")
+    parser.add_argument("--include-author-email", action="store_true",
+                        help="Include the Git author email in report metadata; default omits it and its occurrences in author/signer display text.")
     return parser
 
 
@@ -531,7 +550,8 @@ def main(argv: list[str] | None = None) -> int:
     policy = load_policy(args.policy, args.naos_root, root)
     naos_root = args.naos_root or default_naos_root(policy)
     profile = normalize_profile(args.profile, policy)
-    report = emit(root, naos_root, policy, profile) if mode == "emit" else verify(root, naos_root, policy, profile)
+    report = (emit(root, naos_root, policy, profile, include_author_email=args.include_author_email)
+              if mode == "emit" else verify(root, naos_root, policy, profile, include_author_email=args.include_author_email))
 
     if args.output:
         output: Path | None = Path(args.output)
@@ -559,6 +579,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(
                 f"Evidence Verify: tamper_evident={report.get('tamper_evident')} "
+                f"basis={report.get('tamper_evidence_basis')} "
                 f"signature_entries_present={report.get('signature_entries_present')} "
                 f"envelope_signature_validated_by_naos={report.get('signature_validation_performed')} "
                 f"status={report['status']}"

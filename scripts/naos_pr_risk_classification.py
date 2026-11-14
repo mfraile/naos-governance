@@ -468,7 +468,7 @@ def added_diff_lines(
     if metadata["git_status"] != "available":
         return [], metadata
     diff_args, source = metadata["diff_args"], metadata["diff_source"]
-    code, out, err = run_git(root, ["diff", "--unified=0", "--no-ext-diff", *diff_args])
+    code, out, err = run_git(root, ["diff", "--no-color", "--unified=0", "--no-ext-diff", *diff_args])
     if code != 0:
         metadata.update({"git_status": "unavailable", "git_exit_code": code, "error": sanitized_git_error(err, root)})
         return [], metadata

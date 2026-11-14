@@ -21,6 +21,8 @@ source_types:
   - trend_review
   - repo_review
   - systemic_impact_finding
+  - adapter_coherence_finding
+  - adapter_propagation_finding
   - module_traceability_finding
   - spec_cascade_finding
   - maturity_readiness_finding
@@ -248,9 +250,11 @@ source_types:
 target_surfaces:
   - capabilities
   - policy
+  - security
   - gatekeepers
   - validators
   - evidence_pack
+  - evidence
   - secure_coding_controls
   - sarif_export
   - dashboard
@@ -264,10 +268,15 @@ target_surfaces:
   - task_claim_conflict
   - task_claim_release
   - traceability
+  - spec_cascade
+  - specs
+  - tasks
   - capability_state
   - systemic_impact
   - control_plane_review
+  - human_review
   - module_headers
+  - function_index
   - setup_recommendations
   - evidence_attestation
   - evidence_verification
@@ -289,6 +298,7 @@ target_surfaces:
   - memory_trust_ladder
   - instruction_grade_memory
   - learning_loop_review
+  - governed_learning_lifecycle
   - learning_candidates
   - learning_state
   - learning_history
@@ -356,6 +366,7 @@ target_surfaces:
   - spec_kit_adapter
   - claude_code_hooks
   - codex_plugin_adapter
+  - claude_code_plugin_adapter
   - codex_plugin_source
   - adapter_coherence
   - adapter_propagation

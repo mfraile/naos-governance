@@ -781,23 +781,39 @@ finish, recovery leaves historical committed journals unchanged.
 
 ## Spec-pack materialization qualification
 
-On 2026-09-26, the bounded materialization suite passed on macOS ARM64, Ubuntu
+On 2026-09-26, the earlier staged-copy implementation's bounded suite passed on macOS ARM64, Ubuntu
 x86_64 and Windows 11 x64/NTFS with CPython 3.11, 3.12 and 3.13. Each cell ran
 24 test methods. POSIX cells skipped the two Windows-specific tests; Windows
 recorded 11 skip events including symlink-privilege subtests and POSIX-only
 hardlink cleanup. Windows junction refusal executed successfully without
 symlink privileges. The generated Lite-project integration also passed on
-macOS/Python 3.11. These are source-candidate results, not fresh installed
-artifact qualification or completion of brownfield onboarding.
+macOS/Python 3.11. Those are historical source-candidate results, not fresh installed
+artifact qualification, qualification of the current direct-target copy path, or completion of brownfield onboarding.
 
-Coverage includes exact bytes (CRLF, LF, UTF-8 and Ctrl-Z), existing-file skips,
+Historical coverage included exact bytes (CRLF, LF, UTF-8 and Ctrl-Z), existing-file skips,
 explicit replacement without changing another hardlink owner, late collisions,
 source/target changes, read-only Windows behavior, invalid manifests and missing
 late sources, unsafe report sinks, and truthful reports after runtime failures.
-POSIX uses absent-only hardlink publication; Windows uses absent-only rename.
-Windows compares creation time consistently across descriptor/path APIs and
-uses the supported timestamp operation only on its unpublished temporary.
-Multi-file copying remains sequential without rollback. Hostile concurrent
+The current candidate refuses an existing target under `--force` before any copy,
+then exclusively creates each absent final leaf beneath a held parent and streams
+through its handle. A failed copy may leave a partial target; the report records
+the selected path and whether an observed path still identifies the held file.
+A hidden per-target marker records pending versus verified completion; an
+unfinished marked target blocks reruns until the partial and marker are reviewed
+and removed together. This marker does not attest to file integrity or establish
+crash consistency. A macOS control with process umask 0222 copied the first
+file but left its marker mode 0400; after deleting the target, a retry refused
+without recreating the target or altering the marker.
+Historical `overwritten`, `would_overwrite`, and `copy_cleanup_failed` report
+fields remain for compatibility and are zero in new create-only runs. On
+2026-10-26, the revised source candidate passed the affected macOS ARM64
+CPython 3.12 suite (53 tests, 10 skipped), Ubuntu x86_64 CPython 3.11, 3.12,
+and 3.13 native suites (22 tests, 10 skipped in each), and Windows 11 x64
+CPython 3.11, 3.12, and 3.13 native suites (22 tests, 4 skipped in each).
+The six remote host bundles matched their local SHA-256 digest. These are
+source-level focused checks, not installed-artifact qualification; macOS
+3.11 and 3.13 were not retested for this candidate. Multi-file copying remains
+sequential without rollback. Hostile concurrent
 ancestor changes, network filesystems, ACL/ADS preservation and crash recovery
 are not qualified.
 
@@ -1490,3 +1506,17 @@ rollback and post-head forward recovery remain pending. The portable head is
 still absent in these tests. This is internal component evidence, not public
 migration, installed-artifact acceptance, arbitrary historical-writer support,
 or power-loss certification.
+
+## Windows working-replacement staging
+
+Portable managed-content publication verifies the held existing file before
+creating its replacement payload stage. That stage selects the existing file's
+owner and group at creation; new portable and working-create stages keep the
+default private process-user ownership. Exact security, attributes, content and
+native-identity checks remain required before publication.
+
+This handles Windows sessions where the default owner of an ordinary file
+differs from the process user. Unsupported owner assignment still refuses;
+NAOS does not enable privileges or normalize the existing file's permissions.
+This bounded staging behavior does not establish arbitrary ACL support,
+complete workflow qualification or power-loss durability.

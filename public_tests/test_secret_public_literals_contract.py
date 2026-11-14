@@ -1,9 +1,9 @@
 """Portable public-declaration admission and unknown-credential boundaries."""
 import ast
-import copy
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import shutil
 import subprocess
@@ -18,8 +18,8 @@ from jsonschema import Draft202012Validator
 
 KIT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(KIT / "scripts"))
-import naos_secret_public_literals as public
-import naos_hygiene_common as common
+import naos_secret_public_literals as public  # noqa: E402 - local scripts bootstrap above
+import naos_hygiene_common as common  # noqa: E402 - local scripts bootstrap above
 
 TOKEN = "aB3dE5fG7hI9jK0mN2pQ4rS6tU8vW+/="
 PUBLIC_NAME = "Y29tLmFwcGxlLnByb3ZlbmFuY2U="
@@ -308,7 +308,11 @@ class PublicLiteralContractTests(unittest.TestCase):
     def test_real_installer_copy_marker_selects_project_operands_in_isolated_runtime(self):
         tree = ast.parse((KIT / "naos_init.py").read_text(encoding='utf-8'))
         function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_copy_generated_script")
-        namespace = {"Path": Path, "shutil": shutil, "SourceOrigins": object}
+        namespace = {
+            "Path": Path, "shutil": shutil, "SourceOrigins": object,
+            "os": os, "KIT_DIR": KIT, "hashlib": hashlib,
+            "UPGRADE_SOURCE_POLICY_PATH": KIT / "configs/upgrade_source_policy.yaml",
+        }
         exec(compile(ast.Module(body=[function], type_ignores=[]), "installer_copy", "exec"), namespace)
         scripts = self.root / "scripts"
         scripts.mkdir()
@@ -333,6 +337,394 @@ print(json.dumps(status))
 """
         result = subprocess.run([sys.executable, "-B", "-c", code, str(scripts), str(other)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def session_audit_event(self, key="session_identity_report", session_id="a1b2c3d4-e5f6-4789-abcd-1234567890ef", policy=None):
+        import copy
+        import naos_audit_log as audit
+        from naos_policy import SAFE_FALLBACK_POLICY, report_default_path, session_report_default_path
+        policy = copy.deepcopy(SAFE_FALLBACK_POLICY) if policy is None else policy
+        schemas = {"session_identity_report": "naos.session_identity.v1",
+                   "session_lifecycle_report": "naos.session_lifecycle.v1",
+                   "operator_attribution_report": "naos.operator_attribution.v1"}
+        latest = report_default_path(self.root, "naos", policy, key)
+        mirror = session_report_default_path(self.root, "naos", policy, session_id, key)
+        body = {"schema": schemas[key], "session_id": session_id, "summary": {},
+                "findings": [], "human_review_required": True}
+        latest.parent.mkdir(parents=True, exist_ok=True)
+        latest.write_text(json.dumps(body), encoding="utf-8")
+        event = audit.build_audit_event(root=self.root, naos_root="naos", policy=policy, profile="standard",
+            event_type="operator_attributed" if key == "operator_attribution_report" else "session_started",
+            session_id=session_id, generated_at="2026-10-27T12:00:00Z",
+            generated_by={"operator_id": "fixture-operator", "operator_source": "fixture"},
+            source_report_path=latest, source_report=body, related_artifacts=[str(latest), str(mirror)])
+        return event, mirror
+
+    def save_session_event(self, event):
+        import naos_audit_log as audit
+        path = audit.event_file_path(self.root / "naos/audit_log", event)
+        return self.write(path.relative_to(self.root), json.dumps(event) + "\n")
+
+    def test_exact_session_paths_require_joint_source_and_mirror_witness(self):
+        for key in ("session_identity_report", "session_lifecycle_report", "operator_attribution_report"):
+            with self.subTest(key=key):
+                event, mirror = self.session_audit_event(key)
+                path = self.save_session_event(event)
+                values = public.selected_public_audit_literals([path], root=self.root, naos_root="naos")
+                for operand in (mirror, mirror.parent, mirror.parent.parent):
+                    self.assertIn(str(operand), values)
+                    self.assertIn(operand.relative_to(self.root).as_posix(), values)
+                    self.assertNotIn(str(operand) + ".extra", values)
+                self.assertNotIn(event["session_id"], values)
+
+    def test_session_path_witness_mutants_do_not_expand_vocabulary(self):
+        import copy
+        import naos_audit_log as audit
+        event, mirror = self.session_audit_event()
+        variants = [
+            {"related_artifacts": [event["source_report_path"]]},
+            {"related_artifacts": [event["source_report_path"], str(mirror) + ".extra"]},
+            {"related_artifacts": [str(mirror), event["source_report_path"]]},
+            {"source_report_path": event["source_report_path"] + ".extra"},
+            {"source_report": "naos.static_grader.v1"},
+            {"session_id": "not/valid"},
+            {"source_report_hash": None},
+        ]
+        for changes in variants:
+            with self.subTest(fields=list(changes)):
+                changed = copy.deepcopy(event)
+                changed.update(changes)
+                changed["event_payload_hash"] = audit.hash_json(changed["event_payload_summary"])
+                body = {key: value for key, value in changed.items() if key != "event_id"}
+                changed["event_id"] = "audit-sha256-" + audit.hash_json({"domain": audit.PUBLIC_EVENT_ID_SCHEME, "event": body})
+                path = self.save_session_event(changed)
+                values = public.selected_public_audit_literals([path], root=self.root, naos_root="naos")
+                self.assertNotIn(str(mirror), values)
+                self.assertNotIn(mirror.relative_to(self.root).as_posix(), values)
+
+    def test_session_path_witness_requires_matching_summary(self):
+        import copy
+        import naos_audit_log as audit
+        event, mirror = self.session_audit_event()
+        for field, value in (("session_id", "other-session"), ("schema", "naos.static_grader.v1"),
+                             ("source_report_path", event["source_report_path"] + ".extra")):
+            with self.subTest(field=field):
+                changed = copy.deepcopy(event)
+                changed["event_payload_summary"][field] = value
+                changed["event_payload_hash"] = audit.hash_json(changed["event_payload_summary"])
+                body = {key: value for key, value in changed.items() if key != "event_id"}
+                changed["event_id"] = "audit-sha256-" + audit.hash_json({"domain": audit.PUBLIC_EVENT_ID_SCHEME, "event": body})
+                path = self.save_session_event(changed)
+                values = public.selected_public_audit_literals([path], root=self.root, naos_root="naos")
+                self.assertNotIn(str(mirror), values)
+
+    def test_session_path_metadata_still_scans_neighbor_credentials_and_raw_ids(self):
+        sid = "a9b8c7d6e5f4g3h2i1j0k9l8m7n6p5q4r3s2t1u0"
+        event, mirror = self.session_audit_event(session_id=sid)
+        self.save_session_event(event)
+        report = self.scan({"session_path": str(mirror),
+                            "report_root": mirror.parent.relative_to(self.root).as_posix(),
+                            "session_root": str(mirror.parent.parent),
+                            "raw_session_id": sid,
+                            "neighbor": str(mirror) + ".extra",
+                            "password": str(mirror),
+                            "provider": "sk-aBcDeFgHiJkLmNoPqRsTuVwXyZ123456"})
+        by_status = [item for item in report["findings"] if item["status"] == "high_entropy_literal"]
+        self.assertTrue(any(item["path"] == "input.json" for item in by_status))
+        self.assertTrue(any(item.get("pattern_id") == "assigned_secret" for item in report["findings"]))
+        self.assertTrue(any(item.get("pattern_id") == "openai_style_key" for item in report["findings"]))
+        # The exact benign report paths on line one receive no entropy findings;
+        # raw IDs and adjacent paths remain candidates.
+        text = (self.root / "input.json").read_text(encoding="utf-8")
+        quoted = {match.start() + 1: match.group(1) if match.group(1) is not None else match.group(2)
+                  for match in common.QUOTED_SECRET_LITERAL.finditer(text)}
+        values = [quoted[item["column"]] for item in by_status if item["path"] == "input.json"]
+        self.assertIn(sid, values)
+        self.assertTrue(public.raw_literal_representations(str(mirror) + ".extra") & set(values))
+        self.assertFalse(public.raw_literal_representations(str(mirror)) & set(values))
+
+    def test_session_paths_follow_explicit_policy_and_refuse_unsafe_segments(self):
+        import copy
+        from naos_policy import SAFE_FALLBACK_POLICY
+        policy = copy.deepcopy(SAFE_FALLBACK_POLICY)
+        policy["paths"].update({"sessions_root": "runtime/sessions", "reports_dir": "reports/current",
+                                "session_identity_report": "identity/report.json"})
+        event, mirror = self.session_audit_event(policy=policy)
+        path = self.save_session_event(event)
+        values = public.selected_public_audit_literals([path], root=self.root, naos_root="naos", policy=policy)
+        # Nested report filenames do not change the constructor's reports root.
+        expected_root = self.root / "naos/runtime/sessions" / event["session_id"] / "reports/current"
+        self.assertIn(str(mirror), values)
+        self.assertIn(str(expected_root), values)
+        self.assertNotIn(str(mirror), public.selected_public_audit_literals([path], root=self.root, naos_root="naos"))
+        for unsafe in ("../outside", "/absolute", "C:/outside", "nested/../outside", "nested\\outside"):
+            with self.subTest(unsafe=unsafe):
+                changed = copy.deepcopy(policy)
+                changed["paths"]["sessions_root"] = unsafe
+                values = public.selected_public_audit_literals([path], root=self.root, naos_root="naos", policy=changed)
+                self.assertNotIn(str(mirror), values)
+
+    def test_session_context_budget_preserves_original_audit_labels(self):
+        event, mirror = self.session_audit_event()
+        path = self.save_session_event(event)
+        with patch.object(public, "_audit_session_path_literals", return_value=set()), \
+             patch.object(public, "_audit_day_directory_literals", return_value=set()):
+            original = public.selected_public_audit_literals([path], root=self.root, naos_root="naos")
+        with patch.object(public, "MAX_CONTEXT_VALUES", len(original)):
+            values = public.selected_public_audit_literals([path], root=self.root, naos_root="naos")
+        self.assertEqual(values, original)
+        self.assertNotIn(str(mirror), values)
+
+    def test_session_witness_reuses_selected_audit_read_without_extra_source_reads(self):
+        event, mirror = self.session_audit_event()
+        path = self.save_session_event(event)
+        original = Path.open
+        opened = []
+
+        def observed_open(operand, *args, **kwargs):
+            opened.append(operand)
+            return original(operand, *args, **kwargs)
+
+        with patch.object(Path, "open", observed_open):
+            values = public.selected_public_audit_literals([path], root=self.root, naos_root="naos")
+        self.assertIn(str(mirror), values)
+        self.assertEqual(opened, [path])
+        self.assertFalse(public.selected_public_audit_literals([], root=self.root, naos_root="naos"))
+
+    def test_session_paths_include_native_windows_relative_constructor_forms(self):
+        import naos_audit_log as audit
+        from naos_policy import SAFE_FALLBACK_POLICY
+        event, _mirror = self.session_audit_event()
+        # PureWindowsPath tests emitted spellings, not native Windows execution
+        # or the content of a report at these model paths.
+        root = PureWindowsPath("C:/fixture_root")
+        latest = root / "naos/reports/session_identity.json"
+        mirror = root / "naos/sessions" / event["session_id"] / "reports/session_identity.json"
+        event.update(project_root=str(root), source_report_path=str(latest),
+                     related_artifacts=[str(latest), str(mirror)])
+        event["event_payload_summary"]["source_report_path"] = str(latest)
+        event["event_payload_hash"] = audit.hash_json(event["event_payload_summary"])
+        audit._assign_public_audit_event_id(event)
+        self.assertEqual(audit.validate_audit_event(event), [])
+        values = public._audit_session_path_literals(event, root=root, naos_root="naos",
+                                                     policy=SAFE_FALLBACK_POLICY)
+        for operand in (mirror, mirror.parent, mirror.parent.parent):
+            relative = str(operand.relative_to(root))
+            self.assertTrue(public.raw_literal_representations(relative) <= values)
+            self.assertNotIn(relative + ".extra", values)
+        self.assertNotIn(event["session_id"], values)
+        operands = audit.event_file_paths(root / "naos/audit_log", event)
+        days = public._audit_day_directory_literals(operands, root=root)
+        native_day = str(operands[0].parent.relative_to(root))
+        self.assertTrue(public.raw_literal_representations(native_day) <= days)
+
+    def physical_references(self, files, *, policy=None, context=None):
+        from naos_secret_managed_operands import ProofBudget
+        return public._selected_physical_audit_event_references(files, root=self.root,
+            naos_root="naos", policy=policy,
+            context=context if context is not None else ProofBudget(self.root))
+
+    def test_shared_physical_anchors_survive_broad_context_refusal(self):
+        from naos_secret_managed_operands import ProofBudget
+        event, mirror = self.session_audit_event()
+        path = self.save_session_event(event)
+        with patch.object(public, "collect_public_audit_event_references", return_value={}):
+            self.assertEqual(public.selected_public_audit_literals(
+                [path], root=self.root, naos_root="naos"), set())
+            values = public.selected_public_audit_literals([path], root=self.root,
+                naos_root="naos", context=ProofBudget(self.root))
+        self.assertIn(str(mirror), values)
+        self.assertNotIn(event['session_id'], values)
+        self.assertNotIn(str(mirror) + '.extra', values)
+
+    def test_shared_physical_anchor_preserves_filename_aliases_and_selection_order(self):
+        import naos_audit_log as audit
+        event, _ = self.session_audit_event()
+        paths = audit.event_file_paths(self.root / 'naos/audit_log', event)
+        self.assertEqual(len(paths), 2)
+        for path in paths:
+            self.write(path.relative_to(self.root), json.dumps(event))
+            references = self.physical_references([path])
+            self.assertEqual(references[event['event_id']]['event_file'], str(path))
+        for selected in (list(paths), list(reversed(paths))):
+            references = self.physical_references(selected)
+            self.assertEqual(references[event['event_id']]['event_file'], min(map(str, paths)))
+        self.assertEqual(self.physical_references([]), {})
+
+    def test_shared_physical_anchor_rejects_malformed_and_wrapped_events(self):
+        event, _ = self.session_audit_event()
+        path = self.save_session_event(event)
+        raw = json.dumps(event).encode()
+        cases = [b'{}', b'\xff', json.dumps([event]).encode(),
+                 json.dumps({'events': [event]}).encode(), raw + b'\n' + raw,
+                 raw[:-1] + b',"event_id":"duplicate"}',
+                 raw[:-1] + b',"unknown":NaN}', raw[:-2]]
+        for bad in cases:
+            with self.subTest(value=bad[:24]):
+                path.write_bytes(bad)
+                self.assertEqual(self.physical_references([path]), {})
+        path.write_bytes(raw)
+        neighbor = self.write('naos/audit_log/2026-10-27/not-an-event.jsonl', 'not-json')
+        self.assertEqual(set(self.physical_references([path, neighbor])), {event['event_id']})
+
+    def test_shared_physical_anchor_requires_default_route_and_exact_name(self):
+        from naos_policy import SAFE_FALLBACK_POLICY
+        event, _ = self.session_audit_event()
+        path = self.save_session_event(event)
+        for relative in ('audit.jsonl', 'naos/audit_log/2026-10-28/' + path.name,
+                         'naos/audit_log/2026-10-27/nested/' + path.name):
+            other = self.write(relative, json.dumps(event))
+            self.assertEqual(self.physical_references([other]), {})
+        policy = {**SAFE_FALLBACK_POLICY, 'paths': {
+            **SAFE_FALLBACK_POLICY['paths'], 'audit_log_root': 'custom-audit'}}
+        self.assertEqual(self.physical_references([path], policy=policy), {})
+        changed = {**event, 'session_id': 'different-session'}
+        path.write_text(json.dumps(changed), encoding='utf-8')
+        self.assertEqual(self.physical_references([path]), {})
+
+    def test_shared_physical_anchor_respects_proof_and_selected_file_limits(self):
+        from naos_secret_managed_operands import ProofBudget, MAX_PROOF_BYTES
+        event, _ = self.session_audit_event()
+        path = self.save_session_event(event)
+        context = ProofBudget(self.root)
+        context.bytes_read = MAX_PROOF_BYTES
+        self.assertEqual(self.physical_references([path], context=context), {})
+        self.assertEqual(context.bytes_read, MAX_PROOF_BYTES)
+        self.assertEqual(context.cache, {})
+        self.assertEqual(self.physical_references([path] * 50_001), {})
+
+    def test_shared_physical_anchor_is_cached_until_terminal_verification(self):
+        from naos_secret_managed_operands import ProofBudget, _ScannerProofBudget, OperandRefusal
+        event, _ = self.session_audit_event()
+        path = self.save_session_event(event)
+        raw = path.read_bytes()
+        for budget_class in (ProofBudget, _ScannerProofBudget):
+            with self.subTest(budget=budget_class.__name__):
+                path.write_bytes(raw)
+                context = budget_class(self.root)
+                self.assertEqual(set(self.physical_references([path], context=context)), {event['event_id']})
+                self.assertIn(path.relative_to(self.root).as_posix(), context.cache)
+                self.assertEqual(context.bytes_read, len(raw))
+                self.physical_references([path], context=context)
+                self.assertEqual(context.bytes_read, len(raw))
+                path.write_bytes(raw + b' ')
+                with self.assertRaises(OperandRefusal):
+                    if isinstance(context, _ScannerProofBudget):
+                        context.finish_scanner_batch()
+                    else:
+                        context.admission_checkpoint()
+
+    def test_shared_physical_anchor_refuses_link_and_modeled_reparse_input(self):
+        event, _ = self.session_audit_event()
+        path = self.save_session_event(event)
+        original = Path.lstat
+        class ReparseMetadata:
+            st_file_attributes = 0x400
+            def __init__(self, metadata): self.metadata = metadata
+            def __getattr__(self, name): return getattr(self.metadata, name)
+        def observed(operand, *args, **kwargs):
+            metadata = original(operand, *args, **kwargs)
+            return ReparseMetadata(metadata) if operand == path else metadata
+        with patch.object(Path, 'lstat', observed):
+            self.assertEqual(self.physical_references([path]), {})
+        if os.name != 'nt':
+            target = self.write('owned-target.json', path.read_text(encoding='utf-8'))
+            before = target.read_bytes()
+            path.unlink()
+            path.symlink_to(target)
+            self.assertEqual(self.physical_references([path]), {})
+            self.assertEqual(target.read_bytes(), before)
+
+    def test_shared_physical_anchor_rejects_timestamp_overflow_without_erasing_neighbors(self):
+        import copy
+        import naos_audit_log as audit
+        event, _ = self.session_audit_event()
+        path = self.save_session_event(event)
+        for timestamp in ('0001-01-01T00:00:00+01:00', '9999-12-31T23:59:59-01:00'):
+            changed = copy.deepcopy(event)
+            changed['generated_at'] = timestamp
+            audit._assign_public_audit_event_id(changed)
+            self.assertEqual(audit.recompute_public_audit_event_id(changed), changed['event_id'])
+            other = self.write('naos/audit_log/2026-10-27/overflow.jsonl', json.dumps(changed))
+            self.assertEqual(set(self.physical_references([path, other])), {event['event_id']})
+            self.assertEqual(self.physical_references([other]), {})
+        report = common.check_secret_hygiene(root=self.root, profile='standard',
+            naos_root='naos', rules={'scan_roots': ['naos'], 'include_root_files': False},
+            rules_path=None, severity='required')
+        self.assertEqual(report['summary']['files_failed'], 0)
+        self.assertEqual(report['summary']['coverage_status'], 'complete')
+
+    def test_shared_physical_anchor_models_windows_case_insensitive_default_path(self):
+        import naos_audit_log as audit
+        class WindowsPathModel(PureWindowsPath):
+            def absolute(self): return self
+        root = WindowsPathModel('C:/synthetic-root')
+        event, _ = self.session_audit_event()
+        latest = root / 'naos/reports/session_identity.json'
+        mirror = root / 'naos/sessions' / event['session_id'] / 'reports/session_identity.json'
+        event.update(project_root=str(root), source_report_path=str(latest),
+                     related_artifacts=[str(latest), str(mirror)])
+        event['event_payload_summary']['source_report_path'] = str(latest)
+        event['event_payload_hash'] = audit.hash_json(event['event_payload_summary'])
+        audit._assign_public_audit_event_id(event)
+        expected = audit.event_file_path(root / 'naos/audit_log', event)
+        physical = root / 'NAOS/Audit_Log' / expected.parent.name / expected.name.upper()
+        raw = json.dumps(event).encode()
+        class CachedModel:
+            def __init__(self):
+                self.root = root
+                self.reads = []
+                self.checked = False
+            def read(self, relative):
+                self.reads.append(relative)
+                return raw
+            def admission_checkpoint(self):
+                self.checked = True
+        proof = CachedModel()
+        with patch.object(public, 'Path', WindowsPathModel):
+            found = public._selected_physical_audit_event_references([physical],
+                root=root, naos_root='naos', policy=None, context=proof)
+        self.assertEqual(set(found), {event['event_id']})
+        self.assertEqual(proof.reads, [physical.relative_to(root).as_posix()])
+        self.assertTrue(proof.checked)
+        # Native path classes, not arbitrary string case folding, own equality.
+        self.assertEqual(physical, expected)
+        self.assertNotEqual(PurePosixPath('/root/NAOS/Audit_Log'),
+                            PurePosixPath('/root/naos/audit_log'))
+
+    def test_day_label_budget_never_displaces_previous_session_labels(self):
+        event, mirror = self.session_audit_event()
+        path = self.save_session_event(event)
+        with patch.object(public, "_audit_day_directory_literals", return_value=set()):
+            previous = public.selected_public_audit_literals([path], root=self.root, naos_root="naos")
+        with patch.object(public, "MAX_CONTEXT_VALUES", len(previous)):
+            current = public.selected_public_audit_literals([path], root=self.root, naos_root="naos")
+        self.assertEqual(current, previous)
+        self.assertIn(str(mirror), current)
+        self.assertNotIn(str(path.parent), current)
+
+    def test_selected_audit_day_directory_is_exact_and_credential_checks_remain(self):
+        import naos_audit_log as audit
+        event = self.audit_event()
+        path = audit.event_file_path(self.root / "naos/audit_log", event)
+        self.write(path.relative_to(self.root), json.dumps(event) + "\n")
+        values = public.selected_public_audit_literals([path], root=self.root, naos_root="naos")
+        directory = path.parent
+        for label in (str(directory), directory.as_posix(),
+                      str(directory.relative_to(self.root)), directory.relative_to(self.root).as_posix()):
+            self.assertTrue(public.raw_literal_representations(label) <= values)
+        self.assertNotIn(str(directory) + ".extra", values)
+        self.assertNotIn(str(directory.parent / "2026-10-10"), values)
+        self.assertNotIn(str(directory.parent), values)
+        relative = directory.relative_to(self.root).as_posix()
+        unknown = "naos/audit_log/2026-10-10/" + TOKEN
+        data = {"folder": relative, "password": relative, "unknown": unknown,
+                "provider": "sk-aBcDeFgHiJkLmNoPqRsTuVwXyZ123456"}
+        report = self.scan(data)
+        self.assertTrue(any(row.get("pattern_id") == "assigned_secret" for row in report["findings"]))
+        self.assertTrue(any(row.get("pattern_id") == "openai_style_key" for row in report["findings"]))
+        column = json.dumps(data).index(json.dumps(unknown)) + 1
+        self.assertTrue(any(row["status"] == "high_entropy_literal" and row["column"] == column
+                            for row in report["findings"] if row["path"] == "input.json"))
 
     def audit_event(self):
         import naos_audit_log as audit
@@ -480,6 +872,79 @@ print(json.dumps(status))
         report = self.scan({"value": "safe"})
         self.assertTrue(any(f.get("path") == "naos/reports/secret_hygiene.json" and f["status"] == "high_entropy_literal" for f in report["findings"]))
 
+    def staged_kit_scan(self, payload):
+        temporary = tempfile.TemporaryDirectory(prefix="NAOS-S2-A1b2C3d4E5f6-")
+        self.addCleanup(temporary.cleanup)
+        kit = Path(temporary.name).resolve()
+        (kit / "scripts").mkdir()
+        helper = kit / "scripts/naos_secret_public_literals.py"
+        shutil.copy2(KIT / "scripts/naos_secret_public_literals.py", helper)
+        shutil.copy2(KIT / "scripts/naos_secret_public_literals.json",
+                     kit / "scripts/naos_secret_public_literals.json")
+        shutil.copy2(KIT / "cli.py", kit / "cli.py")
+        cli_path = str(kit / "cli.py")
+        with patch.object(public, "__file__", str(helper)):
+            return cli_path, self.scan(payload(cli_path))
+
+    def test_readiness_cli_operand_is_declared_in_native_kit_contexts(self):
+        catalog = public.read_catalog()
+        for project, kit in (
+            (PurePosixPath("/work/project"), PurePosixPath("/opt/NAOS-S2-A1b2C3")),
+            (PureWindowsPath("C:/work/project"), PureWindowsPath("D:/NAOS-S2-A1b2C3")),
+        ):
+            with self.subTest(kit=str(kit)):
+                values = public.context_values(
+                    catalog, project_root=project, kit_root=kit,
+                    naos_root="naos", runtime_layout="kit",
+                )
+                for value in (str(kit / "cli.py"), (kit / "cli.py").as_posix()):
+                    self.assertTrue(public.raw_literal_representations(value) <= values)
+                self.assertNotIn(str(kit / "cli.py.extra123"), values)
+                self.assertNotIn(str(project / "cli.py"), values)
+
+    def test_copied_context_does_not_invent_a_cli_destination(self):
+        catalog = public.read_catalog()
+        for project, kit in (
+            (PurePosixPath("/work/project"), PurePosixPath("/work/project")),
+            (PureWindowsPath("C:/work/project"), PureWindowsPath("C:/work/project")),
+        ):
+            with self.subTest(kit=str(kit)):
+                values = public.context_values(
+                    catalog, project_root=project, kit_root=kit,
+                    naos_root="naos", runtime_layout="copied_project",
+                )
+                self.assertNotIn(str(project / "cli.py"), values)
+                self.assertNotIn((project / "cli.py").as_posix(), values)
+
+    def test_actual_scanner_accepts_the_exact_source_declared_cli_operand(self):
+        cli_path, report = self.staged_kit_scan(
+            lambda cli: {"schema": "naos.ci_readiness.v1",
+                         "commands": [{"argv": [sys.executable, cli, "claims"]}]},
+        )
+        self.assertFalse(any(character.isspace() for character in cli_path))
+        self.assertGreaterEqual(common.shannon_entropy(cli_path), 4.0)
+        self.assertEqual(report["summary"]["total_findings"], 0, report["findings"])
+        self.assertGreater(report["summary"]["public_literal_matches"], 0)
+
+    def test_cli_operand_admission_preserves_credentials_and_neighbor_scanning(self):
+        cli_path, report = self.staged_kit_scan(
+            lambda cli: {"api_key": cli, "token": "ghp_" + "xY9" * 10,
+                         "neighbor": cli + ".extra123", "unknown": TOKEN},
+        )
+        self.assertTrue(any(row.get("pattern_id") == "assigned_secret"
+                            and row["column"] == 2 for row in report["findings"]))
+        self.assertTrue(any(row.get("pattern_id") == "github_style_token"
+                            for row in report["findings"]))
+        source = json.dumps({"api_key": cli_path, "token": "ghp_" + "xY9" * 10,
+                             "neighbor": cli_path + ".extra123", "unknown": TOKEN})
+        expected_columns = {source.index(json.dumps(value)) + 1
+                            for value in (cli_path + ".extra123", TOKEN)}
+        entropy_columns = {row["column"] for row in report["findings"]
+                           if row["status"] == "high_entropy_literal"}
+        self.assertTrue(expected_columns <= entropy_columns)
+        self.assertNotIn(TOKEN, json.dumps(report))
+
+
 
 class FinitePublicConstructorTests(unittest.TestCase):
     @classmethod
@@ -613,6 +1078,56 @@ class RemainingPublicConstructorTests(FinitePublicConstructorTests):
                 target.write_text(text.replace(old, new), encoding='utf-8')
                 with self.assertRaises(ValueError):
                     self.generator.build(KIT, overlay)
+
+
+class GateParserGrammarContractTests(unittest.TestCase):
+    """Reviewed parser syntax is public; changed content stays a candidate."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix='naos-parser-grammar-')
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        (self.root / 'scripts').mkdir()
+        (self.root / 'src').mkdir()
+
+    def scan(self):
+        from naos_policy import load_policy
+        return common.check_secret_hygiene(root=self.root, profile='standard', naos_root='naos',
+            rules={'scan_roots': ['scripts', 'src'], 'include_root_files': False},
+            rules_path=None, severity='required', policy=load_policy(root=self.root, naos_root='naos'))
+
+    def test_gate_parser_has_one_finite_source_declaration(self):
+        groups = [g for g in public.read_catalog()['groups']
+                  if g['source'] == 'scripts/naos_secret_public_literals.py'
+                  and g['selector'] == 'reviewed_parser:public_gate_reference_location_spans:re.compile']
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(len(groups[0]['values']), 6)
+        component = json.dumps(groups[0]['values'], ensure_ascii=True, separators=(',', ':')).encode()
+        self.assertEqual(hashlib.sha256(component).hexdigest(), groups[0]['component_sha256'])
+
+    def test_shipped_parser_stays_quiet_and_all_four_detector_classes_stay_active(self):
+        (self.root / 'scripts/naos_secret_public_literals.py').write_bytes(Path(public.__file__).read_bytes())
+        body = f'unknown = "{TOKEN}"\npassword = "{TOKEN}"\nprovider = "sk-aBcDeFgHiJkLmNoPqRsTuVwXyZ123456"\nprivate_key = "-----BEGIN PRIVATE KEY-----"\n'
+        (self.root / 'src/control.py').write_text(body, encoding='utf-8')
+        report = self.scan()
+        helper_findings = [r for r in report['findings'] if r.get('path') == 'scripts/naos_secret_public_literals.py']
+        self.assertEqual(helper_findings, [])
+        controls = [r for r in report['findings'] if r.get('path') == 'src/control.py']
+        self.assertEqual(len(controls), 7)
+        self.assertEqual({r.get('pattern_id', r['status']) for r in controls},
+                         {'assigned_secret', 'high_entropy_literal', 'openai_style_key', 'private_key_header'})
+        self.assertEqual(report['summary']['coverage_status'], 'complete')
+
+    def test_changed_parser_like_value_is_not_a_public_declaration(self):
+        tree = ast.parse(Path(public.__file__).read_bytes())
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                        and n.name == 'public_gate_reference_location_spans')
+        grammar = next(n.args[0].value for n in ast.walk(function)
+                       if isinstance(n, ast.Call) and ast.unparse(n.func) == 're.compile')
+        changed = grammar + TOKEN
+        (self.root / 'src/unknown.py').write_text('unknown = ' + json.dumps(changed) + '\n', encoding='utf-8')
+        report = self.scan()
+        self.assertTrue(any(r['status'] == 'high_entropy_literal' for r in report['findings']))
 
 
 if __name__ == "__main__":

@@ -314,12 +314,15 @@ DERIVED_REPORT_KEYS = {
     "dashboard_markdown",
     "dashboard_summary_report",
     "dependency_integrity_report",
+    "design_traceability_report",
     "duplicate_function_hygiene_report",
     "evidence_attestation_report",
     "evidence_classification_report",
     "evidence_conflict_detection_report",
     "evidence_pack_report",
     "external_evidence_ingest_report",
+    "failure_mode_observations_report",
+    "failure_mode_posture_report",
     "function_index_report",
     "gate_evaluation_report",
     "gate_status_report",
@@ -369,6 +372,7 @@ DERIVED_REPORT_KEYS = {
     "task_context_pack_report",
     "test_evidence_report",
     "test_quality_hygiene_report",
+    "ui_experience_quality_report",
 }
 
 RESERVED_DERIVED_REPORT_KEYS = {"ci_readiness", "self_check_dependency_inputs"}
@@ -587,6 +591,12 @@ _AUDIT_GENERATED_BY = {
     **{key: str for key in ("operator_source", "operator_attribution_status")},
     "limitations": _AUDIT_TEXT_LIST, "not_claimed": _AUDIT_TEXT_LIST,
 }
+_AUDIT_CONTEXT_INDEX_SUMMARY = {
+    **_AUDIT_COUNTS, "status": str,
+    **{key: int for key in ("indexed_artifacts", "excluded_artifacts", "chunks",
+        "links", "stale_artifacts")},
+    "fts_available": bool, "sqlite_written": bool, "human_review_required": bool,
+}
 _AUDIT_SUMMARIES = {
     "session_identity_report": [{
         "session_id": _AUDIT_TEXT, "latest_report_compatibility_enabled": bool,
@@ -614,12 +624,11 @@ _AUDIT_SUMMARIES = {
         "team_operator_map_valid": bool, "schema_valid": bool,
         "effective_policy_written": bool,
     }],
-    "local_context_index_report": [{"status": str}, {
-        **_AUDIT_COUNTS, "status": str,
-        **{key: int for key in ("indexed_artifacts", "excluded_artifacts", "chunks",
-            "links", "stale_artifacts")},
-        "fts_available": bool, "sqlite_written": bool, "human_review_required": bool,
-    }],
+    "local_context_index_report": [
+        {"status": str}, _AUDIT_CONTEXT_INDEX_SUMMARY,
+        {**_AUDIT_CONTEXT_INDEX_SUMMARY,
+         "collection_status": str, "capacity_deferred_paths": int},
+    ],
     "sqlite_write_coordination_report": [{
         "status": str, "lock_acquired": bool, "atomic_replace_used": bool,
         "tables_verified": int, "target_db_hash_present": bool,
@@ -1479,54 +1488,23 @@ def create_unresolved_template(root: Path, path: Path, aggregate_review: dict) -
         raise ValueError(
             "Cannot publish a template with invalid current source binding"
         )
-    # Caller must validate sink/source conflicts before this function. POSIX
-    # reuses the existing held report-parent writer; Windows retains its static
-    # component checks and exclusive leaf creation (no sandbox claim).
-    parent_fd = None
-    if os.name != "nt":
-        from naos_policy import _open_report_parent_fd
+    # Caller must validate sink/source conflicts before publication.
+    # Serialize before allocating a final name; only the guarded private stage
+    # may contain a failed or partial payload.
+    from naos_trace_atomic_write import publish_trace
 
-        parent_fd, leaf = _open_report_parent_fd(absolute, strict_parent_topology=True)
-    else:
-        cursor = root
-        for part in PurePosixPath(relative).parts[:-1]:
-            cursor = cursor / part
-            try:
-                cursor.mkdir()
-            except FileExistsError:
-                pass
-            info = cursor.lstat()
-            if (
-                not stat.S_ISDIR(info.st_mode)
-                or stat.S_ISLNK(info.st_mode)
-                or getattr(info, "st_file_attributes", 0) & 0x400
-            ):
-                raise ValueError("Template parent is linked or not a directory")
-        leaf = str(absolute)
+    payload = (
+        json.dumps(aggregate_review["template"], indent=2, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
     try:
-        flags = (
-            os.O_WRONLY
-            | os.O_CREAT
-            | os.O_EXCL
-            | getattr(os, "O_BINARY", 0)
-            | getattr(os, "O_NOFOLLOW", 0)
+        publish_trace(
+            absolute, payload, None, strict_parent_topology=True, create_only=True,
+            posix_creation_mode=0o600,
         )
-        descriptor = (
-            os.open(leaf, flags, 0o600, dir_fd=parent_fd)
-            if parent_fd is not None
-            else os.open(leaf, flags, 0o600)
-        )
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(
-                (
-                    json.dumps(
-                        aggregate_review["template"], indent=2, ensure_ascii=False
-                    )
-                    + "\n"
-                ).encode("utf-8")
-            )
-            stream.flush()
-            os.fsync(stream.fileno())
-    finally:
-        if parent_fd is not None:
-            os.close(parent_fd)
+    except ValueError as exc:
+        if str(exc) != "Trace staging metadata is unsupported":
+            raise
+        raise ValueError(
+            "Family-review template was not created: inherited POSIX ACLs or "
+            "unsupported file flags are refused; existing metadata is preserved"
+        ) from exc

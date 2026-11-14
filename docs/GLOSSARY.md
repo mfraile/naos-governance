@@ -148,8 +148,12 @@ approval, implementation, complete traceability, certification, or compliance.
 
 The bounded setup report emitted by `naos spec-pack-materialize` at
 `naos/reports/spec_pack_materialization.json`. It previews or copies missing
-profile-required spec-pack template files while skipping existing project files
-unless `--force` is explicit. It does not fill specs, approve specs, prove
+profile-required spec-pack template files while skipping existing project files.
+Explicit `--force` refuses an existing selected target before any copy; it does
+not replace it. A failed new copy may leave a reported partial target. A hidden
+per-target marker makes that unfinished copy block the next run until reviewed.
+The marker is a recovery cue, not an integrity attestation. The
+operation does not fill specs, approve specs, prove
 applicability, or prove profile readiness.
 
 ## Spec assembly worksheet

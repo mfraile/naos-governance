@@ -121,16 +121,20 @@ def extract_pattern_tokens(text: str, patterns: list[Any]) -> set[str]:
     return tokens
 
 
-def task_registry_candidates(root: Path, policy: dict[str, Any]) -> list[Path]:
-    naos_root = Path(str(default_naos_root(policy)))
-    candidates = [root / naos_root / "TASK_REGISTRY.yaml"]
+def task_registry_candidates(
+    root: Path, policy: dict[str, Any], *, naos_root: str | None = None,
+) -> list[Path]:
+    governance_root = Path(str(naos_root or default_naos_root(policy)))
+    candidates = [root / governance_root / "TASK_REGISTRY.yaml"]
     candidates.append(root / "TASK_REGISTRY.yaml")
     candidates.append(root / "templates" / "structural-seeds" / "naos" / "TASK_REGISTRY.yaml")
     return candidates
 
 
-def load_task_ids(root: Path, policy: dict[str, Any]) -> tuple[set[str], str | None]:
-    for candidate in task_registry_candidates(root, policy):
+def load_task_ids(
+    root: Path, policy: dict[str, Any], *, naos_root: str | None = None,
+) -> tuple[set[str], str | None]:
+    for candidate in task_registry_candidates(root, policy, naos_root=naos_root):
         if not candidate.is_file():
             continue
         try:
@@ -187,10 +191,11 @@ def collect_traceability_definitions(
     required_set: set[str],
     policy: dict[str, Any],
     ambiguous_definitions: set[str] | None = None,
+    naos_root: str | None = None,
 ) -> tuple[set[str], str | None]:
     source = str(code_rule.get("definition_source") or "patterns")
     if source == "task_registry":
-        return load_task_ids(root, policy)
+        return load_task_ids(root, policy, naos_root=naos_root)
 
     definitions: set[str] = set()
     for rel_path in [str(item) for item in code_rule.get("defined_in") or []]:
@@ -300,7 +305,9 @@ def validate_contract(
     profile: str,
     policy: dict[str, Any],
     mode: str,
+    naos_root: str | None = None,
 ) -> dict[str, Any]:
+    effective_naos_root = naos_root or default_naos_root(policy)
     findings: list[dict[str, Any]] = []
     files: list[dict[str, Any]] = []
     traceability_codes: list[dict[str, Any]] = []
@@ -342,7 +349,7 @@ def validate_contract(
             "status": status_from_counts(summary),
             "mode": mode,
             "project_root": str(root),
-            "naos_root": str(default_naos_root(policy)),
+            "naos_root": str(effective_naos_root),
             "specs_root": path_text(specs_root, root),
             "manifest": path_text(manifest_path, root),
             "deterministic": True,
@@ -555,6 +562,7 @@ def validate_contract(
                 required_set=required_set,
                 policy=policy,
                 ambiguous_definitions=ambiguous_definitions,
+                naos_root=effective_naos_root,
             )
             for identifier in sorted(ambiguous_definitions):
                 findings.append(finding(
@@ -654,7 +662,7 @@ def validate_contract(
         "status": status_from_counts(summary),
         "mode": mode,
         "project_root": str(root),
-        "naos_root": str(default_naos_root(policy)),
+        "naos_root": str(effective_naos_root),
         "specs_root": path_text(specs_root, root),
         "manifest": path_text(manifest_path, root),
         "deterministic": True,
@@ -735,6 +743,7 @@ def main(argv: list[str] | None = None) -> int:
         profile=profile,
         policy=policy,
         mode=args.mode,
+        naos_root=naos_root,
     )
     report["naos_root"] = naos_root
     output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "spec_pack_contract_report")

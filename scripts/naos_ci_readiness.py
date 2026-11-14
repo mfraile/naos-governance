@@ -114,15 +114,9 @@ def _checked_gate_destinations(root, naos_root, policy_path, sinks, receipt_path
 
 
 def input_paths(root, state_root, policy, policy_path, naos_root):
-    selected_policy = resolve_policy_path(policy_path, naos_root, root)[0]
-    inputs = {state_root / 'gatekeepers.yaml'}
-    if selected_policy is not None:
-        inputs.add((root / selected_policy).resolve())
-    for key, value in policy['paths'].items():
-        if (not key.endswith('_report') and isinstance(value, str)
-                and value.endswith(('.json', '.yaml', '.yml'))):
-            inputs.add((state_root / value).resolve())
-    return inputs
+    from naos_self_check_dependency_resolution import dependency_proof_input_paths
+
+    return dependency_proof_input_paths(root, state_root, policy, policy_path, naos_root)
 
 
 def _invalidate_dependency_proof(root, naos_root, policy, policy_path, readiness_path, validator):
@@ -132,32 +126,21 @@ def _invalidate_dependency_proof(root, naos_root, policy, policy_path, readiness
     Final publication and every reader still perform full source verification.
     Like gate cleanup, this does not claim concurrent-writer serialization.
     """
-    from naos_self_check_dependency_resolution import receipt_path, _json, _schema
+    from naos_self_check_dependency_resolution import inspect_derived_receipt_endpoint
 
     def checked():
         current = load_policy(policy_path, naos_root, root)
         if current != policy:
             raise ValueError('Dependency proof policy changed before acquisition')
-        path = receipt_path(root, naos_root, current)
         state_root = naos_root_path(root, naos_root)
         protected = input_paths(root, state_root, current, policy_path, naos_root)
         protected.update(path for key, path in output_paths(root, naos_root, current).items()
                          if key != 'self_check_dependency_resolution_report')
         protected.update({readiness_path, validator})
-        if any(path == other.resolve() or (path.exists() and other.exists() and path.samefile(other))
-               for other in protected):
-            raise ValueError('Dependency proof destination aliases an input, report or validator')
-        if not path.exists():
-            return path, None, None
-        previous, digest = _json(root, path)
-        _schema(previous, 'self_check_dependency_resolution.schema.json')
-        if (previous.get('status') != 'resolved'
-                or previous.get('project_root') != str(root.resolve())
-                or previous.get('naos_root') != naos_root):
-            raise ValueError('Refusing to discard an unrecognized or differently scoped dependency proof')
-        # A supported profile transition may legitimately replace its old proof.
-        metadata = path.stat()
-        return path, digest, (metadata.st_dev, metadata.st_ino)
+        return inspect_derived_receipt_endpoint(
+            root, naos_root, current, policy_path=policy_path,
+            extra_protected=protected,
+        )
 
     path, digest, identity = checked()
     if digest is None:

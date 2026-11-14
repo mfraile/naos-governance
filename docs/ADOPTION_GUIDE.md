@@ -363,9 +363,26 @@ Reconstruction uses explicit word/identifier boundaries for NFR hints, so ordina
 words such as `special`, `author` and `monkey` do not imply CI, authentication or
 key management. These are review hints, not verified requirements.
 
+Functional candidates now name one representative content cue per selected
+file: a public Python callable (including public methods and async functions),
+its first docstring line, a module docstring, or a document section/excerpt.
+Markdown section selection ignores fenced examples. Explicit JavaScript,
+TypeScript, Go and Java function declarations receive conservative lexical
+hints; workflow hints name a declared job or workflow. This is partial extraction:
+unsupported syntax, imports-only/private-only Python and incomplete Python
+samples produce no functional candidate. Existing NFR hints can still apply to
+nonempty content. Empty/comment-only Python modules contribute no candidates.
+Content excerpts use the existing recognized-secret redactor before shortening;
+this does not guarantee that all sensitive prose is removed.
+Test paths enter the test category once, including after repository-intelligence
+merges. A file can still support distinct functional and non-functional hints;
+this is not duplicate code/test discovery. Candidate IDs are report-local and
+may change when the selected evidence changes.
+
 The candidate report's `reconstruction_coverage` records deterministic local
 path selection: at most 5,000 files and 100,000 directory entries, followed by
 category caps of 50 documents, 80 source files, 50 tests and 30 workflows.
+Source selection excludes paths already classified as documents, tests or workflows.
 After generated-content filtering, it selects up to 12 documents, 12 source
 files and 12 **combined tests/workflows**; each cap becomes 100 when repository
 intelligence candidates are supplied. Revalidated retrieval evidence can add

@@ -93,6 +93,8 @@ Expected contents include:
 
 `naos/DASHBOARD.md`, `naos/TRACEABILITY_MATRIX.md`, and the public compliance/admissibility docs are required. If the latest conformance report is missing, the target still succeeds and adds `naos/reports/README-MISSING-CONFORMANCE.txt` to the zip so reviewers can see what was absent and how to regenerate it.
 
+The archive is streamed into a held staging file and checked with a finalized ZIP reader before publication. Generation or integrity-check failure leaves any previous archive untouched. Linked output files and linked output parents are refused; existing outputs must be readable and writable, with supported metadata and a writable parent. Payload and previous-output verification use chunked reads rather than loading entire archives into memory. This publication boundary does not validate the provenance or completeness of the bundled evidence, and does not provide writer locking or a power-loss durability guarantee.
+
 The pack improves handoff ergonomics; it does not change the evidentiary limits described above.
 
 ---

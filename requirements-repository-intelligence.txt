@@ -1,0 +1,6 @@
+# Hash-locked external wheels, resolved and verified against PyPI on 2026-10-20.
+# Install with --require-hashes --only-binary=:all:. See docs/BUILD_INTEGRITY.md.
+# Optional; install only for the repository-intelligence test environment.
+
+networkx==3.6.1 \
+    --hash=sha256:d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762

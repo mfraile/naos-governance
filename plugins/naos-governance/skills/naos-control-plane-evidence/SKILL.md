@@ -81,9 +81,10 @@ readiness is baseline review input only; it does not create baselines. Plan
 coherence is local coordination review only; optional diff-base path comparison
 is advisory implementation-scope evidence only. It does not authorize, sequence,
 approve, resolve work, or prove semantic drift. Evidence signing emits an
-adopter-signable envelope and evidence verification recomputes local
-tamper-evidence and reports signature-entry presence plus best-effort Git HEAD
-metadata; NAOS does not sign, hold keys, validate third-party signatures,
+adopter-signable envelope and evidence verification recomputes local artifact
+digests and the manifest root, then reports tamper-evidence relative to an
+unsigned, regenerable local attestation baseline, signature-entry presence and
+best-effort Git HEAD metadata; NAOS does not sign, hold keys, validate third-party signatures,
 authenticate identities, or
 provide non-repudiation. AI Code Provenance is local evidence packaging only; it does not prove authorship,
 ownership, legal sufficiency, publication readiness, or release readiness.

@@ -9,8 +9,6 @@ import os
 import re
 import stat
 import sys
-import tempfile
-import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +22,7 @@ from naos_self_check_inspection import inspection_active, logical_path  # noqa: 
 
 from naos_policy import (  # noqa: E402
     default_naos_root,
+    ensure_output_directory,
     build_generated_by,
     is_kit_repository,
     load_policy,
@@ -34,6 +33,7 @@ from naos_policy import (  # noqa: E402
     sessions_index_path,
     sessions_root_path,
     write_report_with_session,
+    write_text_output,
 )
 from naos_audit_log import write_audit_event  # noqa: E402
 
@@ -198,47 +198,12 @@ def path_text(path: Path | None, root: Path) -> str | None:
 
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Exclusive per-call temporary creation avoids overwriting another writer's
-    # temporary file. Atomic replacement still does not provide index locking.
-    temp_path: Path | None = None
-    pending_error: BaseException | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", newline="\n", dir=path.parent,
-            prefix=f".{path.name}.", suffix=".tmp", delete=False,
-        ) as handle:
-            temp_path = Path(handle.name)
-            json.dump(data, handle, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        for attempt in range(4):
-            try:
-                os.replace(temp_path, path)
-                return
-            except PermissionError as exc:
-                # A Windows target held without delete sharing can report
-                # ACCESS_DENIED (5), not only SHARING/LOCK_VIOLATION (32/33).
-                # Repeat only this same replace; never alter access controls.
-                if (sys.platform != "win32" or getattr(exc, "winerror", None) not in {5, 32, 33}
-                        or attempt == 3):
-                    raise
-                time.sleep(0.05 * (2 ** attempt))
-    except BaseException as error:
-        pending_error = error
-        raise
-    finally:
-        if temp_path is not None:
-            try:
-                temp_path.unlink(missing_ok=True)
-            except OSError as cleanup_error:
-                if pending_error is None:
-                    raise
-                pending_error.add_note(
-                    "Temporary session JSON cleanup also failed: "
-                    + type(cleanup_error).__name__
-                )
+    # Retain tempfile's umask-filtered 0600 creation/reset behavior on POSIX.
+    # Native Windows publication retains ordinary creation and existing security.
+    write_text_output(path, json.dumps(data, indent=2, sort_keys=True) + "\n", newline="\n",
+                      require_existing_write_access=False, posix_creation_mode=0o600,
+                      preserve_existing_posix_mode=False, retry_windows_sharing=True,
+                      cleanup_error_note="Temporary session JSON cleanup also failed")
 
 
 def empty_index(generated_at: str) -> dict[str, Any]:
@@ -409,7 +374,7 @@ def ensure_session_context(
     session_root = sessions_root_path(root, naos_root, policy) / session_id
     reports_dir = str(policy.get("paths", {}).get("reports_dir") or "reports")
     session_report_root = session_root / reports_dir
-    session_report_root.mkdir(parents=True, exist_ok=True)
+    ensure_output_directory(session_report_root)
     record["report_root"] = path_text(session_report_root, root)
     record.setdefault("latest_reports", {})
     operator = resolve_operator_attribution(root)

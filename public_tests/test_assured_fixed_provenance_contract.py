@@ -40,7 +40,7 @@ class AssuredFixedProvenanceContractTests(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory(prefix='naos-assured-provenance-')
         self.addCleanup(tmp.cleanup)
-        self.root = Path(tmp.name)
+        self.root = Path(tmp.name).resolve()
         self.fixture = self.root / 'fixture'
         self.run_cli('init', str(self.root / 'adopter'), '--new', '--tier', 'assured',
                      '--archetype', 'custom', '--backend', 'static_only',

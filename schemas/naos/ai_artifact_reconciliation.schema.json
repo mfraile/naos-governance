@@ -84,7 +84,7 @@
                 }
               },
               "sample_character_limit": {
-                "const": 12000
+                "enum": [0, 12000]
               },
               "interpretation": {
                 "const": "keyword_context_does_not_establish_artifact_deprecation"
@@ -100,7 +100,91 @@
           "human_review_required": {"type": "boolean"},
           "human_review_boundary": {"type": "string"},
           "non_claims": {"type": "array", "items": {"type": "string"}}
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "deprecation_evidence"
+              ],
+              "properties": {
+                "deprecation_evidence": {
+                  "required": [
+                    "sample_character_limit"
+                  ],
+                  "properties": {
+                    "sample_character_limit": {
+                      "const": 0
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "content_handling"
+              ],
+              "properties": {
+                "content_handling": {
+                  "const": "raw_hash_only_sensitive_configuration"
+                }
+              },
+              "oneOf": [
+                {
+                  "required": [
+                    "artifact_path",
+                    "detected_source"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": ".cursor/mcp.json"
+                    },
+                    "detected_source": {
+                      "const": "cursor_mcp_configuration"
+                    },
+                    "artifact_path": {
+                      "const": ".cursor/mcp.json"
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "artifact_path",
+                    "detected_source"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": ".vscode/mcp.json"
+                    },
+                    "detected_source": {
+                      "const": "vscode_mcp_configuration"
+                    },
+                    "artifact_path": {
+                      "const": ".vscode/mcp.json"
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "artifact_path",
+                    "detected_source"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": ".mcp.json"
+                    },
+                    "detected_source": {
+                      "const": "workspace_mcp_configuration"
+                    },
+                    "artifact_path": {
+                      "const": ".mcp.json"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
       }
     },
     "write_mode": {"enum": ["dry_run", "explicit_write"]},

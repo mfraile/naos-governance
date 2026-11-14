@@ -64,6 +64,7 @@ COPYFILE_NOFOLLOW_SRC = 1 << 18
 COPYFILE_NOFOLLOW_DST = 1 << 19
 TERMINAL_CONTENT_STATES = {"COMMITTED", "ROLLED_BACK"}
 CONTENT_AWARE_MINIMUM_RECOVERY_VERSION = "1.1.0"
+RECOVERY_CHECKPOINT_WARNING_CODE = "RECOVERY_CHECKPOINT_PERSIST_FAILED"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SHA3_512_RE = re.compile(r"^[0-9a-f]{128}$")
 TRANSACTION_ID_RE = re.compile(r"^MC-[0-9a-f]{16}-[0-9a-f]{8}$")
@@ -143,6 +144,14 @@ class CreateOnlyTransactionOutcome:
     transaction_id: str | None
     receipt_path: str | None = None
     detail: str | None = None
+
+
+def _checkpoint_persistence_failure_detail(detail: str, error: Exception) -> str:
+    """Retain a secondary recording failure without changing recovery authority."""
+    return (
+        f"{detail}; {RECOVERY_CHECKPOINT_WARNING_CODE}: "
+        f"{type(error).__name__}: {error}; prior recovery checkpoint may be stale"
+    )
 
 
 @dataclass(frozen=True)
@@ -1335,10 +1344,10 @@ def _validate_receipt(
         "paths": plan["paths"],
         "replacement_performed": False,
     }
-    for field, expected_value in expected.items():
-        if value.get(field) != expected_value:
+    for field_name, expected_value in expected.items():
+        if value.get(field_name) != expected_value:
             raise TransactionPrimitiveError(
-                f"Managed-content receipt {field} binding is invalid."
+                f"Managed-content receipt {field_name} binding is invalid."
             )
     created_metadata = value.get("created_metadata")
     planned_paths = {str(item["path"]) for item in plan["paths"]}
@@ -2538,12 +2547,20 @@ def _validate_journal_record(
         "integrity",
     }
     _validate_sha256_integrity(journal, label="managed-content journal")
-    if set(journal) != expected_keys:
+    if (set(journal) != expected_keys
+            or journal.get("schema") != "naos.upgrade.create_only_transaction.v1"):
         raise TransactionPrimitiveError("Managed-content journal shape is invalid.")
+    plan = journal.get("plan")
+    if not isinstance(plan, dict):
+        raise TransactionPrimitiveError("Managed-content journal plan is invalid.")
+    return _validate_create_only_checkpoint_fields(journal, plan, validate_plan=validate_plan)
+
+
+def _validate_create_only_checkpoint_fields(journal, plan, *, validate_plan):
+    """Identical semantic checks for inline and digest-referencing journals."""
     transaction_id = journal.get("transaction_id")
     if (
-        journal.get("schema") != "naos.upgrade.create_only_transaction.v1"
-        or not isinstance(transaction_id, str)
+        not isinstance(transaction_id, str)
         or TRANSACTION_ID_RE.fullmatch(transaction_id) is None
         or journal.get("state")
         not in {
@@ -2564,9 +2581,6 @@ def _validate_journal_record(
         raise TransactionPrimitiveError(
             "Managed-content journal control fields are invalid."
         )
-    plan = journal.get("plan")
-    if not isinstance(plan, dict):
-        raise TransactionPrimitiveError("Managed-content journal plan is invalid.")
     validate_plan(plan)
     planned_paths = [str(item["path"]) for item in plan["paths"]]
     applied_paths = journal.get("applied_paths")
@@ -2743,20 +2757,25 @@ def _journal_value(
     created_directories: list[dict[str, object]],
     pending_action: dict[str, object] | None = None,
     detail: str | None = None,
+    plan_reference: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return _with_sha256_integrity(
-        {
-            "schema": "naos.upgrade.create_only_transaction.v1",
-            "transaction_id": transaction_id,
-            "plan": plan,
-            "state": state,
-            "applied_paths": applied_paths,
-            "applied_identities": applied_identities,
-            "created_directories": created_directories,
-            "pending_action": pending_action,
-            "detail": detail,
-        }
-    )
+    body = {
+        "schema": "naos.upgrade.create_only_transaction.v1",
+        "transaction_id": transaction_id,
+        "state": state,
+        "applied_paths": applied_paths,
+        "applied_identities": applied_identities,
+        "created_directories": created_directories,
+        "pending_action": pending_action,
+        "detail": detail,
+    }
+    if plan_reference is None:
+        body["plan"] = plan
+    else:
+        body["schema"] = _CREATE_ONLY_COMPACT_JOURNAL_SCHEMA
+        body["minimum_recovery_naos_version"] = CONTENT_AWARE_MINIMUM_RECOVERY_VERSION
+        body["plan_ref"] = dict(plan_reference)
+    return _with_sha256_integrity(body)
 
 
 def _transaction_checkpoint(_label: str) -> None:
@@ -3103,6 +3122,7 @@ def _journal_v2_value(
 
 
 _COMPACT_JOURNAL_SCHEMA = "naos.upgrade.content_transaction.compact.v1"
+_CREATE_ONLY_COMPACT_JOURNAL_SCHEMA = "naos.upgrade.create_only_transaction.compact.v1"
 _COMPACT_PLAN_NAME = "plan.json"
 
 
@@ -3121,9 +3141,15 @@ def _validate_compact_journal_record(
     expected = {"schema", "minimum_recovery_naos_version", "transaction_id",
                 "plan_ref", "state", "applied_actions", "created_directories",
                 "pending_action", "detail", "integrity"}
+    if set(journal) != expected or journal.get("schema") != _COMPACT_JOURNAL_SCHEMA:
+        raise TransactionPrimitiveError("Compact checkpoint shape or plan binding is invalid.")
+    plan = _validate_compact_plan_binding(journal, plan_raw, validated_plan_proof)
+    return _validate_content_checkpoint_fields(journal, plan, validate_plan=validate_plan)
+
+
+def _validate_compact_plan_binding(journal, plan_raw, validated_plan_proof=None):
     reference = journal.get("plan_ref")
-    if (set(journal) != expected or journal.get("schema") != _COMPACT_JOURNAL_SCHEMA
-            or type(reference) is not dict or set(reference) != {"name", "sha256", "size"}
+    if (type(reference) is not dict or set(reference) != {"name", "sha256", "size"}
             or reference.get("name") != _COMPACT_PLAN_NAME
             or type(reference.get("size")) is not int or reference["size"] < 1
             or type(reference.get("sha256")) is not str
@@ -3142,7 +3168,20 @@ def _validate_compact_journal_record(
             raise TransactionPrimitiveError("Compact plan differs from its validated proof.")
     if canonical_plan + b"\n" != plan_raw:
         raise TransactionPrimitiveError("Compact plan sidecar is not canonical JSON.")
-    return _validate_content_checkpoint_fields(journal, plan, validate_plan=validate_plan)
+    return plan
+
+
+def _validate_create_only_compact_journal_record(journal, plan_raw, *, validate_plan):
+    _validate_sha256_integrity(journal, label="compact create-only transaction journal")
+    expected = {"schema", "minimum_recovery_naos_version", "transaction_id", "plan_ref",
+                "state", "applied_paths", "applied_identities", "created_directories",
+                "pending_action", "detail", "integrity"}
+    if (set(journal) != expected
+            or journal.get("schema") != _CREATE_ONLY_COMPACT_JOURNAL_SCHEMA
+            or journal.get("minimum_recovery_naos_version") != CONTENT_AWARE_MINIMUM_RECOVERY_VERSION):
+        raise TransactionPrimitiveError("Compact create-only journal shape is invalid.")
+    plan = _validate_compact_plan_binding(journal, plan_raw)
+    return _validate_create_only_checkpoint_fields(journal, plan, validate_plan=validate_plan)
 
 
 def _validate_checkpoint_plan_proof(plan, *, project_root, proof):
@@ -3181,6 +3220,11 @@ def _read_compact_plan_at(parent_descriptor: int) -> bytes:
 def _load_content_checkpoint_at(parent_descriptor: int, *, project_root: Path,
                                 label: str) -> tuple[dict[str, Any], dict[str, Any], str]:
     journal = _safe_json_object_at(parent_descriptor, "journal.json", label=label)
+    if journal.get("schema") == _CREATE_ONLY_COMPACT_JOURNAL_SCHEMA:
+        plan = _validate_create_only_compact_journal_record(
+            journal, _read_compact_plan_at(parent_descriptor),
+            validate_plan=lambda selected: validate_create_only_plan(selected, project_root=project_root))
+        return journal, plan, "v1"
     if journal.get("schema") == _COMPACT_JOURNAL_SCHEMA:
         plan = _validate_compact_journal_record(journal, _read_compact_plan_at(parent_descriptor),
             validate_plan=lambda selected: validate_content_aware_plan(selected, project_root=project_root))
@@ -3232,8 +3276,10 @@ def _persist_content_checkpoint(
         raise TransactionPrimitiveError("Compact checkpoint transaction-directory binding differs.")
     if validated_plan_proof is None:
         raise TransactionPrimitiveError("Compact checkpoint requires an invocation-local validated plan proof.")
-    validate = lambda selected: _validate_checkpoint_plan_proof(
-        selected, project_root=runtime.root, proof=validated_plan_proof)
+    def validate(selected):
+        return _validate_checkpoint_plan_proof(
+            selected, project_root=runtime.root, proof=validated_plan_proof
+        )
     _validate_compact_journal_record(current, plan_raw, validate_plan=validate,
                                      validated_plan_proof=validated_plan_proof)
     validate(plan)
@@ -3501,7 +3547,34 @@ def _committed_content_topology_failures_at(
     journal: dict[str, Any],
     plan: dict[str, Any],
 ) -> list[str]:
-    """Validate every existing and transaction-created directory binding."""
+    """Check live bindings for unfinished commits and safe shape for history."""
+
+    if journal.get("state") == "COMMITTED":
+        # Historical directory identities describe publication, not a perpetual
+        # reservation of the adopter's tree. Missing and recreated ordinary
+        # directories are valid history; links and non-directory occupants are
+        # still unsafe. Fresh plans independently bind their current ancestors.
+        paths = {str(item["path"]) for item in journal.get("created_directories") or []}
+        paths.update(
+            str(ancestor["path"])
+            for item in plan.get("paths") or []
+            for ancestor in item.get("ancestor_identities") or []
+        )
+        failures = []
+        for relative_text in sorted(paths):
+            descriptor = None
+            try:
+                descriptor = _open_existing_directory_handle(
+                    root_handle, safe_relative_path(relative_text)
+                )
+            except FileNotFoundError:
+                continue
+            except (OSError, ContentPathError, TransactionPrimitiveError):
+                failures.append(f"historical directory topology is unsafe: {relative_text}")
+            finally:
+                if descriptor is not None:
+                    os.close(descriptor)
+        return failures
 
     return [
         *_created_directory_inventory_failures_at(
@@ -3942,7 +4015,13 @@ def _replace_runtime_journal(
     if require_attached:
         runtime.assert_attached()
     with _open_runtime_transaction(runtime, transaction_name) as transaction_fd:
+        if value.get("schema") == _CREATE_ONLY_COMPACT_JOURNAL_SCHEMA:
+            if _compact_plan_reference(_read_compact_plan_at(transaction_fd)) != value["plan_ref"]:
+                raise TransactionPrimitiveError("Compact create-only plan sidecar changed before checkpoint.")
         _replace_json_at(transaction_fd, "journal.json", value)
+        if value.get("schema") == _CREATE_ONLY_COMPACT_JOURNAL_SCHEMA:
+            if _compact_plan_reference(_read_compact_plan_at(transaction_fd)) != value["plan_ref"]:
+                raise TransactionPrimitiveError("Compact create-only plan sidecar changed during checkpoint.")
     if require_attached:
         runtime.assert_attached()
 
@@ -3972,8 +4051,9 @@ def _validated_terminal_journal_inventory_at(
                 "A managed-content transaction preparation requires recovery: "
                 + transaction_name
             )
-        journal = _load_runtime_journal(runtime, transaction_name)
-        plan = _validate_journal(journal, project_root=project_root)
+        journal, plan, version = _load_runtime_content_checkpoint(runtime, transaction_name)
+        if version != "v1":
+            raise TransactionPrimitiveError("Managed-content journal generation is not create-only.")
         if (
             journal.get("transaction_id") != transaction_name
             or plan.get("source_policy_sha256") != source_policy_sha256
@@ -6214,17 +6294,7 @@ def _committed_transaction_failures_at(
     source_policy_sha256: str,
 ) -> list[str]:
     failures: list[str] = []
-    failures.extend(
-        _created_directory_inventory_failures_at(
-            runtime.root_fd,
-            [
-                item
-                for item in journal.get("created_directories") or []
-                if isinstance(item, dict)
-            ],
-        )
-    )
-    failures.extend(_plan_ancestor_inventory_failures_at(runtime.root_fd, plan))
+    failures.extend(_committed_content_topology_failures_at(runtime.root_fd, journal, plan))
     transaction = (
         next(
             (
@@ -6810,6 +6880,8 @@ def apply_create_only_plan(
         receipts_root=receipts_root,
     )
     validate_create_only_plan(plan, project_root=root)
+    # Caller mutations cannot change the digest-bound sidecar or apply authority.
+    plan = copy.deepcopy(plan)
     planned_creation_identity = plan.get("creation_identity")
     try:
         validate_managed_creation_identity(planned_creation_identity)
@@ -6936,9 +7008,12 @@ def apply_create_only_plan(
         applied_identities: dict[str, dict[str, object]] = {}
         created_directories: list[dict[str, object]] = []
         pending_action: dict[str, object] | None = None
+        plan_raw = canonical_bytes(plan) + b"\n"
+        plan_reference = _compact_plan_reference(plan_raw)
         journal = _journal_value(
             transaction_id=transaction_id,
             plan=plan,
+            plan_reference=plan_reference,
             state="PREPARED",
             applied_paths=applied,
             applied_identities=applied_identities,
@@ -6960,6 +7035,9 @@ def apply_create_only_plan(
                 label=f"{preparation_name}/directories",
             )
             try:
+                _write_bytes_new_at(preparation_fd, _COMPACT_PLAN_NAME, plan_raw)
+                if _read_compact_plan_at(preparation_fd) != plan_raw:
+                    raise TransactionPrimitiveError("Compact create-only preparation plan readback differs.")
                 _write_json_new_at(preparation_fd, "journal.json", journal)
                 staged: dict[str, str] = {}
                 for index, item in enumerate(plan["paths"]):
@@ -7067,6 +7145,7 @@ def apply_create_only_plan(
                 _journal_value(
                     transaction_id=transaction_id,
                     plan=plan,
+                    plan_reference=plan_reference,
                     state="APPLYING",
                     applied_paths=applied,
                     applied_identities=applied_identities,
@@ -7083,6 +7162,7 @@ def apply_create_only_plan(
                         _journal_value(
                             transaction_id=transaction_id,
                             plan=plan,
+                            plan_reference=plan_reference,
                             state="APPLYING",
                             applied_paths=applied,
                             applied_identities=applied_identities,
@@ -7136,6 +7216,7 @@ def apply_create_only_plan(
                                 _journal_value(
                                     transaction_id=transaction_id,
                                     plan=plan,
+                                    plan_reference=plan_reference,
                                     state="APPLYING",
                                     applied_paths=applied,
                                     applied_identities=applied_identities,
@@ -7229,6 +7310,7 @@ def apply_create_only_plan(
                         _journal_value(
                             transaction_id=transaction_id,
                             plan=plan,
+                            plan_reference=plan_reference,
                             state="APPLYING",
                             applied_paths=applied,
                             applied_identities=applied_identities,
@@ -7277,6 +7359,7 @@ def apply_create_only_plan(
                         _journal_value(
                             transaction_id=transaction_id,
                             plan=plan,
+                            plan_reference=plan_reference,
                             state="APPLYING",
                             applied_paths=applied,
                             applied_identities=applied_identities,
@@ -7301,6 +7384,7 @@ def apply_create_only_plan(
                 _journal_value(
                     transaction_id=transaction_id,
                     plan=plan,
+                    plan_reference=plan_reference,
                     state="VALIDATING",
                     applied_paths=applied,
                     applied_identities=applied_identities,
@@ -7394,6 +7478,7 @@ def apply_create_only_plan(
                     _journal_value(
                         transaction_id=transaction_id,
                         plan=plan,
+                        plan_reference=plan_reference,
                         state="COMMITTED",
                         applied_paths=applied,
                         applied_identities=applied_identities,
@@ -7421,6 +7506,7 @@ def apply_create_only_plan(
                         _journal_value(
                             transaction_id=transaction_id,
                             plan=plan,
+                            plan_reference=plan_reference,
                             state="RECOVERY_REQUIRED",
                             applied_paths=applied,
                             applied_identities=applied_identities,
@@ -7473,6 +7559,7 @@ def apply_create_only_plan(
                         _journal_value(
                             transaction_id=transaction_id,
                             plan=plan,
+                            plan_reference=plan_reference,
                             state="RECOVERY_REQUIRED",
                             applied_paths=applied,
                             applied_identities=applied_identities,
@@ -7519,6 +7606,7 @@ def apply_create_only_plan(
                         _journal_value(
                             transaction_id=transaction_id,
                             plan=plan,
+                            plan_reference=plan_reference,
                             state="RECOVERY_REQUIRED",
                             applied_paths=applied,
                             applied_identities=applied_identities,
@@ -7543,8 +7631,9 @@ def apply_create_only_plan(
                     "pending evidence cleanup failed: " + pending_cleanup_failure
                 )
             try:
-                rollback_journal = _load_runtime_journal(runtime, transaction_id)
-                _validate_journal(rollback_journal, project_root=root)
+                rollback_journal, _rollback_plan, _version = _load_runtime_content_checkpoint(
+                    runtime, transaction_id
+                )
             except Exception as journal_exc:
                 detail = (
                     f"{exc}; rollback journal could not be loaded safely: {journal_exc}"
@@ -7570,6 +7659,7 @@ def apply_create_only_plan(
                     _journal_value(
                         transaction_id=transaction_id,
                         plan=plan,
+                        plan_reference=plan_reference,
                         state="ROLLING_BACK",
                         applied_paths=applied,
                         applied_identities=applied_identities,
@@ -7787,6 +7877,7 @@ def apply_create_only_plan(
                     _journal_value(
                         transaction_id=transaction_id,
                         plan=plan,
+                        plan_reference=plan_reference,
                         state=state,
                         applied_paths=applied,
                         applied_identities=applied_identities,
@@ -7973,6 +8064,28 @@ def _validate_manifest_evidence_any_at(
             )
 
 
+def _historical_created_leaf_compatible_at(
+    root_descriptor: int, path: str, expected_content: dict[str, Any]
+) -> bool:
+    """Accept adopter absence or restored content without adopting a new inode."""
+    parent = None
+    try:
+        relative = safe_relative_path(path)
+        parent = _open_existing_parent_handle(root_descriptor, relative)
+        leaf = os.stat(relative.name, dir_fd=parent, follow_symlinks=False)
+        if not stat.S_ISREG(leaf.st_mode) or leaf.st_nlink != 1:
+            return False
+        content, _metadata, _ancestors = observe_regular_file_beneath_fd(root_descriptor, relative)
+        return content == expected_content
+    except FileNotFoundError:
+        return True
+    except (OSError, ContentPathError, TransactionPrimitiveError):
+        return False
+    finally:
+        if parent is not None:
+            os.close(parent)
+
+
 def _already_applied_v2_at(
     runtime: _ManagedRuntimeHandles,
     manifest: dict[str, Any],
@@ -7982,6 +8095,7 @@ def _already_applied_v2_at(
     scope_integrity_sha3_512: str,
     source_policy_sha256: str,
     allow_superseded: bool = False,
+    historical_created_directories: tuple[str, ...] = (),
 ) -> str | None:
     transaction = next(
         (
@@ -8064,11 +8178,13 @@ def _already_applied_v2_at(
             or entry.get("base") != _plan_present_identity(action["after"])
             or entry.get("created_metadata") != action["installed_metadata"]
             or not _base_blob_matches_at(runtime.bases_fd, entry)
-            or not _managed_file_matches_at(
-                runtime.root_fd,
-                path,
-                entry["base"],
-                entry["created_metadata"],
+            or not (
+                _managed_file_matches_at(runtime.root_fd, path, entry["base"], entry["created_metadata"])
+                or (
+                    any(safe_relative_path(path).is_relative_to(safe_relative_path(directory))
+                        for directory in historical_created_directories)
+                    and _historical_created_leaf_compatible_at(runtime.root_fd, path, entry["base"])
+                )
             )
         ):
             return None
@@ -8975,8 +9091,8 @@ def apply_content_aware_plan(
                         require_attached=False,
                         validated_plan_proof=validated_plan_proof,
                     )
-                except Exception:
-                    pass
+                except Exception as checkpoint_exc:
+                    detail = _checkpoint_persistence_failure_detail(detail, checkpoint_exc)
                 return CreateOnlyTransactionOutcome(
                     "recovery_required",
                     transaction_id,
@@ -9047,8 +9163,8 @@ def apply_content_aware_plan(
                         require_attached=False,
                         validated_plan_proof=validated_plan_proof,
                     )
-                except Exception:
-                    pass
+                except Exception as checkpoint_exc:
+                    detail = _checkpoint_persistence_failure_detail(detail, checkpoint_exc)
                 return CreateOnlyTransactionOutcome(
                     "rollback_incomplete",
                     transaction_id,
@@ -9429,19 +9545,6 @@ def _recover_create_only_transactions_v1(
                         )
                     )
                     return outcomes
-            paths = plan["paths"]
-            applied_paths = set(journal.get("applied_paths") or [])
-            foreign_preserved: list[str] = []
-            present_or_unsafe: list[str] = []
-            for item in paths:
-                relative_text = str(item["path"])
-                destination = root / safe_relative_path(str(item["path"]))
-                try:
-                    os.lstat(destination)
-                except FileNotFoundError:
-                    continue
-                if relative_text not in applied_paths:
-                    foreign_preserved.append(relative_text)
             if manifest_transaction is not None:
                 commit_failures = _committed_transaction_failures_at(
                     root,
@@ -9518,6 +9621,19 @@ def _recover_create_only_transactions_v1(
                     )
                 )
                 continue
+            paths = plan["paths"]
+            applied_paths = set(journal.get("applied_paths") or [])
+            foreign_preserved: list[str] = []
+            present_or_unsafe: list[str] = []
+            for item in paths:
+                relative_text = str(item["path"])
+                destination = root / safe_relative_path(str(item["path"]))
+                try:
+                    os.lstat(destination)
+                except FileNotFoundError:
+                    continue
+                if relative_text not in applied_paths:
+                    foreign_preserved.append(relative_text)
             provisional_receipt_present = False
             try:
                 os.stat(
@@ -9803,6 +9919,7 @@ def _recover_v2_transactions(
             ) for transaction_id in sorted(missing_journals)]
         preparations: list[str] = []
         unfinished: list[str] = []
+        historical_created_directories: set[str] = set()
         for transaction_name in transaction_names:
             preparing = transaction_name.startswith(".preparing-")
             transaction_id = (
@@ -9839,6 +9956,12 @@ def _recover_v2_transactions(
             if recorded is not None and recorded["plan"] != _plan:
                 raise TransactionPrimitiveError(
                     "Managed-content manifest/journal plan binding differs: " + transaction_id
+                )
+            if not preparing and recorded is not None and journal.get("state") == "COMMITTED":
+                # Later mutations retain directory provenance from earlier
+                # validated committed history; they need not create it again.
+                historical_created_directories.update(
+                    str(item["path"]) for item in journal.get("created_directories") or []
                 )
             if journal.get("state") == "ROLLED_BACK":
                 try:
@@ -10035,6 +10158,8 @@ def _recover_v2_transactions(
                     scope_integrity_sha3_512=scope_integrity_sha3_512,
                     source_policy_sha256=scope_source_policy_sha256,
                     allow_superseded=True,
+                    historical_created_directories=tuple(sorted(historical_created_directories))
+                    if state == "COMMITTED" else (),
                 )
                 if prior != transaction_id:
                     detail = (

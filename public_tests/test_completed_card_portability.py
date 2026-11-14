@@ -33,7 +33,7 @@ class CompletedCardPortabilityTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="naos-completed-card-")
         self.addCleanup(self.temp.cleanup)
-        self.base = Path(self.temp.name)
+        self.base = Path(self.temp.name).resolve()
         self.env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "NAOS_FIXED_TIME": "2026-10-11T00:00:00Z"}
         for name in ("NAOS_ROOT", "NAOS_PROFILE", "REGISTRY_SCHEMA", "PYTHONPATH"):
             self.env.pop(name, None)
@@ -48,7 +48,7 @@ class CompletedCardPortabilityTests(unittest.TestCase):
         (root / "naos/active").mkdir(parents=True)
         (root / "scripts").mkdir()
         (root / "schemas/naos").mkdir(parents=True)
-        for filename in ("naos_task_lifecycle.py", "naos_policy.py", "naos_console.py", "naos_validate_task_registry.py"):
+        for filename in ("naos_task_lifecycle.py", "naos_policy.py", "naos_console.py", "naos_validate_task_registry.py", "naos_trace_atomic_write.py"):
             shutil.copy2(KIT / "scripts" / filename, root / "scripts" / filename)
         shutil.copy2(KIT / "schemas/naos/task_registry.schema.json", root / "schemas/naos/task_registry.schema.json")
         registry = {"schema": "naos.task_registry.v2", "tasks": [{

@@ -183,26 +183,30 @@ def _write_payload_windows(custody, slot, raw, before_raw):
     policy = slot['stage_native_policy']
     with checkpoint._parent(custody, stage) as (parent, name):
         handles = custody.reader.handles
-        with handles.create_private_file(parent, name) as created:
+        with ExitStack() as pins:
             if policy['kind'] == 'windows_working_replace':
                 source_path = slot['destination']
                 source_parent, _, source_name = source_path.rpartition('/')
                 key = custody.reader.directory(source_parent)
-                with handles.open_child(custody.reader.directories[key], source_name,
-                                        kind='file', pin_for_read=True) as source:
-                    info = source.info()
-                    if lb.project_windows_witness(info, source.security()) != policy['source_witness']:
-                        _fail('Windows replacement source native identity changed')
-                    source.seek(0)
-                    checkpoint._check_bytes(source.read, before_raw)
-                    source.seek(0)
-                    handles.copy_staged_file_security(source, created)
-                    created.write_all(raw)
-                    handles.copy_supported_file_attributes(
-                        source, created, expected_attributes=info.attributes)
-                    if lb.project_windows_witness(source.info(), source.security()) != policy['source_witness']:
-                        _fail('Windows replacement source changed during stage')
+                source = pins.enter_context(handles.open_child(
+                    custody.reader.directories[key], source_name,
+                    kind='file', pin_for_read=True))
+                info = source.info()
+                if lb.project_windows_witness(info, source.security()) != policy['source_witness']:
+                    _fail('Windows replacement source native identity changed')
+                source.seek(0)
+                checkpoint._check_bytes(source.read, before_raw)
+                source.seek(0)
+                created = pins.enter_context(
+                    handles.create_private_report_stage(parent, name, source))
+                handles.copy_staged_file_security(source, created)
+                created.write_all(raw)
+                handles.copy_supported_file_attributes(
+                    source, created, expected_attributes=info.attributes)
+                if lb.project_windows_witness(source.info(), source.security()) != policy['source_witness']:
+                    _fail('Windows replacement source changed during stage')
             else:
+                created = pins.enter_context(handles.create_private_file(parent, name))
                 created.write_all(raw)
             created.flush()
             witness = lb.project_windows_witness(created.info(), created.security())

@@ -11,7 +11,12 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 NAOS_ROOT = Path(os.getenv("NAOS_ROOT", "naos"))
 
@@ -89,8 +94,9 @@ def main() -> int:
         lambda _match: f"<!-- BEGIN BACKLOG -->\n{block}\n<!-- END BACKLOG -->",
         backlog_md,
     )
-    BACKLOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    BACKLOG_FILE.write_text(new_md, encoding="utf-8")
+    from naos_policy import write_text_output
+
+    write_text_output(BACKLOG_FILE, new_md)
     print(f"Updated backlog with {len(tasks)} tasks")
     return 0
 

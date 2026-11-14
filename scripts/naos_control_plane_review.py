@@ -126,6 +126,7 @@ RISK_TIER_ORDER = {"low": 0, "medium": 1, "high": 2}
 PARALLEL_LANE_SOURCE_TYPE = "parallel_lane_handoff_finding"
 PARALLEL_LANE_TARGETS = ["control_plane_review", "gatekeepers", "known_gaps", "residual_risks", "next_actions"]
 PARALLEL_LANE_REASON_ORDER = [
+    "handoff_report_invalid",
     "missing_planning_link",
     "dependency_or_claim_conflict",
     "scope_mismatch",
@@ -137,6 +138,7 @@ PARALLEL_LANE_REASON_ORDER = [
     "planned_actual_risk_mismatch",
 ]
 PARALLEL_LANE_GATES = {
+    "handoff_report_invalid": ["G2", "G6"],
     "missing_planning_link": ["G2", "G6"],
     "dependency_or_claim_conflict": ["G2"],
     "scope_mismatch": ["G3"],
@@ -1964,29 +1966,45 @@ def build_parallel_lane_reconciliation(
     for path in sorted(handoff_dir.glob("*.json")):
         source_ref = relative_ref(root, path)
         data, error = load_json_report(path)
+        if not data:
+            error = error or "Handoff report is unavailable or not a nonempty JSON object."
+        elif type(data.get("parallel_lanes_declared")) is not bool:
+            error = "Handoff report parallel_lanes_declared must be a boolean."
         lane = data.get("lane") if isinstance(data, dict) and isinstance(data.get("lane"), dict) else {}
-        declared = bool(data and data.get("parallel_lanes_declared"))
+        if error:
+            lane = {}  # Unusable evidence cannot establish lane identity or declaration.
+        declared = bool(not error and data and data.get("parallel_lanes_declared"))
         source_reports.append(
             {
                 "path": source_ref,
-                "status": data.get("status") if isinstance(data, dict) else ("parse_error" if error else "missing"),
+                "status": "invalid_report" if error else data.get("status"),
                 "schema": data.get("schema") if isinstance(data, dict) else None,
                 "parallel_lanes_declared": declared,
                 "lane_id": lane.get("lane_id"),
                 "error": error,
             }
         )
-        if not data or not declared:
-            continue
-
-        reason_codes, reason_details = reason_codes_for_parallel_lane(
-            lane_report=data,
-            profile=profile,
-            pr_risk_report=pr_risk,
-            plan_coherence_report=plan_coherence,
-            task_claim_report=task_claims,
-            alignment_data=alignment_data,
-        )
+        if error:
+            reason_codes = ["handoff_report_invalid"]
+            reason_details = {
+                "planned_risk_tier": None,
+                "actual_risk_tier": None,
+                "actual_effective_profile": None,
+                "planned_risk_refs": [],
+                "actual_risk_refs": [],
+                "evidence_gap_refs": [source_ref],
+            }
+        else:
+            if not declared:
+                continue
+            reason_codes, reason_details = reason_codes_for_parallel_lane(
+                lane_report=data,
+                profile=profile,
+                pr_risk_report=pr_risk,
+                plan_coherence_report=plan_coherence,
+                task_claim_report=task_claims,
+                alignment_data=alignment_data,
+            )
         if not reason_codes:
             continue
 
@@ -4287,7 +4305,7 @@ def build_ui_experience_quality_reconciliation(
     report, source_ref, data, evidence, source_report = classified_optional_source(
         root, naos_root, profile, policy, "ui_experience_quality_report",
     )
-    error = source_report["error"]
+    _error = source_report["error"]  # Retain the existing required-field read.
     reason_code_counts = {code: 0 for code in UI_EXPERIENCE_QUALITY_REASON_ORDER}
     if evidence["applicability"] == "not_applicable":
         return [], [], {

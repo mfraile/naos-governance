@@ -74,7 +74,7 @@ class SecureCodingProjectionContractTests(unittest.TestCase):
 
     def test_optional_projection_round_trips_real_legacy_and_v2_reports(self):
         with tempfile.TemporaryDirectory(prefix="naos projected reports ") as temporary:
-            directory = Path(temporary)
+            directory = Path(temporary).resolve()
             for version in (1, 2):
                 with self.subTest(version=version):
                     dashboard = directory / "dashboard.json"
