@@ -21,7 +21,6 @@ import json
 import os
 import platform
 import re
-import shutil
 import sqlite3
 import stat
 import sys
@@ -71,7 +70,8 @@ try:  # Installed package or source-checkout shim.
         current_managed_content_paths,
         fsync_directory,
         lock_observation as observe_stable_lock,
-        rename_no_replace,
+        rename_no_replace_at,
+        _open_safe_directory_at,
     )
 except ImportError:  # Generated standalone adopter surface.
     from upgrade_contract import repository_intelligence_windows as ri_windows_storage
@@ -104,7 +104,8 @@ except ImportError:  # Generated standalone adopter surface.
         current_managed_content_paths,
         fsync_directory,
         lock_observation as observe_stable_lock,
-        rename_no_replace,
+        rename_no_replace_at,
+        _open_safe_directory_at,
     )
 
 import naos_local_context_index as local_context_index_module  # noqa: E402
@@ -118,6 +119,7 @@ from naos_local_context_index import (  # noqa: E402
     secure_regular_file_snapshot,
 )
 from naos_policy import (  # noqa: E402
+    _open_report_parent_fd,
     default_naos_root,
     kit_root,
     load_policy,
@@ -1581,16 +1583,113 @@ def _bundle_digest_payload(bundle: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _make_private_directory(path: Path) -> None:
-    if path.exists() or path.is_symlink():
-        raise RepositoryIntelligenceError(f"Refusing existing plan-bundle path: {path}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    os.mkdir(path, 0o700)
+class _PosixPlanBundleStorage:
+    """Keep plan-bundle writes and readback within one admitted directory."""
+
+    def __init__(self, path: Path, parent_fd: int, name: str, directory_fd: int):
+        self.path = path
+        self.parent_fd = parent_fd
+        self.name = name
+        self.directory_fd = directory_fd
+        self.files: dict[str, tuple[int, int, str]] = {}
+
+    def require_named(self) -> None:
+        try:
+            visible_parent = os.stat(self.path.parent, follow_symlinks=False)
+        except OSError as exc:
+            raise RepositoryIntelligenceError(
+                f"Plan-bundle parent identity changed; original path is untrusted: {self.path}"
+            ) from exc
+        held_parent = os.fstat(self.parent_fd)
+        if (not stat.S_ISDIR(visible_parent.st_mode)
+                or (visible_parent.st_dev, visible_parent.st_ino)
+                != (held_parent.st_dev, held_parent.st_ino)
+                or not _state_directory_matches(self.parent_fd, self.name, self.directory_fd)):
+            raise RepositoryIntelligenceError(
+                f"Plan-bundle directory identity changed; original path is untrusted: {self.path}"
+            )
+
+    def write_new(self, name: str, data: bytes) -> None:
+        if name in {"", ".", ".."} or "/" in name or name in self.files:
+            raise RepositoryIntelligenceError(f"Invalid or repeated plan-bundle file: {name}")
+        self.require_named()
+        with _new_state_file_at(self.directory_fd, name, data) as metadata:
+            self.files[name] = (metadata.st_dev, metadata.st_ino, sha256_bytes(data))
+
+    def read(self, name: str) -> bytes:
+        self.require_named()
+        expected = self.files.get(name)
+        if expected is None:
+            raise RepositoryIntelligenceError(f"Unowned plan-bundle file: {name}")
+        flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        descriptor = os.open(name, flags, dir_fd=self.directory_fd)
+        try:
+            opened = os.fstat(descriptor)
+            entry = os.stat(name, dir_fd=self.directory_fd, follow_symlinks=False)
+            if (not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1
+                    or stat.S_IMODE(opened.st_mode) != 0o600
+                    or (opened.st_dev, opened.st_ino) != expected[:2]
+                    or (entry.st_dev, entry.st_ino) != expected[:2]):
+                raise RepositoryIntelligenceError(f"Plan-bundle file identity changed: {name}")
+            with os.fdopen(descriptor, "rb", closefd=False) as stream:
+                data = stream.read()
+            after = os.fstat(descriptor)
+            if (after.st_size != len(data)
+                    or (after.st_dev, after.st_ino, after.st_mtime_ns, after.st_ctime_ns)
+                    != (opened.st_dev, opened.st_ino, opened.st_mtime_ns, opened.st_ctime_ns)
+                    or sha256_bytes(data) != expected[2]):
+                raise RepositoryIntelligenceError(f"Plan-bundle file changed during readback: {name}")
+            self.require_named()
+            return data
+        finally:
+            os.close(descriptor)
+
+    def file_record(self, name: str) -> dict[str, Any]:
+        data = self.read(name)
+        return {"path": name, "sha256": sha256_bytes(data), "size_bytes": len(data)}
+
+    def require_contents(self) -> None:
+        self.require_named()
+        if set(os.listdir(self.directory_fd)) != set(self.files):
+            raise RepositoryIntelligenceError(
+                f"Plan-bundle directory contains an unowned or missing file: {self.path}"
+            )
+        for name in self.files:
+            self.read(name)
 
 
-def _private_file(path: Path) -> None:
-    os.chmod(path, 0o600)
-    _fsync_file(path)
+@contextmanager
+def _posix_plan_bundle_storage(path: Path):
+    try:
+        parent_fd, name = _open_report_parent_fd(
+            path, strict_parent_topology=True, create_parents=True,
+            search_only_ancestors=True, search_only_final=True,
+        )
+    except ValueError as exc:
+        raise RepositoryIntelligenceError(str(exc)) from exc
+    try:
+        if _state_file_stat(parent_fd, name) is not None:
+            raise RepositoryIntelligenceError(f"Refusing existing plan-bundle path: {path}")
+        # Linux O_PATH can hold a search-only parent but cannot fsync it; the
+        # prior bundle writer did not fsync that parent after mkdir either.
+        with _new_state_directory(path, parent_fd=parent_fd,
+                                  fsync_parent=False,
+                                  allowed_special_mode=stat.S_ISGID) as directory_fd:
+            storage = _PosixPlanBundleStorage(path, parent_fd, name, directory_fd)
+            try:
+                yield storage
+                storage.require_contents()
+            except Exception as exc:
+                # A pathname cleanup could select a concurrently replaced tree.
+                # Skip cleanup and report the uncertain original name.
+                raise RepositoryIntelligenceError(
+                    f"Plan-bundle generation failed; temporary cleanup was skipped. "
+                    f"The original path may have changed: {path}; cause: {exc}"
+                ) from exc
+    finally:
+        os.close(parent_fd)
 
 
 @contextmanager
@@ -1617,9 +1716,10 @@ def _build_plan_bundle(
     provenance_gate: dict[str, Any],
 ) -> dict[str, Any]:
     if os.name != "nt":
-        return _build_plan_bundle_contents(root, inspection, profile=profile, purpose=purpose,
-            component_mode=component_mode, rules_path=rules_path, bundle_dir=bundle_dir,
-            provenance_gate=provenance_gate)
+        with _posix_plan_bundle_storage(bundle_dir) as storage:
+            return _build_plan_bundle_contents(root, inspection, profile=profile, purpose=purpose,
+                component_mode=component_mode, rules_path=rules_path, bundle_dir=bundle_dir,
+                provenance_gate=provenance_gate, bundle_storage=storage)
     # The external output parent is caller-selected. The bundle itself is an
     # exclusively created, private directory pinned throughout generation.
     with ri_windows_storage.WindowsRIStorage(str(bundle_dir.parent)) as storage:
@@ -1641,20 +1741,24 @@ def _build_plan_bundle_contents(
     bundle_dir: Path,
     provenance_gate: dict[str, Any],
     native_storage: Any = None,
+    bundle_storage: _PosixPlanBundleStorage | None = None,
 ) -> dict[str, Any]:
-    if native_storage is None:
-        _make_private_directory(bundle_dir)
+    if (native_storage is None) == (bundle_storage is None):
+        raise RepositoryIntelligenceError("Plan-bundle storage must be pinned to one platform backend")
     def write_bytes(path: Path, data: bytes) -> None:
-        if native_storage is None:
-            _write_new_bytes(path, data)
+        if bundle_storage is not None:
+            bundle_storage.write_new(path.name, data)
         else:
             native_storage.write_new(bundle_dir.name + "/" + path.name, data)
     def write_json(path: Path, value: dict[str, Any]) -> None:
-        if native_storage is None:
-            _write_json(path, value)
-            _private_file(path)
+        if bundle_storage is not None:
+            from naos_self_check_inspection import logicalize_payload
+            logicalize_payload(value)
+            write_bytes(path, _json_report_bytes(value))
         else:
             write_bytes(path, _json_report_bytes(value))
+    def file_record(path: Path) -> dict[str, Any]:
+        return bundle_storage.file_record(path.name) if bundle_storage is not None else _file_record(path)
     try:
         graph_model = {
             "directed": True,
@@ -1722,7 +1826,7 @@ def _build_plan_bundle_contents(
                 "status": "validated",
                 "limitations": inventory_report["limitations"],
             }
-            with _bundle_sqlite_connection(native_storage) as connection:
+            with _bundle_sqlite_connection(bundle_storage or native_storage) as connection:
                 fts_available, sqlite_findings = populate_sqlite_database(
                     sqlite_path if connection is None else None,
                     provisional,
@@ -1745,14 +1849,12 @@ def _build_plan_bundle_contents(
                     },
                     connection=connection,
                 )
-                if connection is None:
-                    _private_file(sqlite_path)
-                else:
-                    write_bytes(sqlite_path, connection.serialize())
+                write_bytes(sqlite_path, connection.serialize())
             sqlite_validation = _validate_sqlite(
                 sqlite_path,
                 inspection["effective_source_sha256"],
                 sqlite_content_binding,
+                bundle_reader=bundle_storage.read if bundle_storage is not None else None,
             )
         else:
             sqlite_validation = {
@@ -1770,7 +1872,7 @@ def _build_plan_bundle_contents(
                 inspection["relationships"],
                 source_sha256=inspection["effective_source_sha256"],
                 model_sha256=graph_model_sha256,
-                native_write=write_bytes if native_storage is not None else None,
+                native_write=write_bytes,
             )
         else:
             graph_validation = {
@@ -1837,7 +1939,7 @@ def _build_plan_bundle_contents(
             content_paths.append(sqlite_path)
         if graph_path is not None:
             content_paths.append(graph_path)
-        content_files = sorted((_file_record(path) for path in content_paths), key=lambda item: item["path"])
+        content_files = sorted((file_record(path) for path in content_paths), key=lambda item: item["path"])
         manifest_control = {
             "generation_id": generation_id,
             "generation_content_sha256": generation_content_sha256,
@@ -1878,11 +1980,12 @@ def _build_plan_bundle_contents(
         }
         manifest_path = bundle_dir / "manifest.json"
         write_json(manifest_path, manifest)
-        if native_storage is None:
-            _fsync_directory(bundle_dir)
+        if bundle_storage is not None:
+            os.fsync(bundle_storage.directory_fd)
+            bundle_storage.require_named()
 
         bundle_files = sorted(
-            (_file_record(path) for path in [*content_paths, manifest_path]),
+            (file_record(path) for path in [*content_paths, manifest_path]),
             key=lambda item: item["path"],
         )
         bundle = {
@@ -1904,8 +2007,6 @@ def _build_plan_bundle_contents(
         bundle["bundle_sha256"] = canonical_sha256(_bundle_digest_payload(bundle))
         return bundle
     except Exception:
-        if native_storage is None and bundle_dir.exists() and bundle_dir.is_dir() and not bundle_dir.is_symlink():
-            shutil.rmtree(bundle_dir)
         raise
 
 
@@ -2901,14 +3002,9 @@ def _validate_graphml_file(
     }
 
 
-def _generation_sqlite_connection(path: Path, generation_reader=None):
-    """Open POSIX immutable files or bounded Windows native generation bytes."""
-    if generation_reader is None:
-        return sqlite3.connect(path.resolve(strict=True).as_uri() + "?mode=ro&immutable=1", uri=True)
-    if os.name != "nt":
-        raise RepositoryIntelligenceError("Native generation reader requires Windows")
-    data = generation_reader("local_context_index.sqlite")
-    if not isinstance(data, bytes) or not 0 < len(data) <= ri_windows_storage.MAX_FILE_BYTES:
+def _sqlite_image_connection(data: bytes, *, maximum_bytes: int | None = None):
+    if (not isinstance(data, bytes) or not data
+            or (maximum_bytes is not None and len(data) > maximum_bytes)):
         raise RepositoryIntelligenceError("Native SQLite image is invalid or exceeds its bound")
     connection = sqlite3.connect(":memory:")
     try:
@@ -2924,15 +3020,31 @@ def _generation_sqlite_connection(path: Path, generation_reader=None):
         raise
 
 
+def _generation_sqlite_connection(path: Path, generation_reader=None):
+    """Open POSIX immutable files or bounded Windows native generation bytes."""
+    if generation_reader is None:
+        return sqlite3.connect(path.resolve(strict=True).as_uri() + "?mode=ro&immutable=1", uri=True)
+    if os.name != "nt":
+        raise RepositoryIntelligenceError("Native generation reader requires Windows")
+    return _sqlite_image_connection(
+        generation_reader("local_context_index.sqlite"),
+        maximum_bytes=ri_windows_storage.MAX_FILE_BYTES,
+    )
+
+
 def _validate_sqlite(
     path: Path,
     expected_source_sha256: str,
     expected_content_binding: dict[str, Any],
     *,
     generation_reader=None,
+    bundle_reader=None,
 ) -> dict[str, Any]:
     try:
-        connection = _generation_sqlite_connection(path, generation_reader)
+        if bundle_reader is not None:
+            connection = _sqlite_image_connection(bundle_reader("local_context_index.sqlite"))
+        else:
+            connection = _generation_sqlite_connection(path, generation_reader)
     except OSError as exc:
         raise RepositoryIntelligenceError(f"SQLite generation is unavailable: {path}") from exc
     try:
@@ -3096,19 +3208,180 @@ def _json_report_bytes(report: dict[str, Any]) -> bytes:
     return (json.dumps(report, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
-def _write_new_bytes(path: Path, data: bytes) -> None:
+@contextmanager
+def _state_file_parent(path: Path):
+    """Hold no-follow ancestry for one POSIX state-file operation.
+
+    Retain search-only nonfinal ancestry and the existing private-file mode,
+    rather than imposing the report publisher's separate metadata contract.
+    """
+    try:
+        descriptor, name = _open_report_parent_fd(
+            path, strict_parent_topology=True, create_parents=False,
+            search_only_ancestors=True,
+        )
+    except ValueError as exc:
+        raise RepositoryIntelligenceError(str(exc)) from exc
+    try:
+        yield descriptor, name
+    finally:
+        os.close(descriptor)
+
+
+def _state_file_stat(parent_fd: int, name: str) -> os.stat_result | None:
+    try:
+        return os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+
+
+@contextmanager
+def _state_directory(path: Path, *, parent_fd: int | None = None,
+                     diagnostic: str | None = None):
+    """Hold both the operated directory and its admitted no-follow parent."""
+    with ExitStack() as stack:
+        try:
+            if parent_fd is None:
+                parent_fd, name = stack.enter_context(_state_file_parent(path))
+            else:
+                name = path.name
+            descriptor = _open_safe_directory_at(parent_fd, name, label=str(path), expected_mode=None)
+        except FileNotFoundError:
+            raise
+        except (OSError, TransactionPrimitiveError, RepositoryIntelligenceError) as exc:
+            if diagnostic is not None:
+                raise RepositoryIntelligenceError(f"{diagnostic}: {path}") from exc
+            raise
+        stack.callback(os.close, descriptor)
+        yield parent_fd, name, descriptor
+
+
+def _state_directory_matches(parent_fd: int, name: str, descriptor: int) -> bool:
+    entry = _state_file_stat(parent_fd, name)
+    opened = os.fstat(descriptor)
+    return (entry is not None and stat.S_ISDIR(entry.st_mode)
+            and (entry.st_dev, entry.st_ino) == (opened.st_dev, opened.st_ino))
+
+
+@contextmanager
+def _new_state_directory(path: Path, *, force_private_mode: bool = True,
+                         parent_fd: int | None = None,
+                         fsync_parent: bool = True,
+                         allowed_special_mode: int = 0):
+    with ExitStack() as stack:
+        if parent_fd is None:
+            parent_fd, name = stack.enter_context(_state_file_parent(path))
+        else:
+            name = path.name
+        try:
+            os.mkdir(name, 0o700, dir_fd=parent_fd)
+        except OSError as exc:
+            raise OSError(exc.errno, exc.strerror, str(path)) from exc
+        _, _, descriptor = stack.enter_context(_state_directory(path, parent_fd=parent_fd))
+        # mkdir has no returned descriptor. Refuse detectable substitution before
+        # any payload/metadata mutation; do not normalize an unverified occupant.
+        # A preexisting empty 0700 directory is indistinguishable at this point:
+        # these admission checks do not provide an inode-CAS creation primitive.
+        mode = stat.S_IMODE(os.fstat(descriptor).st_mode)
+        if (mode & ~(0o700 | allowed_special_mode)
+                or (force_private_mode and (mode & 0o777) != 0o700)
+                or os.listdir(descriptor)
+                or not _state_directory_matches(parent_fd, name, descriptor)):
+            raise RepositoryIntelligenceError(
+                f"New state-directory admission conflict was preserved: {path}"
+            )
+        os.fsync(descriptor)
+        if fsync_parent:
+            os.fsync(parent_fd)
+        yield descriptor
+
+
+def _remove_empty_state_directory(parent_fd: int, name: str, descriptor: int, path: Path) -> None:
+    if os.listdir(descriptor) or not _state_directory_matches(parent_fd, name, descriptor):
+        raise RepositoryIntelligenceError(f"Directory rollback conflict was preserved: {path}")
+    os.rmdir(name, dir_fd=parent_fd)
+    os.fsync(parent_fd)
+
+
+def rename_no_replace(source: Path, destination: Path, *,
+                      expected_source: tuple[int, int] | None = None) -> None:
+    """Publish an RI directory beneath held source/destination parents."""
+    with _state_directory(source) as (source_parent, source_name, descriptor):
+        with _state_file_parent(destination) as (destination_parent, destination_name):
+            _publish_state_directory_at(source_parent, source_name, descriptor,
+                destination_parent, destination_name, source, destination,
+                expected_source=expected_source)
+
+
+def _publish_state_directory_at(
+    source_parent: int, source_name: str, descriptor: int,
+    destination_parent: int, destination_name: str, source: Path, destination: Path, *,
+    expected_source: tuple[int, int] | None = None,
+) -> None:
+    opened = os.fstat(descriptor)
+    if ((expected_source is not None and (opened.st_dev, opened.st_ino) != expected_source)
+            or not _state_directory_matches(source_parent, source_name, descriptor)):
+        raise RepositoryIntelligenceError(f"Directory publication identity conflict was preserved: {source}")
+    try:
+        rename_no_replace_at(source_parent, source_name, destination_parent, destination_name)
+    except OSError as exc:
+        if sys.platform == "darwin":
+            raise OSError(exc.errno, exc.strerror, str(destination)) from exc
+        raise
+    os.fsync(source_parent)
+    os.fsync(destination_parent)
+
+
+def _same_state_file(left: os.stat_result | None, right: os.stat_result) -> bool:
+    return left is not None and (
+        left.st_dev, left.st_ino, left.st_mode, left.st_nlink,
+        left.st_size, left.st_mtime_ns, left.st_ctime_ns,
+    ) == (
+        right.st_dev, right.st_ino, right.st_mode, right.st_nlink,
+        right.st_size, right.st_mtime_ns, right.st_ctime_ns,
+    )
+
+
+def _require_private_pending(
+    metadata: os.stat_result, label: Path, *,
+    diagnostic: str = "Unsafe pending atomic-write file is preserved and refused",
+) -> None:
+    if (not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1
+            or stat.S_IMODE(metadata.st_mode) != 0o600):
+        raise RepositoryIntelligenceError(
+            f"{diagnostic}: {label}"
+        )
+
+
+@contextmanager
+def _new_state_file_at(parent_fd: int, name: str, data: bytes):
+    """Keep the created inode open through its caller's publication/cleanup.
+
+    A payload failure intentionally retains the fixed partial pending file for
+    the existing recovery grammar. No process-wide umask change is needed.
+    """
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
-    descriptor = os.open(path, flags, 0o600)
+    descriptor = os.open(name, flags, 0o600, dir_fd=parent_fd)
     try:
         os.fchmod(descriptor, 0o600)
         offset = 0
         while offset < len(data):
-            offset += os.write(descriptor, data[offset:])
+            written = os.write(descriptor, data[offset:])
+            if written <= 0:
+                raise OSError("State-file payload write made no progress.")
+            offset += written
         os.fsync(descriptor)
+        yield os.fstat(descriptor)
     finally:
         os.close(descriptor)
+
+
+def _write_new_bytes(path: Path, data: bytes) -> None:
+    with _state_file_parent(path) as (parent_fd, name):
+        with _new_state_file_at(parent_fd, name, data):
+            pass
 
 
 def _current_active_pointer(context_root: Path) -> dict[str, Any] | None:
@@ -3124,30 +3397,55 @@ def _current_active_pointer(context_root: Path) -> dict[str, Any] | None:
 
 
 def _atomic_write_bytes(path: Path, data: bytes) -> None:
-    parent = path.parent
-    temporary = parent / f".{path.name}.pending"
-    if temporary.exists() or temporary.is_symlink():
-        metadata = os.lstat(temporary)
-        if (
-            stat.S_ISLNK(metadata.st_mode)
-            or not stat.S_ISREG(metadata.st_mode)
-            or metadata.st_nlink != 1
-            or stat.S_IMODE(metadata.st_mode) != 0o600
-        ):
-            raise RepositoryIntelligenceError(
-                f"Unsafe pending atomic-write file is preserved and refused: {temporary}"
-            )
-        temporary.unlink()
-        _fsync_directory(parent)
-    _write_new_bytes(temporary, data)
-    try:
-        os.replace(temporary, path)
-        _fsync_directory(parent)
-    finally:
+    with _state_file_parent(path) as (parent_fd, name):
+        _atomic_state_file_at(parent_fd, name, data, path)
+
+
+def _atomic_state_file_at(
+    parent_fd: int, name: str, data: bytes, path: Path, *,
+    expected_current: os.stat_result | None = None,
+) -> None:
+    pending = f".{name}.pending"
+    metadata = _state_file_stat(parent_fd, pending)
+    if metadata is not None:
+        _require_private_pending(metadata, path.with_name(pending))
+        os.unlink(pending, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+    with _new_state_file_at(parent_fd, pending, data) as owned:
         try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
+            if not _same_state_file(_state_file_stat(parent_fd, pending), owned):
+                raise RepositoryIntelligenceError("State-file pending occupant changed; preserved and refused.")
+            if expected_current is not None and not _same_state_file(
+                _state_file_stat(parent_fd, name), expected_current
+            ):
+                raise RepositoryIntelligenceError("Active pointer changed before rollback; preserved and refused.")
+            os.replace(pending, name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            os.fsync(parent_fd)
+        finally:
+            # Holding the original inode prevents an unlink/recreate from
+            # recycling its identity. Never remove a foreign replacement.
+            if _same_state_file(_state_file_stat(parent_fd, pending), owned):
+                os.unlink(pending, dir_fd=parent_fd)
+
+
+@contextmanager
+def _read_state_file_at(parent_fd: int, name: str):
+    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent_fd)
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise RepositoryIntelligenceError("Unsafe active pointer is preserved and refused.")
+        chunks = []
+        while chunk := os.read(descriptor, 64 * 1024):
+            chunks.append(chunk)
+        data = b"".join(chunks)
+        after = os.fstat(descriptor)
+        if not _same_state_file(after, before) or len(data) != before.st_size:
+            raise RepositoryIntelligenceError("Active pointer changed during snapshot; preserved and refused.")
+        yield data, before
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 def _validate_promoted_generation(
@@ -3237,21 +3535,30 @@ def _staging_pending_name(name: str) -> str:
     return f".{name}.pending"
 
 
-def _copy_exact_bundle(bundle_dir: Path, staging_dir: Path, records: list[dict[str, Any]]) -> None:
-    os.mkdir(staging_dir, 0o700)
-    os.chmod(staging_dir, 0o700)
-    _fsync_directory(staging_dir)
-    _fsync_directory(staging_dir.parent)
-    for record in sorted(records, key=lambda item: str(item.get("path") or "")):
-        name = str(record.get("path") or "")
-        data = secure_regular_file_bytes(bundle_dir / name)
-        if sha256_bytes(data) != record.get("sha256") or len(data) != record.get("size_bytes"):
-            raise RepositoryIntelligenceError(f"Plan-bundle file changed during promotion: {name}")
-        destination = staging_dir / name
-        pending = staging_dir / _staging_pending_name(name)
-        _write_new_bytes(pending, data)
-        rename_no_replace(pending, destination)
-        _fsync_directory(staging_dir)
+def _copy_exact_bundle(bundle_dir: Path, staging_dir: Path, records: list[dict[str, Any]]) -> os.stat_result:
+    with _new_state_directory(staging_dir) as parent_fd:
+        for record in sorted(records, key=lambda item: str(item.get("path") or "")):
+            name = str(record.get("path") or "")
+            if not name or Path(name).name != name or name in {".", ".."}:
+                raise RepositoryIntelligenceError(f"Transaction staging-file path is invalid: {name!r}")
+            data = secure_regular_file_bytes(bundle_dir / name)
+            if sha256_bytes(data) != record.get("sha256") or len(data) != record.get("size_bytes"):
+                raise RepositoryIntelligenceError(f"Plan-bundle file changed during promotion: {name}")
+            destination = name
+            pending = _staging_pending_name(name)
+            with _new_state_file_at(parent_fd, pending, data) as owned:
+                if not _same_state_file(_state_file_stat(parent_fd, pending), owned):
+                    raise RepositoryIntelligenceError("Staged bundle occupant changed; preserved and refused.")
+                try:
+                    rename_no_replace_at(parent_fd, pending, parent_fd, destination)
+                except OSError as exc:
+                    if sys.platform == "darwin":
+                        # renamex_np historically displayed the full destination;
+                        # renameatx_np receives only a leaf, without reopening it.
+                        raise OSError(exc.errno, exc.strerror, str(staging_dir / name)) from exc
+                    raise
+                os.fsync(parent_fd)
+        return os.fstat(parent_fd)
 
 
 def _exact_file_record_map(records: Any) -> dict[str, dict[str, Any]]:
@@ -3288,12 +3595,35 @@ def _operation_directory_conflicts(
     require_complete: bool = False,
     expected_device: int | None = None,
     expected_inode: int | None = None,
+    _directory_fd: int | None = None,
+    _observations: dict[str, os.stat_result] | None = None,
 ) -> list[str]:
     expected = _exact_file_record_map(records)
+    if _directory_fd is not None:
+        return _operation_directory_conflicts_at(
+            _directory_fd, path, expected, allow_pending=allow_pending,
+            require_complete=require_complete, expected_device=expected_device,
+            expected_inode=expected_inode, observations=_observations,
+        )
     try:
-        root_metadata = os.lstat(path)
+        with _state_directory(path) as (_, _, descriptor):
+            return _operation_directory_conflicts_at(
+                descriptor, path, expected, allow_pending=allow_pending,
+                require_complete=require_complete, expected_device=expected_device,
+                expected_inode=expected_inode, observations=_observations,
+            )
     except FileNotFoundError:
         return []
+    except (OSError, ValueError, RepositoryIntelligenceError, TransactionPrimitiveError):
+        return [str(path)]
+
+
+def _operation_directory_conflicts_at(
+    descriptor: int, path: Path, expected: dict[str, dict[str, Any]], *,
+    allow_pending: bool, require_complete: bool, expected_device: int | None,
+    expected_inode: int | None, observations: dict[str, os.stat_result] | None,
+) -> list[str]:
+    root_metadata = os.fstat(descriptor)
     conflicts: list[str] = []
     if (
         stat.S_ISLNK(root_metadata.st_mode)
@@ -3309,8 +3639,12 @@ def _operation_directory_conflicts(
         _staging_pending_name(name): name for name in expected
     } if allow_pending else {}
     observed_complete: set[str] = set()
-    for child in sorted(path.iterdir(), key=lambda item: item.name):
-        metadata = os.lstat(child)
+    for name in sorted(os.listdir(descriptor)):
+        child = path / name
+        metadata = _state_file_stat(descriptor, name)
+        if metadata is None:
+            conflicts.append(str(child))
+            continue
         if (
             stat.S_ISLNK(metadata.st_mode)
             or not stat.S_ISREG(metadata.st_mode)
@@ -3319,19 +3653,25 @@ def _operation_directory_conflicts(
         ):
             conflicts.append(str(child))
             continue
-        record = expected.get(child.name)
+        record = expected.get(name)
         if record is not None:
             try:
-                data = secure_regular_file_bytes(child)
+                with _read_state_file_at(descriptor, name) as (data, opened):
+                    if not _same_state_file(metadata, opened):
+                        raise RepositoryIntelligenceError("Staging member changed during validation.")
             except (OSError, RepositoryIntelligenceError):
                 conflicts.append(str(child))
                 continue
             if len(data) != record["size_bytes"] or sha256_bytes(data) != record["sha256"]:
                 conflicts.append(str(child))
             else:
-                observed_complete.add(child.name)
+                observed_complete.add(name)
+                if observations is not None:
+                    observations[name] = metadata
             continue
-        if child.name in pending_names:
+        if name in pending_names:
+            if observations is not None:
+                observations[name] = metadata
             continue
         conflicts.append(str(child))
     if require_complete:
@@ -3348,24 +3688,35 @@ def _remove_owned_staging(
     *,
     expected_device: int | None = None,
     expected_inode: int | None = None,
+    _parent_fd: int | None = None,
 ) -> None:
-    if not staging_path.exists() and not staging_path.is_symlink():
-        return
-    conflicts = _operation_directory_conflicts(
-        staging_path,
-        records,
-        allow_pending=True,
-        expected_device=expected_device,
-        expected_inode=expected_inode,
-    )
-    if conflicts:
-        raise RepositoryIntelligenceError(
-            "Rollback conflict preserved in transaction staging: " + ", ".join(conflicts)
+    with ExitStack() as stack:
+        try:
+            parent_fd, name, descriptor = stack.enter_context(_state_directory(
+                staging_path, parent_fd=_parent_fd,
+                diagnostic="Rollback conflict preserved in transaction staging",
+            ))
+        except FileNotFoundError:
+            return
+        observed: dict[str, os.stat_result] = {}
+        conflicts = _operation_directory_conflicts(
+            staging_path, records, allow_pending=True,
+            expected_device=expected_device, expected_inode=expected_inode,
+            _directory_fd=descriptor, _observations=observed,
         )
-    for child in sorted(staging_path.iterdir(), key=lambda item: item.name):
-        child.unlink()
-    staging_path.rmdir()
-    _fsync_directory(staging_path.parent)
+        if not _state_directory_matches(parent_fd, name, descriptor):
+            conflicts.append(str(staging_path))
+        if conflicts:
+            raise RepositoryIntelligenceError(
+                "Rollback conflict preserved in transaction staging: " + ", ".join(conflicts)
+            )
+        for child, metadata in sorted(observed.items()):
+            if not _same_state_file(_state_file_stat(descriptor, child), metadata):
+                raise RepositoryIntelligenceError(
+                    "Rollback conflict preserved in transaction staging: " + str(staging_path / child)
+                )
+            os.unlink(child, dir_fd=descriptor)
+        _remove_empty_state_directory(parent_fd, name, descriptor, staging_path)
 
 
 def _journal_digest_payload(journal: dict[str, Any]) -> dict[str, Any]:
@@ -3374,19 +3725,37 @@ def _journal_digest_payload(journal: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _write_journal(path: Path, journal: dict[str, Any], *, state: str, error: str | None = None) -> dict[str, Any]:
+def _write_journal(path: Path, journal: dict[str, Any], *, state: str, error: str | None = None,
+                   _parent_fd: int | None = None) -> dict[str, Any]:
     updated = copy.deepcopy(journal)
     updated["state"] = state
     updated["updated_at"] = utc_now_text()
     updated["last_error"] = error
     updated["journal_sha256"] = canonical_sha256(_journal_digest_payload(updated))
     _validate_schema(updated, JOURNAL_SCHEMA)
-    _atomic_write_bytes(path, _json_report_bytes(updated))
+    if _parent_fd is None:
+        _atomic_write_bytes(path, _json_report_bytes(updated))
+    else:
+        _atomic_state_file_at(_parent_fd, path.name, _json_report_bytes(updated), path)
     return updated
 
 
-def _load_journal(path: Path) -> dict[str, Any]:
-    journal = _strict_json_file(path)
+def _load_journal(path: Path, *, _parent_fd: int | None = None) -> dict[str, Any]:
+    if _parent_fd is None:
+        journal = _strict_json_file(path)
+    else:
+        metadata = _state_file_stat(_parent_fd, path.name)
+        if metadata is None:
+            raise RepositoryIntelligenceError(f"JSON control file is unavailable: {path}")
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise RepositoryIntelligenceError(f"Refusing unsafe JSON control file: {path}")
+        try:
+            with _read_state_file_at(_parent_fd, path.name) as (data, _):
+                journal = loads_strict_json(data)
+        except (CanonicalizationError, OSError, ValueError) as exc:
+            raise RepositoryIntelligenceError(f"Invalid JSON control file {path}: {exc}") from exc
+        if not isinstance(journal, dict):
+            raise RepositoryIntelligenceError(f"JSON control file must contain an object: {path}")
     if journal.get("schema") != "naos.repository_intelligence.transaction_journal.v1":
         raise RepositoryIntelligenceError(f"Unsupported transaction journal: {path}")
     if canonical_sha256(_journal_digest_payload(journal)) != journal.get("journal_sha256"):
@@ -3427,15 +3796,13 @@ def _prepare_transaction_directory(
         raise RepositoryIntelligenceError(
             f"Transaction preparation already exists: {transaction_id}. Run status/recovery before retrying."
         )
-    os.mkdir(preparing_dir, 0o700)
-    _fsync_directory(transactions_root)
-    prepared = _write_journal(
-        preparing_dir / "journal.json",
-        journal,
-        state="PREPARED",
-    )
-    rename_no_replace(preparing_dir, transaction_dir)
-    _fsync_directory(transactions_root)
+    with _state_file_parent(preparing_dir) as (parent_fd, preparing_name):
+        with _new_state_directory(preparing_dir, force_private_mode=False,
+                                  parent_fd=parent_fd) as descriptor:
+            prepared = _write_journal(preparing_dir / "journal.json", journal,
+                                       state="PREPARED", _parent_fd=descriptor)
+            _publish_state_directory_at(parent_fd, preparing_name, descriptor,
+                parent_fd, transaction_dir.name, preparing_dir, transaction_dir)
     return transaction_dir / "journal.json", prepared
 
 
@@ -3445,58 +3812,52 @@ def _normalize_preparing_transactions(transactions_root: Path) -> list[dict[str,
     normalized: list[dict[str, Any]] = []
     if not transactions_root.exists():
         return normalized
-    for child in sorted(transactions_root.iterdir(), key=lambda item: item.name):
-        transaction_id = _transaction_id_from_preparing_name(child.name)
-        if transaction_id is None:
-            continue
-        metadata = os.lstat(child)
-        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
-            raise RepositoryIntelligenceError(
-                f"Unsafe transaction preparation entry is preserved and refused: {child}"
-            )
-        journal_pending = child / ".journal.json.pending"
-        if journal_pending.exists() or journal_pending.is_symlink():
-            pending_metadata = os.lstat(journal_pending)
-            if (
-                stat.S_ISLNK(pending_metadata.st_mode)
-                or not stat.S_ISREG(pending_metadata.st_mode)
-                or pending_metadata.st_nlink != 1
-                or stat.S_IMODE(pending_metadata.st_mode) != 0o600
-            ):
+    with _state_directory(transactions_root) as (_, _, root_fd):
+        for name in sorted(os.listdir(root_fd)):
+            transaction_id = _transaction_id_from_preparing_name(name)
+            if transaction_id is None:
+                continue
+            child = transactions_root / name
+            metadata = _state_file_stat(root_fd, name)
+            if metadata is None or not stat.S_ISDIR(metadata.st_mode):
                 raise RepositoryIntelligenceError(
-                    f"Unsafe pending journal is preserved and refused: {journal_pending}"
+                    f"Unsafe transaction preparation entry is preserved and refused: {child}"
                 )
-            journal_pending.unlink()
-            _fsync_directory(child)
-        entries = sorted(item.name for item in child.iterdir())
-        if not entries:
-            child.rmdir()
-            _fsync_directory(transactions_root)
-            normalized.append(
-                {
-                    "transaction_id": transaction_id,
-                    "state": "PREPARATION_DISCARDED",
-                    "journal_path": None,
-                    "unreferenced_generation_preserved": False,
-                }
-            )
-            continue
-        if entries != ["journal.json"]:
-            raise RepositoryIntelligenceError(
-                f"Unknown transaction preparation contents are preserved and refused: {child}"
-            )
-        journal = _load_journal(child / "journal.json")
-        if journal.get("transaction_id") != transaction_id:
-            raise RepositoryIntelligenceError(
-                f"Transaction preparation identity mismatch is preserved and refused: {child}"
-            )
-        transaction_dir = transactions_root / transaction_id
-        if transaction_dir.exists() or transaction_dir.is_symlink():
-            raise RepositoryIntelligenceError(
-                f"Transaction preparation collides with an existing transaction: {transaction_id}"
-            )
-        rename_no_replace(child, transaction_dir)
-        _fsync_directory(transactions_root)
+            with _state_directory(child, parent_fd=root_fd) as (_, _, child_fd):
+                pending_name = ".journal.json.pending"
+                pending_metadata = _state_file_stat(child_fd, pending_name)
+                if pending_metadata is not None:
+                    _require_private_pending(pending_metadata, child / pending_name,
+                        diagnostic="Unsafe pending journal is preserved and refused")
+                    os.unlink(pending_name, dir_fd=child_fd)
+                    os.fsync(child_fd)
+                entries = sorted(os.listdir(child_fd))
+                if not entries:
+                    _remove_empty_state_directory(root_fd, name, child_fd, child)
+                    normalized.append({
+                        "transaction_id": transaction_id,
+                        "state": "PREPARATION_DISCARDED",
+                        "journal_path": None,
+                        "unreferenced_generation_preserved": False,
+                    })
+                    continue
+                if entries != ["journal.json"]:
+                    raise RepositoryIntelligenceError(
+                        f"Unknown transaction preparation contents are preserved and refused: {child}"
+                    )
+                journal = _load_journal(child / "journal.json", _parent_fd=child_fd)
+                if journal.get("transaction_id") != transaction_id:
+                    raise RepositoryIntelligenceError(
+                        f"Transaction preparation identity mismatch is preserved and refused: {child}"
+                    )
+                transaction_dir = transactions_root / transaction_id
+                if _state_file_stat(root_fd, transaction_id) is not None:
+                    raise RepositoryIntelligenceError(
+                        f"Transaction preparation collides with an existing transaction: {transaction_id}"
+                    )
+                _publish_state_directory_at(root_fd, name, child_fd, root_fd,
+                    transaction_id, child, transaction_dir,
+                    expected_source=(metadata.st_dev, metadata.st_ino))
     return normalized
 
 
@@ -3666,20 +4027,16 @@ def _remove_active_pending(root: Path, context_root: Path, journal: dict[str, An
             "Transaction active-pointer pending path is invalid."
         )
     try:
-        metadata = os.lstat(pending)
+        with _state_file_parent(pending) as (parent_fd, name):
+            metadata = _state_file_stat(parent_fd, name)
+            if metadata is None:
+                return
+            _require_private_pending(metadata, pending,
+                                     diagnostic="Active-pointer rollback conflict was preserved")
+            os.unlink(name, dir_fd=parent_fd)
+            os.fsync(parent_fd)
     except FileNotFoundError:
         return
-    if (
-        stat.S_ISLNK(metadata.st_mode)
-        or not stat.S_ISREG(metadata.st_mode)
-        or metadata.st_nlink != 1
-        or stat.S_IMODE(metadata.st_mode) != 0o600
-    ):
-        raise RepositoryIntelligenceError(
-            f"Active-pointer rollback conflict was preserved: {pending}"
-        )
-    pending.unlink()
-    _fsync_directory(pending.parent)
 
 
 def _reconcile_initial_context_publication(
@@ -3717,77 +4074,67 @@ def _reconcile_initial_context_publication(
                 "Journaled context publication disappeared; rollback preserved state."
             )
         return journal
-    metadata = os.lstat(candidate)
-    if (
-        stat.S_ISLNK(metadata.st_mode)
-        or not stat.S_ISDIR(metadata.st_mode)
-        or stat.S_IMODE(metadata.st_mode) != 0o700
-        or not isinstance(device, int)
-        or isinstance(device, bool)
-        or not isinstance(inode, int)
-        or isinstance(inode, bool)
-        or metadata.st_dev != device
-        or metadata.st_ino != inode
-    ):
-        raise RepositoryIntelligenceError(
-            f"Context publication identity conflict was preserved: {candidate}"
-        )
-    entries = sorted(child.name for child in candidate.iterdir())
-    if entries != ["generations"]:
-        raise RepositoryIntelligenceError(
-            f"Context publication contents conflict was preserved: {candidate}"
-        )
-    generations = candidate / "generations"
-    generations_metadata = os.lstat(generations)
-    if (
-        stat.S_ISLNK(generations_metadata.st_mode)
-        or not stat.S_ISDIR(generations_metadata.st_mode)
-        or stat.S_IMODE(generations_metadata.st_mode) != 0o700
-    ):
-        raise RepositoryIntelligenceError(
-            f"Context generations directory conflict was preserved: {generations}"
-        )
-    generation_entries = sorted(generations.iterdir(), key=lambda item: item.name)
-    expected_generation = str(journal.get("generation_id") or "")
-    if generation_entries:
-        if len(generation_entries) != 1 or generation_entries[0].name != expected_generation:
+    with _state_directory(candidate,
+        diagnostic="Context publication identity conflict was preserved") as (parent_fd, name, context_fd):
+        metadata = os.fstat(context_fd)
+        if (
+            stat.S_IMODE(metadata.st_mode) != 0o700
+            or not isinstance(device, int) or isinstance(device, bool)
+            or not isinstance(inode, int) or isinstance(inode, bool)
+            or metadata.st_dev != device or metadata.st_ino != inode
+        ):
             raise RepositoryIntelligenceError(
-                f"Context generation conflict was preserved: {generations}"
+                f"Context publication identity conflict was preserved: {candidate}"
             )
-        conflicts = _operation_directory_conflicts(
-            generation_entries[0],
-            journal.get("staging_files"),
-            allow_pending=False,
-            require_complete=True,
-            expected_device=journal.get("staging_device"),
-            expected_inode=journal.get("staging_inode"),
-        )
-        if conflicts:
+        if sorted(os.listdir(context_fd)) != ["generations"]:
             raise RepositoryIntelligenceError(
-                "Context generation conflict was preserved: " + ", ".join(conflicts)
+                f"Context publication contents conflict was preserved: {candidate}"
             )
-    if context_exists:
-        if not generation_entries:
+        generations = candidate / "generations"
+        generations_metadata = _state_file_stat(context_fd, "generations")
+        if (generations_metadata is None or not stat.S_ISDIR(generations_metadata.st_mode)
+                or stat.S_IMODE(generations_metadata.st_mode) != 0o700):
             raise RepositoryIntelligenceError(
-                "Published context root has no journaled generation."
+                f"Context generations directory conflict was preserved: {generations}"
             )
-        updated = copy.deepcopy(journal)
-        updated["context_published"] = True
-        updated["generation_published"] = True
-        updated["completed_action_index"] = max(
-            1, int(updated.get("completed_action_index") or 0)
-        )
-        return updated
-    if generation_entries:
-        _remove_owned_staging(
-            generation_entries[0],
-            journal.get("staging_files"),
-            expected_device=journal.get("staging_device"),
-            expected_inode=journal.get("staging_inode"),
-        )
-    generations.rmdir()
-    prepared.rmdir()
-    _fsync_directory(prepared.parent)
+        with _state_directory(generations, parent_fd=context_fd) as (_, _, generations_fd):
+            generation_entries = sorted(os.listdir(generations_fd))
+            expected_generation = str(journal.get("generation_id") or "")
+            if generation_entries:
+                if generation_entries != [expected_generation]:
+                    raise RepositoryIntelligenceError(
+                        f"Context generation conflict was preserved: {generations}"
+                    )
+                generation = generations / expected_generation
+                try:
+                    with _state_directory(generation, parent_fd=generations_fd) as (_, _, generation_fd):
+                        conflicts = _operation_directory_conflicts(
+                            generation, journal.get("staging_files"), allow_pending=False,
+                            require_complete=True, expected_device=journal.get("staging_device"),
+                            expected_inode=journal.get("staging_inode"), _directory_fd=generation_fd,
+                        )
+                except (OSError, TransactionPrimitiveError):
+                    conflicts = [str(generation)]
+                if conflicts:
+                    raise RepositoryIntelligenceError(
+                        "Context generation conflict was preserved: " + ", ".join(conflicts)
+                    )
+            if context_exists:
+                if not generation_entries:
+                    raise RepositoryIntelligenceError("Published context root has no journaled generation.")
+                updated = copy.deepcopy(journal)
+                updated["context_published"] = True
+                updated["generation_published"] = True
+                updated["completed_action_index"] = max(1, int(updated.get("completed_action_index") or 0))
+                return updated
+            if generation_entries:
+                _remove_owned_staging(
+                    generations / expected_generation, journal.get("staging_files"),
+                    expected_device=journal.get("staging_device"),
+                    expected_inode=journal.get("staging_inode"), _parent_fd=generations_fd,
+                )
+            _remove_empty_state_directory(context_fd, "generations", generations_fd, generations)
+        _remove_empty_state_directory(parent_fd, name, context_fd, candidate)
     return journal
 
 
@@ -3832,8 +4179,30 @@ def _restore_active_pointer(
     proposed_active_sha256: str,
     proposed_active_file_sha256: str | None,
 ) -> None:
-    if active_path.exists():
-        live_bytes = secure_regular_file_bytes(active_path)
+    try:
+        with _state_file_parent(active_path) as (parent_fd, name):
+            _restore_active_pointer_at(
+                parent_fd, name, active_path,
+                active_before_bytes=active_before_bytes,
+                active_before_file_sha256=active_before_file_sha256,
+                proposed_active_sha256=proposed_active_sha256,
+                proposed_active_file_sha256=proposed_active_file_sha256,
+            )
+    except FileNotFoundError:
+        if active_before_bytes is not None:
+            raise
+
+
+def _restore_active_pointer_at(
+    parent_fd: int, name: str, active_path: Path, *,
+    active_before_bytes: bytes | None, active_before_file_sha256: str | None,
+    proposed_active_sha256: str, proposed_active_file_sha256: str | None,
+) -> None:
+    if _state_file_stat(parent_fd, name) is None:
+        if active_before_bytes is not None:
+            _atomic_state_file_at(parent_fd, name, active_before_bytes, active_path)
+        return
+    with _read_state_file_at(parent_fd, name) as (live_bytes, metadata):
         live_file_sha256 = sha256_bytes(live_bytes)
         if active_before_file_sha256 and live_file_sha256 == active_before_file_sha256:
             return
@@ -3853,12 +4222,13 @@ def _restore_active_pointer(
                 "Active pointer semantic identity changed unexpectedly; rollback preserved the live pointer."
             )
         if active_before_bytes is None:
-            active_path.unlink()
-            _fsync_directory(active_path.parent)
+            if not _same_state_file(_state_file_stat(parent_fd, name), metadata):
+                raise RepositoryIntelligenceError("Active pointer changed before rollback; preserved and refused.")
+            os.unlink(name, dir_fd=parent_fd)
+            os.fsync(parent_fd)
         else:
-            _atomic_write_bytes(active_path, active_before_bytes)
-    elif active_before_bytes is not None:
-        _atomic_write_bytes(active_path, active_before_bytes)
+            _atomic_state_file_at(parent_fd, name, active_before_bytes, active_path,
+                                  expected_current=metadata)
 
 
 def _assert_context_entries(context_root: Path) -> None:
@@ -4436,9 +4806,8 @@ def apply_plan(
             _validate_promoted_generation(root, final_dir, control=control, bundle=bundle)
         else:
             journal = _write_journal(journal_path, journal, state="APPLYING")
-            _copy_exact_bundle(bundle_dir, staging_dir, records)
+            staging_metadata = _copy_exact_bundle(bundle_dir, staging_dir, records)
             _validate_promoted_generation(root, staging_dir, control=control, bundle=bundle)
-            staging_metadata = os.lstat(staging_dir)
             journal["staging_device"] = staging_metadata.st_dev
             journal["staging_inode"] = staging_metadata.st_ino
             journal["completed_action_index"] = 0
@@ -4446,41 +4815,36 @@ def apply_plan(
 
         if not reused_existing:
             if context_kind == "absent":
-                os.mkdir(context_staging_dir, 0o700)
-                os.chmod(context_staging_dir, 0o700)
-                os.mkdir(context_staging_dir / "generations", 0o700)
-                os.chmod(context_staging_dir / "generations", 0o700)
-                _fsync_directory(context_staging_dir / "generations")
-                _fsync_directory(context_staging_dir)
-                _fsync_directory(transaction_dir)
-                context_metadata = os.lstat(context_staging_dir)
-                journal["context_staging_device"] = context_metadata.st_dev
-                journal["context_staging_inode"] = context_metadata.st_ino
-                journal = _write_journal(journal_path, journal, state="APPLYING")
-                rename_no_replace(
-                    staging_dir,
-                    context_staging_dir / "generations" / generation_id,
-                )
-                staging_dir = None
-                _fsync_directory(context_staging_dir / "generations")
-                try:
-                    rename_no_replace(context_staging_dir, context_root)
-                except FileExistsError as exc:
-                    raise RepositoryIntelligenceError(
-                        "Generated context root appeared during atomic publication; it was preserved and refused."
-                    ) from exc
-                _fsync_directory(context_root.parent)
+                with _new_state_directory(context_staging_dir) as context_fd:
+                    with _new_state_directory(context_staging_dir / "generations",
+                                              parent_fd=context_fd):
+                        context_metadata = os.fstat(context_fd)
+                        journal["context_staging_device"] = context_metadata.st_dev
+                        journal["context_staging_inode"] = context_metadata.st_ino
+                        journal = _write_journal(journal_path, journal, state="APPLYING")
+                        rename_no_replace(
+                            staging_dir, context_staging_dir / "generations" / generation_id,
+                            expected_source=(journal["staging_device"], journal["staging_inode"]),
+                        )
+                        staging_dir = None
+                        try:
+                            rename_no_replace(context_staging_dir, context_root,
+                                expected_source=(context_metadata.st_dev, context_metadata.st_ino))
+                        except FileExistsError as exc:
+                            raise RepositoryIntelligenceError(
+                                "Generated context root appeared during atomic publication; it was preserved and refused."
+                            ) from exc
                 journal["context_published"] = True
             else:
                 _assert_context_entries(context_root)
                 try:
-                    rename_no_replace(staging_dir, final_dir)
+                    rename_no_replace(staging_dir, final_dir,
+                        expected_source=(journal["staging_device"], journal["staging_inode"]))
                 except FileExistsError as exc:
                     raise RepositoryIntelligenceError(
                         "Generation destination appeared during atomic publication; it was preserved and refused."
                     ) from exc
                 staging_dir = None
-                _fsync_directory(generations_root)
             journal["generation_published"] = True
         journal["completed_action_index"] = 1
         journal = _write_journal(journal_path, journal, state="APPLYING")
@@ -6151,15 +6515,14 @@ def _external_output_path(root: Path, value: str | None, default: Path | None = 
 
 
 def _write_immutable_json(path: Path, report: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    from naos_trace_atomic_write import publish_trace
+
     data = (json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
-    if os.name == "nt":
-        with ri_windows_storage.WindowsRIStorage(str(path.parent)) as storage:
-            storage.write_new(path.name, data)
-    else:
-        _write_new_bytes(path, data)
-        os.chmod(path, 0o600)
-        _fsync_directory(path.parent)
+    if os.name == "nt" and len(data) > ri_windows_storage.MAX_FILE_BYTES:
+        raise ri_windows_storage.RIStorageConflict("RI file payload is invalid or exceeds the bound")
+    publish_trace(path, data, None, strict_parent_topology=True,
+                  private_new_file=True, create_only=True, fsync_parent=os.name != "nt",
+                  search_only_ancestors=True)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -6238,6 +6601,11 @@ def main(argv: list[str] | None = None) -> int:
         policy = load_policy(args.policy, args.naos_root, root)
         naos_root = args.naos_root or default_naos_root(policy)
         profile = normalize_profile(args.profile, policy)
+        if args.operation in {"apply", "enroll"} and args.output:
+            # Refuse known invalid receipt destinations before changing state.
+            output = _external_output_path(root, args.output)
+            if output is not None and output.exists():
+                raise RepositoryIntelligenceError("Report output already exists and was preserved.")
         if args.operation in {"plan", "refresh"}:
             # Refuse an invalid requested destination before generating a source
             # bundle, and allocate a default directory only when it is needed.

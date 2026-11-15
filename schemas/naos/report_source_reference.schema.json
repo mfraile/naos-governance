@@ -166,7 +166,10 @@
                 "type": "string"
               },
               "enabled": {
-                "type": "boolean"
+                "type": [
+                  "boolean",
+                  "null"
+                ]
               },
               "current_maturity": {
                 "type": "string"
@@ -269,7 +272,34 @@
                   }
                 }
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "enabled": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "evaluated_status": {
+                      "const": "not_configured"
+                    },
+                    "ready_for_promotion": {
+                      "const": false
+                    },
+                    "promotion_recorded": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            ]
           }
         }
       }

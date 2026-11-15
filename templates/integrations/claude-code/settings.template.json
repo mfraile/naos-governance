@@ -21,6 +21,8 @@
             "type": "command",
             "command": "python",
             "args": [
+              "-I",
+              "-B",
               "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
               "--event",
               "session-start"
@@ -38,6 +40,8 @@
             "type": "command",
             "command": "python",
             "args": [
+              "-I",
+              "-B",
               "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
               "--event",
               "pre-tool-edit"
@@ -53,6 +57,8 @@
             "type": "command",
             "command": "python",
             "args": [
+              "-I",
+              "-B",
               "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
               "--event",
               "pre-tool-bash"
@@ -70,11 +76,15 @@
             "type": "command",
             "command": "python",
             "args": [
+              "-I",
+              "-B",
               "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
               "--event",
-              "post-tool-write"
+              "post-tool-write",
+              "--post-write-timeout-seconds",
+              "120"
             ],
-            "timeout": 20
+            "timeout": 125
           }
         ]
       }
@@ -86,6 +96,8 @@
             "type": "command",
             "command": "python",
             "args": [
+              "-I",
+              "-B",
               "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
               "--event",
               "pre-compact"
@@ -102,6 +114,8 @@
             "type": "command",
             "command": "python",
             "args": [
+              "-I",
+              "-B",
               "${CLAUDE_PROJECT_DIR}/naos/integrations/claude-code/hooks/dispatch.py",
               "--event",
               "session-end"

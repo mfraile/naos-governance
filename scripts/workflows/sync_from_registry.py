@@ -31,17 +31,25 @@ After editing TASK_REGISTRY.yaml, run this and everything stays in sync.
 ENVIRONMENT:
     NAOS_ROOT  — path to the naos/ governance folder (default: "naos")
 
+METADATA:
+    A null owner is shown as unspecified. Finite numeric-string estimates are
+    used numerically without editing the registry. Invalid estimates or phases
+    are refused before derived writes. Named phases remain distinct; numeric
+    subphases retain the existing major-phase grouping. Omitted defaults remain.
+
 [ADAPT] PHASE_META: Replace the generic phase names with your project's actual
 milestone names and target dates before using this script.
 """
 
 import argparse
 import json
+import math
 import os
 import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -57,6 +65,7 @@ from naos_task_lifecycle import (  # noqa: E402
     validate_task_artifact_identity,
 )
 from naos_console import configure_console_output  # noqa: E402
+from naos_policy import write_text_output  # noqa: E402
 from naos_validate_task_registry import (  # noqa: E402
     TeamConfigValidationError,
     require_valid_team_config,
@@ -115,11 +124,11 @@ class Task:
     id: str
     title: str
     requirement: Optional[str]
-    phase: Optional[int]
+    phase: Optional[int | float | str]
     priority: Optional[str]
     status: str
     estimate_days: float
-    owner: str
+    owner: Optional[str]
     acceptance: str
     description: str
     progress_percent: Optional[int] = None
@@ -146,10 +155,27 @@ def load_registry() -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def _estimate_value(value: Any, task_id: str) -> int | float:
+    """Accept finite numeric declarations; never invent an estimate for null."""
+    try:
+        if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+            raise ValueError
+        number = float(value) if isinstance(value, str) else value
+        if not math.isfinite(number):
+            raise ValueError
+        return number
+    except (ValueError, OverflowError) as exc:
+        raise ValueError(f"{task_id}.estimate_days must be a finite number or numeric string") from exc
+
+
 def get_tasks(registry: Dict) -> List[Task]:
     """Extract all tasks from registry."""
     tasks = []
     for t in registry.get("tasks", []):
+        try:
+            _phase_key(t.get("phase"))
+        except ValueError as exc:
+            raise ValueError(f"{t['id']}.phase: {exc}") from exc
         tasks.append(
             Task(
                 id=t["id"],
@@ -158,7 +184,7 @@ def get_tasks(registry: Dict) -> List[Task]:
                 phase=t.get("phase"),
                 priority=t.get("priority"),
                 status=t.get("status", "planned"),
-                estimate_days=t.get("estimate_days", 0),
+                estimate_days=_estimate_value(t.get("estimate_days", 0), t["id"]),
                 owner=t.get("owner", "Engineering"),
                 acceptance=t.get("acceptance", ""),
                 description=t.get("description", ""),
@@ -363,8 +389,7 @@ python scripts/workflows/sync_from_registry.py --backlog
 """
 
     cleaned = "\n".join(line.rstrip() for line in content.splitlines()) + "\n"
-    BACKLOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    BACKLOG_PATH.write_text(cleaned, encoding="utf-8")
+    write_text_output(BACKLOG_PATH, cleaned)
     print(
         f"   ✅ Written {len(in_progress) + len(ready) + len(planned)} tasks to BACKLOG.md"
     )
@@ -403,7 +428,7 @@ def sync_execution_task_matrix(tasks: List[Task]) -> None:
             + ", ".join(orphan_ids)
         )
 
-    sorted_tasks = sorted(tasks, key=lambda t: (t.phase is None, t.phase, t.id))
+    sorted_tasks = sorted(tasks, key=lambda t: (_phase_key(t.phase), t.id))
 
     matrix = f"""{start_marker}
 | ID | Title | Phase | Type | FR/NFR | Status | Owner | Target End | Acceptance |
@@ -427,16 +452,16 @@ def sync_execution_task_matrix(tasks: List[Task]) -> None:
         else:
             status_display = states["lifecycle_state"].replace("_", " ").title()
 
-        meta = PHASE_META.get(int(t.phase), {"date": "TBD"}) if t.phase is not None else {}
+        meta = PHASE_META.get(_major_phase(t.phase), {"date": "TBD"}) if t.phase is not None else {}
         target_end = meta.get("date", "TBD") if t.phase is not None else "—"
 
-        matrix += f"| {t.id} | {t.title} | {_display_metadata(t.phase)} | {task_type} | {_display_metadata(t.requirement)} | {status_display} | {t.owner[:3]} | {target_end} | {t.acceptance} |\n"
+        matrix += f"| {t.id} | {t.title} | {_display_metadata(t.phase)} | {task_type} | {_display_metadata(t.requirement)} | {status_display} | {_display_metadata(t.owner)[:3]} | {target_end} | {t.acceptance} |\n"
 
     matrix += f"{end_marker}"
 
     new_text = text[:start_idx] + matrix + text[end_idx + len(end_marker) :]
 
-    EXECUTION_PATH.write_text(new_text, encoding="utf-8")
+    write_text_output(EXECUTION_PATH, new_text)
     print(f"   ✅ Updated Task Matrix with {len(tasks)} tasks")
 
 
@@ -482,7 +507,7 @@ def sync_dashboard_metrics(tasks: List[Task], metrics: Dict) -> None:
         lines[index] = match.group(1) + value + ending
     text = "".join(lines)
 
-    DASHBOARD_PATH.write_text(text, encoding="utf-8")
+    write_text_output(DASHBOARD_PATH, text)
     print(f"   ✅ Updated metrics: {tasks_done}/{tasks_total} ({percent}%)")
 
 
@@ -508,12 +533,28 @@ def _replace_between_markers(
     )
 
 
-def _phase_key(phase) -> float:
-    """Convert phase to a sortable float (e.g. '8.5' -> 8.5, 8 -> 8.0)."""
+def _phase_key(phase: Any) -> tuple[int, Decimal | str]:
+    """Sort numeric phases, then named phases, then absent declarations."""
+    if phase is None:
+        return (2, "")
+    if isinstance(phase, bool) or not isinstance(phase, (str, int, float)):
+        raise ValueError("phase must be a nonempty scalar value")
+    text = str(phase).strip()
+    if not text:
+        raise ValueError("phase must be a nonempty scalar value")
     try:
-        return float(phase)
-    except (TypeError, ValueError):
-        return 99.0
+        number = Decimal(text)
+    except InvalidOperation:
+        return (1, text)
+    if not number.is_finite():
+        raise ValueError("phase must be finite")
+    return (0, number)
+
+
+def _major_phase(phase: int | float | str) -> int | str:
+    """Retain numeric major-phase grouping without merging named identities."""
+    kind, value = _phase_key(phase)
+    return int(value) if kind == 0 else str(value)
 
 
 def _phase_status(tasks_in_phase: List[Task]) -> str:
@@ -543,12 +584,12 @@ def _phase_status(tasks_in_phase: List[Task]) -> str:
     return "⚪ PLANNED"
 
 
-def _group_tasks_by_major_phase(tasks: List[Task]) -> Dict[int, List[Task]]:
-    """Group tasks by major phase number (int part of phase)."""
-    groups: Dict[int, List[Task]] = defaultdict(list)
+def _group_tasks_by_major_phase(tasks: List[Task]) -> Dict[int | str, List[Task]]:
+    """Group numeric subphases by major number; retain each named phase."""
+    groups: Dict[int | str, List[Task]] = defaultdict(list)
     for t in tasks:
         if t.phase is not None:
-            groups[int(_phase_key(t.phase))].append(t)
+            groups[_major_phase(t.phase)].append(t)
     return groups
 
 
@@ -641,7 +682,7 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
         "| Phase | Name | Target Date | Tasks | Done | Status |",
         "|------:|------|-------------|------:|-----:|--------|",
     ]
-    for major_phase in sorted(phase_groups.keys()):
+    for major_phase in sorted(phase_groups.keys(), key=_phase_key):
         meta = PHASE_META.get(
             major_phase,
             {"name": f"Phase {major_phase}", "date": "TBD", "criteria": "TBD"},
@@ -726,7 +767,7 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
         f"| **Tasks Implemented** | {tasks_done}/{tasks_total} ({percent}%) | 100% | {'🟢 ON TRACK' if percent > 70 else '🟡 AT RISK'} |",
     ]
 
-    for major_phase in sorted(phase_groups.keys()):
+    for major_phase in sorted(phase_groups.keys(), key=_phase_key):
         pts = phase_groups[major_phase]
         done_ct = sum(1 for t in pts if is_task_delivered(t.state_record()))
         if done_ct < len(pts):
@@ -783,7 +824,7 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
         "|------:|------|------:|------------:|-------------:|----------:|",
     ]
 
-    for major_phase in sorted(phase_groups.keys()):
+    for major_phase in sorted(phase_groups.keys(), key=_phase_key):
         meta = PHASE_META.get(major_phase, {"name": f"Phase {major_phase}"})
         pts = phase_groups[major_phase]
         est = sum(t.estimate_days * 8 for t in pts)
@@ -828,7 +869,7 @@ def sync_project_status(tasks: List[Task], metrics: Dict) -> None:
 
     # --- Write file ---
     cleaned = "\n".join(line.rstrip() for line in text.splitlines()) + "\n"
-    PROJECT_STATUS_PATH.write_text(cleaned, encoding="utf-8")
+    write_text_output(PROJECT_STATUS_PATH, cleaned)
     print(f"   ✅ PROJECT_STATUS.md written ({len(cleaned)} bytes)")
 
 
@@ -879,7 +920,11 @@ def main() -> None:
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(2)
-    tasks = get_tasks(registry)
+    try:
+        tasks = get_tasks(registry)
+    except ValueError as exc:
+        print(f"ERROR: {exc}; derived files were not written.", file=sys.stderr)
+        sys.exit(2)
     metrics = get_metrics(registry)
 
     print(f"\n📋 Loaded {len(tasks)} tasks from registry\n")

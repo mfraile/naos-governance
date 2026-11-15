@@ -38,6 +38,9 @@ policy_linkage:
   require_policy_ref: true
   model_provider_policy_ref: "naos/model_provider_policy.yaml"
 
+# Null leaves a canonical threshold unset (a supplied legacy alias may apply).
+# Zero is an active threshold: positive values exceed it; equality does not.
+# Non-finite numbers are invalid evidence and require review, not a passed check.
 thresholds:
   cost_usd_review_threshold: null
   latency_ms_review_threshold: null

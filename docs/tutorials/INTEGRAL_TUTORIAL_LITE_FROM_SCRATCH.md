@@ -11,7 +11,7 @@
 ## What You Will Have at the End
 
 - A `lite` profile installed with 9 rules (3 blocking-posture)
-- Three AI instruction files configured (Copilot, Claude Code, Cursor)
+- Generated AI instruction files and explicit host-loading checks
 - A partial spec kit in place
 - A low-noise, non-publishing NAOS control-plane CI workflow with read-only repository permission and ephemeral runner outputs
 - Capability state, systemic impact, module-header, spec-pack, spec-cascade, and control-plane review posture
@@ -59,6 +59,7 @@ Or from source:
 ```bash
 PROJECT=/path/to/your/new-project
 python naos_init.py "$PROJECT" --new --tier lite --archetype custom --backend static_only --activate
+cd "$PROJECT"
 ```
 
 ### Step 2: Verify the installed structure
@@ -277,6 +278,12 @@ Fix any findings before proceeding.
 - [x] Traceability headers added to new files
 ```
 
+A checked checklist alone does not establish verified delivery. Native verified
+completion requires existing implementation, test and evidence files plus an
+approved exact-task `task_delivery` decision. Follow the
+[native completion procedure](./MICRO_TUTORIAL_14_NAOS_TASK_COMPLETE_WITH_CONFORMANCE.md)
+and preserve unfinished or unverified states until those prerequisites exist.
+
 Then:
 
 ```
@@ -324,14 +331,14 @@ accepted follow-up actions in the existing status source.
 | Capability | Status |
 |-----------|--------|
 | Documented blocking posture (3 rules) | ✅ |
-| Three AI instruction files | ✅ |
+| AI instruction files | Generated; verify loading in the active host |
 | Lite-native task workflow (task-start → plan → implement → review → task-complete) | ✅ |
 | Task registry and story cards | ✅ |
 | Weekly planning cadence | Manual; weekly prompts are Standard/Assured |
 | Full spec-driven development | Partial |
 | Requirements traceability (FR→Task→Code→Test) | Partial |
 | Optional semantic/similarity evidence | Not active by default; project-configured only |
-| Behavioral Governance Readiness | Advisory readiness only; behavioral scoring/evaluator runtime remains project-configured |
+| Behavioral Governance Readiness | Advisory readiness only; no behavioral scoring/evaluator runtime in this kit |
 | Governance dashboard + evidence metrics | Available where reports exist |
 | Non-publishing NAOS readiness CI (ephemeral runner writes) | ✅ |
 

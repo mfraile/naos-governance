@@ -367,9 +367,13 @@ def load_rules(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     if not path.exists():
         return DEFAULT_RULES, {"path": str(path), "present": False, "source": "default_fallback"}
     try:
-        loaded = load_yaml_mapping(path)
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if loaded is None:
+            loaded = {}
+        if not isinstance(loaded, dict):
+            raise ValueError("AI-surface budget rules must be a YAML mapping")
     except Exception as exc:
-        return DEFAULT_RULES, {"path": str(path), "present": False, "source": "default_fallback", "error": str(exc)}
+        return DEFAULT_RULES, {"path": str(path), "present": True, "source": "default_fallback", "error": str(exc)}
     return deep_merge(DEFAULT_RULES, loaded), {"path": str(path), "present": True, "source": "rules_file"}
 
 
@@ -390,8 +394,14 @@ def relpath(path: Path, root: Path) -> str:
         return path.as_posix()
 
 
-def ignored(path: Path) -> bool:
+def ignored(path: Path, root: Path) -> bool:
     ignored_parts = {".git", ".venv", "venv", "node_modules", "dist", "build", "__pycache__"}
+    try:
+        path = path.relative_to(root)
+    except ValueError:
+        # Preserve legacy external-operand handling; only project-local
+        # exclusions are independent of the checkout's ancestor names.
+        pass
     return any(part in ignored_parts for part in path.parts)
 
 
@@ -406,7 +416,7 @@ def collect_family_files(root: Path, rules: dict[str, Any]) -> dict[str, list[Pa
             if not isinstance(pattern, str):
                 continue
             for path in root.glob(pattern):
-                if path.is_file() and not ignored(path):
+                if path.is_file() and not ignored(path, root):
                     paths[relpath(path, root)] = path
         families[family_id] = [paths[key] for key in sorted(paths)]
     return families
@@ -558,7 +568,7 @@ def resolve_scenario_file(root: Path, item: Any) -> tuple[Path | None, bool, str
     if not path:
         return None, optional, path
     full = root / path
-    return (full if full.is_file() and not ignored(full) else None), optional, path
+    return (full if full.is_file() and not ignored(full, root) else None), optional, path
 
 
 def build_scenarios(
@@ -1349,6 +1359,20 @@ def build_report(
     baseline_data, baseline_meta = load_baseline(baseline_path)
     baseline, baseline_findings = compare_baseline(snapshot, baseline_data, baseline_meta, rules, profile, policy)
     findings.extend(baseline_findings)
+    if rules_meta.get("error"):
+        findings.append(
+            finding(
+                finding_id="AI_SURFACE_RULES_INVALID",
+                severity=condition_severity(profile, policy, "warning"),
+                status="rules_invalid",
+                message=(
+                    "Selected AI-surface rules could not be loaded as a YAML mapping; "
+                    "estimates use module defaults and configured limits were not evaluated. "
+                    "Repair the rules and rerun."
+                ),
+                source=str(rules_path),
+            )
+        )
     # Only explicitly declared observations receive context for the actual rules
     # used. Scenario IDs and absent baseline paths remain subjects, not files
     # asserted to exist. A failed/missing rules load uses module defaults.
@@ -1862,7 +1886,7 @@ def generated_files(preview_root: Path) -> list[str]:
     for path in preview_root.rglob("*"):
         if path.is_symlink():
             raise RuntimeError(f"Fresh scaffold unexpectedly contains a symlink: {path}")
-        if path.is_file() and not ignored(path):
+        if path.is_file() and not ignored(path, preview_root):
             files.append(path.relative_to(preview_root).as_posix())
     return sorted(set(files))
 

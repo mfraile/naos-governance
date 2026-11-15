@@ -32,6 +32,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from naos_policy import write_text_output  # noqa: E402
 from source_roots import iter_function_index_modules  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -247,10 +248,14 @@ def build_similarity_index() -> None:
             if not isinstance(func_str, str):
                 continue
             func_count += 1
-            func_name = func_str.split("(")[0].strip().strip("'\"")
+            # Generated index notes describe provenance, not function behavior.
+            declaration = re.split(
+                r"\s+#\s*(?:DUP: also in .+|DEPRECATED)\s*$", func_str, maxsplit=1,
+            )[0]
+            func_name = declaration.split("(")[0].strip().strip("'\"")
             doc = ""
-            if "#" in func_str:
-                doc = func_str.split("#", 1)[1].strip()
+            if "#" in declaration:
+                doc = declaration.split("#", 1)[1].strip()
 
             key = f"{module_key}.{func_name}"
             name_tokens = _tokenize(func_name)
@@ -259,7 +264,7 @@ def build_similarity_index() -> None:
             entry: dict = {
                 "tokens": sorted(name_tokens),
                 "doc_tokens": sorted(doc_tokens),
-                "signature": func_str.split("#")[0].strip().strip("'\""),
+                "signature": declaration.split("#")[0].strip().strip("'\""),
                 "module": module_path,
             }
             entries[key] = entry
@@ -371,9 +376,7 @@ def build_similarity_index() -> None:
         "entries": entries,
     }
 
-    SIMILARITY_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(SIMILARITY_INDEX_PATH, "w", encoding="utf-8") as f:
-        json.dump(meta, f, indent=None, separators=(",", ":"))
+    write_text_output(SIMILARITY_INDEX_PATH, json.dumps(meta, indent=None, separators=(",", ":")))
 
     file_size = SIMILARITY_INDEX_PATH.stat().st_size
     print(f"\n  Index written: {SIMILARITY_INDEX_PATH}")
@@ -495,11 +498,13 @@ def query_similar(phrase: str) -> str:
             print(f'WARNING: optional similarity query failed ({exc}); using tokens only', file=sys.stderr)
             results.clear()
 
-    # Jaccard fallback
+    # Score each field separately: more documentation cannot dilute the name.
     query_tokens = _tokenize(phrase)
     for key, entry in entries.items():
-        entry_tokens = set(entry.get("tokens", [])) | set(entry.get("doc_tokens", []))
-        score = _jaccard_similarity(query_tokens, entry_tokens)
+        score = max(
+            _jaccard_similarity(query_tokens, set(entry.get("tokens", []))),
+            _jaccard_similarity(query_tokens, set(entry.get("doc_tokens", []))),
+        )
         if score > 0.3:
             results.append((score, key, entry.get("signature", ""), "jaccard"))
 

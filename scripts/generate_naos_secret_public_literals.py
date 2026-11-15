@@ -14,6 +14,9 @@ import re
 
 import yaml
 
+from naos_policy import write_text_output
+from naos_trace_atomic_write import publish_trace
+
 SCHEMA = "naos.secret_public_literals.v1"
 QUOTED = re.compile(r"'((?:\\.|[^'\\])*)'|\"((?:\\.|[^\"\\])*)\"")
 NEW_MEMBERS = {"scripts/naos_report_composition.py",
@@ -76,6 +79,7 @@ CODE_TEMPLATES = {
 # parser call contributes its first literal grammar argument; a selected
 # formatter contributes source template syntax, never an instantiated value.
 FUNCTION_REGEX = {
+    "scripts/naos_secret_public_literals.py": {"public_gate_reference_location_spans"},
     "scripts/naos_secret_managed_operands.py": {"_legacy_operands", "_windows_operands", "_hex", "_control_record", "_ri_record"},
     "scripts/naos_ac_completion_evidence.py": {"command_path_operands"},
     "scripts/naos_adoption_common.py": {"makefile_targets"},
@@ -125,6 +129,16 @@ REGEX_DECLARATIONS.update({
 REGEX_DECLARATIONS["scripts/naos_module_header_traceability.py"].update({"req_patterns", "task_patterns", "spec_patterns"})
 REGEX_DECLARATIONS["scripts/naos_hygiene_common.py"].add("reference_key")
 REGEX_DECLARATIONS["scripts/naos_code_quality_audit.py"].add("_REQ_HEADER_RE")
+# Reviewed day-zero parser declarations; keep credential detection active.
+REGEX_DECLARATIONS["scripts/naos_session_identity.py"] = {"SESSION_ID_PATTERN"}
+REGEX_DECLARATIONS["scripts/naos_task_context_integrity.py"] = {"DEVICE"}
+REGEX_DECLARATIONS["scripts/validators/validate_capability_contracts.py"].add("_DIRECT_NEGATION")
+REGEX_DECLARATIONS["scripts/validators/validate_profile_generated_surfaces.py"] = {"INSTRUCTION_REFERENCE_RE"}
+FUNCTION_REGEX["scripts/naos_ai_surface_budget.py"] = {"visit"}
+FUNCTION_REGEX["upgrade_contract/windows_handles.py"] = {"reset_spec_copy_marker"}
+FUNCTION_REGEX["scripts/validators/validate_tutorial_consistency.py"] = {"check_public_boundary"}
+FUNCTION_FORMATTERS["upgrade_contract/security.py"] = {"_created_metadata_schema"}
+CODE_TEMPLATES["scripts/naos_windows_report.py"] = {"candidate"}
 
 def encoded_values(values):
     result = set()
@@ -184,6 +198,26 @@ def reviewed_constructor_groups(source, members, add):
     add("literal", relative, "standards.*.source.reviewed_canonical_register", {v["source"] for v in standards.values()})
     require(tree("naos_init.py"), "preview_dir / 'naos' / 'secure_coding_control_register.yaml'")
     add("project_path", "naos_init.py", "secure_coding_control_register.destination", {"naos/secure_coding_control_register.yaml"})
+    relative = 'scripts/naos_grader_assessment.py'
+    defaults = [node for node in tree(relative).body if isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == 'DEFAULT_CONFIG' for t in node.targets)]
+    if len(defaults) != 1:
+        raise ValueError('grader default declaration changed')
+    baseline = ast.literal_eval(defaults[0].value)['baseline_reference']
+    if baseline != 'naos/reports/grader_assessment_baseline.json':
+        raise ValueError('review changed grader baseline constructor')
+    add('project_path', relative, 'DEFAULT_CONFIG.baseline_reference.public_default', {baseline})
+    relative = 'templates/structural-seeds/naos/repository_intelligence_rules.yaml'
+    families = yaml.safe_load(source(relative).read_text(encoding='utf-8'))['artifact_families']
+    documentation = [item for item in families if item['id'] == 'documentation']
+    if len(documentation) != 1 or 'README.md' not in documentation[0]['include_patterns']:
+        raise ValueError('README public family declaration changed')
+    require(function('scripts/naos_repository_intelligence.py', '_source_nodes'), 'f"artifact:{artifact.get(\'artifact_id\')}"')
+    identifier = function('scripts/naos_local_context_index.py', 'artifact_id_for')
+    require(identifier, '"A-" + hashlib.sha256(identity).hexdigest()[:16]')
+    require(identifier, 'f"{family_id or \'artifact\'}\\0{path_text}".encode("utf-8")')
+    alias = 'artifact:A-' + hashlib.sha256(b'documentation\0README.md').hexdigest()[:16]
+    add('literal', relative, 'documentation.README.public_artifact_alias', {alias})
     relative = "scripts/naos_self_check.py"
     operands = []
     for node in ast.walk(tree(relative)):
@@ -194,8 +228,10 @@ def reviewed_constructor_groups(source, members, add):
     if len(operands) != 5:
         raise ValueError("self-check directory selectors changed")
     def path_operand(node):
-        if isinstance(node, ast.Name) and node.id == "root": return "project_path", ""
-        if isinstance(node, ast.Call) and ast.unparse(node) == "kit_root()": return "kit_path", ""
+        if isinstance(node, ast.Name) and node.id == "root":
+            return "project_path", ""
+        if isinstance(node, ast.Call) and ast.unparse(node) == "kit_root()":
+            return "kit_path", ""
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
             kind, prefix = path_operand(node.left)
             suffix = "naos" if isinstance(node.right, ast.Name) and node.right.id == "naos_root" else ast.literal_eval(node.right)
@@ -221,6 +257,63 @@ def reviewed_constructor_groups(source, members, add):
     require(exporter, "f'{location}.{key}'")
     require(exporter, "f'{location}[{index}]'")
     require(exporter, "enumerate(data)")
+    host_source = "scripts/naos_ai_surface_budget.py"
+    host_tree = function(host_source, "_build_guarded_project_context")
+    vendor = [value for node in ast.walk(host_tree) if isinstance(node, ast.Dict)
+              for key, value in zip(node.keys, node.values)
+              if isinstance(key, ast.Constant) and key.value == "vendor_guidance"]
+    if len(vendor) != 1:
+        raise ValueError("ambiguous host vendor guidance constructor")
+    vendor_refs = ast.literal_eval(vendor[0])["source_refs"]
+    alternatives = [value for node in ast.walk(host_tree) if isinstance(node, ast.Dict)
+                    for key, value in zip(node.keys, node.values)
+                    if isinstance(key, ast.Constant) and key.value == "source_refs"
+                    and isinstance(value, ast.IfExp)]
+    if (len(alternatives) != 1 or ast.unparse(alternatives[0].test) != "candidate_host == 'cursor'"
+            or not isinstance(vendor_refs, list) or len(vendor_refs) != 2):
+        raise ValueError("host source-reference constructor changed")
+    hosts = ("cursor", "copilot_harness", "vscode_local")
+    require(function(host_source, "build_host_contexts"), "('cursor', 'copilot_harness', 'vscode_local')")
+    host_refs = {host: ast.literal_eval(alternatives[0].body if host == "cursor" else alternatives[0].orelse)
+                 for host in hosts}
+    if any(not isinstance(refs, list) or len(refs) != 1
+           or any(type(ref) is not str or not ref.startswith('https://') for ref in refs)
+           for refs in host_refs.values()):
+        raise ValueError("nonfinite host source-reference operands")
+    locations = {prefix + ".vendor_guidance.source_refs[" + str(index) + "]"
+                 for prefix in ("$.host_context", "$.host_contexts.claude_code")
+                 for index in range(len(vendor_refs))}
+    locations.update("$.host_contexts." + host + ".source_refs[" + str(index) + "]"
+                     for host, refs in host_refs.items() for index in range(len(refs)))
+    add("literal", "scripts/naos_evidence_export.py", "collect_external_references.ai_surface_host_context.finite_locations", locations)
+    crosswalk = function("scripts/naos_validate_roadmap_crosswalk.py", "find_default_crosswalk")
+    for extension in ("yaml", "yml", "json"):
+        require(crosswalk, "root / naos_root / 'roadmap_crosswalk." + extension + "'")
+    add("project_path", "scripts/naos_validate_roadmap_crosswalk.py", "find_default_crosswalk.default_candidates",
+        {"naos/roadmap_crosswalk." + extension for extension in ("yaml", "yml", "json")})
+    require(function(policy_source, "session_report_default_path"), "sessions_root_path(root, naos_root, policy)")
+    require(function(policy_source, "session_report_default_path"), "str(policy.get('paths', {}).get(filename_key) or filename_key)")
+    policy_tree = tree(policy_source)
+    defaults = [ast.literal_eval(node.value) for node in policy_tree.body
+                if (isinstance(node, ast.Assign) and any(
+                    isinstance(target, ast.Name) and target.id == 'SAFE_FALLBACK_POLICY' for target in node.targets))
+                or (isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+                    and node.target.id == 'SAFE_FALLBACK_POLICY')]
+    if len(defaults) != 1:
+        raise ValueError("ambiguous default report filenames")
+    roles = set()
+    for relative in members:
+        if not relative.startswith('scripts/') or not relative.endswith('.py') or not source(relative).is_file():
+            continue
+        for node in ast.walk(tree(relative)):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == 'session_report_default_path' and len(node.args) == 5
+                    and isinstance(node.args[4], ast.Constant) and type(node.args[4].value) is str):
+                roles.add(node.args[4].value)
+    if not roles or any(role not in defaults[0]['paths'] for role in roles):
+        raise ValueError("session report constructor role missing its shipped filename")
+    add("literal", policy_source, "session_report_default_path.literal_role_pairs",
+        {role + ':' + defaults[0]['paths'][role] for role in roles})
     index_tree = function("scripts/naos_local_context_index.py", "build_report")
     pairs = [(key, value) for node in ast.walk(index_tree) if isinstance(node, ast.Dict) for key, value in zip(node.keys, node.values) if isinstance(key, ast.Constant) and key.value == "artifact_chunks"]
     if len(pairs) != 1 or ast.unparse(pairs[0][1]) != "chunks[:200]":
@@ -343,6 +436,39 @@ def build(source_root: Path, overlay_root: Path | None = None):
     declaration = json.loads(source("configs/source_modes.json").read_text(encoding='utf-8'))
     members = sorted({row["source"] for row in declaration["items"]} | NEW_MEMBERS)
     add("kit_path", "configs/source_modes.json", "reviewed_member_paths_and_new_scanner_members", members)
+    # One public comparison pin, bound to the exact shipped disabled taxonomy.
+    # Custom declarations and arbitrary digests are not admitted.
+    posture_relative = "scripts/naos_failure_mode_posture.py"
+    posture_tree = ast.parse(source(posture_relative).read_text(encoding="utf-8"))
+    inactive_pins = [node.value for node in posture_tree.body
+                     if isinstance(node, ast.Assign) and any(
+                         isinstance(target, ast.Name)
+                         and target.id == "INACTIVE_DEFAULT_TAXONOMY_SHA256"
+                         for target in node.targets)]
+    seed_hash = hashlib.sha256(source(
+        "templates/structural-seeds/naos/failure_mode_taxonomy.yaml"
+    ).read_bytes()).hexdigest()
+    if len(inactive_pins) != 1 or ast.literal_eval(inactive_pins[0]) != seed_hash:
+        raise ValueError("inactive failure-mode taxonomy pin changed; review declaration")
+    add("literal", posture_relative, "INACTIVE_DEFAULT_TAXONOMY_SHA256.exact_shipped_seed", {seed_hash})
+    # The readiness runner uses this shipped root operand outside source_modes'
+    # generator-facing roots. Admit only its finite, source-bound constructor.
+    runner = ast.parse(source("scripts/naos_ci_readiness.py").read_text(encoding="utf-8"))
+    chains = [node for node in runner.body
+              if isinstance(node, ast.FunctionDef) and node.name == "run_chain"]
+    if len(chains) != 1:
+        raise ValueError("readiness runner constructor is ambiguous")
+    prefixes = [node.value for node in ast.walk(chains[0])
+                if isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "prefix"]
+    expected_prefix = ast.parse(
+        "[sys.executable, str(SCRIPT_DIR.parent / 'cli.py')]", mode="eval",
+    ).body
+    if len(prefixes) != 1 or ast.unparse(prefixes[0]) != ast.unparse(expected_prefix):
+        raise ValueError("readiness runner CLI constructor changed")
+    cli_operand = prefixes[0].elts[1].args[0].right.value
+    add("kit_path", "scripts/naos_ci_readiness.py",
+        "run_chain.prefix.current_kit_cli_entrypoint", {cli_operand})
     # Actual installer operands: schema/docs are finite copy lists; scripts
     # are top-level files plus workflows, with the installer's exclusions.
     installer = ast.parse(source("naos_init.py").read_text(encoding='utf-8'))
@@ -571,7 +697,7 @@ def build(source_root: Path, overlay_root: Path | None = None):
             selected = None
             selector = None
             if (isinstance(node, ast.Call) and node.args and function in FUNCTION_REGEX.get(name, set())
-                    and ast.unparse(node.func) in {"re.compile", "re.match", "re.fullmatch", "re.findall", "re.finditer"}):
+                    and ast.unparse(node.func) in {"re.compile", "re.match", "re.fullmatch", "re.findall", "re.finditer", "re.search"}):
                 selected, selector = node.args[0], "reviewed_parser:" + function + ":" + ast.unparse(node.func)
             elif (isinstance(node, ast.JoinedStr) and function in FUNCTION_FORMATTERS.get(name, set())
                     and any(isinstance(value, ast.FormattedValue) for value in node.values)):
@@ -638,6 +764,18 @@ def main():
     declaration = next(node for node in tree.body if isinstance(node, ast.Assign)
                        and any(isinstance(t, ast.Name) and t.id == "_REFERENCE_SCHEMAS" for t in node.targets))
     pins = ast.literal_eval(declaration.value)
+    constructor_names = [ast.literal_eval(node.value) for node in tree.body
+                         if isinstance(node, ast.Assign) and any(
+                             isinstance(target, ast.Name) and target.id == '_CONSTRUCTOR_REFERENCE_SCHEMA_NAMES'
+                             for target in node.targets)]
+    # Legacy helper outputs have no constructor consumers or additional pins.
+    constructor_consumers = {'selected_public_constructor_context', 'public_constructor_label_spans'}
+    has_constructor_consumer = any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                                   and node.name in constructor_consumers for node in tree.body)
+    if len(constructor_names) > 1 or (not constructor_names and has_constructor_consumer):
+        raise ValueError('missing exact constructor reference schema declaration')
+    for name in constructor_names[0] if constructor_names else ():
+        pins.setdefault(name, None)
     for name in pins:
         relative = "schemas/naos/" + name + ".schema.json"
         selected = args.overlay_root / relative if args.overlay_root else None
@@ -647,9 +785,10 @@ def main():
     updated_pins = "_REFERENCE_SCHEMAS = " + repr(pins) + "\n"
     pin_text = "".join(lines[:declaration.lineno-1]) + updated_pins + "".join(lines[declaration.end_lineno:])
     if args.check:
-        if pins != ast.literal_eval(declaration.value):raise ValueError("reference schema pins are stale")
+        if pins != ast.literal_eval(declaration.value):
+            raise ValueError("reference schema pins are stale")
     else:
-        helper.write_text(pin_text, encoding='utf-8')
+        write_text_output(helper, pin_text, create_parents=False)
     catalog = build(args.source_root, args.overlay_root)
     raw = (json.dumps(catalog, ensure_ascii=True, separators=(",", ":")) + "\n").encode()
     if len(raw) > 1024 * 1024 or sum(len(g["values"]) for g in catalog["groups"]) > 16_384:
@@ -662,8 +801,9 @@ def main():
         if target.read_bytes() != raw or helper.read_text(encoding='utf-8') != updated:
             raise ValueError("public vocabulary or bound digest is stale")
     else:
-        target.write_bytes(raw)
-        helper.write_text(updated, encoding='utf-8')
+        publish_trace(target, raw, None, strict_parent_topology=True,
+                      observe_current=True, create_parents=False)
+        write_text_output(helper, updated, create_parents=False)
     print(json.dumps({"sha256": digest, "bytes": len(raw), "groups": len(catalog["groups"]), "entries": sum(len(g["values"]) for g in catalog["groups"]), "check": args.check}))
 
 if __name__ == "__main__":

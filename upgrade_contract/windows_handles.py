@@ -272,6 +272,7 @@ class HeldHandle:
     def __init__(self, ops: _WindowsOps, value: int, *, writable: bool = False,
                  created: bool = False, delete_pinned: bool = False,
                  metadata_restore: bool = False,
+                 policy_read: bool = False,
                  origin: tuple[tuple[int, bytes], str] | None = None):
         if not value or value == INVALID_HANDLE_VALUE:
             raise ValueError("Invalid Windows handle")
@@ -282,6 +283,7 @@ class HeldHandle:
         self._created = created
         self._delete_pinned = delete_pinned
         self._metadata_restore = metadata_restore
+        self._policy_read = policy_read
         self._origin = origin
 
     def close(self) -> None:
@@ -397,17 +399,23 @@ class _WindowsOps:
             tag.ReparseTag, basic.CreationTime, basic.LastWriteTime, basic.ChangeTime,
         )
 
-    def assert_supported_metadata(self, handle: HeldHandle) -> HandleInfo:
+    def assert_supported_metadata(
+        self, handle: HeldHandle, *, permitted_file_attributes: int = SUPPORTED_FILE_ATTRIBUTES,
+        for_policy_read: bool = False,
+    ) -> HandleInfo:
         """Fail closed on links, unsupported attributes, EAs, and named streams."""
         info = self.observe(handle)
-        permitted = SUPPORTED_DIRECTORY_ATTRIBUTES if info.directory else SUPPORTED_FILE_ATTRIBUTES
+        if for_policy_read and (not handle._policy_read or handle._writable
+                                or handle._delete_pinned or handle._metadata_restore):
+            raise ValueError("Policy metadata exception requires its read-only held file")
+        permitted = SUPPORTED_DIRECTORY_ATTRIBUTES if info.directory else permitted_file_attributes
         if info.attributes & ~permitted:
             raise UnsafeWindowsPath(
                 "Unsupported Windows attributes ("
                 + self._metadata_diagnostic(handle, directory=info.directory,
                                             attributes=info.attributes) + ")"
             )
-        if not info.directory and info.links != 1:
+        if not info.directory and (info.links < 1 or info.links != 1 and not for_policy_read):
             raise UnsafeWindowsPath(
                 "Unsupported hard-link count ("
                 + self._metadata_diagnostic(handle, directory=False,
@@ -491,8 +499,21 @@ class _WindowsOps:
                    for_publish: bool = False, for_delete: bool = False,
                    for_security_copy: bool = False,
                    for_metadata_restore: bool = False,
-                   pin_for_read: bool = False) -> HeldHandle:
+                   pin_for_read: bool = False, shared_lock: bool = False,
+                   for_policy_read: bool = False) -> HeldHandle:
         validate_component(name)
+        if type(for_policy_read) is not bool:
+            raise ValueError("for_policy_read must be a boolean")
+        if for_policy_read and (kind != "file" or not pin_for_read or any((
+                for_rename, create, for_lock, for_write, for_publish, for_delete,
+                for_security_copy, for_metadata_restore, shared_lock))):
+            raise ValueError("Source-policy read requires an exclusively read-pinned file")
+        if type(shared_lock) is not bool:
+            raise ValueError("shared_lock must be a boolean")
+        if shared_lock and (not for_lock or kind != "file" or any((
+                for_rename, create, for_write, for_publish, for_delete,
+                for_security_copy, for_metadata_restore, pin_for_read))):
+            raise ValueError("Shared lock requires an otherwise unmodified file-lock open")
         if parent.value is None:
             raise ValueError("Closed parent handle")
         if (kind not in {"directory", "file"}
@@ -546,7 +567,7 @@ class _WindowsOps:
         # must share those rights while denying DELETE (rename/unlink of this
         # directory). Leaf pins still deny competing content writes/deletes.
         share = FILE_SHARE_READ
-        if kind == "directory" or not mutation_pinned:
+        if kind == "directory" or not mutation_pinned or shared_lock:
             share |= FILE_SHARE_WRITE
         if not mutation_pinned:
             share |= FILE_SHARE_DELETE
@@ -561,10 +582,13 @@ class _WindowsOps:
         handle = HeldHandle(self, result.value, writable=for_write or for_lock,
                             created=create, delete_pinned=for_delete,
                             metadata_restore=for_metadata_restore,
+                            policy_read=for_policy_read,
                             origin=(parent_identity, name))
         try:
-            info = self.assert_supported_metadata(handle)
-            if info.directory != (kind == "directory") or (kind == "file" and info.links != 1):
+            info = (self.assert_supported_metadata(handle, for_policy_read=True)
+                    if for_policy_read else self.assert_supported_metadata(handle))
+            if info.directory != (kind == "directory") or (kind == "file" and (
+                    info.links < 1 or info.links != 1 and not for_policy_read)):
                 raise UnsafeWindowsPath("Child type or hard-link count is unsafe")
             return handle
         except BaseException:
@@ -705,7 +729,9 @@ class _WindowsOps:
     def read(self, handle: HeldHandle, count: int) -> bytes:
         if handle.value is None or not isinstance(count, int) or not 0 <= count <= MAX_IO_CHUNK:
             raise ValueError("Invalid handle or read length")
-        if self.assert_supported_metadata(handle).directory:
+        info = (self.assert_supported_metadata(handle, for_policy_read=True)
+                if getattr(handle, "_policy_read", False) else self.assert_supported_metadata(handle))
+        if info.directory:
             raise UnsafeWindowsPath("Cannot read directory as file")
         if count == 0:
             return b""
@@ -972,22 +998,28 @@ class _WindowsOps:
             if self.k32.LocalFree(pointer):
                 raise WindowsHandleError("LocalFree(SID)", winerror=int(self.last_error()))
 
-    def _private_security(self) -> SecurityParts:
+    def _private_security(self, *, owner_sid: bytes | None = None,
+                          group_sid: bytes | None = None) -> SecurityParts:
         """New private objects grant full file access only to this process user.
 
         Query the primary token without enabling privileges or modifying it.
         Pass a protected descriptor during exclusive creation, so no inherited
         permissive-DACL window precedes a later ACL repair. This is for private
-        runtime/templates, not a policy for replacing adopter file permissions.
+        runtime/templates. Report stages may select an existing owner/group;
+        an Owner Rights ACE suppresses a different owner's implicit WRITE_DAC.
         """
         token = HANDLE()
         self._check_win(self.advapi.OpenProcessToken(
             self.k32.GetCurrentProcess(), TOKEN_QUERY, ctypes.byref(token)), "OpenProcessToken")
         try:
-            owner = self._token_sid(token, TOKEN_USER_CLASS)
-            group = self._token_sid(token, TOKEN_PRIMARY_GROUP_CLASS)
+            user = self._token_sid(token, TOKEN_USER_CLASS)
+            owner = user if owner_sid is None else owner_sid
+            group = (self._token_sid(token, TOKEN_PRIMARY_GROUP_CLASS)
+                     if group_sid is None else group_sid)
             owner_text, group_text = self._sid_string(owner), self._sid_string(group)
-            sddl, _ = _utf16(f"O:{owner_text}G:{group_text}D:P(A;;FA;;;{owner_text})")
+            user_text = owner_text if owner == user else self._sid_string(user)
+            owner_rights = "(A;;RC;;;OW)" if owner != user else ""
+            sddl, _ = _utf16(f"O:{owner_text}G:{group_text}D:P(A;;FA;;;{user_text}){owner_rights}")
             descriptor, length = HANDLE(), DWORD()
             self._check_win(self.advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW(
                 sddl, 1, ctypes.byref(descriptor), ctypes.byref(length)),
@@ -1004,10 +1036,16 @@ class _WindowsOps:
                 if not present.value or not dacl.value or not self.advapi.IsValidAcl(dacl):
                     raise UnsafeWindowsPath("Private DACL is missing or invalid")
                 acl_length = ACL_HEADER.from_address(dacl.value).AclSize
-                # One non-inherited ACCESS_ALLOWED_ACE, FILE_ALL_ACCESS, for
-                # the exact token user. Reject unexpected converter output.
-                ace = struct.pack('<BBHI', 0, 0, 8 + len(owner), 0x001F01FF) + owner
-                expected_acl = struct.pack('<BBHHH', 2, 0, 8 + len(ace), 1, 0) + ace
+                # Full access belongs to the exact token user. A different
+                # owner receives READ_CONTROL only, suppressing implicit
+                # WRITE_DAC. Reject any unexpected converter output.
+                ace = struct.pack('<BBHI', 0, 0, 8 + len(user), 0x001F01FF) + user
+                count = 1
+                if owner != user:
+                    owner_rights_sid = b'\x01\x01' + b'\0' * 5 + b'\x03' + struct.pack('<I', 4)
+                    ace += struct.pack('<BBHI', 0, 0, 8 + len(owner_rights_sid), READ_CONTROL) + owner_rights_sid
+                    count += 1
+                expected_acl = struct.pack('<BBHHH', 2, 0, 8 + len(ace), count, 0) + ace
                 if acl_length != len(expected_acl) or ctypes.string_at(dacl, acl_length) != expected_acl:
                     raise UnsafeWindowsPath("Private DACL differs from the process-user-only policy")
                 control, revision = USHORT(), DWORD()
@@ -1026,10 +1064,13 @@ class _WindowsOps:
             self._check_win(self.k32.CloseHandle(token), "CloseHandle(token)")
 
     def _create_with_security(self, parent: HeldHandle, name: str,
-                              security: SecurityParts | None, *, kind: str) -> HeldHandle:
+                              security: SecurityParts | None, *, kind: str,
+                              exclusive_data: bool = False) -> HeldHandle:
         validate_component(name)
         if kind not in {"file", "directory"}:
             raise ValueError("Private child kind must be file or directory")
+        if type(exclusive_data) is not bool or (exclusive_data and kind != "file"):
+            raise ValueError("Exclusive report data sharing requires a file")
         if not self.assert_supported_metadata(parent).directory:
             raise UnsafeWindowsPath("Parent is not a directory")
         parent_identity = self.observe(parent).identity
@@ -1051,7 +1092,7 @@ class _WindowsOps:
         else:
             access |= GENERIC_READ | GENERIC_WRITE | DELETE
             options = FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT
-            share = FILE_SHARE_READ
+            share = 0 if exclusive_data else FILE_SHARE_READ
         status = self.ntdll.NtCreateFile(
             ctypes.byref(result), access, ctypes.byref(attrs), ctypes.byref(iosb),
             None, 0x20 if kind == "file" else 0, share,
@@ -1089,6 +1130,24 @@ class _WindowsOps:
     def create_report_child(self, parent: HeldHandle, name: str, *, kind: str) -> HeldHandle:
         """Exclusive ordinary inherited-security creation for new report outputs."""
         return self._create_with_security(parent, name, None, kind=kind)
+
+    def create_private_report_stage(self, parent: HeldHandle, name: str,
+                                    source: HeldHandle) -> HeldHandle:
+        """Preserve ownership, restricting owner rights and competing data opens.
+
+        Sharing stays closed while the caller selects the existing report's
+        DACL and writes the payload, through rename and the held handle's close.
+        """
+        if source._ops is not self:
+            raise UnsafeWindowsPath("Report source requires matching native handles")
+        info = self.assert_supported_metadata(source)
+        if info.directory or info.links != 1:
+            raise UnsafeWindowsPath("Report stage requires an ordinary source file")
+        selected = self.observe_security(source)
+        security = self._private_security(
+            owner_sid=selected.owner_sid, group_sid=selected.group_sid
+        )
+        return self._create_with_security(parent, name, security, kind="file", exclusive_data=True)
 
     def create_private(self, parent: HeldHandle, name: str, *, kind: str) -> HeldHandle:
         validate_component(name)
@@ -1161,7 +1220,80 @@ class _WindowsOps:
         return tuple(sorted(names, key=str.casefold))
 
 
-def _native_ops() -> _WindowsOps:
+class _SpecCopyOps(_WindowsOps):
+    """Spec-copy-only extension for ordinary Windows READONLY template files."""
+
+    def assert_supported_metadata(self, handle: HeldHandle) -> HandleInfo:
+        info = super().assert_supported_metadata(
+            handle, permitted_file_attributes=SUPPORTED_FILE_ATTRIBUTES | 0x1,
+        )
+        if not info.directory and info.attributes & 0x80 and info.attributes != 0x80:
+            raise UnsafeWindowsPath("NORMAL cannot be combined with another file attribute")
+        return info
+
+    def reset_spec_copy_marker(self, handle: HeldHandle) -> HandleInfo:
+        """Reset only a held, single-link completed spec-copy marker to pending."""
+        if (handle.value is None or handle._ops is not self or not handle._writable
+                or handle._origin is None or not re.fullmatch(
+                    r"\.naos-spec-copy-state-[0-9a-f]{64}", handle._origin[1],
+                )):
+            raise UnsafeWindowsPath("Spec-copy marker reset requires a held writable marker")
+        before = self.assert_supported_metadata(handle)
+        if before.directory or before.links != 1 or before.size != 1:
+            raise UnsafeWindowsPath("Completed spec-copy marker has unsafe type, links, or size")
+        self.seek(handle, 0)
+        self._check_win(self.k32.SetEndOfFile(handle.value), "SetEndOfFile(spec copy marker)")
+        self.flush(handle)
+        after = self.assert_supported_metadata(handle)
+        if after.identity != before.identity or after.size != 0:
+            raise UnsafeWindowsPath("Spec-copy marker reset did not retain its identity")
+        return after
+
+    def set_spec_copy_metadata(
+        self, handle: HeldHandle, *, access_ns: int | None = None,
+        write_ns: int | None = None, readonly: bool | None = None,
+    ) -> HandleInfo:
+        """Set source times and READONLY only on an owned, held spec target."""
+        if not handle._created or not handle._writable or handle.value is None:
+            raise UnsafeWindowsPath("Spec-copy metadata requires an owned writable stage")
+        if readonly is not None and type(readonly) is not bool:
+            raise ValueError("readonly must be a boolean")
+        before = self.assert_supported_metadata(handle)
+        if before.directory:
+            raise UnsafeWindowsPath("Spec-copy metadata requires a regular file")
+        security = self.observe_security(handle)
+
+        def filetime(value: int | None) -> int:
+            if value is None:
+                return 0
+            if type(value) is not int:
+                raise ValueError("Spec-copy timestamp must be integer nanoseconds")
+            converted = value // 100 + 116444736000000000
+            if not 0 < converted < 2**63:
+                raise ValueError("Spec-copy timestamp is outside Windows FILETIME")
+            return converted
+
+        attributes = 0
+        if readonly is not None:
+            attributes = before.attributes & ~(0x1 | 0x80)
+            if readonly:
+                attributes |= 0x1
+            elif not attributes:
+                attributes = 0x80
+        basic = FILE_BASIC_INFO(0, filetime(access_ns), filetime(write_ns), 0, attributes)
+        self._check_win(self.k32.SetFileInformationByHandle(
+            handle.value, FILE_BASIC_INFO_CLASS, ctypes.byref(basic), ctypes.sizeof(basic)),
+            "SetFileInformationByHandle(spec copy metadata)")
+        after = self.assert_supported_metadata(handle)
+        if (after.identity != before.identity or after.size != before.size
+                or (readonly is not None and after.attributes != attributes)
+                or (write_ns is not None and after.modified_time != filetime(write_ns))
+                or self.observe_security(handle) != security):
+            raise UnsafeWindowsPath("Spec-copy target identity or metadata changed")
+        return after
+
+
+def _native_ops(ops_class: type[_WindowsOps] = _WindowsOps) -> _WindowsOps:
     if sys.platform != "win32" or os.name != "nt" or not hasattr(ctypes, "WinDLL"):
         raise RuntimeError("Native Windows handles require CPython on Windows")
     if sys.implementation.name != "cpython" or sys.version_info[:2] not in {(3, 11), (3, 12), (3, 13)}:
@@ -1219,7 +1351,7 @@ def _native_ops() -> _WindowsOps:
     for function, args, result in prototypes:
         function.argtypes = args
         function.restype = result
-    return _WindowsOps(k32, ntdll, last_error=ctypes.get_last_error, advapi=advapi)
+    return ops_class(k32, ntdll, last_error=ctypes.get_last_error, advapi=advapi)
 
 
 class WindowsHandles:
@@ -1248,13 +1380,17 @@ class WindowsHandles:
                    for_publish: bool = False, for_delete: bool = False,
                    for_security_copy: bool = False,
                    for_metadata_restore: bool = False,
-                   pin_for_read: bool = False) -> HeldHandle:
+                   pin_for_read: bool = False, shared_lock: bool = False,
+                   for_policy_read: bool = False) -> HeldHandle:
+        if type(for_policy_read) is not bool:
+            raise ValueError("for_policy_read must be a boolean")
         return self._ops.open_child(parent, name, kind=kind, for_rename=for_rename,
                                     create=create, for_lock=for_lock, for_write=for_write,
                                     for_publish=for_publish, for_delete=for_delete,
                                     for_security_copy=for_security_copy,
                                     for_metadata_restore=for_metadata_restore,
-                                    pin_for_read=pin_for_read)
+                                    pin_for_read=pin_for_read, shared_lock=shared_lock,
+                                    **({"for_policy_read": True} if for_policy_read else {}))
 
     def restore_rename_metadata(self, handle: HeldHandle, *, creation_time: int,
                                 attributes: int) -> None:
@@ -1303,5 +1439,27 @@ class WindowsHandles:
     def create_private_file(self, parent: HeldHandle, name: str) -> HeldHandle:
         return self._ops.create_private(parent, name, kind="file")
 
+    def create_private_report_stage(self, parent: HeldHandle, name: str,
+                                    source: HeldHandle) -> HeldHandle:
+        return self._ops.create_private_report_stage(parent, name, source)
+
     def delete_exact(self, parent: HeldHandle, name: str, target: HeldHandle) -> None:
         self._ops.delete_exact(parent, name, target)
+
+
+class WindowsSpecCopyHandles(WindowsHandles):
+    """Native handles with READONLY support scoped to spec-template copying."""
+
+    def __init__(self) -> None:
+        self._ops = _native_ops(_SpecCopyOps)
+
+    def reset_spec_copy_marker(self, handle: HeldHandle) -> HandleInfo:
+        return self._ops.reset_spec_copy_marker(handle)
+
+    def set_spec_copy_metadata(
+        self, handle: HeldHandle, *, access_ns: int | None = None,
+        write_ns: int | None = None, readonly: bool | None = None,
+    ) -> HandleInfo:
+        return self._ops.set_spec_copy_metadata(
+            handle, access_ns=access_ns, write_ns=write_ns, readonly=readonly,
+        )

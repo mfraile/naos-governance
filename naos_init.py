@@ -637,6 +637,17 @@ def _copy_generated_script(
     if "# AUTO-GENERATED" in text[:2048]:
         return
 
+    if (os.name == "nt" and src.resolve() == (
+            KIT_DIR / "scripts" / "naos_secret_managed_operands.py").resolve()
+            and UPGRADE_SOURCE_POLICY_PATH.resolve() == (
+                KIT_DIR / "configs" / "upgrade_source_policy.yaml").resolve()):
+        slot = "COPIED_SOURCE_POLICY_PATH_SHA256 = None\n"
+        if text.count(slot) != 1:
+            raise SourceModeError("Copied Windows scanner has no unique source-policy role slot")
+        policy_label = "\\".join(UPGRADE_SOURCE_POLICY_PATH.parts[1:])
+        pin = hashlib.sha256(policy_label.encode("utf-8")).hexdigest()
+        text = text.replace(slot, f"COPIED_SOURCE_POLICY_PATH_SHA256 = {pin!r}\n")
+
     marker = "# AUTO-GENERATED: Copied by naos init from the NAOS kit.\n"
     if text.startswith("#!"):
         first_line, _, rest = text.partition("\n")
@@ -2188,10 +2199,6 @@ def _generate_host_routes(
     inventory = set(generated)
     skill_names = {p.name for p in (TEMPLATES_DIR / "skills").iterdir() if p.is_dir()}
     skill_catalogue_input = json.dumps(sorted(skill_names), separators=(",", ":")).encode("utf-8")
-    installed_skills = {
-        Path(relative).parent.name for relative in inventory
-        if relative.startswith(".github/skills/") and relative.endswith("/SKILL.md")
-    }
 
     makefile = preview_dir / "Makefile.naos"
     unavailable_make_targets = _unavailable_project_make_targets(
@@ -2402,6 +2409,7 @@ def scaffold_files(
     source_origins: SourceOrigins | None = None,
     copied_tool_outputs: set[Path] | None = None,
     _defer_traceability_content: bool = False,
+    private_preview_address: PrivatePreviewAddress | None = None,
 ) -> list[str]:
     """
     Generate governance files into preview_dir.
@@ -2410,6 +2418,10 @@ def scaffold_files(
     Security: writes ONLY to preview_dir — never modifies project_path directly.
     Activation (copy to project_path) requires separate --activate call.
     """
+    if private_preview_address is not None:
+        if type(private_preview_address) is not PrivatePreviewAddress:
+            raise ValueError("Private preview addressing requires its owning address")
+        private_preview_address.require_root(preview_dir, io=True)
     generated: list[str] = []
     if copied_tool_outputs is None:
         copied_tool_outputs = set()
@@ -3275,7 +3287,9 @@ def scaffold_files(
             "naos_readiness.py",
             "naos_ai_precommit.py",
             "naos_policy.py",
+            "naos_trace_atomic_write.py",
             "source_roots.py",
+            "naos_staged_python.py",
             "naos_console.py",
             "spec_header.py",
             "naos_schema_validation.py",
@@ -3518,8 +3532,14 @@ def scaffold_files(
                 {"profile": tier},
             )
         catalogue = emit_catalogue(preview_dir)
+        catalogue_relative = Path("configs/naos_ai_surface_catalogue.yaml")
+        catalogue_output = preview_dir / catalogue_relative
+        if private_preview_address is not None:
+            catalogue_output = Path(private_preview_address.ordinary_source(
+                catalogue_relative, catalogue_output,
+            ))
         write_catalogue(
-            preview_dir / "configs" / "naos_ai_surface_catalogue.yaml",
+            catalogue_output,
             render_catalogue(catalogue),
         )
         generated.append("configs/naos_ai_surface_catalogue.yaml")
@@ -3717,27 +3737,34 @@ def _activate_managed_content(
 ) -> list[str]:
     windows = _windows_cli()
     if windows is not None:
-        if private_preview_address is not None:
+        try:
+            if private_preview_address is not None:
+                return windows.activate(
+                    project_root, sources, request_inputs=request_inputs, dry_run=dry_run,
+                    greenfield=greenfield, checks=fixed_checks,
+                    preapply_revalidator=preapply_revalidator,
+                    private_preview_address=private_preview_address,
+                )
             return windows.activate(
                 project_root, sources, request_inputs=request_inputs, dry_run=dry_run,
                 greenfield=greenfield, checks=fixed_checks,
                 preapply_revalidator=preapply_revalidator,
-                private_preview_address=private_preview_address,
             )
-        return windows.activate(
-            project_root, sources, request_inputs=request_inputs, dry_run=dry_run,
-            greenfield=greenfield, checks=fixed_checks,
-            preapply_revalidator=preapply_revalidator,
+        except windows.ActivationPreflightRefusal as exc:
+            raise ActivationPreflightRefusal(str(exc)) from exc
+    try:
+        # Intent construction only reads inputs; root publication starts below.
+        intent = (
+            _greenfield_root_intent(
+                project_root,
+                sources,
+                request_inputs=request_inputs,
+            )
+            if greenfield
+            else None
         )
-    intent = (
-        _greenfield_root_intent(
-            project_root,
-            sources,
-            request_inputs=request_inputs,
-        )
-        if greenfield
-        else None
-    )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ActivationPreflightRefusal(str(exc)) from exc
     session = None
     scope = None
     try:
@@ -5314,6 +5341,7 @@ def _generate_scaffold_preview(
         source_origins=source_origins,
         copied_tool_outputs=copied_tool_outputs,
         _defer_traceability_content=True,
+        private_preview_address=private_preview_address,
     )
     # Native Path strings use backslashes on Windows. Overlay and adapter
     # comparisons consume portable root-relative identifiers.
@@ -6114,7 +6142,7 @@ def main() -> int:
             "agent",
         ],
         default=None,
-        help="Optional AI review policy (default: static_only). Legacy: auto/ollama/agent.",
+        help="AI review policy: choose explicitly for non-interactive Lite/Standard/Assured; wizard otherwise. Quickstart defaults to disabled. Legacy: auto/ollama/agent.",
     )
     parser.add_argument(
         "--activate",
@@ -6182,7 +6210,7 @@ def main() -> int:
                 must_exist=not args.new,
                 allow_existing_resume=args.new and args.activate,
             )
-    except (OSError, ValueError) as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         print(f"NOT_APPLIED: {exc}", file=sys.stderr)
         return 2
 

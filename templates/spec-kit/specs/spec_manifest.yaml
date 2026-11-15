@@ -121,7 +121,7 @@ traceability_codes:
     definition_source: task_registry
     reference_files: [03-requirements.md, 10-execution.md]
     reference_patterns:
-      - "\\b(T-[0-9]{3})\\b"
+      - "(?<![\\w-])((?:[A-Z0-9]+-)*T-[0-9]{3,})(?![\\w-])"
 
 files:
   - id: "01"
@@ -176,7 +176,7 @@ files:
         pattern: "\\bAC-[0-9]{3}-[0-9]+\\b"
         description: "Requirements include AC ids."
       - id: requirement_task_link
-        pattern: "\\bT-[0-9]{3}\\b"
+        pattern: "(?<![\\w-])(?:[A-Z0-9]+-)*T-[0-9]{3,}(?![\\w-])"
         description: "Requirements link to task ids when tasks are available."
   - id: "04"
     path: 04-architecture.md
@@ -289,7 +289,7 @@ files:
         pattern: "\\{#EXEC-[A-Z0-9]+\\}"
         description: "Execution sections include EXEC anchors."
       - id: execution_task_link
-        pattern: "\\bT-[0-9]{3}\\b"
+        pattern: "(?<![\\w-])(?:[A-Z0-9]+-)*T-[0-9]{3,}(?![\\w-])"
         description: "Execution plan references task ids."
       - id: execution_requirement_link
         pattern: "\\b(?:FR|NFR)-[0-9]{3}\\b"

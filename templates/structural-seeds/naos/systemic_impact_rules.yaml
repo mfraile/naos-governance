@@ -39,12 +39,15 @@ review_binding:
     - dashboard_markdown
     - dashboard_summary_report
     - dependency_integrity_report
+    - design_traceability_report
     - duplicate_function_hygiene_report
     - evidence_attestation_report
     - evidence_classification_report
     - evidence_conflict_detection_report
     - evidence_pack_report
     - external_evidence_ingest_report
+    - failure_mode_observations_report
+    - failure_mode_posture_report
     - function_index_report
     - gate_evaluation_report
     - gate_status_report
@@ -96,6 +99,7 @@ review_binding:
     - task_context_pack_report
     - test_evidence_report
     - test_quality_hygiene_report
+    - ui_experience_quality_report
     - ci_readiness
 
 defaults:
@@ -271,6 +275,7 @@ changed_path_routing:
         - ".github/run_test_shard.py"
         - ".github/windows_test_job.py"
         - ".github/test-duration-baseline.json"
+        - ".github/reconcile_test_duration_inventory.py"
         - "templates/workflows/**"
         - "plugins/**/hooks/**"
         - "templates/integrations/**/hooks/**"

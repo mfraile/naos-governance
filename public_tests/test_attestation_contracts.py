@@ -6,6 +6,7 @@ installed package entry point. All writes remain in temporary project fixtures.
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -17,18 +18,24 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import yaml
 
 
 KIT = Path(os.environ.get("NAOS_TEST_KIT", Path(__file__).resolve().parents[1])).resolve()
+if str(KIT / "scripts") not in sys.path:
+    sys.path.insert(0, str(KIT / "scripts"))
+import naos_evidence_attestation as attestation  # noqa: E402
+import naos_self_check_dependency_resolution as resolution  # noqa: E402
+from naos_policy import load_policy, evidence_pack_output_path  # noqa: E402
 
 
 class AttestationContracts(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="naos-attestation-contract-")
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         (self.root / "naos/reports").mkdir(parents=True)
         (self.root / "naos/evidence").mkdir()
         self.att_path = self.root / "naos/reports/evidence_attestation.json"
@@ -91,6 +98,58 @@ class AttestationContracts(unittest.TestCase):
         self.assertEqual(changed.get("digest_validation"), "invalid")
         self.assertFalse(changed["tamper_evident"])
         self.assert_consumers(changed)
+
+    def test_signature_presence_is_not_signed_and_integrity_names_unsigned_baseline(self):
+        self.producer()
+        _, emitted = self.run_cli("evidence-sign", expected=0)
+        self.assertNotIn("signed", emitted)
+        envelope_path = self.root / "naos/evidence/evidence_envelope.json"
+        envelope = json.loads(envelope_path.read_text())
+        envelope["envelope"]["signatures"] = [{"keyid": "synthetic", "sig": "unverified"}]
+        envelope_path.write_text(json.dumps(envelope))
+        _, report = self.run_cli("evidence-verify", expected=0)
+        self.assertNotIn("signed", report)
+        self.assertTrue(report["signature_entries_present"])
+        self.assertFalse(report["signature_validation_performed"])
+        self.assertTrue(report["tamper_evident"])
+        self.assertEqual(report["tamper_evidence_basis"], "unsigned_local_attestation_baseline")
+        for command in ("evidence-pack", "dashboard"):
+            with self.subTest(consumer=command):
+                _, output = self.run_cli(command)
+                section = output["evidence_verification"]
+                self.assertNotIn("signed", section)
+                self.assertTrue(section["signature_entries_present"])
+                self.assertFalse(section["signature_validation_performed"])
+                self.assertEqual(section["tamper_evidence_basis"], "unsigned_local_attestation_baseline")
+
+    def test_author_email_is_explicit_optin_in_cli_and_projections(self):
+        self.producer()
+        email = "synthetic-author@example.invalid"
+        empty_template = self.root / "empty-git-template"
+        empty_template.mkdir()
+        for command in (
+            ["git", "init", "--template", str(empty_template), str(self.root)],
+            ["git", "-C", str(self.root), "-c", "user.name=" + email.upper(),
+             "-c", "user.email=" + email, "-c", "commit.gpgsign=false",
+             "-c", "core.hooksPath=" + str(empty_template),
+             "commit", "--allow-empty", "-m", "Synthetic identity privacy fixture"],
+        ):
+            run = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertEqual(run.returncode, 0, run.stderr)
+        for optin in (False, True):
+            args = ["--include-author-email"] if optin else []
+            for command in ("evidence-sign", "evidence-verify"):
+                _, report = self.run_cli(command, *args, expected=0)
+                identity = report["identity_binding"]
+                self.assertEqual("email" in identity["author"], optin)
+                self.assertEqual(email in json.dumps(report).lower(), optin)
+                self.assertFalse(identity["identity_authentication_performed"])
+                self.assertFalse(report["signature_validation_performed"])
+            for command in ("evidence-pack", "dashboard"):
+                _, report = self.run_cli(command)
+                identity = report["evidence_verification"]["identity_binding"]
+                self.assertEqual("email" in identity["author"], optin)
+                self.assertEqual(email in json.dumps(identity).lower(), optin)
 
     def test_malformed_inputs_are_structured_errors_in_both_entrypoints(self):
         valid = self.producer()
@@ -349,6 +408,133 @@ class AttestationContracts(unittest.TestCase):
                     target = preview / relative
                     self.assertEqual((target.read_bytes(), target.stat().st_mtime_ns), state)
         self.root = fixture_parent
+
+
+class DependencyReceiptAttestationContracts(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix="naos-receipt-domain-")
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name).resolve()
+        (self.root / "naos/reports").mkdir(parents=True)
+        self.policy = load_policy(root=self.root, naos_root="naos")
+
+    def collect(self, rules, policy=None, **kwargs):
+        return attestation.collect_artifacts(
+            root=self.root, rules=rules, policy=self.policy if policy is None else policy,
+            generated_at=datetime.now(timezone.utc), **kwargs,
+        )
+
+    def test_classified_receipt_publication_does_not_change_independent_domain(self):
+        # This models endpoint classification only. The file is deliberately not
+        # a receipt and is never offered to a proof reader or used as evidence.
+        for reports in ("reports", "observations"):
+            with self.subTest(reports=reports):
+                self.policy["paths"]["reports_dir"] = reports
+                directory = self.root / "naos" / reports
+                directory.mkdir(exist_ok=True)
+                independent = directory / "independent.json"
+                independent.write_text('{"synthetic_independent_input":true}')
+                pack = evidence_pack_output_path(self.root, "naos", self.policy)
+                pack.parent.mkdir(exist_ok=True)
+                pack.write_text('{"synthetic_independent_pack":true}')
+                endpoint = resolution.receipt_path(self.root, "naos", self.policy)
+                rules = {"artifact_groups": [{"id": "independent", "included_paths": [
+                    f"naos/{reports}/*.json", pack.relative_to(self.root).as_posix()]}]}
+                with patch.object(resolution, "inspect_derived_receipt_endpoint",
+                                  return_value=(endpoint, None, None), create=True):
+                    before, _, _ = self.collect(rules)
+                    endpoint.write_text('{"synthetic_membership_witness_only":true}')
+                    after, _, _ = self.collect(rules)
+                    self.assertEqual(before, after)
+                    self.assertEqual({v["path"] for v in after}, {
+                        independent.relative_to(self.root).as_posix(), pack.relative_to(self.root).as_posix()})
+                    neighbor = directory / "unknown-neighbor.json"
+                    neighbor.write_text('{"independent_neighbor":true}')
+                    changed, _, _ = self.collect(rules)
+                    self.assertIn(neighbor.relative_to(self.root).as_posix(), {v["path"] for v in changed})
+                    pack.write_text('{"changed_independent_pack":true}')
+                    changed_pack, _, _ = self.collect(rules)
+                    old_digest = next(v["digest"] for v in changed if v["path"] == pack.relative_to(self.root).as_posix())
+                    new_digest = next(v["digest"] for v in changed_pack if v["path"] == pack.relative_to(self.root).as_posix())
+                    self.assertNotEqual(old_digest, new_digest)
+
+    def test_explicitly_required_classified_receipt_stays_missing(self):
+        endpoint = resolution.receipt_path(self.root, "naos", self.policy)
+        endpoint.write_text('{"synthetic_membership_witness_only":true}')
+        reference = endpoint.relative_to(self.root).as_posix()
+        with patch.object(resolution, "inspect_derived_receipt_endpoint",
+                          return_value=(endpoint, None, None), create=True):
+            manifest, missing, _ = self.collect({"artifact_groups": [{
+                "id": "explicit", "required_artifacts": [reference]}]})
+        self.assertEqual(manifest, [])
+        self.assertEqual([v["path"] for v in missing], [reference])
+
+    def test_absent_endpoint_and_partial_policy_are_read_only(self):
+        endpoint, digest, identity = resolution.inspect_derived_receipt_endpoint(
+            self.root, "naos", self.policy)
+        self.assertFalse(endpoint.exists())
+        self.assertIsNone(digest)
+        self.assertIsNone(identity)
+        manifest, missing, _ = self.collect({"artifact_groups": []}, policy={})
+        self.assertEqual((manifest, missing), ([], []))
+        self.assertFalse(endpoint.exists())
+        # Standalone collectors also work before a governance folder exists;
+        # the optional evidence-pack output then has no destination.
+        unadopted = self.root / "not-yet-adopted"
+        unadopted.mkdir()
+        policy = load_policy(root=unadopted, naos_root="naos")
+        absent, digest, identity = resolution.inspect_derived_receipt_endpoint(
+            unadopted, "naos", policy)
+        self.assertFalse(absent.exists())
+        self.assertIsNone(digest)
+        self.assertIsNone(identity)
+        self.assertFalse((unadopted / "naos").exists())
+
+    def test_named_input_and_pack_aliases_refuse_before_exemption(self):
+        import copy
+
+        for kind in ("declared-input", "pack", "explicit-source"):
+            with self.subTest(kind=kind):
+                policy = copy.deepcopy(self.policy)
+                extras = ()
+                if kind == "pack":
+                    policy["paths"].update(reports_dir="evidence", self_check_dependency_resolution_report="evidence_pack.json")
+                else:
+                    policy["paths"]["self_check_dependency_resolution_report"] = "authored.json"
+                    source = self.root / "naos/reports/authored.json"
+                    if kind == "declared-input":
+                        policy["paths"]["custom_authored_input"] = "reports/authored.json"
+                    else:
+                        extras = (source,)
+                with self.assertRaises(ValueError):
+                    resolution.inspect_derived_receipt_endpoint(
+                        self.root, "naos", policy, extra_protected=extras)
+                self.assertFalse((self.root / "naos/reports/authored.json").exists())
+
+        for invalid in (None, False, 1, []):
+            with self.subTest(invalid_path=invalid):
+                policy = copy.deepcopy(self.policy)
+                policy["paths"]["self_check_dependency_resolution_report"] = invalid
+                with self.assertRaises(ValueError):
+                    resolution.inspect_derived_receipt_endpoint(self.root, "naos", policy)
+
+    def test_foreign_malformed_and_hardlinked_endpoint_never_becomes_exempt(self):
+        endpoint = resolution.receipt_path(self.root, "naos", self.policy)
+        for content in ('{broken', '{"schema":"foreign"}',
+                        json.dumps({"schema": resolution.SCHEMA, "synthetic_authored_input": True})):
+            with self.subTest(content=content):
+                endpoint.write_text(content)
+                with self.assertRaises(ValueError):
+                    self.collect({"artifact_groups": [{"id": "reports", "included_paths": ["naos/reports/*.json"]}]})
+                self.assertEqual(endpoint.read_text(), content)
+        endpoint.unlink()
+        original = self.root / "authored.json"
+        original.write_text(json.dumps({"schema": resolution.SCHEMA, "synthetic_authored_input": True}))
+        os.link(original, endpoint)
+        with self.assertRaises(ValueError):
+            resolution.inspect_derived_receipt_endpoint(self.root, "naos", self.policy)
+        self.assertEqual(endpoint.read_bytes(), original.read_bytes())
+        self.assertEqual(original.stat().st_nlink, 2)
 
 
 if __name__ == "__main__":

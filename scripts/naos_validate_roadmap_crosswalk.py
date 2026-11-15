@@ -34,7 +34,9 @@ from naos_validate_claims import evidence_verified  # noqa: E402
 
 IMPLEMENTED_STATES = {"implemented", "shipped", "done", "complete", "completed"}
 VALID_STATES = IMPLEMENTED_STATES | {"planned", "gated", "rejected", "deferred", "experimental"}
-ID_PATTERN = re.compile(r"\b(?:REC|GOV|WI|Q|S|T|FR|NFR|REQ)-[A-Z0-9][A-Z0-9_.-]*\b")
+# A lowercase filename slug can follow a separator. A final dot/hyphen
+# would manufacture another ID; neither can end a full-match identifier.
+ID_PATTERN = re.compile(r"\b(?:REC|GOV|WI|Q|S|T|FR|NFR|REQ)-[A-Z0-9][A-Z0-9_.-]*(?<![.-])\b")
 
 
 def collect_ids_from_text(path: Path) -> set[str]:

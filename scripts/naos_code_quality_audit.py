@@ -22,13 +22,26 @@ Usage:
 Environment variables:
     NAOS_ROOT   Path to the naos/ governance directory (default: naos)
     SRC_ROOT    Path to the source directory (default: src)
+
+Staged checks use NUL-delimited Git paths. If Git is unavailable or fails,
+the CLI reports not_evaluated (STAGED_DIFF_UNAVAILABLE) and exits 2 instead
+of publishing a clean assessment. Successful report formats are unchanged.
+
+Semantic warning history is staged before each file publication. Appends retain
+the exact existing byte prefix; rotation retains its text/newline behavior and
+archive-first order. Actual writes require readable existing files, supported
+metadata and staging authority in the parent. Under-cap rotation is read-only.
+Archive and main publication are separate operations, without a writer lock or
+cross-file transaction guarantee.
 """
 
 import argparse
 import ast
 import json
+import hashlib
 import os
 import re
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
@@ -38,6 +51,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 from naos_console import configure_console_output
+from naos_policy import write_text_output
+from naos_trace_atomic_write import BinaryProducer, _stream_fingerprint, publish_trace, read_trace_source
 from architecture_boundaries import (
     BoundaryPolicyError,
     find_boundary_violations,
@@ -72,6 +87,29 @@ TASK_REGISTRY = NAOS_ROOT / "TASK_REGISTRY.yaml"
 _REQ_HEADER_RE = re.compile(r"^## ((?:FR|NFR)-[A-Z0-9]+(?:-ENHANCED)?):", re.MULTILINE)
 _IMPLEMENTS_RE = re.compile(r"Implements:\s*([^\n]+)")
 _TASK_HEADER_RE = re.compile(r"Task:\s*(T-[\w-]+|GOV-\d+|P2-[\w-]+)")
+
+
+class StagedDiffUnavailable(RuntimeError):
+    """The staged input set could not be evaluated reliably."""
+
+
+def staged_paths() -> list[str]:
+    """Read exact filename data; a failed Git command is not an empty index."""
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM", "-z"],
+            capture_output=True, cwd=str(PROJECT_ROOT), check=False,
+        )
+    except OSError as exc:
+        raise StagedDiffUnavailable(f"Git staged-file enumeration unavailable ({type(exc).__name__})") from exc
+    if result.returncode != 0:
+        raise StagedDiffUnavailable(f"Git staged-file enumeration failed (exit {result.returncode})")
+    if result.stdout and not result.stdout.endswith(b"\0"):
+        raise StagedDiffUnavailable("Git staged-file enumeration returned invalid NUL-delimited output")
+    try:
+        return [os.fsdecode(name) for name in result.stdout.split(b"\0") if name]
+    except UnicodeError as exc:
+        raise StagedDiffUnavailable("Git staged filenames cannot be represented on this host") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -625,8 +663,6 @@ def generate_function_index(output_path: Path | None = None) -> dict[str, Any]:
     _inject_used_by(index, imported_by, source_prefix)
     _inject_anomaly_markers(index, py_files, single_root.as_posix() if single_root else "")
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
     header = (
         f"# FUNCTION_INDEX.yaml — Codebase cognitive map\n"
         f"# Auto-generated via: python scripts/naos_code_quality_audit.py --generate-index\n"
@@ -648,7 +684,7 @@ def generate_function_index(output_path: Path | None = None) -> dict[str, Any]:
         allow_unicode=True,
     )
 
-    output_path.write_text(header + yaml_content, encoding="utf-8")
+    write_text_output(output_path, header + yaml_content, encoding="utf-8")
 
     total_modules = len(selected_paths)
     token_estimate = len(yaml_content.split())
@@ -775,18 +811,9 @@ def check_duplicates(
 
     staged_files: set[str] = set()
     if staged_only:
-        import subprocess
-
-        result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
-            capture_output=True,
-            text=True,
-            cwd=str(PROJECT_ROOT),
-        )
         staged_files = {
-            f.strip()
-            for f in result.stdout.strip().split("\n")
-            if f.strip().endswith(".py") and f.strip().startswith(SRC_ROOT_VAL + "/")
+            f for f in staged_paths()
+            if f.endswith(".py") and f.startswith(SRC_ROOT_VAL + "/")
         }
 
     func_index: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -1045,6 +1072,52 @@ def _jaccard_sim(a: set, b: set) -> float:
     return len(a & b) / len(a | b)
 
 
+def _semantic_text_bytes(text: str) -> bytes:
+    """Translate only new text, retaining historical byte prefixes verbatim."""
+    return text.replace("\n", os.linesep).encode("utf-8")
+
+
+def _append_semantic_history(path: Path, text: str, header: str, *, distinct_from=None) -> None:
+    """Stage a chunked append, bound to its observed source bytes/absence."""
+    with read_trace_source(path) as source:
+        original = None
+        if source is not None:
+            info = os.fstat(source.fileno())
+            if distinct_from == (info.st_dev, info.st_ino):
+                raise ValueError("Semantic log and archive must be distinct files")
+            original = _stream_fingerprint(source)
+    tail = _semantic_text_bytes((header if original is None else "") + text)
+
+    def produce(stage):
+        if original is not None:
+            with read_trace_source(path) as source:
+                if source is None or _stream_fingerprint(source) != original:
+                    raise ValueError("Semantic history changed before append")
+                source.seek(0)
+                while block := source.read(1024 * 1024):
+                    stage.write(block)
+        stage.write(tail)
+
+    def validate(stage):
+        remaining = original[0] if original is not None else 0
+        digest = hashlib.sha256()
+        while remaining:
+            block = stage.read(min(remaining, 1024 * 1024))
+            if not block:
+                raise ValueError("Semantic history prefix ended during staging")
+            digest.update(block)
+            remaining -= len(block)
+        if original is not None and digest.hexdigest() != original[1]:
+            raise ValueError("Semantic history prefix changed during staging")
+        if stage.read(len(tail) + 1) != tail:
+            raise ValueError("Semantic history append changed during staging")
+
+    publish_trace(path, BinaryProducer(produce, validate), None,
+                  strict_parent_topology=True, observe_current=original is not None,
+                  create_only=original is None,
+                  expected_preimage_sha256=original[1] if original is not None else None)
+
+
 def rotate_semantic_warnings_log(log_path: Path | None = None) -> bool:
     """Rotate SEMANTIC_WARNINGS_LOG.csv when it exceeds the 2000-row cap.
 
@@ -1053,12 +1126,18 @@ def rotate_semantic_warnings_log(log_path: Path | None = None) -> bool:
     Returns True if rotation was performed, False otherwise.
     """
     from datetime import datetime
+    from naos_self_check_inspection import inspection_publish_path
 
-    csv_path = log_path or SEMANTIC_WARNINGS_LOG
-    if not csv_path.exists():
-        return False
+    csv_path = inspection_publish_path(log_path or SEMANTIC_WARNINGS_LOG)
+    with read_trace_source(csv_path) as source:
+        if source is None:
+            return False
+        info = os.fstat(source.fileno())
+        identity = (info.st_dev, info.st_ino)
+        original = source.read()
 
-    lines = csv_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    text = original.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.splitlines(keepends=True)
     if not lines:
         return False
 
@@ -1073,15 +1152,11 @@ def rotate_semantic_warnings_log(log_path: Path | None = None) -> bool:
 
     archive_name = f"SEMANTIC_WARNINGS_ARCHIVE_{datetime.now(UTC).strftime('%Y%m')}.csv"
     archive_path = csv_path.parent / archive_name
-    archive_exists = archive_path.exists()
-    with open(archive_path, "a", encoding="utf-8") as f:
-        if not archive_exists:
-            f.write(header)
-        f.writelines(rows_to_archive)
-
-    with open(csv_path, "w", encoding="utf-8") as f:
-        f.write(header)
-        f.writelines(rows_to_keep)
+    if os.path.normcase(os.path.abspath(csv_path)) == os.path.normcase(os.path.abspath(archive_path)):
+        raise ValueError("Semantic log and archive must be distinct files")
+    _append_semantic_history(archive_path, "".join(rows_to_archive), header, distinct_from=identity)
+    publish_trace(csv_path, _semantic_text_bytes(header + "".join(rows_to_keep)), original,
+                  strict_parent_topology=True, create_parents=False)
 
     archived_count = len(rows_to_archive)
     print(
@@ -1097,15 +1172,12 @@ def _log_semantic_warning(
 ) -> None:
     """Append semantic warning to CSV log for ongoing monitoring."""
     from datetime import datetime
+    from naos_self_check_inspection import inspection_publish_path
 
-    csv_path = SEMANTIC_WARNINGS_LOG
-    write_header = not csv_path.exists()
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(csv_path, "a", encoding="utf-8") as f:
-        if write_header:
-            f.write("timestamp,new_function,matched_function,score,method\n")
-        ts = datetime.now(UTC).isoformat()
-        f.write(f"{ts},{new_func},{matched_func},{score:.4f},{method}\n")
+    csv_path = inspection_publish_path(SEMANTIC_WARNINGS_LOG)
+    ts = datetime.now(UTC).isoformat()
+    _append_semantic_history(csv_path, f"{ts},{new_func},{matched_func},{score:.4f},{method}\n",
+                             "timestamp,new_function,matched_function,score,method\n")
     rotate_semantic_warnings_log(csv_path)
 
 
@@ -1160,20 +1232,11 @@ def check_semantic_duplicates(
     if not entries:
         return report
 
-    import subprocess
-
     staged_files: set[str] = set()
     if staged_only:
-        result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
-            capture_output=True,
-            text=True,
-            cwd=str(PROJECT_ROOT),
-        )
         staged_files = {
-            f.strip()
-            for f in result.stdout.strip().split("\n")
-            if f.strip().endswith(".py") and f.strip().startswith(SRC_ROOT_VAL + "/")
+            f for f in staged_paths()
+            if f.endswith(".py") and f.startswith(SRC_ROOT_VAL + "/")
         }
         if not staged_files:
             return report
@@ -1353,20 +1416,11 @@ def check_boundaries(staged_only: bool = False) -> list[BoundaryViolation]:
     )
     staged_files: set[str] = set()
     if staged_only:
-        import subprocess
-
-        result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
-            capture_output=True,
-            text=True,
-            cwd=str(PROJECT_ROOT),
-        )
         staged_files = {
-            f.strip()
-            for f in result.stdout.strip().split("\n")
-            if f.strip().endswith(".py")
+            f for f in staged_paths()
+            if f.endswith(".py")
             and any(
-                prefix == "." or f.strip().startswith(prefix + "/")
+                prefix == "." or f.startswith(prefix + "/")
                 for prefix in root_prefixes
             )
         }
@@ -1482,18 +1536,9 @@ def check_arch_ownership(staged_only: bool = False) -> ArchOwnershipResult:
         return result
 
     if staged_only:
-        import subprocess
-
-        git_result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
-            capture_output=True,
-            text=True,
-            cwd=str(PROJECT_ROOT),
-        )
         files_to_check = [
-            PROJECT_ROOT / f.strip()
-            for f in git_result.stdout.strip().split("\n")
-            if f.strip().endswith(".py") and f.strip().startswith(SRC_ROOT_VAL + "/")
+            PROJECT_ROOT / f for f in staged_paths()
+            if f.endswith(".py") and f.startswith(SRC_ROOT_VAL + "/")
         ]
     else:
         files_to_check = sorted(SRC_DIR.rglob("*.py"))
@@ -1699,18 +1744,8 @@ def check_spec_alignment(staged_only: bool = False) -> SpecAlignmentReport:
     report = SpecAlignmentReport()
 
     if staged_only:
-        import subprocess
-
-        result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
-            capture_output=True,
-            text=True,
-            cwd=str(PROJECT_ROOT),
-        )
         py_files = [
-            PROJECT_ROOT / f.strip()
-            for f in result.stdout.strip().split("\n")
-            if f.strip().endswith(".py")
+            PROJECT_ROOT / f for f in staged_paths() if f.endswith(".py")
         ]
     else:
         py_files = sorted(SRC_DIR.rglob("*.py"))
@@ -1873,6 +1908,19 @@ def main():
     )
     args = parser.parse_args()
 
+    try:
+        return _run_checks(args)
+    except StagedDiffUnavailable as exc:
+        failure = {"status": "not_evaluated", "reason_code": "STAGED_DIFF_UNAVAILABLE",
+                   "message": "Staged checks not evaluated: " + str(exc)}
+        if args.report == "json":
+            print(json.dumps(failure, indent=2))
+        else:
+            print(failure["reason_code"] + ": " + failure["message"], file=sys.stderr)
+        sys.exit(2)
+
+
+def _run_checks(args):
     if args.semantic_audit:
         report = {
             "status": "unavailable",

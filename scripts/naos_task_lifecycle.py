@@ -12,7 +12,9 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
+from contextlib import ExitStack
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,13 +28,17 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_policy import (  # noqa: E402
+    _open_report_parent_fd,
+    _report_metadata_at,
     default_naos_root,
+    ensure_output_directory,
     kit_root,
     load_policy,
     normalize_profile,
     report_output_path,
     write_report,
 )
+from naos_trace_atomic_write import publish_trace, read_trace_source  # noqa: E402
 
 
 REPORT_SCHEMA = "naos.task_lifecycle.v1"
@@ -1050,11 +1056,97 @@ def validate_completion_verification(
     }
 
 
-def _write_yaml_temp(path: Path, data: dict[str, Any]) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(f".{path.name}.naos-tmp")
-    temp.write_bytes(yaml.safe_dump(data, sort_keys=False, allow_unicode=True).encode("utf-8"))
-    return temp
+def _completion_bytes(path: Path) -> bytes | None:
+    with read_trace_source(path) as source:
+        return None if source is None else source.read()
+
+
+def _completion_root(root: Path, naos_root: str) -> Path:
+    """Normalize configured sidecars only after inspecting erased ancestors.
+
+    Static aliases, including a link before '..', must not disappear through
+    normalization. Publication independently applies the held-parent boundary;
+    these observations do not add a concurrent namespace sandbox guarantee.
+    """
+    configured = Path(naos_root)
+    raw = (configured if configured.is_absolute() else root / configured).absolute()
+    cursor = Path(raw.anchor)
+    for component in raw.parts[1:]:
+        if component == "..":
+            cursor = cursor.parent
+            continue
+        cursor = cursor / component
+        try:
+            info = cursor.lstat()
+        except FileNotFoundError:
+            # Preserve lexical normalization of a missing component followed
+            # by '..'. The selected root itself must exist for task resolution.
+            continue
+        if (stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400
+                or not stat.S_ISDIR(info.st_mode)):
+            raise ValueError("Task completion root uses a linked or non-directory ancestor")
+    return cursor
+
+
+def _publish_completion_file(path: Path, content: bytes, original: bytes | None) -> None:
+    # Retain parent-authorized replacement and the legacy umask-filtered 0666
+    # stage mode. Exact bytes are never decoded or newline-translated here.
+    from naos_self_check_inspection import inspection_publish_path
+
+    publish_trace(inspection_publish_path(path), content, original,
+                  strict_parent_topology=True, create_only=original is None,
+                  require_existing_write_access=False, posix_creation_mode=0o666,
+                  preserve_existing_posix_mode=False)
+
+
+def _remove_completion_file(path: Path, expected: bytes) -> None:
+    """Remove an observed transaction file through its held, no-follow parent.
+
+    Like the existing publisher this is an observed name refresh, not a lock,
+    a concurrent filesystem sandbox or a crash-atomic multi-file transaction.
+    """
+    if os.name == "nt":
+        import naos_windows_report as native
+
+        absolute = os.path.abspath(os.fspath(path))
+        native.wh.validate_root_path(absolute)
+        handles = native.wh.WindowsHandles()
+        with ExitStack() as stack:
+            # Deletion does not need create-child rights in the active folder.
+            # Keep each ancestor pinned through the existing read-only handles.
+            target_path = Path(absolute)
+            parent = stack.enter_context(handles.open_root(target_path.anchor))
+            for component in target_path.parts[1:-1]:
+                parent = stack.enter_context(handles.open_child(
+                    parent, component, kind="directory", pin_for_read=True))
+            name = target_path.name
+            with handles.open_child(parent, name, kind="file", for_delete=True) as target:
+                if native._digest(target) != safe_digest_bytes(expected):
+                    raise ValueError("Task transaction file changed before removal")
+                handles.delete_exact(parent, name, target)
+        return
+    parent, name = _open_report_parent_fd(path, strict_parent_topology=True, create_parents=False)
+    try:
+        before = _report_metadata_at(parent, name, path)
+        if before is None:
+            raise ValueError("Task transaction file disappeared before removal")
+        flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0)
+        descriptor = os.open(name, flags, dir_fd=parent)
+        with os.fdopen(descriptor, "rb") as source:
+            held = os.fstat(source.fileno())
+            if (held.st_dev, held.st_ino, held.st_nlink) != (before.st_dev, before.st_ino, 1):
+                raise ValueError("Task transaction file changed before removal")
+            content = source.read()
+            after = os.fstat(source.fileno())
+            named = _report_metadata_at(parent, name, path)
+            if (content != expected or named is None
+                    or (after.st_dev, after.st_ino, after.st_nlink, after.st_size, after.st_mtime_ns)
+                    != (named.st_dev, named.st_ino, 1, named.st_size, named.st_mtime_ns)
+                    or (held.st_size, held.st_mtime_ns) != (after.st_size, after.st_mtime_ns)):
+                raise ValueError("Task transaction file changed before removal")
+            os.unlink(name, dir_fd=parent)
+    finally:
+        os.close(parent)
 
 
 def _completion_registry_bytes(original: bytes, expected: dict[str, Any], task_id: str) -> bytes:
@@ -1146,17 +1238,18 @@ def _completion_registry_bytes(original: bytes, expected: dict[str, Any], task_i
     return text.encode("utf-8")
 
 
-def _restore_file(path: Path, original: bytes | None) -> None:
+def _restore_file(path: Path, original: bytes | None, *, expected: Any = ...) -> None:
     """Restore one transaction file to its exact pre-transition bytes."""
 
-    if original is None:
-        if path.exists():
-            path.unlink()
+    current = _completion_bytes(path)
+    if current == original:
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(f".{path.name}.naos-rollback")
-    temp.write_bytes(original)
-    os.replace(temp, path)
+    if expected is not Ellipsis and current != expected:
+        raise ValueError("Task rollback refuses a changed transaction file")
+    if original is None:
+        _remove_completion_file(path, current)
+    else:
+        _publish_completion_file(path, original, current)
 
 
 def complete_task(
@@ -1427,26 +1520,37 @@ def complete_task(
             or (registry_path.read_bytes() if registry_path.is_file() else None) != registry_original
             or (history_path.read_bytes() if history_path.is_file() else None) != history_original):
         raise ValueError("Task identity inputs changed during completion; retry from fresh context.")
-    completed_dir.mkdir(parents=True, exist_ok=True)
-    completed_temp = completed_path.with_name(f".{completed_path.name}.naos-tmp")
-    completed_temp.write_bytes(card_bytes)
-    registry_temp = registry_path.with_name(f".{registry_path.name}.naos-tmp")
-    registry_temp.write_bytes(registry_bytes)
-    history_temp = _write_yaml_temp(history_path, history)
+    # Retain lexical configured roots for the no-follow writer. Read-side path
+    # resolution above must not erase an alias before the mutation boundary.
+    lexical_naos = _completion_root(root, naos_root)
+    active_path = lexical_naos / "active" / active_path.name
+    completed_path = lexical_naos / "completed" / active_path.name
+    registry_path = lexical_naos / "TASK_REGISTRY.yaml"
+    history_path = lexical_naos / "completed_history.yaml"
+    history_bytes = yaml.safe_dump(history, sort_keys=False, allow_unicode=True).encode("utf-8")
+    ensure_output_directory(completed_path.parent)
+    for path, original in ((active_path, card_bytes), (registry_path, registry_original),
+                           (history_path, history_original), (completed_path, None)):
+        if _completion_bytes(path) != original:
+            raise ValueError("Task identity inputs changed during completion; retry from fresh context.")
+    attempted = []
     try:
-        os.replace(completed_temp, completed_path)
-        os.replace(registry_temp, registry_path)
-        os.replace(history_temp, history_path)
-        active_path.unlink()
-    except Exception:
-        for temp in (completed_temp, registry_temp, history_temp):
-            if temp.exists():
-                temp.unlink()
-        _restore_file(registry_path, registry_original)
-        _restore_file(history_path, history_original)
-        _restore_file(active_path, card_bytes)
-        if completed_path.exists():
-            completed_path.unlink()
+        for path, content, original in ((completed_path, card_bytes, None),
+                                         (registry_path, registry_bytes, registry_original),
+                                         (history_path, history_bytes, history_original)):
+            # Record intent before the publisher, which can fail after rename
+            # while qualifying metadata. Rollback only our expected postimage.
+            attempted.append((path, original, content))
+            _publish_completion_file(path, content, original)
+        attempted.append((active_path, card_bytes, None))
+        _remove_completion_file(active_path, card_bytes)
+    except Exception as error:
+        for path, original, content in reversed(attempted):
+            try:
+                _restore_file(path, original, expected=content)
+            except Exception as rollback_error:
+                error.add_note(f"Task rollback could not restore {path.name}: {rollback_error}")
+                error._naos_task_rollback_incomplete = True
         raise
     return report
 
@@ -1662,7 +1766,14 @@ def main(argv: list[str] | None = None) -> int:
             report = inspect_task(root, naos_root, profile, exact, args.recovery_mode)
         report["contract"] = {"path": str(contract_path), "source": contract_source, "schema": contract.get("schema")}
     except Exception as exc:
-        report = _error_report(profile, str(args.task or "").strip().upper() or None, "invalid_task_lifecycle", str(exc))
+        incomplete = bool(getattr(exc, "_naos_task_rollback_incomplete", False))
+        message = str(exc)
+        if incomplete:
+            message += "; rollback incomplete: " + "; ".join(getattr(exc, "__notes__", []))
+        report = _error_report(profile, str(args.task or "").strip().upper() or None, "invalid_task_lifecycle", message)
+        if incomplete:
+            report["mutated"] = True
+            report["limitations"].append("Task rollback did not finish; inspect the remaining task files before retrying.")
 
     output = Path(args.output) if args.output else report_output_path(root, naos_root, policy, "task_lifecycle_report")
     write_report(output, report)

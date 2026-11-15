@@ -40,7 +40,7 @@ from naos_evidence_contracts import (  # noqa: E402
 )
 
 
-from naos_report_composition import compose_publication, CompositionError
+from naos_report_composition import compose_publication, CompositionError  # noqa: E402 - repository-local script bootstrap
 
 
 URL_RE = re.compile(r"https?://[^\s)'\"<>]+")
@@ -658,7 +658,7 @@ def summarize_evidence_verification(artifact: dict[str, Any]) -> dict[str, Any]:
         "status": data.get("status") or artifact.get("status"),
         "summary": data.get("summary") or {},
         "tamper_evident": bool(data.get("tamper_evident")),
-        "signed": legacy_signed is True,
+        "tamper_evidence_basis": "unsigned_local_attestation_baseline",
         "signature_entries_present": signature_entries_present,
         "signature_validation_performed": False,
         "signature_validation_claim_rejected": signature_validation_claim_rejected,
@@ -676,7 +676,7 @@ def summarize_evidence_verification(artifact: dict[str, Any]) -> dict[str, Any]:
         "limitations": data.get("limitations") or [],
         "not_claimed": data.get("not_claimed") or [],
         "human_review_required": bool(data.get("human_review_required")),
-        "rule": "Evidence verification recomputes local artifact digests and the manifest root, then reports tamper-evidence, signature-entry presence, and best-effort Git HEAD metadata. It does not validate third-party signatures, authenticate identities, sign for NAOS, approve work, provide non-repudiation, certify controls, or prove compliance.",
+        "rule": "Evidence verification recomputes local artifact digests and the manifest root, then reports tamper-evidence relative to an unsigned, regenerable local attestation baseline, signature-entry presence, and best-effort Git HEAD metadata. It does not validate third-party signatures, authenticate identities, sign for NAOS, approve work, provide non-repudiation, certify controls, or prove compliance.",
     }
 
 
@@ -2132,7 +2132,7 @@ def build_evidence_pack(
             ),
             "evidence_verification_rule": (
                 "NAOS evidence verification recomputes local artifact digests and the manifest "
-                "root, then reports tamper-evidence, signature-entry presence, and best-effort "
+                "root, then reports tamper-evidence relative to an unsigned, regenerable local attestation baseline, signature-entry presence, and best-effort "
                 "Git HEAD metadata. It does not validate adopter signatures, authenticate "
                 "identities, sign artifacts, hold keys, approve work, provide non-repudiation, "
                 "certify controls, or prove compliance."

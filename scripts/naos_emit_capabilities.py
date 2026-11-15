@@ -12,6 +12,12 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from naos_policy import validate_report_write_path, write_text_output  # noqa: E402
+
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent / "validators"))
     from frontmatter_utils import (  # type: ignore[import-not-found]
@@ -276,12 +282,12 @@ def render_catalogue(catalogue: dict[str, Any]) -> str:
 
 
 def write_catalogue(output: Path, content: str) -> bool:
-    output.parent.mkdir(parents=True, exist_ok=True)
+    validate_report_write_path(output)
     encoded = content.encode("utf-8")
     existing = output.read_bytes() if output.exists() else None
     if existing == encoded:
         return False
-    output.write_bytes(encoded)
+    write_text_output(output, content, newline="\n")
     return True
 
 

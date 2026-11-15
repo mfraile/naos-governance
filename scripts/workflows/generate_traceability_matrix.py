@@ -622,8 +622,9 @@ def main() -> int:
         arch_refs_in_code=arch_refs_in_code,
     )
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(content, encoding="utf-8", newline="\n")
+    from naos_policy import write_text_output
+
+    write_text_output(OUT, content, newline="\n")
     print(f"\n✅ Wrote {OUT}")
     print(f"   - {len(code_rows)} code files analyzed")
     print(f"   - {sum(len(reqs) for _, reqs, _, _, _ in code_rows)} total linkages")

@@ -43,6 +43,9 @@ from naos_policy import (  # noqa: E402
 
 
 REPORT_SCHEMA = "naos.failure_mode_posture.v1"
+# Exact shipped disabled seed, not a credential or a configurable trust grant.
+# A changed/custom declaration keeps the existing profile review requirement.
+INACTIVE_DEFAULT_TAXONOMY_SHA256 = "4401dd8af0d2e4500b1a56484fb60b2d81f6b1d0a28a7edd67670da363b9defc"
 CANONICAL_MODES = [
     {"mode_id": "F1", "family": "factual", "name": "API/library fabrication"},
     {"mode_id": "F2", "family": "factual", "name": "Package fabrication"},
@@ -207,8 +210,9 @@ def safe_digest(path: Path) -> str | None:
     return digest.hexdigest()
 
 
-def load_yaml_mapping(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+def load_yaml_mapping(path: Path, *, content: bytes | None = None) -> dict[str, Any]:
+    raw = path.read_bytes() if content is None else content
+    data = yaml.safe_load(raw.decode("utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"Expected YAML mapping: {path}")
     return data
@@ -623,7 +627,9 @@ def build_report(
     taxonomy_source: str,
     collect_provenance: bool = True,
 ) -> dict[str, Any]:
-    declaration = load_yaml_mapping(taxonomy_path)
+    taxonomy_bytes = taxonomy_path.read_bytes()
+    taxonomy_hash = hashlib.sha256(taxonomy_bytes).hexdigest()
+    declaration = load_yaml_mapping(taxonomy_path, content=taxonomy_bytes)
     posture = profile_posture(declaration, profile)
     severity = severity_from_posture(root, naos_root, posture)
     enabled = bool_value(declaration.get("enabled"))
@@ -729,7 +735,7 @@ def build_report(
         "deterministic": True,
         "taxonomy_path": str(taxonomy_path),
         "taxonomy_source": taxonomy_source,
-        "taxonomy_hash": safe_digest(taxonomy_path),
+        "taxonomy_hash": taxonomy_hash,
         "enabled": enabled,
         "failure_mode_posture_declared": declared,
         "runtime_enabled": False,
@@ -760,7 +766,11 @@ def build_report(
         "residual_risks": list(dict.fromkeys(string_list(declaration.get("residual_risks")) + RESIDUAL_RISKS)),
         "limitations": LIMITATIONS,
         "not_claimed": NOT_CLAIMED,
-        "human_review_required": bool(findings) or bool_value(posture.get("human_review_required"), False),
+        "human_review_required": bool(findings) or (
+            bool_value(posture.get("human_review_required"), False)
+            and not (not enabled and not declared
+                     and taxonomy_hash == INACTIVE_DEFAULT_TAXONOMY_SHA256)
+        ),
         "generated_by": build_generated_by(root) if collect_provenance else {},
         "summary": summary,
     }

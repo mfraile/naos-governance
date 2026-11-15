@@ -1,5 +1,5 @@
 ---
-# Model omitted: adopter host selection applies; this does not pin or approve a model.
+# Model omitted: host selects; no model pin or approval.
 naos_model_role: review
 description: "Code review agent — quality, security, and governance-evidence review"
 tools:
@@ -62,7 +62,7 @@ Fallback: without a task card or explicit AC/spec, mark the mapping `UNAVAILABLE
 - [ ] Relevant capability constraints and profile policy were respected
 - [ ] If `specs/04-architecture.md` changed, linkage to specs 01-03, task registry, traceability, capabilities, gates/evidence, known gaps, and residual risks was reviewed
 - [ ] If agents, skills, prompts, instructions, workflows, policies, capabilities, gatekeepers, validators, evidence semantics, dashboard semantics, or AI tool surfaces changed, control-plane self-review was performed
-- [ ] If governed artifact families changed, pass exact stable paths to `naos systemic-impact --changed-path <path>`; keep kit/adopter roles separate; resolve every obligation with evidence using `--review-record <yaml> --require-resolved`
+- [ ] If governed artifact families changed, pass exact stable paths to `naos systemic-impact --changed-path <path>`; keep kit and adopter roles separate; resolve every obligation with evidence using `--review-record <yaml> --require-resolved`
 - [ ] If source modules were added or materially changed, `naos module-headers` was run or recommended; missing/legacy/stale/duplicate headers were not silently auto-rewritten
 - [ ] If spec-pack inputs or evidence changed, run or recommend `naos spec-pack-contract`, `naos spec-pack-materialize --dry-run`, `naos spec-assembly-worksheet`, and `naos spec-cascade` as applicable; do not treat findings as spec-quality proof, templates as filled specs, promote candidates automatically, or silently pass uncovered requirements, references, or source
 - [ ] In Lite+, live `naos plan-coherence` readiness was `ready` at handoff; use `--diff-base <ref>` for declared scope. Structural inputs supersede; task status does not. Findings are review evidence, not approval, release authority, or semantic-drift proof

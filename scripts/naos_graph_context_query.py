@@ -22,7 +22,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from naos_self_check_inspection import inspection_input_path, logicalize_payload  # noqa: E402
 
-from naos_local_context_query import resolve_indexed_path  # noqa: E402
+from naos_local_context_query import resolve_indexed_path, sqlite_query_connection  # noqa: E402
 
 from naos_policy import (  # noqa: E402
     default_naos_root,
@@ -34,6 +34,7 @@ from naos_policy import (  # noqa: E402
     report_default_path,
     report_output_path,
     write_report,
+    write_text_output,
 )
 
 
@@ -136,14 +137,16 @@ def local_context_index_paths(
     index_report = Path(index_report_arg) if index_report_arg else report_default_path(root, naos_root, policy, "local_context_index_report")
     index_report = inspection_input_path(root, naos_root, index_report)
     sqlite_path = Path(sqlite_arg) if sqlite_arg else None
+    sqlite_declared = False
     if sqlite_path is None and index_report.exists():
         try:
             report = read_json_mapping(index_report)
+            sqlite_declared = "sqlite_artifact" in report
             sqlite_value = ((report.get("sqlite_artifact") or {}).get("path") or "")
             sqlite_path = Path(sqlite_value) if sqlite_value else None
         except Exception:
             sqlite_path = None
-    if sqlite_path is None:
+    if sqlite_path is None and not sqlite_declared:
         configured = str(policy.get("paths", {}).get("local_context_index_sqlite") or "context_index/local_context_index.sqlite")
         sqlite_path = root / naos_root / configured
     # Resolve after all ordinary path selection. A pending/failed selected DB
@@ -159,8 +162,7 @@ def rows_as_dicts(connection: sqlite3.Connection, query: str, params: tuple[Any,
 
 
 def load_index_from_sqlite(sqlite_path: Path) -> dict[str, Any]:
-    connection = sqlite3.connect(sqlite_path)
-    try:
+    with sqlite_query_connection(sqlite_path) as connection:
         artifacts = rows_as_dicts(connection, "SELECT * FROM artifacts ORDER BY path, artifact_id")
         chunks = rows_as_dicts(connection, "SELECT * FROM artifact_chunks ORDER BY path, chunk_id")
         links = rows_as_dicts(connection, "SELECT * FROM artifact_links ORDER BY source_path, link_type, reference_id")
@@ -168,8 +170,6 @@ def load_index_from_sqlite(sqlite_path: Path) -> dict[str, Any]:
             row["name"]
             for row in rows_as_dicts(connection, "SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual table')")
         }
-    finally:
-        connection.close()
     for artifact in artifacts:
         artifact["profile_scope"] = parse_json_text(artifact.get("profile_scope"), artifact.get("profile_scope"))
         artifact["limitations"] = parse_json_text(artifact.get("limitations"), [])
@@ -546,7 +546,6 @@ def write_markdown_if_requested(root: Path, naos_root: str, policy: dict[str, An
         if directory is None:
             return None
         path = directory / f"graph_{report['query']['query_id']}.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         f"# Graph Context Query: {report['query']['query_id']}",
         "",
@@ -589,7 +588,7 @@ def write_markdown_if_requested(root: Path, naos_root: str, policy: dict[str, An
     )
     for item in report.get("not_claimed") or []:
         lines.append(f"- {item}")
-    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    write_text_output(path, "\n".join(lines).rstrip() + "\n")
     return str(path)
 
 
@@ -621,12 +620,14 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
         findings.append(finding("graph_context_query.index_missing", "advisory", "not_configured", "Run naos context-index before querying graph context candidates.", path=str(index_report_path)))
 
     index_data = {"source": "none", "artifacts": [], "chunks": [], "links": [], "tables": []}
-    if index_available and sqlite_path and sqlite_path.exists():
-        try:
+    sqlite_exists = False
+    try:
+        sqlite_exists = bool(sqlite_path and sqlite_path.exists())
+        if index_available and sqlite_exists:
             index_data = load_index_from_sqlite(sqlite_path)
             sqlite_available = True
-        except Exception as exc:
-            findings.append(finding("graph_context_query.sqlite_unavailable", "advisory", "advisory", f"SQLite index could not be read; falling back to JSON report links. {exc}", path=str(sqlite_path)))
+    except Exception as exc:
+        findings.append(finding("graph_context_query.sqlite_unavailable", "advisory", "advisory", f"SQLite index could not be read; falling back to JSON report links. {exc}", path=str(sqlite_path)))
     if index_available and not sqlite_available:
         index_data = load_index_from_report(index_report)
 
@@ -665,6 +666,15 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
         findings.append(finding("graph_context_query.seed_path_missing", "advisory", "missing", f"Seed path did not resolve uniquely in the generated local context index: {args.path}"))
 
     has_query = bool(modes_requested)
+    if has_query and index_data.get("source") == "report":
+        counts = index_report.get("link_counts")
+        total_links = counts.get("links") if isinstance(counts, dict) else None
+        available_links = len(index_data.get("links") or [])
+        if type(total_links) is int and total_links > available_links:
+            findings.append(finding(
+                "graph_context_query.json_projection_partial_links", "advisory", "advisory",
+                f"JSON fallback contains {available_links} of {total_links} indexed links ({total_links - available_links} unavailable); this query may miss candidates. Collection capacity coverage is not query completeness. Use the SQLite index or review source files before relying on no results.",
+            ))
     if not has_query:
         no_seed = finding("graph_context_query.no_seed", "advisory", "not_configured", "Supply --artifact-id, --path, --task, --spec, --capability, --context-query-result, or --task-context-pack.")
         no_seed.update(evidence_classification="confirmed", classification_scope="invocation_input_absence",
@@ -807,7 +817,7 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
             "index_role": "generated explicit-link source; not authoritative evidence",
         },
         "sqlite_artifact": {"path": str(sqlite_path) if sqlite_path else None, "available": sqlite_available, "tables": index_data.get("tables") or []},
-        "sqlite_artifact_exists": bool(sqlite_path and sqlite_path.exists()),
+        "sqlite_artifact_exists": sqlite_exists,
         "graph_context_readiness": {key: value for key, value in graph_readiness.items() if key != "data"},
         "local_context_query_context": {key: value for key, value in local_query.items() if key != "data"},
         "memory_provider_access": memory_access_context,

@@ -101,6 +101,13 @@ The adopter declares state in `naos/capability_state.yaml`. That declaration is 
 
 The report distinguishes `ready`, `blocked`, `advisory`, `not_configured`, `disabled`, and `unknown`. It keeps waivers visible and sets `promotion_recorded: false` because maturity movement is a human/project governance decision. For `standard` and `assured`, movement to a higher maturity requires human approval. L5 is conservative by design: the kit can identify supporting evidence and gaps, but it cannot certify L5 maturity automatically.
 
+Composed dashboard and evidence-pack collection witnesses preserve an absent
+capability-state declaration as `enabled: null`, distinct from an explicitly
+disabled capability (`enabled: false`). A null-enabled witness row must remain
+`not_configured`, with `ready_for_promotion: false` and
+`promotion_recorded: false`. Accepting that unknown state makes the report
+schema valid; it does not satisfy missing evidence or authorize promotion.
+
 L2 review requires at least one applicable supporting reference and no unresolved
 required reference. Registered reports are checked for shape, scope and their
 own bounded outcome. A dashboard or gate aggregate cannot substitute for L2
@@ -336,6 +343,16 @@ dispatch, worktree or branch creation, approval, blocking gate wiring, merge,
 task closure, release, runtime orchestration, certification, attestation, or
 proof of compliance.
 
+Unreadable, malformed, non-object or empty handoff reports, and reports whose
+`parallel_lanes_declared` is not a boolean, retain a human-review route with
+`handoff_report_invalid`. Their source diagnostic records the error; no lane
+identity, declaration or risk tier is established from unusable content.
+`declared_lane_reports` counts only readable explicit declarations. Review
+requires repairing the report and rerunning the producer and control-plane
+review, using the existing profile routing severity. Absent reports and readable
+reports explicitly declaring `false` retain their existing `not_applicable`
+behavior. This does not activate a lane or a runtime integration.
+
 **Conflict-visibility floor.** Conflicting task claims are never silently dropped at
 any profile: they always surface a `warning` conflict finding and set
 `human_review_required`. At quickstart/lite this is advisory and non-blocking
@@ -398,6 +415,16 @@ signal anchor applies to Standard/Assured, where that hook check is installed.
 The AI-surface budget control is a static context-health check for the instructions that shape AI behavior: profile `.ai/RULES.md` files, generated governance rules, governance instructions, agents, prompts, skills, workflows, manuals, quick references, and related control-plane documentation. Run `naos ai-surface-budget --profile <profile>` or `make -f Makefile.naos naos-ai-surface-budget` to write `naos/reports/ai_surface_context_budget.json`.
 
 The report estimates artifact token weight, required anchor coverage, family-level posture, combined loadout pressure, and optional approved-baseline drift. Required anchors are only present when every configured phrase is found; partial matches are reported with `missing_phrases`. It is deterministic and one-way: StaticGrader, grader assessment, gate status, evidence pack, and dashboard can consume the report, but autoresearch metrics and grader outcomes do not automatically tune its thresholds or rewrite its baseline. A baseline change requires an explicit reviewed artifact update.
+
+An unreadable, malformed or non-mapping selected rules file produces an explicit
+`AI_SURFACE_RULES_INVALID` finding with `rules_invalid` status. The file remains
+marked present; `rules.source: default_fallback` and its error identify the
+module-default estimates. Those estimates do not evaluate the unreadable
+configured limits. The diagnostic follows the existing invalid-baseline warning
+convention: advisory on QuickStart, warning on Lite/Standard/Assured, with existing
+profile and `--strict` exit rules. Repair the rules and rerun. A missing optional
+rules file still uses the existing fallback without an invalid-file finding;
+this diagnostic is not complete rules-schema validation.
 
 The legacy family and `resident_context` totals are full matched catalogue weights,
 not measurements of host startup context. `combined_scenarios` are configured
@@ -619,6 +646,16 @@ save the completed declaration at the selected record path and rerun with
 project policy **before** acquiring the template, because policy changes
 invalidate the binding.
 
+Template publication stages the complete UTF-8/LF payload before installing
+the new file. Serialization, payload-write or file-sync failure leaves no final
+template, so the operation can be retried. Existing files and linked output
+paths are refused. POSIX creation retains `0600 & ~umask`; when the creation
+permissions mask owner-read, publication clearly refuses without creating the
+final template or changing the process umask. Windows uses the shared native
+held-parent publication boundary and inherited creation security. Unsupported
+inherited POSIX ACLs receive an explicit refusal, leaving the final template
+absent and existing ACLs unchanged; publication never strips ACLs to proceed.
+
 A closed entry identifies the source family and exact review surface, declares
 the reviewer and UTC review time, and supplies rationale, local evidence paths
 and their SHA-256 digests. `output_evidence` maps each exact required-review
@@ -643,6 +680,14 @@ outputs do not identify the human source review: otherwise a self-check report
 containing that review would invalidate the review every time it was written.
 All original missing/stale artifact findings and downstream gate checks remain
 active. A recorded source review cannot make an adverse output satisfy a gate.
+The finite list includes the scheduled design-traceability, UI-experience-quality,
+failure-mode-posture and failure-mode-observations reports; refreshing these
+outputs does not change their durable source-review bindings.
+Existing projects retain their explicit selections. To adopt these outputs,
+review and add `design_traceability_report`, `ui_experience_quality_report`,
+`failure_mode_posture_report` and `failure_mode_observations_report` to the
+project's declared list, then regenerate and review its family record: changing
+the rules invalidates the earlier record's rules binding.
 
 Wildcard supplemental patterns may discover registered runtime observations;
 only those exact declared observations are omitted, while unknown matching bytes
@@ -666,6 +711,11 @@ unknown event fields and custom report references remain current byte witnesses.
 Canonical paths describe sink roles, not authenticated writers or report truth.
 Runtime findings and downstream validation stay active, and these mutable sinks
 cannot be used as closed-review evidence.
+The context-index audit contract accepts both its earlier summary and the current
+summary with a string `collection_status` and nonnegative integer
+`capacity_deferred_paths`. Unknown summary fields and invalid types remain raw
+byte witnesses; accepting a producer shape does not establish complete collection
+or make an adverse report satisfy a gate.
 
 The session index retains its authored session identity, creation time, status,
 profile, task, operator, lists and all unknown fields. Only its generated timestamp,
@@ -709,8 +759,10 @@ repository writers can construct or change an event and recompute its ID, and
 the nonce and body hash do not authenticate a producer, prove event truth,
 prove credential safety of other fields, or make the log tamper-proof. Existing
 legacy event files remain readable without rewriting their bytes or names;
-legacy random identifiers receive no new recognition. Ordinary secret checks
-continue to apply to every other event value and credential assignment.
+legacy random identifiers receive no new recognition. Credential-assignment and
+provider checks continue on every event value. Other values remain entropy
+candidates except exact session path and dated audit-directory labels established
+by the constructor checks described below; this never admits a raw session ID.
 
 ## Module Header Traceability
 
@@ -782,8 +834,9 @@ Spec-pack materialization is a bounded missing-file addition and repair
 surface, not a profile-transition mechanism. It reads the local canonical template source under
 `naos/spec_templates/spec-kit/specs/` in generated projects, previews missing
 profile-required files with `--dry-run`, and copies missing files only when the
-operator runs it without `--dry-run`. Existing project files are skipped unless
-`--force` is explicit. Before copying, it validates the trusted manifest schema,
+operator runs it without `--dry-run`. Existing project files are skipped by
+default. Explicit `--force` refuses a selected existing target before any copy.
+Before copying, it validates the trusted manifest schema,
 full profile-inheritance graph and path inventory, then every selected required
 source, destination, and path topology. It does not cross-check
 `files[].required_profiles` metadata against every profile-list membership.
@@ -791,8 +844,8 @@ Invalid manifests, missing or symbolic-link sources,
 out-of-project targets, and symbolic-link or non-regular destination paths
 produce blocked evidence and no spec-file changes. A requested report path is
 also checked for symlinked in-project ancestors, regular single-link leaf type, and basic writability
-before apply. If no report path is configured, evidence is stdout-only. `--force` replaces only an existing
-regular file inside the project; it does not relax these checks.
+before apply. If no report path is configured, evidence is stdout-only.
+`--force` does not relax these checks or permit replacement.
 
 Report `--output` paths containing a lexical `..` component are refused even
 when normalization would place the report inside the project. From the project
@@ -802,17 +855,25 @@ hardlink checks still apply to the selected report path.
 
 Apply implements native macOS/Linux/Windows operations with CPython 3.11–3.13;
 other runtime families fail closed. See `PLATFORM_ADAPTERS.md` for bounded
-native qualification. Each successful leaf uses a same-directory temporary
-before POSIX link, Windows no-clobber rename, or explicit replacement. Windows
-reparse points (including junctions) are refused. Windows preserves source
-read-only attributes and inherits destination-directory ACLs; `--force` does
-not clear an existing destination’s read-only protection.
-The multi-file operation is sequential and has no rollback. A runtime filesystem,
-post-install temporary cleanup, or late report-write failure can therefore occur
-after the current or earlier copied leaves are in place. If an absent target was
-installed before its temporary cleanup failed, it remains counted as copied and
-the residue path is a blocking `copy_cleanup_failed` finding; remaining copies
-stop. In the report-write case, blocked evidence is printed to stdout. That
+native qualification. Each absent final leaf is created exclusively beneath a
+held parent and streamed through its file handle; it is visible while being
+written. Windows reparse points (including junctions) are refused. Windows
+preserves source read-only attributes and inherits destination-directory ACLs.
+The multi-file operation is sequential and has no rollback. A runtime filesystem
+or late report-write failure can therefore occur after earlier copies. A failed
+new copy may leave a partial target; the blocking `copy_failed` finding reports
+the selected path and whether an observed path still identifies the held file.
+The copier
+does not delete a possibly replaced name. A hidden per-target marker is written
+before each new copy and marked complete after file verification. A rerun refuses
+an unfinished marked target and leaves it untouched until the operator reviews
+and removes the partial file and marker together. Existing completed files are
+still skipped; a deleted completed file can be copied again when its marker
+can be reopened for writing. A restrictive permission mask may refuse that
+retry with the target absent and the marker untouched. The marker is a
+recovery cue, not an integrity attestation or crash-consistency guarantee. Historical `overwritten`,
+`would_overwrite`, and `copy_cleanup_failed` fields remain in the report but
+are zero for new create-only runs. In the report-write case, blocked evidence is printed to stdout. That
 state reports `report_write_failed > 0` while `apply_allowed` remains true and
 `apply_refused` remains false because the spec-file apply completed before the
 report sink failed.
@@ -1044,16 +1105,31 @@ into success. This phase does not infer freshness from modification time alone.
 ### Tamper-evidence and the keyless signing bridge
 
 The attestation report now also records a deterministic **`manifest_root_digest`** — a single
-SHA-256 over the artifact manifest. Any post-hoc edit to a covered artifact changes this root.
-This tamper-evidence is **on by default** at every profile (keyless, zero-config, works for a
-solo developer with no infrastructure).
+SHA-256 over the artifact manifest. Verification compares current subjects with an
+**unsigned local attestation baseline**. It detects edits when that saved baseline
+remains unchanged; someone who rewrites both subjects and baseline can restore
+digest equality. This is a local consistency check, not authenticated history.
+Configured scope and required coverage remain separate from digest equality.
+
+New emit/verify reports, evidence-pack summaries and dashboards omit the
+misleading `signed` alias. Use `signature_entries_present`; signature validation
+remains false. `tamper_evident` is qualified by
+`tamper_evidence_basis: unsigned_local_attestation_baseline`, including human
+output. Legacy `signed` inputs remain readable as entry presence only, without
+republishing that alias. Existing raw evidence is not rewritten. External
+signatures require independent adopter verification and trust decisions.
 
 For optional adopter-controlled sign-off, NAOS provides a **signable-envelope bridge**
 (adopter-owned, ADR-0007 — NAOS never holds keys, signs, or validates signatures):
 
 - `naos evidence-sign` emits a **DSSE-style signable envelope** over the manifest root
   (`payloadType`, base64 payload, empty `signatures: []`) plus best-effort Git-reported HEAD
-  signature, signer, and author metadata. The compatibility-named `identity_binding` field is
+  signature, signer, and author metadata. Author email is omitted by default;
+  occurrences of that known address in author/signer display text are masked.
+  `--include-author-email` explicitly includes the original metadata for that
+  invocation of either signing-bridge command. This is not general PII filtering:
+  different addresses in Git display text can remain. Existing stored reports
+  and downstream copies are not scrubbed. The compatibility-named `identity_binding` field is
   metadata only; NAOS applies no independent trust or acceptance policy to Git's reported
   status and does not authenticate an identity.
 - An **adopter may sign** the envelope with an external signer — for example, a local key,
@@ -1247,6 +1323,33 @@ Spec references must be portable paths beneath `specs/`. Parent traversal, absol
 
 The JSON report is `naos/reports/task_context_pack.json`. Markdown output, when explicitly requested, is derived from JSON and written to `naos/context_packs/<TASK-ID>.md`. The pack summarizes or references the active task card, task registry, specs, relevant capability cards, policy profile, function-index posture, module-header traceability, spec-pack contract posture, spec-cascade coherence posture, source-to-test/test-evidence posture, systemic impact, control-plane review, setup recommendations, memory-readiness state, evidence attestation, gates, known gaps, residual risks, waivers, commands, and human-review boundaries. It does not include full large reports or memory dumps by default.
 
+### Session and claim write safety
+
+Session indexes and task-claim YAML use guarded whole-file publication beneath
+held no-follow parents. Existing output content and supported metadata are
+verified before replacement; linked or multiply linked targets are refused.
+Session JSON retains LF serialization and umask-filtered 0600 creation/reset;
+claim YAML retains its existing mode and parent-authorized replacement.
+If session creation permissions mask owner-read, publication refuses clearly,
+preserving the existing destination and process umask. It does not temporarily
+grant read permissions. Native Windows retains its supported security and
+bounded sharing-error retry behavior.
+
+Claim transactions use one persistent single-link lock object under checked
+parents, and session report directories use checked no-follow preparation.
+These are local cooperative coordination safeguards, not operator authorization,
+distributed locking, namespace confinement or a power-loss guarantee.
+
+Task completion stages exact card, registry and completion-history bytes through
+the guarded writer and binds rollback to the bytes published by that operation.
+Changed or linked rollback destinations are preserved and reported for manual
+recovery; a rollback failure is visible in the existing lifecycle findings and
+mutation flag. POSIX creation permissions that mask owner-read cause a clear
+refusal before task-file publication, preserving prior files and the process
+umask. Dry-run and supported relative sidecar paths retain their behavior.
+The operation remains a sequential multi-file update rather than a crash-atomic
+transaction or a concurrent-writer lock.
+
 ### Brownfield Repository Intelligence
 
 Before activating NAOS into an existing repository, run the
@@ -1257,6 +1360,28 @@ the target. Apply writes only the capability-owned provenance, transaction, and
 generated-intelligence namespace. Brownfield `init --activate` consumes the
 validated immutable generation binding, or an executed not-applicable result,
 before its separate scaffold transaction.
+
+External repository-intelligence JSON plans and reports use create-only,
+whole-file publication beneath held no-follow parents after the CLI's existing
+physical-path normalization. Existing destinations are preserved.
+POSIX traversal retains search-only authority on nonfinal ancestors without
+requiring directory-list access; the final output parent retains read authority
+for its directory-sync attempt. Private stages establish POSIX mode 0600
+explicitly, including under a restrictive
+umask, or the native Windows private security policy before payload writes.
+Windows retains its 64 MiB immutable-output limit. Failed payload writes do not
+publish a partial final report. On POSIX, shared-writer failures retain every
+unpublished stage without attempting name deletion, including ordinary failures.
+Stderr and a note on the primary exception identify its last observed location
+for manual review; the name may have moved or now identify a foreign occupant.
+The diagnostic does not authenticate that occupant or authorize deletion.
+Retained partials keep their existing permissions. Refusals before stage creation
+produce no retention notice. Native Windows cleanup is unchanged.
+POSIX directory sync is attempted through the held parent after publication;
+a sync failure reports refusal while preserving the complete published file.
+That post-publication failure has no unpublished-stage retention notice.
+These output safeguards do not make apply/enroll and report publication one
+transaction, lock the filesystem namespace, or guarantee power-loss durability.
 
 The baseline generation requires a host SQLite build with FTS5; activation and
 query fail closed when it is unavailable. Windows native generations are read through
@@ -1295,6 +1420,15 @@ make -f Makefile.naos naos-context-index
 
 The JSON report is `naos/reports/local_context_index.json`. In generated adopter projects, the command also writes `naos/context_index/local_context_index.sqlite` using Python stdlib `sqlite3`, with FTS5 when the local SQLite build supports it and graceful metadata/path lookup fallback when it does not. The index stores source hashes, freshness metadata, bounded chunks/summaries, authority classification, provenance metadata, and explicit links. It is generated, derived, cache-like, and not authoritative; repository evidence and deterministic NAOS reports remain the review trail. The v1 index does not enable SQLite extension loading, sqlite-vec, embeddings, semantic scoring, graph traversal, Engram, MCP, private memory payloads, or automatic context injection.
 
+SQLite builds and its journal files stay in a fresh temporary workspace. The
+validated database bytes are streamed into the same-directory guarded publication
+stage before replacement. Database and lock outputs refuse linked or non-regular
+destinations and linked parent directories. Stale-lock removal and release check
+the observed lock bytes and file identity; a replaced or edited lock is preserved
+and reported. The lock remains temporary local coordination, with the existing
+timeout and stale-age rules. These checks do not provide distributed locking,
+leaf compare-and-swap or a concurrent-filesystem sandbox.
+
 ### Local Context Query
 
 `self-check --task T-123 --query "bounded context" --graph-path src/component.py`
@@ -1314,6 +1448,17 @@ make -f Makefile.naos naos-context-query QUERY="governance"
 ```
 
 The JSON report is `naos/reports/local_context_query.json`. It queries the generated local context index through deterministic modes such as exact path, artifact id, task id, spec reference, capability id, metadata filters, explicit links, and sanitized FTS keyword search when FTS is available. Results are bounded candidate references, not answers. They include source paths, hashes, freshness, authority levels, provenance, and limitations so humans and AI tools can check source artifacts directly. The query UX does not use sqlite-vec, embeddings, semantic scoring, graph algorithms, Engram, MCP, private memory payloads, automatic context injection, or durable memory write-back.
+
+Local and graph SQLite queries use a fresh private snapshot of the selected
+database and its rollback/WAL inputs. Recovery and checkpoint writes stay in
+that workspace; source files, permissions and the process umask are preserved.
+Committed WAL and single-database rollback contents remain readable. Copying
+uses bounded chunks and temporary disk proportional to the selected inputs.
+Changes observed during capture and super-journal markers that could reference
+external files use the existing SQLite-unavailable or FTS fallback diagnostics.
+This does not provide a lock or an atomic snapshot of a concurrently changing
+external database. The workspace and connection are removed/closed after use;
+selected report paths and the current self-check input-custody rules remain.
 
 ```bash
 naos semantic-candidates --profile quickstart
@@ -1614,6 +1759,193 @@ and recognized credentials inside placeholders remain candidates. Secrets with
 other forms, whitespace or low entropy may be missed; use dedicated scanning
 where needed. Managed files are not blanket-excluded.
 
+Fresh scaffold lint and hook header checks omit a staged Python file only when
+its index bytes and working file still match the base in one fully linked
+managed-content manifest. Edited files, changed executable bits, hard links,
+unknown paths and unavailable or ambiguous provenance retain the checks. This
+selection uses recorded scaffold content without changing its ownership label;
+an unchanged adopter-owned seed becomes eligible as soon as it is edited.
+Secret hygiene keeps scanning these files and generated reports. Reviewed parser
+grammars, source-format templates and schema identifiers use the reproducible
+public-declaration catalogue for entropy classification only; provider and
+credential-assignment detection remain active. The catalogue also derives the
+gate-reference parser's exact public regex syntax from its named source
+function. This declares parser grammar, not report contents or arbitrary
+adopter values. Changed grammar-like values remain entropy candidates.
+The kit's exact `cli.py` operand comes from the readiness runner's command constructor,
+so that path can appear in recorded arguments without an entropy false alarm.
+Adjacent and unknown paths remain candidates. Copied project scanners do not
+invent a local `cli.py` destination from this kit-only declaration. Local hash links establish
+consistency, not authenticity, approval or continuous filesystem custody.
+Copied Windows scanners carry a generator-supplied digest of the original default
+source-policy path label. This preserves that exact constructor role after the
+scanner moves into a project, without embedding the original private directory
+name or accepting another path from a report. A missing or mismatching pin grants
+no additional allowance. Credential-assignment and provider checks still run.
+
+Exact session report paths can also be recognized from a selected, locally
+hash-consistent audit event for one of the three session-aware report producers.
+The current policy constructor must match the latest report path and the ordered
+latest/session artifact pair, with matching schema, session ID and source-path
+summary fields. This derives only the exact session root, reports root and
+report filename labels; raw session IDs and adjacent paths remain candidates.
+It adds no source-report reads and retains the existing context/read limits.
+The event's source-report hash is shape-checked, not reverified against report
+content; these labels do not authenticate a producer or establish evidence truth.
+Assignment/provider checks continue on every value, including recognized paths.
+
+Selected physical audit records under the default audit-log root are also
+validated through the scanner's existing shared proof cache. Their exact
+content-derived event ID, project scope, aware timestamp and current or prior
+deterministic filename must agree. Unrelated selected JSON cannot erase these
+independently proved anchors when the older embedded-event collector exhausts
+its separate corpus budget. Embedded-event handling and all existing limits
+remain unchanged. The physical event stays cached until final proof checking;
+unsafe, changed or over-budget proof inputs grant no additional recognition.
+Malformed neighboring records remain scanned and do not erase valid anchors.
+Path selection retains native case semantics; an unrepresentable UTC timestamp
+refuses only that event rather than aborting the scan.
+
+Additional session-report filenames come from the shipped literal constructor
+calls and their default policy filenames. Their labels are recognized only in
+selected, schema-valid systemic `files_found` arrays, their dashboard projection,
+session-index `session_path` fields, and aggregate producer-input `derived_outputs`
+path fields. Saved secret reports also recognize these same proved session
+labels at typed `scans.input_files[*].path` and `scans.scope_inventory[*].path`
+quotes, using the pinned secret-report schema and existing row shapes/statuses.
+Finding messages, other body fields and raw session IDs stay scanned.
+Each aggregate row must declare the matching
+`session_report_copy:<role>` key and exact session/filename constructor; a known
+path assigned to a different role receives no allowance. A selected audit event must bind the
+current selected latest report and identical session copy by hash, schema,
+profile, session ID and payload summary. Custom filenames, stale or unselected
+anchors, raw IDs and ordinary body fields receive no new allowance. New proof
+reads share the existing 32 MiB budget; carrier parsing retains the 8 MiB file,
+depth and metadata-coordinate limits. This establishes metadata consistency,
+not producer authenticity, evidence truth or approval.
+
+The policy-selected dependency-resolution receipt also recognizes exact JSON
+object keys in `proof.source_bindings` as file-reference metadata. Each admitted
+`project:` or `kit:` key must resolve to a safe current source file whose raw
+SHA-256 matches that binding; the map digest and project/governance-root scope
+must agree. Kit references retain the producer's finite source families and
+suffixes. Only original quote intervals that would otherwise trigger entropy
+review receive this exception. Unalerted projected bindings are not reinterpreted
+as raw hashes. Body copies, unknown slots/namespaces, missing or changed sources,
+private dotenv/key names and credential patterns retain scanning. Source reads
+share the existing 32 MiB proof budget and terminal identity checks; malformed,
+unsafe or over-budget witnesses grant no allowance. This establishes local
+file-reference consistency, not receipt validity, authenticity or readiness;
+the independent dependency-proof reader remains required.
+
+For finite policy-selected report consumers, the scanner reuses the actual
+selected input read for metadata checking. That read uses the same regular-file,
+descriptor, parent and identity observations as the proof reader. Only one
+consumer buffer of at most 8 MiB is active; it is evicted after processing.
+Identity observations remain bounded by the existing 16,384-identity limit and
+are checked again before the scanner returns. A changed observed consumer
+invalidates the result even after its buffer has been evicted. Other inputs,
+including larger reports, retain full body and credential scanning without this
+optimization. Independent source reads still share the existing 32 MiB budget;
+a later independent read of an evicted consumer is charged normally, and prior
+source charges are never refunded. Direct proof-helper callers retain their
+original limits. This avoids charging already-scanned consumer bytes as new
+proof reads; it does not grant any new body, filename or credential exception.
+
+The selected systemic report's exact `aggregate_review.record_path` quote can
+also be recognized when its local record is among the selected files. The
+report and record must match their pinned schemas, current root/profile/NAOS
+scope and each other's bindings; those bindings must match the current selected
+policy bytes, systemic-rule bytes and effective policy. This uses the existing
+regular-file proof and shared read budget, with the record reader's existing
+1 MiB and complexity limits. Stale, malformed, unselected or differently scoped
+inputs grant no allowance. Other record-path occurrences and body values remain
+scanned. These checks establish a constructor/path role, not authenticated
+review, valid review decisions, producer origin or evidence availability. A
+deterministic path to a missing output does not make that output available.
+
+The generated public vocabulary also includes only the finite shipped host
+guidance reference locations and default roadmap-crosswalk operands, derived
+from their actual source constructors. It does not admit arbitrary JSON
+locations, adopter-selected paths or policy filenames.
+
+An evidence pack can additionally recognize those finite host-guidance location
+tails beneath the exact gate/evidence-result configuration-subject constructor.
+The collected artifact's `external_references[i].location` quote qualifies:
+the selected canonical gate source must match its recorded byte size and hash,
+current scope and pinned schema, and its complete reference list must reproduce
+the existing collector and deduper. The subject's role, scope and digest must
+agree. A stale source, changed URL/location/order or unknown tail grants no
+allowance. URLs and ordinary body copies remain scanned. These checks establish
+navigation-label consistency, not a configuration review, authentic collection,
+human approval or source truth. Gate-source proof uses the existing 8 MiB
+document/32 MiB shared domain; the older reference reader keeps its 1 MiB limit.
+The pack's top-level reference summary gets the same location treatment only
+when its complete row exactly matches an already-proved current artifact row.
+Changing its URL, location or other fields grants no summary allowance.
+
+The selected canonical source-to-test map has no separate JSON Schema or root
+fields. Its real schema marker, profile, default `src`/`tests` roots and exact
+metadata rows must agree with current selected Python inputs and the producer's
+static import/type helpers. At `mappings[i].source`, declared-import
+`mappings[i].tests[j].path` and `test_inputs[i].path`, entropy is evaluated after
+removing only the observed project-root prefix. The relative filename still
+faces ordinary entropy checks; provider/assignment checks see the original full
+text. This adds no configured exception target and does not prove execution,
+coverage or complete project discovery. Changed/unselected inputs, custom roots,
+coverage-input cases and ordinary body copies receive no projection.
+
+Selected, body-ID-consistent audit records also supply their exact dated parent
+directory through the existing event-path constructor. An unobserved date,
+neighboring path or higher directory receives no allowance. Native and POSIX
+relative session-path spellings follow the same exact policy constructor; the
+Windows spelling is not converted from arbitrary input. These labels remain
+entropy-only metadata correlation, not report-content verification or producer
+authentication. Existing event/session labels take priority when the context
+budget is full; date labels use only remaining capacity. Read/context limits
+and credential checks remain unchanged.
+
+That same default-policy role covers separately stored ancestor names only at
+their exact saved-plan coordinates. The complete name sequence must match the
+bound path, with a consistent source-volume identity and distinct well-shaped
+file identifiers. This is constructor metadata consistency, not current native
+identity authority. Missing or malformed optional ancestry grants no additional
+coordinates; names copied into other fields remain entropy candidates.
+
+The existing classifier ordinal-label proof also recognizes the classifier's
+default profile severities, including `required` in Standard. It still requires
+the complete selected diagnostic vector and its exact constructor fields;
+this does not classify source findings as true, authenticate a producer, or
+exempt neighboring body values from secret scanning.
+
+A saved secret-report warning may echo the path to that exact benign metadata.
+Only the `findings[i].path` scalar of a modern ordinal `high_entropy_literal`
+finding receives the corresponding entropy exception. Its unique input row must
+match the current source bytes by hash and size, and its line/column must identify
+an independently proved Windows default-policy ancestor coordinate in the
+linked committed plan. Missing, ambiguous, malformed or changed inputs grant
+no exception. Repeated findings share a bounded proof parse, not a broader scope.
+Other finding fields, neighboring body values, credential assignments and provider
+patterns remain scanned. This proves content consistency, not report origin,
+authenticity, approval or whether every other report statement is true.
+
+The pre-commit header check evaluates eligible staged Python text through the
+canonical module-header validator, using its configured include/exclude rules,
+requirement references and task references. Unstaged source edits do not replace
+the indexed text. The hook remains warning-only for headers in Standard and
+Assured; it does not write a partial report or stage files. Run `naos
+module-headers` for the ordinary full-project report. A missing helper or an
+unavailable staged source is reported as not evaluated rather than checked by a
+second header regex.
+
+Function similarity compares name tokens and documentation tokens separately,
+taking the higher Jaccard score with the existing threshold. A longer docstring
+therefore cannot dilute an exact name match. Rebuilding the similarity index
+omits generated `DUP:` paths and `DEPRECATED` notes from documentation tokens;
+signatures and module paths remain available for display. Existing indexes can
+still be queried, but rebuild them to remove previously cached annotation
+tokens. Optional similarity providers retain their explicit project settings.
+
 The seed and fallback ship with empty `entropy_allowed_values`. Exact public
 identifiers, including `D3_instruction_following_behavior`, are recognized through
 separate digest-bound public declarations, not an adopter-owned default allowlist.
@@ -1622,6 +1954,23 @@ provider prefixes still run. Unknown or changed high-entropy literals remain
 candidates; source paths and scan thresholds are unchanged. Additional
 adopter-reviewed exceptions remain explicit; no literals are learned or added
 automatically.
+
+The public catalogue also derives the shipped grader baseline reference and the
+default repository-intelligence `documentation`/`README.md` artifact alias from
+their exact source constructors. These fixed labels do not establish report
+currentness, producer authenticity or graph effectiveness.
+
+An already explicit path in `entropy_allowed_values` can match its native
+representation at narrowly selected task-context, session-lifecycle and
+default-test-root report metadata quotes. The selected rule bytes must agree
+with the active rules; the schema, role, project/profile, unique task registry
+and card identity, lifecycle card digest, or complete selected test-input list
+must also match current sources. A session mirror additionally requires current
+session evidence and exact latest/mirror bytes. Compact cards do not establish
+a second active task. Ordinary bodies and unknown paths remain scanned, and
+credential assignment/provider patterns still run. A foreign absolute path is
+never rebound by filename suffix. These checks use the existing shared proof
+limits and do not add coverage or automatically add exception targets.
 
 Repeated matches have distinct rule/path/line/column IDs and retain separate
 SARIF fingerprints. Values are not copied into findings. Secret reports count
@@ -1672,6 +2021,10 @@ Duplicate-function hygiene accounts for discovered, selected Python files. Test-
 `scans.coverage_status` describe only this input set. Per-file outcomes appear
 in `scans.input_files`; failures also produce normal findings and `known_gaps`.
 Discovery bounds for these two static hygiene producers are 50,000 unique entries per invocation (including selected roots and immediate root accounting), 50,000 selector occurrences, and depth 64 relative to the project root. Duplicate and overlapping roots share entry and traversal accounting. Windows drive-relative, drive-absolute, rooted and UNC selectors and parent traversal are refused lexically on every host before metadata access. Excluded directories are pruned and linked ancestors are checked from the root outward. Entry, selector or depth exhaustion emits a policy-severity discovery finding and marks coverage incomplete; the partial inventory follows filesystem enumeration order before bounded sorting and is not a complete scan. These bounds do not change profile severity, strict exit policy, or adopter-relative root selections.
+Test-quality `scans.effective_scan_roots` records the same bounded selector prefix
+used for discovery, preserving duplicate order and ordinary fallback behavior.
+An oversized list is not normalized again for report rendering; its omitted
+selectors remain unassessed under the existing selector-limit finding.
 
 Test-quality advisory signals include recognized pytest/unittest skip/xfail declarations on functions, direct classes and module `pytestmark`; assertions after an unconditional return/raise in the same suite; literal-disabled branches; and assertion syntax under handlers that may swallow AssertionError. These are bounded static review signals, not runtime reachability, malicious intent, authorization or correctness proof. Aliases, dynamic inheritance and arbitrary control-flow reasoning remain unassessed. Existing legitimate skip/xfail cases and unconditional re-raise handlers remain valid.
 Python source encoding declarations are respected. Parser recursion failures are
@@ -1914,6 +2267,11 @@ files are not rewritten. These filters do not establish complete redaction.
 
 Harness trace import reads an explicit repo-local JSONL/NDJSON file and writes `naos/reports/harness_trace_import.json`; with `--write-events`, it appends valid normalized records to `naos/agent_trace_events.yaml` for later `naos agent-traces` validation. It does not execute harnesses, capture runtime events, activate hooks, run commands from trace records, call providers/APIs, access the network, read memory payloads, write memory, approve work, certify outcomes, or prove behavior.
 
+Duplicate normalized event IDs within one import are reported in preview and
+refuse the entire append with `--write-events`, preserving existing trace history
+or target absence. Imported-event counts describe normalized candidate records;
+`written_events` and `events_written` describe the actual write outcome.
+
 AI-surface health budget reads configured AI/governance artifact families and writes `naos/reports/ai_surface_context_budget.json` in legacy singleton mode. It estimates standalone and combined context pressure, validates required anchors, compares against an explicit approved baseline when present, and surfaces degraded/warning posture to StaticGrader, grader assessment, gate status, evidence pack, and dashboard. Its opt-in `--fresh-profiles` mode measures four isolated generated profiles and has no default write. Both paths are deterministic and local-file-only: they do not call models/providers, read or write memory, prevent hallucinations, evaluate behavior, auto-tune thresholds, or approve baseline changes.
 
 StaticGrader reads trace validation/report metadata where present and writes `naos/reports/static_grader_report.json`. It is deterministic and structural only: BaseGrader defines the small protocol, StaticGrader checks trace schema conformance, source/evidence references, task/spec/capability linkage, forbidden-payload absence, non-claim boundaries, residual risks, and zero-cost posture. It does not evaluate semantic behavior, fairness, alignment, robustness, safety, explainability, accountability, legal/regulatory posture, runtime behavior, or hallucination risk. D2/D3/D5/D6/D7/D8-style behavioral dimensions remain not evaluated/readiness-only, and humans decide any durable conclusion.
@@ -2027,7 +2385,7 @@ forward-slash project-relative file or directory paths, not globs. Discovery als
 retains the bounded prompt/rule/workflow fallback and nested `AGENTS.md`,
 `CLAUDE.md` and `CLAUDE.local.md` discovery. These are path-based review candidates;
 detection does not assert that a particular vendor/version loads them. `scan_limits` defaults to
-50 files per selected path and 5,000 fallback files; values must be integers
+128 files per selected path and 5,000 fallback files; values must be integers
 between 1 and 100,000. Directory traversal also has a 100,000-entry budget.
 `scan_scope` records selected paths, limits, selected file counts, issues,
 truncation and completeness. Counts on truncated scans are not repository totals.
@@ -2043,6 +2401,20 @@ review and empty that list. Host instruction/skill changes carry medium maintena
 impact; byte changes do not prove semantic harm or vendor loading behavior.
 Fingerprints retain raw bytes across all platforms. Incomplete selected fingerprint
 coverage produces `not_ready`, never `baseline_current` from a partial digest.
+
+The behavioral report's `instruction_discovery` record labels its count with
+`selection_basis: discovered_instruction_files`: `selected_file_count` counts the
+instruction files selected from discovery, and `discovery_file_limit` records the
+effective file budget. This lets an ordinary first report remain current after
+publication without counting its own new output as another instruction. Per-path
+`file_count` fields retain their existing meaning. The full discovery scan still
+counts every applicable file against its limits and preserves completeness,
+truncation and issues; no report directory is excluded. Older v1 reports with a
+raw discovery `file_count` remain readable, but regenerate them before current
+observation acceptance. Stored content must still exactly match the producer.
+If publication tips the actual discovery scan over its limit, acceptance refuses
+the stale report and a rerun reports incomplete coverage. Custom fingerprint roots
+that include the report's output folder remain self-referential and are refused.
 
 These inspections reject static symlink/reparse paths and require no host AI tool,
 provider, Bash or Make. They are local advisory inspection, not a concurrent
@@ -2228,6 +2600,22 @@ and explicit disclaimer fields, are not claims of coverage. This remains a
 lexical check requiring human review; it does not interpret negation or prove
 that a claim is true.
 
+The exact unchanged shipped, disabled failure-mode taxonomy does not request
+review solely because the Standard or Assured profile normally requires it.
+The report retains that raw profile setting. Active or custom declarations,
+including a locally annotated seed, keep their existing review requirements;
+findings and authority claims remain visible.
+
+For optional control-plane evidence, a generic `AGENTS.md` alone does not select
+OpenCode. OpenCode-specific configuration or local surfaces establish that
+scope; a local `.opencode` directory together with `AGENTS.md` also does so.
+Unsafe links and reparse points remain unresolved. A present inactive
+failure-mode or OpenCode report is optional only when its semantic content
+matches a fresh local producer result. Collection time and operator attribution
+remain separate metadata. This comparison establishes current local consistency,
+not producer authenticity, human approval or readiness. Required evidence does
+not receive this optional exemption.
+
 `naos agent-sponsor-registry`, `naos aivss-verify` and
 `naos ai-component-inventory` prefer valid project schemas and use their exact
 kit schema when the project copy is absent. The component inventory likewise
@@ -2297,6 +2685,24 @@ then verified against current independent inputs and producer results before a
 separate `self_check_dependency_resolution_report` is published. Stored gate
 readers require the declared full-self-check membership and revalidate the
 current proof; a stored ready flag, omitted row or relabelled row is insufficient.
+
+The resolution receipt is a derived output, outside the independent attestation
+domain that its own proof replays. Only its exact confined, policy-selected
+endpoint is excluded, visibly listed in `rules.generated_output_exclusions`.
+Existing bytes must have the recognized receipt schema and project scope;
+classification does not verify the proof. Publication and the independent reader
+still require complete source verification. Aliases to policy, rules, reviewer
+metadata, declared inputs and other outputs are refused. The evidence pack and
+unknown neighboring files remain attestation subjects. Explicitly requiring the
+excluded receipt still produces missing coverage; no requirement is waived.
+
+Dependency capture and resolution receipt publication bind the recognized prior
+bytes and use the existing guarded output writer. Linked parents, linked or
+multiply-linked leaves, changed preimages and unsupported metadata are refused
+without replacing the selected output. This file-publication boundary does not
+make a capture a resolved proof or provide a concurrent-filesystem sandbox.
+On POSIX, creation permissions that mask owner-read cause a clear refusal:
+the existing file and process umask are preserved, without temporary read grants.
 
 The acquisition dashboard records progress history before dependency capture.
 The final dashboard uses `--no-progress-history` to render the existing history

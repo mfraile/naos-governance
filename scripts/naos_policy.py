@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import io
 from collections import OrderedDict
 from threading import RLock
 from copy import deepcopy
@@ -1240,10 +1241,12 @@ def validate_report_write_path(path: Path | None) -> None:
 
 
 def _absolute_lexical_path(path: Path, *, resolve_parent_symlinks: bool = False) -> Path:
-    absolute = Path(os.path.abspath(os.fspath(path)))
     if resolve_parent_symlinks:
+        absolute = Path(os.path.abspath(os.fspath(path)))
         return absolute.parent.resolve(strict=False) / absolute.name
-    return absolute
+    # Keep parent components until the strict no-follow walk examines them.
+    # abspath would erase a symlink followed by '..' before that check.
+    return path.absolute()
 
 
 def _secure_windows_report_writes_supported() -> bool:
@@ -1266,7 +1269,10 @@ def _secure_directory_fd_writes_supported() -> bool:
     )
 
 
-def _open_report_parent_fd(path: Path, *, strict_parent_topology: bool) -> tuple[int, str]:
+def _open_report_parent_fd(path: Path, *, strict_parent_topology: bool,
+                           create_parents: bool = True,
+                           search_only_ancestors: bool = False,
+                           search_only_final: bool = False) -> tuple[int, str]:
     absolute = _absolute_lexical_path(
         path,
         resolve_parent_symlinks=not strict_parent_topology,
@@ -1277,18 +1283,34 @@ def _open_report_parent_fd(path: Path, *, strict_parent_topology: bool) -> tuple
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
-    descriptor = os.open(parent.anchor or os.sep, os.O_RDONLY | os.O_DIRECTORY)
+    ancestor_flags = flags
+    if search_only_ancestors or search_only_final:
+        # O_PATH on Linux and O_SEARCH on Darwin retain no-follow directory
+        # custody without newly requiring read/list access to nonfinal parents.
+        search = getattr(os, "O_PATH", None)
+        if search is None and sys.platform == "darwin":
+            # Darwin sys/fcntl.h: O_SEARCH == O_EXEC (0x40000000) | O_DIRECTORY.
+            search = 0x40000000
+        if search is None:
+            raise ValueError("Search-only report ancestor handles are unavailable")
+        ancestor_flags = search | flags
+    components = parent.parts[1:]
+    descriptor = os.open(parent.anchor or os.sep, ancestor_flags if components else flags)
     try:
-        for component in parent.parts[1:]:
+        for index, component in enumerate(components):
+            child_flags = (flags if index == len(components) - 1 and not search_only_final
+                           else ancestor_flags)
             try:
-                child = os.open(component, flags, dir_fd=descriptor)
+                child = os.open(component, child_flags, dir_fd=descriptor)
             except FileNotFoundError:
+                if not create_parents:
+                    raise
                 try:
                     os.mkdir(component, 0o777, dir_fd=descriptor)
                 except FileExistsError:
                     pass
                 try:
-                    child = os.open(component, flags, dir_fd=descriptor)
+                    child = os.open(component, child_flags, dir_fd=descriptor)
                 except OSError as exc:
                     if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
                         raise ValueError(
@@ -1328,6 +1350,8 @@ def _write_report_with_directory_fd(
     data: str,
     *,
     strict_parent_topology: bool,
+    expected_parent_identity: tuple[int, int] | None = None,
+    expect_absent: bool = False,
 ) -> None:
     parent_fd, filename = _open_report_parent_fd(
         path,
@@ -1336,7 +1360,13 @@ def _write_report_with_directory_fd(
     temporary_name: str | None = None
     temporary_fd = -1
     try:
+        if expected_parent_identity is not None:
+            parent_state = os.fstat(parent_fd)
+            if (parent_state.st_dev, parent_state.st_ino) != expected_parent_identity:
+                raise ValueError(f"Report parent changed after preflight: {path.parent}")
         existing = _report_metadata_at(parent_fd, filename, path)
+        if expect_absent and existing is not None:
+            raise FileExistsError(f"Report output appeared after preflight: {path}")
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         if hasattr(os, "O_CLOEXEC"):
             flags |= os.O_CLOEXEC
@@ -1368,12 +1398,17 @@ def _write_report_with_directory_fd(
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        os.rename(
-            temporary_name,
-            filename,
-            src_dir_fd=parent_fd,
-            dst_dir_fd=parent_fd,
-        )
+        if expect_absent:
+            from naos_trace_atomic_write import _metadata_module, _publish_no_replace
+
+            _publish_no_replace(parent_fd, temporary_name, filename, _metadata_module())
+        else:
+            os.rename(
+                temporary_name,
+                filename,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
         temporary_name = None
         try:
             os.fsync(parent_fd)
@@ -1457,16 +1492,114 @@ def _write_report_portable_fallback(
                 pass
 
 
+def ensure_output_directory(path: Path) -> None:
+    """Prepare an output directory through the same held no-follow parent walk."""
+    from naos_self_check_inspection import inspection_publish_path
+
+    probe = inspection_publish_path(path / ".naos-directory-probe")
+    if _secure_windows_report_writes_supported():
+        from naos_windows_report import ensure_report_directory
+        ensure_report_directory(probe.parent)
+        return
+    if not _secure_directory_fd_writes_supported():
+        raise ValueError("Safe output directory preparation primitives unavailable")
+    descriptor, _name = _open_report_parent_fd(probe, strict_parent_topology=True)
+    os.close(descriptor)
+
+
+def write_binary_output(path: Path, produce, validate) -> None:
+    """Produce and validate a binary artifact in the held publication stage.
+
+    Callbacks are trusted application code. The writer retains its existing
+    topology, authority, supported metadata and name-refresh guarantees.
+    """
+    from naos_self_check_inspection import inspection_publish_path
+    from naos_trace_atomic_write import BinaryProducer, publish_trace
+
+    producer = BinaryProducer(produce, validate)
+    publish_trace(inspection_publish_path(path), producer, None,
+                  strict_parent_topology=True, observe_current=True)
+
+
+def write_text_output(path: Path | None, data: str, *, newline: str | None = None,
+                      encoding: str | None = "utf-8", create_parents: bool = True,
+                      private_new_file: bool = False, create_only: bool = False,
+                      require_existing_write_access: bool = True,
+                      posix_creation_mode: int | None = None,
+                      preserve_existing_posix_mode: bool = True,
+                      retry_windows_sharing: bool = False,
+                      cleanup_error_note: str | None = None) -> None:
+    """Publish serialized text without following linked destinations.
+
+    Preserve Path.write_text newline behavior, write authority and supported
+    metadata. Existing files must also be readable for metadata preservation;
+    same-directory staging requires a writable parent. Refuse otherwise without
+    changing the destination. Existing JSON report serialization stays separate.
+    Private configuration callers may retain parent-authorized replacement;
+    create-only event callers never replace an existing destination.
+    Defaults retain UTF-8 and parent creation. Explicit encoding=None uses
+    Python's implicit text encoding; create_parents=False requires held parents.
+    State writers may select an umask-filtered POSIX creation mode and explicitly
+    reset the old mode to it. Other supported existing metadata is still kept.
+    Windows sharing retries apply only to a held stage's final rename. An
+    optional cleanup note keeps this operation's primary error when cleanup
+    also fails; cancellation continues to propagate.
+    """
+    if path is None:
+        return
+    if not isinstance(data, str):
+        raise TypeError("Text output requires a string")
+    if newline not in {None, "", "\n", "\r", "\r\n"}:
+        raise ValueError("Unsupported text output newline")
+    if type(preserve_existing_posix_mode) is not bool or type(retry_windows_sharing) is not bool:
+        raise ValueError("Publication modes must be booleans")
+    ending = os.linesep if newline is None else newline
+    if ending not in {"", "\n"}:
+        data = data.replace("\n", ending)
+    payload = data
+    if encoding != "utf-8":
+        # Match Path.write_text's encoding selection without opening a pathname.
+        # Newline translation has already occurred above.
+        with io.BytesIO() as buffer:
+            with io.TextIOWrapper(buffer, encoding=io.text_encoding(encoding), newline="") as stream:
+                stream.write(data)
+                stream.flush()
+                payload = buffer.getvalue()
+    from naos_self_check_inspection import inspection_publish_path
+    from naos_trace_atomic_write import publish_trace
+
+    options = {}
+    if posix_creation_mode is not None:
+        options['posix_creation_mode'] = posix_creation_mode
+    if not preserve_existing_posix_mode:
+        options['preserve_existing_posix_mode'] = False
+    if retry_windows_sharing:
+        options['retry_windows_sharing'] = True
+    if cleanup_error_note is not None:
+        options['cleanup_error_note'] = cleanup_error_note
+    publish_trace(inspection_publish_path(path), payload, None,
+                  strict_parent_topology=True, observe_current=not create_only,
+                  private_new_file=private_new_file, create_only=create_only,
+                  create_parents=create_parents,
+                  require_existing_write_access=require_existing_write_access, **options)
+
+
 def write_report(
     path: Path | None,
     report: dict[str, Any],
     *,
     strict_parent_topology: bool = False,
+    expected_parent_identity: tuple[Any, Any] | None = None,
+    expect_absent: bool = False,
 ) -> None:
     from naos_self_check_inspection import logicalize_payload, inspection_publish_path
     logicalize_payload(report)
     if path is None:
         return
+    if expected_parent_identity is not None and not strict_parent_topology:
+        raise ValueError("A bound report parent requires strict topology")
+    if expect_absent and not strict_parent_topology:
+        raise ValueError("A create-only report requires strict topology")
     path = inspection_publish_path(path)
     data = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if _secure_directory_fd_writes_supported():
@@ -1474,11 +1607,16 @@ def write_report(
             path,
             data,
             strict_parent_topology=strict_parent_topology,
+            expected_parent_identity=expected_parent_identity,
+            expect_absent=expect_absent,
         )
     elif strict_parent_topology and _secure_windows_report_writes_supported():
         from naos_windows_report import write_strict_report
 
-        write_strict_report(path, data)
+        write_strict_report(
+            path, data, expected_parent_identity=expected_parent_identity,
+            expect_absent=expect_absent,
+        )
     elif strict_parent_topology:
         raise RuntimeError(
             "Strict report-parent topology requires secure directory-descriptor writes on this platform; "

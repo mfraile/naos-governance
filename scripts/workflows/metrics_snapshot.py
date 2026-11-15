@@ -6,8 +6,8 @@ NAOS Portable Governance Kit
 Usage: python scripts/workflows/metrics_snapshot.py [--output-json PATH] [--trend-md PATH]
 Env:   NAOS_ROOT   (default: naos)  — root of the governance directory
 
-Writes a JSON snapshot to naos/metrics/snapshot_YYYYMMDD_HHMMSS.json and
-a timestamped copy to the --output-json path (default: metrics_snapshot.json).
+Writes a JSON snapshot to naos/metrics/snapshots/snapshot_YYYYMMDD_HHMMSS.json
+and a latest copy to --output-json (default: metrics_snapshot.json).
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from naos_task_lifecycle import is_task_delivered, normalize_task_states  # noqa: E402
+from naos_policy import ensure_output_directory, write_text_output  # noqa: E402
 
 NAOS_ROOT = Path(os.getenv("NAOS_ROOT", "naos"))
 
@@ -217,7 +218,7 @@ def main() -> None:
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    ensure_output_directory(out_dir)
 
     prev_path = Path(args.prev) if args.prev else _auto_prev_in_dir(out_dir)
     prev = _load_prev_snapshot(prev_path)
@@ -225,14 +226,14 @@ def main() -> None:
     curr = collect_snapshot()
     ts = time.strftime("%Y%m%d_%H%M%S", time.gmtime(curr["generated_at"]))
     stamped_path = out_dir / f"snapshot_{ts}.json"
-    stamped_path.write_text(json.dumps(curr, indent=2))
+    write_text_output(stamped_path, json.dumps(curr, indent=2), encoding=None, create_parents=False)
 
     latest_path = Path(args.output_json)
-    latest_path.write_text(json.dumps(curr, indent=2))
+    write_text_output(latest_path, json.dumps(curr, indent=2), encoding=None, create_parents=False)
 
     trend = compute_trend(curr, prev)
     if args.trend_md:
-        Path(args.trend_md).write_text(render_trend_md(trend))
+        write_text_output(Path(args.trend_md), render_trend_md(trend), encoding=None, create_parents=False)
 
     print(f"Wrote snapshot to {stamped_path}")
     print(

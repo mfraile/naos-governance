@@ -215,7 +215,7 @@ def check_python_syntax() -> Tuple[bool, List[str]]:
     issues: List[str] = []
     root = Path.cwd()
     for py_file in root.rglob("*.py"):
-        if any(excl in py_file.parts for excl in EXCLUDE_DIRS):
+        if any(excl in py_file.relative_to(root).parts for excl in EXCLUDE_DIRS):
             continue
         try:
             with tokenize.open(py_file) as source:

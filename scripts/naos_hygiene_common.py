@@ -40,16 +40,19 @@ from naos_policy import (  # noqa: E402
 
 from naos_secret_patterns import (SECRET_SCAN_ROOTS, SECRET_SCAN_SUFFIXES,  # noqa: E402
                                   is_secret_scan_file, iter_secret_content_matches)  # noqa: E402
-from naos_secret_public_literals import (PublicVocabularyError, load_public_literals,
+from naos_secret_public_literals import (PublicVocabularyError, load_public_literals,  # noqa: E402 - repository import bootstrap
                                         public_audit_ids, selected_public_audit_literals, selected_public_reference_literals,
                                         selected_public_derived_report_ids,
                                         public_secret_finding_ids, selected_public_secret_finding_literals,
                                         selected_public_producer_witness_literals,
-                                        selected_public_claim_context, public_claim_label_spans, public_git_comparison_spans)  # noqa: E402
+                                        selected_public_claim_context, public_claim_label_spans, public_git_comparison_spans,
+                                        selected_public_constructor_context, public_constructor_label_spans, public_family_record_path_spans, public_operational_path_spans,
+                                        public_gate_reference_location_spans, public_source_test_path_projections,
+                                        selected_scanner_consumer_paths)  # noqa: E402
 
 
-from naos_secret_managed_operands import _ScannerProofBudget, inventory_operand_spans
-from source_roots import INFERRED_ADOPTER_ROOTS, inferred_adopter_python_files, native_adopter_root_aliases, is_native_python_package_marker, declared_package_roots, declared_package_selects
+from naos_secret_managed_operands import _ScannerProofBudget, inventory_operand_spans, MAX_REPRESENTATIONS  # noqa: E402 - repository import bootstrap
+from source_roots import INFERRED_ADOPTER_ROOTS as INFERRED_ADOPTER_ROOTS, inferred_adopter_python_files, native_adopter_root_aliases, is_native_python_package_marker, declared_package_roots, declared_package_selects  # noqa: E402 - repository import bootstrap
 
 
 NON_CLAIMS = [
@@ -237,7 +240,8 @@ def _hygiene_roots(rules: dict[str, Any], fallback: list[str]):
 
 
 def _hygiene_scope(root: Path, rules: dict[str, Any], roots: list[str],
-                   suffixes: set[str], *, secret: bool = False):
+                   suffixes: set[str], *, secret: bool = False,
+                   prepared_roots: tuple[list[str], bool] | None = None):
     """Bound unique discovered entries and depth, including immediate root accounting."""
     root = root.absolute()
     excluded = (DEFAULT_EXCLUDE_DIRS - {"dev"} if secret else DEFAULT_EXCLUDE_DIRS) | set(rules.get("exclude_dirs") or [])
@@ -334,7 +338,8 @@ def _hygiene_scope(root: Path, rules: dict[str, Any], roots: list[str],
 
     # Duplicate and overlapping roots share both work accounting and visited entries.
     selected_roots = set()
-    selectors, truncated = _hygiene_roots(rules, roots)
+    selectors, truncated = (_hygiene_roots(rules, roots)
+                            if prepared_roots is None else prepared_roots)
     if truncated:
         issue(root, "selector_limit")
     for raw in selectors:
@@ -536,8 +541,10 @@ class _AlphaFunction(ast.NodeTransformer):
                 excluded.update(alias.asname or alias.name for alias in child.names)
         self.excluded = excluded
         arguments = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
-        if node.args.vararg: arguments.append(node.args.vararg)
-        if node.args.kwarg: arguments.append(node.args.kwarg)
+        if node.args.vararg:
+            arguments.append(node.args.vararg)
+        if node.args.kwarg:
+            arguments.append(node.args.kwarg)
         for arg in arguments:
             self.bind(arg.arg)
         # A comprehension owns its targets; do not leak them into function scope.
@@ -566,7 +573,8 @@ class _AlphaFunction(ast.NodeTransformer):
         return node
 
     def visit_ExceptHandler(self, node):
-        if node.name: node.name = self.mapped(node.name)
+        if node.name:
+            node.name = self.mapped(node.name)
         return self.generic_visit(node)
 
     def visit_comprehension_scope(self, node):
@@ -580,11 +588,13 @@ class _AlphaFunction(ast.NodeTransformer):
                 else:
                     generator.iter = self.visit(generator.iter)
                 for target in ast.walk(generator.target):
-                    if isinstance(target, ast.Name) and isinstance(target.ctx, ast.Store): self.bind(target.id)
+                    if isinstance(target, ast.Name) and isinstance(target.ctx, ast.Store):
+                        self.bind(target.id)
                 generator.target = self.visit(generator.target)
                 generator.ifs = [self.visit(value) for value in generator.ifs]
             for field in ("elt", "key", "value"):
-                if hasattr(node, field): setattr(node, field, self.visit(getattr(node, field)))
+                if hasattr(node, field):
+                    setattr(node, field, self.visit(getattr(node, field)))
             return node
         finally:
             self.scopes.pop()
@@ -600,7 +610,8 @@ def _alpha_normalized_dump(node):
                    ast.NamedExpr, ast.Match)
     for statement in node.body:
         for child in ast.walk(statement):
-            if isinstance(child, unsupported): return None
+            if isinstance(child, unsupported):
+                return None
             if isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id in {"eval", "exec", "locals", "globals", "vars", "dir"}:
                 return None
     clone = copy.deepcopy(node)
@@ -681,12 +692,15 @@ def _python_scan_scope(root: Path, rules: dict[str, Any], name: str, severity: s
         selectors, truncated = _hygiene_roots(rules, PYTHON_ROOTS)
         roots = [_hygiene_selector(root, raw) for raw in selectors]
         for index, selected in enumerate(roots):
-            if selected is None:continue
+            if selected is None:
+                continue
             parts = selected.relative_to(root).parts
-            if not parts or selected in inventory:continue
+            if not parts or selected in inventory:
+                continue
             canonical = native_adopter_root_aliases(root, [parts[0]]).get(parts[0])
             physical = next((name for name, known in aliases.items() if known == canonical), None)
-            if physical is not None:roots[index] = root / physical / Path(*parts[1:])
+            if physical is not None:
+                roots[index] = root / physical / Path(*parts[1:])
         selector_states = []
         for raw, selected in zip(selectors, roots):
             if selected is None:
@@ -701,7 +715,8 @@ def _python_scan_scope(root: Path, rules: dict[str, Any], name: str, severity: s
                 selector_states.append({"path": raw, "status": status})
             else:
                 selector_states.append({"path": raw, "status": inventory[selected]})
-        if truncated:issues.append({"path": ".", "status": "selector_limit"})
+        if truncated:
+            issues.append({"path": ".", "status": "selector_limit"})
         files = sorted(path for path, state in inventory.items() if state == "selected" and
                        any(selected is not None and (path == selected or path.is_relative_to(selected)) for selected in roots))
     omitted = sorted(set(inferred) - set(files))
@@ -869,6 +884,39 @@ def shannon_entropy(value: str) -> float:
     return -sum((count / length) * math.log2(count / length) for count in counts.values())
 
 
+def _entropy_candidate(value: str, minimum: int, threshold: float) -> float | None:
+    """The existing raw-token predicate, shared by emission and key proofs."""
+    if (len(value) < minimum or any(character.isspace() for character in value)
+            or not re.search(r"[A-Za-z]", value) or not re.search(r"[0-9]", value)):
+        return None
+    entropy = shannon_entropy(value)
+    return None if entropy < threshold else entropy
+
+
+def _selected_dependency_receipt(root: Path, naos_root: str, policy) -> str | None:
+    if (type(policy) is not dict or type(policy.get("paths")) is not dict
+            or any(type(key) is not str for key in policy["paths"])):
+        return None
+    metadata = policy.get("_meta") or {}
+    if type(metadata) is not dict:
+        return None
+    try:
+        from naos_policy import naos_root_path
+        from naos_self_check_dependency_resolution import receipt_output_path, dependency_proof_input_paths
+
+        path = receipt_output_path(root, naos_root, policy)
+        protected = dependency_proof_input_paths(
+            root, naos_root_path(root, naos_root), policy,
+            metadata.get("path"), naos_root)
+        if any(path == other.resolve()
+               or (path.exists() and other.exists() and path.samefile(other))
+               for other in protected):
+            return None
+        return path.absolute().relative_to(root.absolute()).as_posix()
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
+
+
 def _line_allowed(line: str) -> bool:
     """The first unquoted trailing comment must contain only the existing marker."""
     quote: str | None = None
@@ -1023,12 +1071,20 @@ def check_secret_hygiene(*, root: Path, profile: str, naos_root: str, rules: dic
         files = [path for path in files if path.parent != root or path in explicit]
     managed_proof = _ScannerProofBudget(root)
     if public_vocabulary["status"] == "valid":
-        public_literals.update(selected_public_audit_literals(files, root=root, naos_root=naos_root))
+        public_literals.update(selected_public_audit_literals(files, root=root, naos_root=naos_root, policy=policy, context=managed_proof))
         public_literals.update(selected_public_reference_literals(files, root=root, naos_root=naos_root))
         public_literals.update(selected_public_derived_report_ids(files, root=root, naos_root=naos_root))
         public_literals.update(selected_public_secret_finding_literals(files, root=root))
         public_literals.update(selected_public_producer_witness_literals(files, root=root, naos_root=naos_root, context=managed_proof))
     claim_context = selected_public_claim_context(files, root=root, naos_root=naos_root, policy=policy) if public_vocabulary['status'] == 'valid' else None
+    constructor_context = selected_public_constructor_context(files, root=root, naos_root=naos_root,
+        profile=profile, policy=policy, context=managed_proof) if public_vocabulary['status'] == 'valid' else None
+    consumer_paths = selected_scanner_consumer_paths(root=root, naos_root=naos_root,
+        policy=policy) if public_vocabulary['status'] == 'valid' else set()
+    dependency_receipt = (_selected_dependency_receipt(root, naos_root, policy)
+                          if public_vocabulary['status'] == 'valid' else None)
+    if dependency_receipt is not None:
+        consumer_paths.add(dependency_receipt)
     waivers: list[dict[str, Any]] = []
     instruction_aliases = []
     scanned_instruction_metadata = {}
@@ -1040,6 +1096,9 @@ def check_secret_hygiene(*, root: Path, profile: str, naos_root: str, rules: dic
     inventory_operand_matches = 0
     inventory_operand_diagnostics = []
     for path in files:
+        end_consumer = getattr(managed_proof, 'end_scanned_consumer', None)
+        if end_consumer is not None:
+            end_consumer()
         relative = relpath(path, root)
         try:
             leaf_metadata = path.lstat()
@@ -1064,7 +1123,11 @@ def check_secret_hygiene(*, root: Path, profile: str, naos_root: str, rules: dic
             continue
         try:
             instruction_before = path.lstat() if path.parent == root and path.name in _ROOT_INSTRUCTION_NAMES else None
-            scanned_raw = path.read_bytes()
+            consumer_reader = getattr(managed_proof, 'read_scanned_consumer', None)
+            scanned_raw = (consumer_reader(relative) if relative in consumer_paths
+                           and consumer_reader is not None else None)
+            if scanned_raw is None:
+                scanned_raw = path.read_bytes()
             instruction_after = path.lstat() if instruction_before is not None else None
             if instruction_before is not None and _instruction_file_witness(instruction_before) == _instruction_file_witness(instruction_after):
                 scanned_instruction_metadata[path] = _instruction_file_witness(instruction_after)
@@ -1077,18 +1140,54 @@ def check_secret_hygiene(*, root: Path, profile: str, naos_root: str, rules: dic
                                     severity=severity, status=status, path=relpath(path, root),
                                     message="Selected file could not be read as UTF-8; secret scan coverage is incomplete."))
             continue
-        inputs.append({"path": relpath(path, root), "status": "read",
-                       "sha256": hashlib.sha256(scanned_raw).hexdigest(), "size_bytes": len(scanned_raw)})
+        input_row = {"path": relative, "status": "read", "size_bytes": len(scanned_raw)}
+        # A public digest can confirm guesses of a short dotenv/key file.
+        # Keep ordinary input/instruction hashes and all scan behavior unchanged.
+        if not is_secret_scan_file(path, {".env", ".key", ".pem"}):
+            input_row["sha256"] = hashlib.sha256(scanned_raw).hexdigest()
+        inputs.append(input_row)
         public_event_ids = public_audit_ids(file_text) if public_vocabulary["status"] == "valid" and path.suffix.lower() in {".json", ".jsonl"} else set()
         if public_vocabulary["status"] == "valid" and path.suffix.lower() in {".json", ".jsonl"}:
             public_event_ids.update(public_secret_finding_ids(file_text))
         operand_spans = set()
         if path.suffix.lower() == ".json":
-            operand_spans, operand_diagnostic = inventory_operand_spans(file_text, relative, root, naos_root, managed_proof)
+            entropy_candidates = set()
+            if relative == dependency_receipt:
+                offset = 0
+                for line in file_text.splitlines(keepends=True):
+                    for match in QUOTED_SECRET_LITERAL.finditer(line):
+                        literal = match.group(1) if match.group(1) is not None else match.group(2)
+                        if _entropy_candidate(literal, entropy_min_length, entropy_threshold) is not None:
+                            entropy_candidates.add((offset + match.start(), offset + match.end()))
+                            if len(entropy_candidates) > MAX_REPRESENTATIONS:
+                                break
+                    offset += len(line)
+                    if len(entropy_candidates) > MAX_REPRESENTATIONS:
+                        break
+                operand_spans, operand_diagnostic = inventory_operand_spans(
+                    file_text, relative, root, naos_root, managed_proof,
+                    dependency_receipt=dependency_receipt, entropy_candidates=entropy_candidates)
+            else:
+                operand_spans, operand_diagnostic = inventory_operand_spans(
+                    file_text, relative, root, naos_root, managed_proof)
             if operand_diagnostic["status"] != "not_applicable":
                 inventory_operand_diagnostics.append({"path": relative, **operand_diagnostic})
         claim_spans = public_claim_label_spans(file_text, relative, root=root, naos_root=naos_root, context=claim_context) if path.suffix.lower() == '.json' else set()
         comparison_spans = public_git_comparison_spans(file_text, relative, root=root, naos_root=naos_root, selected=files, policy=policy, context=managed_proof) if public_vocabulary['status'] == 'valid' and path.suffix.lower() == '.json' else set()
+        constructor_spans = public_constructor_label_spans(file_text, relative, root=root,
+            naos_root=naos_root, context=constructor_context) if path.suffix.lower() == '.json' else set()
+        family_record_spans = public_family_record_path_spans(file_text, relative, root=root,
+            naos_root=naos_root, profile=profile, selected=files, policy=policy,
+            context=managed_proof) if public_vocabulary['status'] == 'valid' and path.suffix.lower() == '.json' else set()
+        operational_spans = public_operational_path_spans(file_text, relative, root=root,
+            naos_root=naos_root, profile=profile, selected=files, policy=policy,
+            rules=rules, context=managed_proof, session_context=constructor_context) if public_vocabulary['status'] == 'valid' and path.suffix.lower() == '.json' else set()
+        gate_location_spans = public_gate_reference_location_spans(file_text, relative,
+            root=root, naos_root=naos_root, profile=profile, selected=files, policy=policy,
+            context=managed_proof) if public_vocabulary['status'] == 'valid' and path.suffix.lower() == '.json' else set()
+        source_test_projections = public_source_test_path_projections(file_text, relative,
+            root=root, naos_root=naos_root, profile=profile, selected=files, policy=policy,
+            context=managed_proof) if public_vocabulary['status'] == 'valid' and path.suffix.lower() == '.json' else {}
         line_offset = 0
         line_offsets = []
         for raw_line in file_text.splitlines(keepends=True):
@@ -1149,7 +1248,7 @@ def check_secret_hygiene(*, root: Path, profile: str, naos_root: str, rules: dic
                 if (line_offsets[line_no - 1] + match.start(), line_offsets[line_no - 1] + match.end()) in operand_spans:
                     inventory_operand_matches += 1
                     continue
-                if (line_offsets[line_no - 1] + match.start(), line_offsets[line_no - 1] + match.end()) in claim_spans | comparison_spans:
+                if (line_offsets[line_no - 1] + match.start(), line_offsets[line_no - 1] + match.end()) in claim_spans | comparison_spans | constructor_spans | family_record_spans | operational_spans | gate_location_spans:
                     public_literal_matches += 1
                     continue
                 if literal in public_literals or literal in public_event_ids:
@@ -1161,10 +1260,12 @@ def check_secret_hygiene(*, root: Path, profile: str, naos_root: str, rules: dic
                 if (literal_span not in assigned_spans
                         and _local_document_reference(literal, line, match.start(), match.end(), lines, line_no - 1)):
                     continue
-                if not (re.search(r"[A-Za-z]", literal) and re.search(r"[0-9]", literal)):
-                    continue
-                entropy = shannon_entropy(literal)
-                if entropy < entropy_threshold:
+                # A proved map column removes only the observed project root
+                # for entropy. Credential scans above always see original text.
+                entropy_operand = source_test_projections.get(
+                    (line_offsets[line_no - 1] + match.start(), line_offsets[line_no - 1] + match.end()), literal)
+                entropy = _entropy_candidate(entropy_operand, entropy_min_length, entropy_threshold)
+                if entropy is None:
                     continue
                 entropy_matches += 1
                 findings.append(
@@ -1264,7 +1365,7 @@ def check_secret_hygiene(*, root: Path, profile: str, naos_root: str, rules: dic
                "include_root_files": include_root, "coverage_status": coverage, "input_files": inputs,
                "public_literals": public_vocabulary,
                "inventory_operand_proofs": inventory_operand_diagnostics,
-               "entropy_scope": "Paired quoted literals without whitespace, containing letters and digits; punctuation is retained. Exact digest-bound public declarations and exact operands under observed project/executing-kit roots are excluded from entropy only. Validated public audit event IDs and content-addressed secret finding IDs are recomputed from exact producer objects; finding-body fields remain scanned. Safe relative document paths in YAML reference fields/lists retain their bounded exception. Exact independently linked managed operands and their diagnostic path echoes are excluded only at typed scalar quote coordinates after full independent proof. Proof-only reads use a separate 32MiB cache and do not improve coverage. Exact resolved Git comparison arguments are excluded only at the two schema-bound PR-risk diff_args quote coordinates in policy-selected reports or exact current hash-bound PR-family evidence carriers; this proves label consistency, not ownership, approval or evidence truth. Assignment/provider checks remain active; unknown values remain blocking by profile.",
+               "entropy_scope": "Paired quoted literals without whitespace, containing letters and digits; punctuation is retained. Exact digest-bound public declarations and exact operands under observed project/executing-kit roots are excluded from entropy only. Validated public audit event IDs and content-addressed secret finding IDs are recomputed from exact producer objects; other finding-body fields remain scanned. Exact session path labels use joint selected-event and policy-constructor metadata, without admitting raw IDs or verifying source-report content. Exact dated audit-directory labels come only from validated selected audit event operands; native relative session spellings follow the same constructor. A modern entropy finding path echo is excluded only when its unique current hash/size-bound input proves the exact independently linked Windows default-policy ancestor coordinate; this is content consistency, not report authenticity. Safe relative document paths in YAML reference fields/lists retain their bounded exception. Exact independently linked managed operands and their diagnostic path echoes are excluded only at typed scalar quote coordinates after full independent proof. Proof-only reads use a separate 32MiB cache and do not improve coverage. Exact resolved Git comparison arguments are excluded only at the two schema-bound PR-risk diff_args quote coordinates in policy-selected reports or exact current hash-bound PR-family evidence carriers; this proves label consistency, not ownership, approval or evidence truth. Assignment/provider checks remain active; unknown values remain blocking by profile. Additional session report labels require selected current audit/latest/mirror bytes and finite shipped filename roles, only at schema-bound files_found/session_path/derived-output quotes and typed secret-scan inventory path slots; raw IDs and unrelated bodies stay scanned. Finite selected report consumers reuse one actual held-read input buffer of at most 8MiB, with final identity verification; independent source reads retain the 32MiB cap and later source reads are charged normally. Default grader-baseline paths and the finite shipped README artifact alias use exact public constructors. Task/lifecycle/test-health full-path exceptions require schema-bound operational metadata, selected current source/rule bytes and an existing explicit operand exception; lifecycle mirrors also require current session anchors. Collected gate navigation labels require exact selected hash/size-bound sources and reproduced finite reference constructors. Source/test-map metadata projects only the observed root before ordinary relative-filename entropy checks; credential checks still see original text. Dependency-receipt source_bindings keys require the policy-selected root-bound carrier, matching map digest and safe current project/executing-kit raw source bytes; only exact entropy-candidate key quotes are recognized. Body copies, unknown slots, private-name inputs and credential checks stay active; this does not verify the receipt or establish readiness. This establishes metadata consistency, not content authenticity or execution.",
                "scan_roots": scan_roots,
                "root_selection": [{"path": raw, "status": "outside_root" if _hygiene_selector(root, raw) is None
                                    else "excluded" if inventory.get(_hygiene_selector(root, raw)) == "excluded"
@@ -1362,8 +1463,10 @@ def _assertion_syntax(node):
         recognized = bool(name and name.startswith("assert") and (name in ASSERT_CALLS or name.startswith("assert_") or len(name) > 6 and name[6].isupper())) or qualified in {"raises", "fail", "pytest.raises", "pytest.fail", "self.fail"}
         trivial = False
         if recognized and node.args:
-            if name == "assertTrue": trivial = _constant_truth(node.args[0]) is True
-            elif name == "assertFalse": trivial = _constant_truth(node.args[0]) is False
+            if name == "assertTrue":
+                trivial = _constant_truth(node.args[0]) is True
+            elif name == "assertFalse":
+                trivial = _constant_truth(node.args[0]) is False
             elif name in {"assertEqual", "assertEquals", "assertNotEqual"} and len(node.args) >= 2 and all(isinstance(arg, ast.Constant) for arg in node.args[:2]):
                 equal = node.args[0].value == node.args[1].value
                 trivial = equal if name != "assertNotEqual" else not equal
@@ -1375,14 +1478,20 @@ def _statement_flow(node, remaining=64):
     """Bounded exits for literal branches; unknown flow retains fallthrough."""
     if remaining <= 0:
         return {"fallthrough", "unknown"}
-    if isinstance(node, ast.Return): return {"return"}
-    if isinstance(node, ast.Raise): return {"raise"}
-    if isinstance(node, (ast.Break, ast.Continue)): return {"loop_exit"}
-    if isinstance(node, ast.Assert) and _constant_truth(node.test) is False: return {"raise"}
+    if isinstance(node, ast.Return):
+        return {"return"}
+    if isinstance(node, ast.Raise):
+        return {"raise"}
+    if isinstance(node, (ast.Break, ast.Continue)):
+        return {"loop_exit"}
+    if isinstance(node, ast.Assert) and _constant_truth(node.test) is False:
+        return {"raise"}
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
         qualified = _qualified_name(node.value.func)
-        if qualified in {"pytest.fail", "self.fail"}: return {"raise"}
-        if qualified in {"pytest.skip", "pytest.xfail", "self.skipTest"}: return {"skip"}
+        if qualified in {"pytest.fail", "self.fail"}:
+            return {"raise"}
+        if qualified in {"pytest.skip", "pytest.xfail", "self.skipTest"}:
+            return {"skip"}
     if isinstance(node, ast.If):
         truth = _constant_truth(node.test)
         left = _suite_flow(node.body, remaining - 1)
@@ -1397,7 +1506,8 @@ def _statement_flow(node, remaining=64):
 def _suite_flow(statements, remaining=64):
     outcomes = {"fallthrough"}
     for statement in statements:
-        if "fallthrough" not in outcomes: break
+        if "fallthrough" not in outcomes:
+            break
         outcomes = (outcomes - {"fallthrough"}) | _statement_flow(statement, remaining)
     return outcomes
 
@@ -1436,7 +1546,8 @@ def _test_structure(node: ast.FunctionDef | ast.AsyncFunctionDef, tree: ast.AST 
         rows = []
         for statement in statements:
             rows.append((statement, dead, suppressed))
-            if "fallthrough" not in _statement_flow(statement): dead = True
+            if "fallthrough" not in _statement_flow(statement):
+                dead = True
         return rows
 
     pending = list(reversed(suite(node.body)))
@@ -1498,9 +1609,11 @@ def _test_structure(node: ast.FunctionDef | ast.AsyncFunctionDef, tree: ast.AST 
                 and any(_qualified_name(arg) in {"AssertionError", "Exception", "BaseException",
                                                    "builtins.AssertionError", "builtins.Exception", "builtins.BaseException"}
                         for arg in item.context_expr.args) for item in child.items)
-            if suppresses and _suite_assertion_present(child.body): result["swallowed"] = True
+            if suppresses and _suite_assertion_present(child.body):
+                result["swallowed"] = True
             pending.extend(reversed(suite(child.body, dead, suppressed or suppresses)))
-            for item in reversed(child.items): pending.append((item.context_expr, dead, suppressed))
+            for item in reversed(child.items):
+                pending.append((item.context_expr, dead, suppressed))
             continue
         pending.extend((descendant, dead, suppressed or trivial) for descendant in reversed(list(ast.iter_child_nodes(child))))
     result["has_assertion"] = bool(result["effective_assertions"]) and not disables_evidence
@@ -1513,7 +1626,8 @@ def _suite_assertion_present(statements):
         child = pending.pop()
         if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
             continue
-        if _assertion_syntax(child)[0]: return True
+        if _assertion_syntax(child)[0]:
+            return True
         pending.extend(ast.iter_child_nodes(child))
     return False
 
@@ -1578,7 +1692,8 @@ def _scan_non_python_test_markers(root, scope, rules):
         if not any(fnmatchcase(relative, pattern) or fnmatchcase(path.name, pattern) for pattern in globs):
             continue
         try:
-            with path.open("rb") as stream: raw = stream.read(_TEST_MARKER_MAX_BYTES + 1)
+            with path.open("rb") as stream:
+                raw = stream.read(_TEST_MARKER_MAX_BYTES + 1)
             if len(raw) > _TEST_MARKER_MAX_BYTES:
                 rows.append({"path": relative, "status": "size_limit"})
                 continue
@@ -1598,7 +1713,10 @@ def _scan_non_python_test_markers(root, scope, rules):
 
 
 def check_test_quality_hygiene(*, root: Path, profile: str, naos_root: str, rules: dict[str, Any], rules_path: str | None, severity: str) -> dict[str, Any]:
-    files, scope, discovery, _ = _hygiene_scope(root, rules, ["tests"], {".py"})
+    prepared_roots = _hygiene_roots(rules, ["tests"])
+    files, scope, discovery, _ = _hygiene_scope(
+        root, rules, ["tests"], {".py"}, prepared_roots=prepared_roots
+    )
     parsed, findings, input_summary, inputs = _parse_python_inputs(files, root, "test_quality_hygiene", severity)
     findings.extend(_scope_findings(discovery, "test_quality_hygiene", severity))
     if any(row["status"] != "missing_root" for row in discovery):
@@ -1712,7 +1830,7 @@ def check_test_quality_hygiene(*, root: Path, profile: str, naos_root: str, rule
             "unassessed_test_files": len(unassessed),
             "discovery_errors": sum(row["status"] != "missing_root" for row in discovery),
         },
-        scans={"assertion_model": "bounded_python_ast_effective_assertion", "scope_basis": "explicit_configured_test_roots", "effective_scan_roots": normalized_list(rules.get("scan_roots"), ["tests"]), "non_python_marker_globs": marker_globs, "non_python_marker_inputs": marker_inputs, "non_python_assertion_coverage": "unassessed", "authorization_model": "not_assessed_compare_pr_diff_and_human_approval", "coverage_status": input_summary["coverage_status"], "input_files": inputs, "unassessed_test_files": unassessed, "discovery_issues": discovery},
+        scans={"assertion_model": "bounded_python_ast_effective_assertion", "scope_basis": "explicit_configured_test_roots", "effective_scan_roots": prepared_roots[0], "non_python_marker_globs": marker_globs, "non_python_marker_inputs": marker_inputs, "non_python_assertion_coverage": "unassessed", "authorization_model": "not_assessed_compare_pr_diff_and_human_approval", "coverage_status": input_summary["coverage_status"], "input_files": inputs, "unassessed_test_files": unassessed, "discovery_issues": discovery},
         known_gaps=[
             *[f"Unassessed test file: {name}." for name in unassessed],
             *[f"Unassessed discovery: {row['path']} ({row['status']})." for row in discovery],
@@ -1750,7 +1868,8 @@ def _parse_requirement_name(line: str) -> str | None:
     cleaned = line.strip()
     if not cleaned or cleaned.startswith("#") or cleaned.startswith(("-", "git+", "http://", "https://")):
         return None
-    cleaned = re.split(r"[<>=!~;\[]", cleaned, maxsplit=1)[0].strip()
+    cleaned = re.split(r"\s+#", cleaned, maxsplit=1)[0].strip()
+    cleaned = re.split(r"[<>=!~;\[@]", cleaned, maxsplit=1)[0].strip()
     return cleaned or None
 
 
@@ -1814,13 +1933,16 @@ def first_party_modules(root: Path, files: list[Path]) -> set[str]:
     declarations, _ = declared_package_roots(root)
     for row in declarations:
         selected = [path for path in files if declared_package_selects(root, path, row)]
-        if not selected:continue
-        if row["name"]:names.add(row["name"].split(".")[0])
+        if not selected:
+            continue
+        if row["name"]:
+            names.add(row["name"].split(".")[0])
         if row["namespace"]:
             depth = len(row["root"].relative_to(root).parts)
             for path in selected:
                 relative = path.relative_to(root).parts[depth:]
-                if relative:names.add(Path(relative[0]).stem)
+                if relative:
+                    names.add(Path(relative[0]).stem)
     return names
 
 

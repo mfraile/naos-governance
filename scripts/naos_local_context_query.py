@@ -9,8 +9,11 @@ import json
 import os
 import re
 import sqlite3
+import stat
 import sys
+import tempfile
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -30,6 +33,7 @@ from naos_policy import (  # noqa: E402
     report_output_path,
     severity_for_profile,
     write_report,
+    write_text_output,
 )
 
 
@@ -211,14 +215,16 @@ def local_context_index_paths(
 ) -> tuple[Path, Path | None]:
     index_report = Path(index_report_arg) if index_report_arg else report_default_path(root, naos_root, policy, "local_context_index_report")
     sqlite_path = Path(sqlite_arg) if sqlite_arg else None
+    sqlite_declared = False
     if sqlite_path is None and index_report.exists():
         try:
             report = read_json_mapping(index_report)
+            sqlite_declared = "sqlite_artifact" in report
             sqlite_value = ((report.get("sqlite_artifact") or {}).get("path") or "")
             sqlite_path = safe_path(sqlite_value)
         except Exception:
             sqlite_path = None
-    if sqlite_path is None:
+    if sqlite_path is None and not sqlite_declared:
         configured = str(policy.get("paths", {}).get("local_context_index_sqlite") or "context_index/local_context_index.sqlite")
         sqlite_path = root / naos_root / configured
     from naos_self_check_inspection import inspection_input_path
@@ -228,6 +234,101 @@ def local_context_index_paths(
 def rows_as_dicts(connection: sqlite3.Connection, query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
     connection.row_factory = sqlite3.Row
     return [dict(row) for row in connection.execute(query, params).fetchall()]
+
+
+def _sqlite_input_state(path: Path):
+    try:
+        info = path.stat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError("SQLite query input is not a regular file")
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink, info.st_size, info.st_mtime_ns)
+
+
+def _copy_sqlite_input(source: Path, destination: Path, expected) -> None:
+    """Stream read-only input into a fresh guarded private snapshot leaf."""
+    from naos_trace_atomic_write import BinaryProducer, publish_trace
+
+    copied = {}
+
+    def produce(stage):
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
+        descriptor = os.open(source, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            def held_state():
+                info = os.fstat(stream.fileno())
+                return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink, info.st_size, info.st_mtime_ns)
+            if held_state() != expected:
+                raise ValueError("SQLite query input changed before snapshot copying")
+            digest, size = hashlib.sha256(), 0
+            while block := stream.read(1024 * 1024):
+                digest.update(block)
+                size += len(block)
+                remaining = memoryview(block)
+                while remaining:
+                    written = stage.write(remaining)
+                    if written is None or written <= 0:
+                        raise OSError("SQLite snapshot write made no progress")
+                    remaining = remaining[written:]
+            if held_state() != expected or size != expected[4]:
+                raise ValueError("SQLite query input changed during snapshot copying")
+        copied.update(size=size, digest=digest.hexdigest())
+
+    def validate(stage):
+        digest, size = hashlib.sha256(), 0
+        while block := stage.read(1024 * 1024):
+            digest.update(block)
+            size += len(block)
+        if size != copied["size"] or digest.hexdigest() != copied["digest"]:
+            raise ValueError("SQLite snapshot differs from its captured input")
+
+    publish_trace(destination, BinaryProducer(produce, validate), None,
+                  strict_parent_topology=True, private_new_file=True, create_only=True,
+                  create_parents=False, search_only_ancestors=True)
+
+
+@contextmanager
+def sqlite_query_connection(path: Path):
+    """Run SQLite recovery only on private copies, never on selected inputs.
+
+    Keep committed WAL and single-database rollback recovery. Super-journal
+    references are refused before SQLite can follow an external filename.
+    Changes observed while copying use the caller's existing advisory fallback;
+    this does not provide a concurrent-filesystem sandbox or a writer lock.
+    """
+    source = path.resolve(strict=True)
+    inputs = {suffix: Path(str(source) + suffix) for suffix in ("", "-journal", "-wal")}
+    expected = {suffix: _sqlite_input_state(value) for suffix, value in inputs.items()}
+    if expected[""] is None:
+        raise FileNotFoundError(path)
+    with tempfile.TemporaryDirectory(prefix="naos-sqlite-query-") as directory:
+        owned = Path(directory).resolve()
+        if os.name == "posix":
+            # Only this newly created private workspace; no input permission or
+            # process umask changes. Snapshot leaves use private_new_file mode.
+            owned.chmod(0o700)
+        database = owned / "index.sqlite"
+        for suffix, selected in inputs.items():
+            # Empty recovery files carry no recovery bytes. SQLite can use the
+            # database without opening them; retain their state recheck below.
+            if expected[suffix] is not None and (not suffix or expected[suffix][4]):
+                _copy_sqlite_input(selected, Path(str(database) + suffix), expected[suffix])
+        if any(_sqlite_input_state(value) != expected[suffix] for suffix, value in inputs.items()):
+            raise ValueError("SQLite query inputs changed while capturing the snapshot")
+        journal = Path(str(database) + "-journal")
+        if journal.exists() and journal.stat().st_size >= 16:
+            with journal.open("rb") as stream:
+                stream.seek(-8, os.SEEK_END)
+                if stream.read(8) == bytes.fromhex("d9d505f920a163d7"):
+                    raise ValueError("SQLite query refuses a super-journal marker requiring external recovery validation")
+        connection = sqlite3.connect(database)
+        try:
+            connection.execute("PRAGMA query_only=ON")
+            connection.execute("PRAGMA temp_store=MEMORY")
+            yield connection
+        finally:
+            connection.close()
 
 
 COLLECTION_COVERAGE_SCOPE = 'configured artifact collection; capacity accounting only'
@@ -260,8 +361,7 @@ def validated_collection_coverage(value: Any, indexed_count: int | None = None) 
 
 
 def load_index_from_sqlite(sqlite_path: Path) -> dict[str, Any]:
-    connection = sqlite3.connect(sqlite_path)
-    try:
+    with sqlite_query_connection(sqlite_path) as connection:
         artifacts = rows_as_dicts(connection, "SELECT * FROM artifacts ORDER BY path, artifact_id")
         chunks = rows_as_dicts(connection, "SELECT * FROM artifact_chunks ORDER BY path, chunk_id")
         links = rows_as_dicts(connection, "SELECT * FROM artifact_links ORDER BY source_path, link_type, reference_id")
@@ -274,8 +374,6 @@ def load_index_from_sqlite(sqlite_path: Path) -> dict[str, Any]:
             rows = rows_as_dicts(connection, "SELECT CASE WHEN length(CAST(coverage_json AS BLOB)) <= 8192 THEN coverage_json END AS coverage_json FROM index_collection_coverage WHERE run_id = ? LIMIT 2", ("current",))
             if len(rows) == 1:
                 coverage = parse_json_text(rows[0]["coverage_json"], None)
-    finally:
-        connection.close()
     for artifact in artifacts:
         artifact["profile_scope"] = parse_json_text(artifact.get("profile_scope"), artifact.get("profile_scope"))
         artifact["limitations"] = parse_json_text(artifact.get("limitations"), [])
@@ -478,6 +576,21 @@ def query_index(
             if artifact_matches_filters(artifact, filters, chunks_by_artifact.get(str(artifact.get("artifact_id")), []))
         ]
 
+    if index_data.get("source") == "report":
+        projections = (
+            ("chunks", "chunk_counts", "local_context_query.json_projection_partial_chunks", bool(args.query or args.report_status)),
+            ("links", "link_counts", "local_context_query.json_projection_partial_links", bool(args.task or args.spec or args.capability)),
+        )
+        for collection, count_key, identifier, needed in projections:
+            counts = index_report.get(count_key)
+            total = counts.get(collection) if isinstance(counts, dict) else None
+            available = len(index_data[collection])
+            if needed and type(total) is int and total > available:
+                findings.append({
+                    "id": identifier, "severity": "advisory", "status": "advisory",
+                    "message": f"JSON fallback contains {available} of {total} indexed {collection} ({total - available} unavailable); this query may miss candidates. Collection capacity coverage is not query completeness. Use the SQLite index or review source files before relying on no results.",
+                })
+
     if args.path:
         used_modes.append("exact_path_lookup")
         normalized = resolve_indexed_path(args.path, {str(item.get("path")) for item in artifacts})
@@ -535,7 +648,7 @@ def query_index(
             try:
                 if sqlite_path is None:
                     raise FileNotFoundError("SQLite path was not resolved")
-                with sqlite3.connect(sqlite_path) as connection:
+                with sqlite_query_connection(sqlite_path) as connection:
                     connection.row_factory = sqlite3.Row
                     rows = [
                         dict(row)
@@ -665,8 +778,7 @@ def write_markdown_if_requested(root: Path, naos_root: str, policy: dict[str, An
         if directory is None:
             return None
         output = directory / f"{report['query']['query_id']}.md"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(markdown_for_report(report), encoding="utf-8")
+    write_text_output(output, markdown_for_report(report))
     return str(output)
 
 
@@ -727,10 +839,11 @@ def build_report(root: Path, naos_root: str, profile: str, policy: dict[str, Any
 
     index_data = {"source": "none", "artifacts": [], "chunks": [], "links": [], "fts_available": False, "tables": []}
     sqlite_available = False
-    if index_available and sqlite_path and sqlite_path.exists():
+    if index_available and sqlite_path:
         try:
-            index_data = load_index_from_sqlite(sqlite_path)
-            sqlite_available = True
+            if sqlite_path.exists():
+                index_data = load_index_from_sqlite(sqlite_path)
+                sqlite_available = True
         except Exception as exc:
             findings.append(
                 {

@@ -25,7 +25,7 @@ source and SHA-256; the version string alone cannot identify it. See
 [Artifact acquisition](#artifact-acquisition). Publication of source changes
 does not replace an existing release asset or qualify a new artifact.
 
-Installing NAOS activates a profile and scaffolds governance files. It does not cause every capability to become mature immediately. Capability maturity depends on project readiness, configuration, validator outputs, evidence freshness, gatekeeper status, and human review. See [docs/CONTROL_PLANE.md](docs/CONTROL_PLANE.md) for the capability/policy/evidence model, [docs/AUDIT_PLAYBOOK.md](docs/AUDIT_PLAYBOOK.md) for deterministic audit checks, and [docs/ASSURED_PROFILE_ACTIVATION.md](docs/ASSURED_PROFILE_ACTIVATION.md) before relying on the `assured` profile.
+Explicitly activating a reviewed NAOS install set copies the selected profile's governance files into the project. Package installation and preview generation do not activate that install set. Activation does not cause every capability to become mature immediately. Capability maturity depends on project readiness, configuration, validator outputs, evidence freshness, gatekeeper status, and human review. See [docs/CONTROL_PLANE.md](docs/CONTROL_PLANE.md) for the capability/policy/evidence model, [docs/AUDIT_PLAYBOOK.md](docs/AUDIT_PLAYBOOK.md) for deterministic audit checks, and [docs/ASSURED_PROFILE_ACTIVATION.md](docs/ASSURED_PROFILE_ACTIVATION.md) before relying on the `assured` profile.
 
 ---
 
@@ -107,6 +107,14 @@ macOS, Ubuntu and Windows 11. Package metadata permits Python ≥ 3.11; managed
 filesystem adapters have the narrower CPython 3.11–3.13 boundary above. Check
 the [operation and host tables](docs/PLATFORM_ADAPTERS.md#reading-platform-support)
 before treating preview or installation success as mutation qualification.
+
+Initialization refuses an unsupported native adapter before activation changes
+with `NOT_APPLIED` and an unchanged-target diagnostic. An external temporary
+preview may already have been generated. Failures after root publication or
+another activation mutation retain `ACTIVATION_FAILED` and recovery guidance.
+The installed source-policy file may have hard-link aliases: policy reads bind
+stable bytes and their digest, while managed destinations retain their strict
+single-link checks. This does not authorize writes through a source alias.
 
 The shared `Makefile.naos` requires GNU Make and a POSIX-compatible recipe shell.
 It is optional for the native Python route. On Windows, opening Git Bash alone
@@ -308,7 +316,7 @@ evidence must separately review its sensitivity and configure retention using
 an approved artifact destination. Local rehearsals do not establish hosted
 execution or retention.
 
-The recommended installation method is `naos-governance init`, which detects your project structure and scaffolds the selected profile:
+The recommended setup command is `naos-governance init`, which detects your project structure and prepares a preview of the selected profile:
 
 ```bash
 # Detection mode — prompts for or uses the selected profile
@@ -328,11 +336,12 @@ naos-governance init . --tier standard
 > its project context manually. See [Minimum Tooling Requirements](#minimum-tooling-requirements)
 > if you are not using an AI coding assistant.
 
-`naos init` does the following:
+`naos init` performs these steps while preparing the preview. Only an explicit,
+supported `--activate` call copies the install set into the project:
 
 1. Analyses the project (language, frameworks, existing governance files)
 2. Uses your explicit profile tier, or prompts you to choose one
-3. Copies the selected profile's prevalidated derived `.ai/RULES.md` to your repository
+3. Copies the selected profile's prevalidated derived rules into the preview at `.ai/RULES.md`
 4. Scaffolds the instruction triple (`CLAUDE.md`, `.github/copilot-instructions.md`, `.github/project-context.md`)
 5. Writes the optional git-hook file (`.githooks/pre-commit`) without changing
    `core.hooksPath` or activating the hook
@@ -408,7 +417,7 @@ Before preparing an implementation-ready planning decision, run the spec-pack ch
 
 Write planning-baseline versions as positive YAML integers. Invalid version types produce schema findings before lineage evaluation; `--strict` makes invalid planning evidence fail the command. Alignment Markdown accepts UTF-8 with or without a leading byte-order mark on all supported OSs; keep each YAML frontmatter delimiter on its own `---` line.
 
-To preview or repair missing profile-required spec templates, run `naos spec-pack-materialize . --profile <profile> --dry-run` or `make -f Makefile.naos naos-spec-pack-materialize` to write `naos/reports/spec_pack_materialization.json` when that adopter report path is configured; kit-repository and other no-output runs return stdout evidence only. Remove `--dry-run` only when you intend to copy missing template files; existing regular files are skipped unless `--force` is explicit. The command validates the manifest schema/profile graph/path inventory and the complete selected source/destination plan, then checks a requested report sink for symlinked in-project ancestors, regular single-link leaf type, and basic writability. It does not cross-check `files[].required_profiles` metadata against every profile-list membership. It blocks without changing spec files when a manifest is invalid, a source is missing or unsafe, a report sink is unsafe or unwritable, a destination escapes the project/is a symbolic link/is not a regular file, or the runtime is outside native macOS/Linux/Windows with CPython 3.11–3.13. `--force` does not bypass those checks. Each leaf uses a same-directory temporary before POSIX link, Windows no-clobber rename, or explicit replacement. Windows junctions and other reparse points are refused; source read-only attributes are retained, destination ACLs are inherited, and an existing read-only destination is not made writable for `--force`. The multi-file operation is sequential and has no rollback, and a runtime filesystem, post-install cleanup, or late report-write failure can occur after the current or earlier files were copied. A target installed before cleanup failure remains counted as copied with a blocking residue finding; a late report failure returns blocked stdout evidence showing the completed copies. This bounded operation does not apply a profile transition. For brownfield adoption, run `naos spec-assembly-worksheet . --profile <profile>` or `make -f Makefile.naos naos-spec-assembly-worksheet` to write `naos/reports/spec_assembly_worksheet.json`, which maps adoption evidence, candidate requirements, and traceability gaps to manifest-declared spec files for human review. These reports do not fill specs, promote candidate requirements, prove applicability, approve requirements, or prove complete traceability.
+To preview or repair missing profile-required spec templates, run `naos spec-pack-materialize . --profile <profile> --dry-run` or `make -f Makefile.naos naos-spec-pack-materialize` to write `naos/reports/spec_pack_materialization.json` when that adopter report path is configured; kit-repository and other no-output runs return stdout evidence only. Remove `--dry-run` only when you intend to copy missing template files; existing regular files are skipped; explicit `--force` refuses any selected existing target before copying. The command validates the manifest schema/profile graph/path inventory and the complete selected source/destination plan, then checks a requested report sink for symlinked in-project ancestors, regular single-link leaf type, and basic writability. It does not cross-check `files[].required_profiles` metadata against every profile-list membership. It blocks without changing spec files when a manifest is invalid, a source is missing or unsafe, a report sink is unsafe or unwritable, a destination escapes the project/is a symbolic link/is not a regular file, or the runtime is outside native macOS/Linux/Windows with CPython 3.11–3.13. `--force` does not bypass those checks or permit replacement. Each absent final leaf is created exclusively beneath a held parent and streamed through its file handle, so it is visible while being written. Windows junctions and other reparse points are refused; source read-only attributes are retained and destination ACLs are inherited. The multi-file operation is sequential and has no rollback: a runtime failure may leave a partial target, which is reported with its selected path and identity state, and earlier copies remain. A hidden per-target status marker is created before each copy and marked complete after verification. If a marked partial target exists, a rerun refuses before copying; review and remove the partial file and its marker together before retrying. Existing completed files remain skipped, and a deleted completed file can be copied again if its marker can be reopened for writing. A restrictive permission mask may refuse that retry while leaving the target absent and the marker untouched. The marker is a recovery cue, not an integrity attestation or crash-consistency guarantee. A late report failure returns blocked stdout evidence showing completed copies. Historical overwrite and temporary-cleanup report fields remain for compatibility but are zero in new create-only runs. This bounded operation does not apply a profile transition. For brownfield adoption, run `naos spec-assembly-worksheet . --profile <profile>` or `make -f Makefile.naos naos-spec-assembly-worksheet` to write `naos/reports/spec_assembly_worksheet.json`, which maps adoption evidence, candidate requirements, and traceability gaps to manifest-declared spec files for human review. These reports do not fill specs, promote candidate requirements, prove applicability, approve requirements, or prove complete traceability.
 
 NAOS also evaluates deterministic spec-cascade coherence across requirements, task registry entries, source headers, and configured source roots. Run `naos spec-cascade --profile <profile>` or `make -f Makefile.naos naos-spec-cascade` to write `naos/reports/spec_cascade_coherence.json`. The report flags structural findings such as orphan headers, stale status links, uncovered requirements, overloaded FRs, and untraced source; it does not prove complete traceability, code correctness, runtime behavior, approval, certification, or compliance.
 
@@ -564,6 +573,13 @@ When attestation is explicitly disabled or not configured, a matching no-payload
 envelope report is `not_applicable`; it establishes no integrity or signature
 success. Disabling attestation does not make an existing payload valid.
 
+Both commands omit the Git author email by default and mask that known address
+where it appears in author/signer display text. Use `--include-author-email`
+explicitly when those reports should contain the original author metadata.
+This option changes report metadata only, outside the signable payload. It does
+not validate signatures or scrub old reports, and other addresses in arbitrary
+Git display text may remain. Review stored metadata before sharing evidence.
+
 An unsupported-input finding declares `confirmed` provenance only for the
 observed parser coverage limitation, with its input path. It does not confirm
 that input's assertions or resolve any conflicting review outcomes. The
@@ -620,8 +636,11 @@ Derived output is used by a consumer only when explicitly selected with
 `summary.effective_policy_written` is true only after a successful write in that
 invocation. A rejected merge, stale target, dry-run, or failed write leaves it
 false. Dry-run does not resolve the unused effective target; requested unsafe or
-unwritable targets produce a structured finding. YAML output retains its direct
-write semantics and does not claim interruption recovery.
+unwritable targets produce a structured finding. YAML output uses the shared
+staged publisher. Failed unpublished POSIX stages remain for manual review;
+a directory-sync failure after publication reports an error while preserving
+the complete published file. This does not guarantee interruption recovery or
+power-loss durability.
 
 Policy overlays are bounded:
 
@@ -676,13 +695,38 @@ Run `naos grader-assessment --mode audit --profile <profile>` or `make -f Makefi
 
 Run `naos model-policy --profile <profile>` or `make -f Makefile.naos naos-model-policy` to write `naos/reports/model_provider_policy.json`. This reviews local declarations in `naos/model_provider_policy.yaml`, optional `naos_model_role` frontmatter, and future-readiness references for model roles, provider kind, alias posture, obvious literal secret-like values, data-exposure posture, and disabled runtime posture. It does not call providers, start local models, validate credentials, recommend models, maintain provider catalogs, route runtime calls, approve work, certify controls, prove compliance, or activate LLMGrader/autoresearch/semantic behavior.
 
+### Optional setup-module plans
+
+The recipes below show the separate review/apply route for completed portable
+v3 projects. In that route, `naos add`, including `--confirm`, only prepares a
+review; exit `0` does not mean the files were installed. An eligible legacy
+create-only project may still use direct `--confirm` after its dry-run review.
+Do not assume that legacy behavior applies to a completed v3 project.
+
+For each recipe, replace `EXTERNAL_PLAN` with a new file outside the project,
+under an existing directory; the file must not already exist. Quote paths that
+contain spaces. Review the saved plan and stop if it is blocked. Compute the
+SHA-256 of the complete saved file without editing or reformatting it:
+
+```bash
+python -c "import hashlib,pathlib,sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())" EXTERNAL_PLAN
+```
+
+Replace `REVIEWED_SHA256` with that exact lowercase digest in the separate
+`naos upgrade --apply-plan` command. Check the expected installed paths before
+running the module's report commands. An unchanged or previously completed plan
+is not proof that current files are unchanged. Use the recorded project profile;
+substitute `assured` for `standard` when that is the recorded profile.
+
 The agent sponsor registry is not installed by any default profile. Standard and
 Assured adopters that have an owner-reviewed need for per-agent build-time
-sponsor declarations can preview and explicitly confirm it:
+sponsor declarations can preview it, then review and apply its explicit plan:
 
 ```bash
 naos add setup-module agent_sponsor_registry --profile standard --dry-run
-naos add setup-module agent_sponsor_registry --profile standard --confirm
+naos add setup-module agent_sponsor_registry --profile standard --confirm --plan-out EXTERNAL_PLAN
+# Review the saved plan and compute its complete-file SHA-256 as described above
+naos upgrade . --apply-plan EXTERNAL_PLAN --expect-plan-digest REVIEWED_SHA256
 naos agent-sponsor-registry --profile standard
 naos control-plane-review --profile standard
 ```
@@ -705,7 +749,9 @@ decision to use assessor-supplied AIVSS-Agentic v0.8 arithmetic:
 
 ```bash
 naos add setup-module aivss_arithmetic_verification --profile standard --dry-run
-naos add setup-module aivss_arithmetic_verification --profile standard --confirm
+naos add setup-module aivss_arithmetic_verification --profile standard --confirm --plan-out EXTERNAL_PLAN
+# Review the saved plan and compute its complete-file SHA-256 as described above
+naos upgrade . --apply-plan EXTERNAL_PLAN --expect-plan-digest REVIEWED_SHA256
 naos aivss-verify --profile standard
 naos control-plane-review --profile standard
 ```
@@ -1244,27 +1290,31 @@ See [docs/ENGRAM_SETUP.md](docs/ENGRAM_SETUP.md) for the full local, optional-to
 
 ## Progressive Enhancement via `naos add`
 
-After the initial `naos init`, use `naos add` to deploy additional governance artifacts
+After the initial `naos init`, use `naos add` to select and plan additional governance artifacts
 (instructions, agents, specs, skills, and explicit setup modules) one at a time as your project needs them.
+Completed portable v3 projects remain plan-only, including with `--confirm`: save
+one exact request with `--plan-out`, review it, then apply through the separate
+digest-bound `naos upgrade` command. Eligible legacy create-only requests retain
+their direct-add behavior. The examples below preview selections first.
 
 ```bash
 # List all available artifacts not yet deployed in this project
 naos add --list
 
-# Add an instruction file
-naos add instruction database
-naos add instruction graph-database
+# Preview an instruction request
+naos add instruction database --dry-run
+naos add instruction graph-database --dry-run
 
-# Add an agent definition
-naos add agent naos-research
+# Preview an agent request
+naos add agent naos-research --dry-run
 
-# Add a profile-conditional spec file
-naos add spec 05
+# Preview a profile-conditional spec request
+naos add spec 05 --dry-run
 
-# Add a skill
-naos add skill cognitive-checkpoint
+# Preview a skill request
+naos add skill cognitive-checkpoint --dry-run
 
-# Review and apply explicit setup-module actions
+# List and preview explicit setup-module actions
 naos add setup-module --list
 naos add setup-module read_only_ci_readiness --profile lite --dry-run
 naos add setup-module deterministic_conformance_review --profile lite --dry-run
@@ -1275,10 +1325,17 @@ naos add instruction graph-database --dry-run
 # Blanket replacement is deliberately refused
 naos add instruction database --force
 
-# An eligible proven kit-owned collision uses an external immutable plan
-naos add instruction database --plan-out /tmp/database-plan.json
-naos upgrade . --apply-plan /tmp/database-plan.json --expect-plan-digest SHA256
+# Completed portable v3 only: save one exact request for review
+# Choose a new external file and review/hash it as in Optional setup-module plans
+naos add instruction database --plan-out EXTERNAL_PLAN
+naos upgrade . --apply-plan EXTERNAL_PLAN --expect-plan-digest REVIEWED_SHA256
 ```
+
+Legacy content-aware collision plans also require an external plan and separate
+central apply, but retain their original digest rules: use the reviewed plan's
+embedded `plan_sha256` on POSIX, or embedded `digest_sha256` on Windows.
+The complete-file hash recipe above is for portable v3 plans; do not substitute
+it for a legacy plan's embedded digest.
 
 A new skill add plans its exact legacy `.github/skills/<name>/` tree together
 with `.agents/skills/naos-portable-<name>/`, the Claude command wrapper at
@@ -1367,7 +1424,7 @@ loading, and feature support vary and require client-specific verification.
 | Governance files (RULES.md, instructions) | Any text editor | AI can consume the guidance; human review remains necessary |
 | `naos init` scaffolding | Python ≥ 3.11 | Same |
 | `naos add` progressive deployment | Python ≥ 3.11 | Same |
-| `/naos-design` spec elicitation | **AI coding assistant required** | Full PM-quality elicitation |
+| `/naos-design` spec elicitation | **AI coding assistant required** | Profile-aware spec elicitation; human review required |
 | `/naos-specify` FR/NFR generation | **AI coding assistant required** | Structured requirement IDs |
 | `@naos-plan` task breakdown | **AI coding assistant required** | Story cards + WI decomposition |
 | Session lifecycle hook templates | Claude Code only | Optional templates; NAOS does not activate or prove host hook behavior |
@@ -1377,10 +1434,10 @@ loading, and feature support vary and require client-specific verification.
 
 If you are not using an AI coding assistant (e.g., setting up governance for a team member):
 
-1. Run `naos-governance init --new` with Lite, Standard, or Assured to scaffold that profile's spec files. Quickstart intentionally creates no spec pack.
+1. Run `naos-governance init --new` with Lite, Standard, or Assured to prepare a preview of that profile's spec files. Review the preview before explicit activation. Quickstart intentionally creates no spec pack.
 2. For Lite and above, open each generated spec file — unfinished sections use `[ADAPT: ...]` markers. Keep unsupported mappings visibly unresolved and the document Draft until the necessary decisions and filled checks exist.
 3. Fill those markers manually using the generated spec files as structured templates; for Quickstart, maintain the applicable project context directly.
-4. The generated hook behaves consistently across tools when the adopter activates it. `RULES.md` supplies policy/human-review posture; only installed, configured consumers enforce executable checks.
+4. Review and integrate the generated Git hook explicitly, then verify its execution in the selected Git environment. `RULES.md` supplies policy/human-review posture; only installed, configured consumers enforce executable checks.
 
 > **Design intent**: The governance layer (**RULES.md**, instruction files, agent definitions)
 > is fully independent of AI tooling. You get value from the structural constraints even
@@ -1628,19 +1685,25 @@ This prevents a per-response event from writing lifecycle end records. No hook
 settings are edited automatically.
 
 The per-tool gate-status and self-check reviews remain separately selectable
-entries in this optional manual merge. They retain report writes on each
-matched tool event and can add repeated work. Review which entries to select
-and their cost; run the same checks manually when not selected. This does not
-waive manual governance duties or claim measured hook performance.
+entries in this optional manual merge and can add repeated work. Gate-status
+can publish its configured report; self-check performs live inspection without
+publishing project reports. Run self-check manually with `--output` or
+`--refresh` when evidence must be retained. Review which entries to select and
+their cost; run the same checks manually when not selected. This does not waive
+manual governance duties or claim measured hook performance.
 
 ### Installing Hook Templates
+
+For completed v3 projects, follow the [setup-module review/apply steps](#optional-setup-module-plans).
 
 ```bash
 # Preview adopter-local hook templates without writing
 naos add setup-module claude_code_hooks --profile standard --dry-run
 
-# Copy templates under naos/integrations/ after review
-naos add setup-module claude_code_hooks --profile standard --confirm
+# Save a new external plan, then apply only the reviewed exact file
+naos add setup-module claude_code_hooks --profile standard --confirm --plan-out EXTERNAL_PLAN
+# Review the saved plan and compute its complete-file SHA-256 as described above
+naos upgrade . --apply-plan EXTERNAL_PLAN --expect-plan-digest REVIEWED_SHA256
 ```
 
 The setup module copies templates only. It does not overwrite
@@ -1872,10 +1935,13 @@ plugins/naos-governance/
 ```
 
 Use the optional adapter setup-module only to copy project-local guidance:
+For completed v3 projects, follow the [setup-module review/apply steps](#optional-setup-module-plans).
 
 ```bash
 naos add setup-module codex_plugin_adapter --profile standard --dry-run
-naos add setup-module codex_plugin_adapter --profile standard
+naos add setup-module codex_plugin_adapter --profile standard --confirm --plan-out EXTERNAL_PLAN
+# Review the saved plan and compute its complete-file SHA-256 as described above
+naos upgrade . --apply-plan EXTERNAL_PLAN --expect-plan-digest REVIEWED_SHA256
 naos adapter-coherence --profile standard
 ```
 
@@ -1908,7 +1974,9 @@ Use the optional adapter setup-module only to copy project-local guidance:
 
 ```bash
 naos add setup-module claude_code_plugin_adapter --profile standard --dry-run
-naos add setup-module claude_code_plugin_adapter --profile standard
+naos add setup-module claude_code_plugin_adapter --profile standard --confirm --plan-out EXTERNAL_PLAN
+# Review the saved plan and compute its complete-file SHA-256 as described above
+naos upgrade . --apply-plan EXTERNAL_PLAN --expect-plan-digest REVIEWED_SHA256
 naos adapter-coherence --profile standard
 ```
 
@@ -1976,6 +2044,15 @@ An optional `--output` report must be outside TARGET. Temporary files are remove
 when validation exits normally; process termination can leave temporary residue.
 
 ### Local context collection capacity
+
+JSON index reports retain at most 200 chunks and 200 links. When a JSON-backed
+query needs a truncated collection, its advisory findings state the available,
+total and unavailable counts where valid parent totals exist. Exact-path lookup
+uses the complete indexed artifact metadata and does not inherit the chunk cap.
+The SQLite index avoids this JSON preview limit; configured collection, file,
+chunking and privacy bounds still apply. Use `naos context-index` to build SQLite,
+or review source files directly before relying on an empty result. Historical
+reports without valid parent totals cannot establish the omitted count.
 
 `context-index` retains the configured artifact bound (500 by default) and existing lexical path order. Optional `collection_coverage` v1 metadata distinguishes capacity-deferred paths from other exclusion records. Capacity omissions produce an explicit policy finding and advisory or human-review posture; they are not content-read or privacy-checked files. JSON reports and atomically published SQLite metadata retain this coverage; query results and task-pack context expose it. Legacy SQLite indexes remain readable with unknown coverage until rebuilt. Complete-within-configured-bounds means no capacity omission in that run, never complete discovery, relevance or repository assurance. Review omitted paths directly before relying on a no-result query.
 

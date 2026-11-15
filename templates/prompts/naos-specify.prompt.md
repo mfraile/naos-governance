@@ -50,14 +50,14 @@ Before writing the spec, gather evidence:
 Produce a complete section using this EXACT structure. Every subsection is **mandatory**.
 
 ```markdown
-## [FR|NFR]-XXX: [Concise Title]
+### [FR|NFR]-XXX: [Concise Title]
 
 **Priority**: P[0|1|2] ([Critical|High|Enhancement])
 **Status**: 📋 SPECIFIED
 **System Scope**: [ADAPT: your scope tags]
 **Dependencies**: [List dependent FR/NFR IDs]
 
-### User Story (Spec-Kit Enhanced)
+#### User Story (Spec-Kit Enhanced)
 
 **As a** [specific role at a specific type of organization]
 **I want** [concrete capability with measurable attributes]
@@ -67,7 +67,7 @@ Produce a complete section using this EXACT structure. Every subsection is **man
 
 **Independent Test**: [One sentence describing how to verify this in isolation]
 
-### Acceptance Scenarios (Given/When/Then)
+#### Acceptance Scenarios (Given/When/Then)
 
 **Scenario 1: [Happy Path Name]**
 - **Given** [precondition]
@@ -82,7 +82,7 @@ Produce a complete section using this EXACT structure. Every subsection is **man
 
 [Add 2-4 scenarios covering: happy path, edge case, failure mode, security]
 
-### Acceptance Criteria (Checklist)
+#### Acceptance Criteria (Checklist)
 
 **MUST HAVE (P0):**
 - [ ] [Criterion 1 — measurable, testable]
@@ -94,7 +94,7 @@ Produce a complete section using this EXACT structure. Every subsection is **man
 **NICE TO HAVE (P2):**
 - [ ] [Criterion 4]
 
-### Technical Specifications
+#### Technical Specifications
 
 ```yaml
 [component_name]:
@@ -103,7 +103,7 @@ Produce a complete section using this EXACT structure. Every subsection is **man
   [integration points]
 ```
 
-### Systemic Impacts (Coherence Analysis)
+#### Systemic Impacts (Coherence Analysis)
 
 **Upstream Impacts** (How other docs influence this FR):
 - **01-problem.md**: [Which pain point does this address?]
@@ -117,7 +117,7 @@ Produce a complete section using this EXACT structure. Every subsection is **man
 **Horizontal Impacts** (Peer FRs):
 - **FR-XXX**: [Dependency or interaction description]
 
-### Traceability
+#### Traceability
 
 **ARCH Components**: [ARCH-X, ARCH-Y from specs/04-architecture.md]
 

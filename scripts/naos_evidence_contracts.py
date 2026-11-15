@@ -375,7 +375,7 @@ def _control_plane_declaration_state(root: Path, naos_root: str, policy: dict[st
         # The producer reviews repo-local OpenCode surfaces even when its
         # declaration is disabled. Never follow a link or reparse point while
         # detecting selected files, even if the producer would visit it.
-        surfaces = ("AGENTS.md", "opencode.json", "opencode.jsonc",
+        surfaces = ("opencode.json", "opencode.jsonc",
                     ".opencode/config.yaml", ".opencode/config.yml")
         found_surface = False
         for item in surfaces:
@@ -390,6 +390,28 @@ def _control_plane_declaration_state(root: Path, naos_root: str, policy: dict[st
                 return "invalid"
             if selected:
                 found_surface = True
+        # The producer includes shared AGENTS.md only after an OpenCode-specific
+        # surface or local .opencode directory establishes scope.
+        directory = root / ".opencode"
+        directory_state = _safe_file(root, directory)
+        has_directory = False
+        if directory_state == "not_regular_file":
+            try:
+                metadata = directory.lstat()
+            except OSError:
+                return "invalid"
+            if (not stat.S_ISDIR(metadata.st_mode)
+                    or getattr(metadata, "st_file_attributes", 0) & _REPARSE_ATTRIBUTE):
+                return "invalid"
+            has_directory = True
+        elif directory_state != "missing":
+            return "invalid"
+        if found_surface or has_directory:
+            state = _safe_file(root, root / "AGENTS.md")
+            if state == "available":
+                found_surface = True
+            elif state != "missing":
+                return "invalid"
         if found_surface:
             return "active"
     return "active" if declared_enabled else "inactive"
@@ -948,13 +970,18 @@ def _classify_one(
                         result["human_review_required"] = True
         if (optional_disabled and result["producer_outcome"] == "not_run"
                 and (status in {"disabled", "not_run"}
-                     or (consumer == "control_plane" and descriptor.key in {"design_traceability", "ui_experience_quality", "failure_mode_posture", "failure_mode_observations"}
+                     or (consumer == "control_plane" and descriptor.key in {"design_traceability", "ui_experience_quality", "failure_mode_posture", "failure_mode_observations", "opencode_config_hygiene"}
                          and status == "not_configured" and report.get("enabled") is False
                          and (descriptor.key != "design_traceability" or report.get("object_identity_declared") is False)
+                         and (descriptor.key != "opencode_config_hygiene" or report.get("opencode_config_declared") is False)
+                         and (descriptor.key != "failure_mode_posture" or report.get("declared_authority_attempts") == [])
                          and report.get("runtime_enabled") is False
                          and report.get("human_review_required") is False))
                 and result["scope"] == "matched"
-                and not adverse_findings and not review_findings):
+                and not adverse_findings and not review_findings
+                and _inactive_control_plane_report_matches(
+                    descriptor.key, report, root=root, profile=profile,
+                    naos_root=naos_root, policy=policy, consumer=consumer)):
             result.update(applicability="not_applicable", applicability_reason="optional_producer_disabled",
                           applicability_source="current_local_rules", freshness="not_applicable",
                           producer_outcome="not_applicable", requirement_outcome="not_applicable")
@@ -2272,6 +2299,22 @@ def reproduce_control_plane_source(key: str, *, root: Path, profile: str,
     if key == "failure_mode_observations":
         arguments["output_path"] = report_default_path(root, naos_root, policy, descriptor.output_key)
     return producer.build_report(**arguments)
+
+
+def _inactive_control_plane_report_matches(
+    key: str, report: dict[str, Any], *, root: Path, profile: str,
+    naos_root: str, policy: dict[str, Any], consumer: str,
+) -> bool:
+    """Do not exempt a present inactive report from its current local inputs."""
+    if consumer != "control_plane" or key not in {"failure_mode_posture", "opencode_config_hygiene"}:
+        return True
+    try:
+        current = reproduce_control_plane_source(
+            key, root=root, profile=profile, naos_root=naos_root, policy=policy,
+        )
+        return _control_plane_projection(report) == _control_plane_projection(current)
+    except (OSError, UnicodeError, ValueError, TypeError, KeyError, yaml.YAMLError):
+        return False
 
 
 def _control_plane_projection(report: dict[str, Any]) -> dict[str, Any]:

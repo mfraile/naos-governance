@@ -208,7 +208,7 @@ class GeneratedHookSnapshotTests(unittest.TestCase):
     def test_actual_generated_hooks_commit_the_valid_snapshot_only(self):
         for profile in ("standard", "assured"):
             with self.subTest(profile=profile), tempfile.TemporaryDirectory(prefix="naos-hooks-") as tmp:
-                base = Path(tmp)
+                base = Path(tmp).resolve()
                 seed = base / "preview"
                 result = run(base, sys.executable, KIT / "cli.py", "init", base / "absent",
                              "--new", "--tier", profile, "--archetype", "custom",

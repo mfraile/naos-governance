@@ -309,9 +309,9 @@ def _read_source_policy_bytes(path: Path) -> bytes:
     descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     try:
         before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink < 1:
             raise ContentPlanningError(
-                "Managed-content source policy is not a unique regular file."
+                "Managed-content source policy is not a regular file."
             )
         chunks: list[bytes] = []
         while True:

@@ -311,7 +311,7 @@ implementation, close tasks, merge results, release, or publish.
 
 ```mermaid
 flowchart LR
-    A["Absent project path"] --> B["naos init PATH --new --tier standard\nactivate scaffold"]
+    A["Absent project path"] --> B["naos init PATH --new --tier standard --activate"]
     B --> C["naos preflight"]
     C --> D["naos intake"]
     D --> E["naos install-plan"]
@@ -321,7 +321,14 @@ flowchart LR
     H --> I["@naos-plan"]
 ```
 
-- **Install vs adopt vs activate:** `init` puts NAOS files/CLI wrappers in the project; intake/preflight/install-plan *understand and plan* the project; `--activate` and explicit setup modules *enable* controls; prompts/agents/validators *operate* during delivery.
+**Activation:** create-only activation after preview review.
+
+- **Install, adopt and activate:** `init` prepares a preview; explicit
+  `init --activate` copies its generated install set into the project.
+  Intake/preflight/install-plan record project inputs and setup-planning evidence.
+  Confirmed setup-module installation adds selected files; control readiness
+  still depends on configuration, evidence and human review. Prompts, agents and
+  validators support the delivery workflow.
 - **Human checkpoint:** review the install plan and decision record before treating setup as complete.
 - **Cross-platform checkout:** review and commit the generated `.gitattributes` with the scaffold. Resolve reported LF-policy gaps in your Git rules; NAOS preserves existing or locally modified attributes and does not renormalize files or recorded hashes.
 - **Completed-card integrity:** new history digests declare `canonicalization: crlf-to-lf-v1`; only CRLF pairs become LF for hashing. Archived bytes and exact task ownership are preserved. Historical unmarked digests remain raw-byte hashes: restore only an original or reconstructed candidate whose raw SHA-256 exactly matches the recorded value. Never relabel or recompute a historical digest to accept changed content. Review checkout rules for future `completed/*.md` cards; path-specific `-text -filter -ident -working-tree-encoding` preserves historical raw bytes, while an LF rule is safe only when it already matches those bytes. Preserve existing adopter attributes and review effective Git overrides before cross-host checkout. No automatic historical migration or restoration is performed.
@@ -865,7 +872,7 @@ Plural `Implements`, `Tasks`, and `Specs` labels are intentional. Multiple IDs a
 
 ### Optional Semantic / Similarity Layer
 
-Core NAOS is deterministic, file-first, portable, and has no semantic model dependency. Optional semantic/similarity support is project-configured, disabled by default, provider-neutral, and evidence-backed (e.g. `sentence-transformers/all-mpnet-base-v2` only when a project explicitly enables it). The generic kit does not require embeddings, GPU, or semantic duplicate detection by default; semantic candidates are advisory inputs for human review, not authority.
+Core NAOS is deterministic, file-first, portable, and has no semantic model dependency. Optional function-search embeddings require the current project to explicitly enable `local_sentence_transformers` and select a model. Queries use embeddings only when the saved index matches that provider, model and device configuration. This function-search runtime is separate from the readiness-only `semantic-candidates` report. The generic kit does not require embeddings, GPU, or semantic duplicate detection by default; similarity results are advisory inputs for human review, not authority.
 
 ---
 
@@ -955,7 +962,7 @@ artifact qualification limits are recorded in the platform documentation.
 | `naos preflight` | Inspect readiness before adoption | `preflight_report.json` | Does not approve setup |
 | `naos intake` | Capture adopter answers | `intake_report.json` | Unknowns remain unknown |
 | `naos install-plan` | Plan adoption/install choices | `install_plan.json` | Does not install automatically |
-| `naos adopt . --mode greenfield\|brownfield --dry-run` | Orchestrate adoption evidence | report artifacts | Requires secure directory-descriptor writes; otherwise fails closed before report creation |
+| `naos adopt . --mode greenfield\|brownfield --dry-run` | Orchestrate adoption evidence | report artifacts | Uses supported POSIX anchored or native Windows strict report writes; unsafe paths/metadata refuse |
 | `naos adopt . --mode greenfield\|brownfield --no-write-preview` | Preview adoption without side effects | nothing | No report or activation writes |
 | `naos add setup-module profile_baseline --dry-run` | Plan an explicit optional module using the recorded project profile | legacy direct apply creates selected absent files; v3 is plan-only | An explicit profile mismatch is refused. Kit-required gates/confirmation cannot be removed by the project catalogue; stricter project checks also apply. Eligible kit-owned collisions require `--plan-out` and central digest-bound apply |
 
@@ -1108,7 +1115,7 @@ A reduced map of the files you touch most. The complete generated-report authori
 | AC completion evidence | `naos/reports/ac_completion_evidence.json` | Generated | `naos ac-completion-evidence` |
 | Harness trace import | `naos/reports/harness_trace_import.json` | Generated | `naos harness-trace-import` |
 | API symbol reality | `naos/reports/api_symbol_reality.json` | Generated | `naos api-symbol-reality` |
-| Capabilities | `naos/capability_state.yaml`, `capabilities/*.yaml` | Manual / adopter declaration | Human/project governance owner |
+| Capabilities | `naos/capability_state.yaml` (all profiles), `naos/capabilities/*.yaml` (Lite+) | Manual / adopter declaration | Human/project governance owner |
 | Governance config | `naos/gatekeepers.yaml`, `naos/maturity_levels.yaml`, policy/rules YAML | Manual / adopter configuration | Human/project governance owner |
 | Evidence | `naos/reports/*.json`, `naos/evidence/evidence_pack.json` | Generated | Validators and CLI/Make wrappers |
 | Review | `naos/control_plane_review_items.yaml`, `naos/reports/control_plane_review.json` | Items manual / report generated | Human declares items; command generates report |
@@ -1142,10 +1149,15 @@ remain project-local; invalid/link inputs fail instead of triggering fallback.
 Kit provenance is labeled `kit://` and hashed.
 
 Spec materialization implements native macOS, Ubuntu and Windows leaf copying
-with CPython 3.11–3.13. Preview first; apply skips existing files unless
-`--force` is explicit. Symlinks and Windows reparse points are refused. Windows
-read-only destinations are not made writable. Multi-file copying is sequential
-and has no rollback; inspect blocked stdout/report evidence before retry.
+with CPython 3.11–3.13. Preview first; apply copies missing files and skips existing
+regular files. Explicit `--force` refuses a selected existing target before any
+copy; it does not permit replacement. Symlinks and Windows reparse points are
+refused. Windows read-only destinations are not made writable. Multi-file copying
+is sequential and has no rollback; earlier successful copies remain after a
+failure. A failed copy may leave a partial target and its hidden status marker.
+A rerun refuses an unfinished marked target. Review the partial file and its
+marker together before cleanup and retry. Inspect blocked stdout/report evidence;
+the marker is a recovery cue, not an integrity attestation.
 
 ### AI inventory and behavioral fingerprint coverage
 
@@ -1448,8 +1460,11 @@ Derived output is used by a consumer only when explicitly selected with
 `summary.effective_policy_written` is true only after a successful write in that
 invocation. A rejected merge, stale target, dry-run, or failed write leaves it
 false. Dry-run does not resolve the unused effective target; requested unsafe or
-unwritable targets produce a structured finding. YAML output retains its direct
-write semantics and does not claim interruption recovery.
+unwritable targets produce a structured finding. YAML output uses the shared
+staged publisher. Failed unpublished POSIX stages remain for manual review;
+a directory-sync failure after publication reports an error while preserving
+the complete published file. This does not guarantee interruption recovery or
+power-loss durability.
 
 ### Add request applicability
 

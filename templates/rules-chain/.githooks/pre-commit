@@ -28,8 +28,9 @@ set -euo pipefail
 #  ASSURED — conditional hard checks when corresponding files/scripts exist:
 #   architecture coherence, Mermaid syntax, metrics coherence, and task coherence.
 #
-# Profile tiers are controlled by NAOS_TIER: quickstart | lite (default) |
-# standard | assured. The code below is authoritative for exact warning/failure
+# Profile tiers are controlled by NAOS_TIER: quickstart | lite | standard |
+# assured. See the NAOS_TIER assignment below for this hook's default.
+# The code below is authoritative for exact warning/failure
 # behavior; RULES posture counts are not executable-check counts.
 # ============================================================================
 
@@ -197,7 +198,14 @@ if [ "$NAOS_TIER" = "standard" ] || [ "$NAOS_TIER" = "assured" ]; then
   if command -v ruff >/dev/null 2>&1; then
     PY_STAGED=$(echo "$STAGED_FILES" | grep '\.py$' || true)
     if [ -n "$PY_STAGED" ]; then
-      if echo "$PY_STAGED" | xargs ruff check --quiet; then
+      run_staged_ruff() {
+        if [ -f scripts/naos_staged_python.py ]; then
+          "$PYTHON_CMD" scripts/naos_staged_python.py --ruff
+        else
+          echo "$PY_STAGED" | xargs ruff check --quiet
+        fi
+      }
+      if run_staged_ruff; then
         :
       else
         CHECK_STATUS=$?
@@ -237,19 +245,15 @@ if [ "$NAOS_TIER" = "standard" ] || [ "$NAOS_TIER" = "assured" ]; then
   # enforcement_level: soft
   echo "  - Spec alignment gate (traceability headers)..."
   NEW_PY=$(echo "$STAGED_FILES" | grep '\.py$' || true)
-  if [ -n "$NEW_PY" ]; then
-    MISSING_HEADERS=""
-    while IFS= read -r py_file; do
-      [ -f "$py_file" ] || continue
-      if ! grep -qE 'Implements\s*:?\s*(FR|NFR)-' "$py_file" 2>/dev/null; then
-        MISSING_HEADERS="$MISSING_HEADERS\n    $py_file"
-      fi
-    done <<< "$NEW_PY"
-    if [ -n "$MISSING_HEADERS" ]; then
-      echo -e "${YELLOW}[WARN]${NC} New Python files missing 'Implements: FR-XXX' header:"
-      echo -e "$MISSING_HEADERS"
-      echo "  Add: Implements: FR-XXX, Task: T-XXX, Specs: …, Rationale: …"
+  if [ -n "$NEW_PY" ] && [ -f scripts/naos_staged_python.py ]; then
+    if NAOS_ROOT="$NAOS_ROOT" NAOS_TIER="$NAOS_TIER" "$PYTHON_CMD" scripts/naos_staged_python.py --headers; then
+      :
+    else
+      CHECK_STATUS=$?
+      echo -e "${YELLOW}[WARN]${NC} Staged module headers were not evaluated (exit $CHECK_STATUS; enforcement: soft)"
     fi
+  elif [ -n "$NEW_PY" ]; then
+    echo -e "${YELLOW}[WARN]${NC} Staged module headers were not evaluated: scripts/naos_staged_python.py is unavailable (enforcement: soft)"
   fi
 
   # Check 10: Task registry schema + dependency/parallelism validation

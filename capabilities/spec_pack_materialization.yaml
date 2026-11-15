@@ -4,8 +4,9 @@ description: >
   Copies missing manifest-required NAOS spec-pack template files into an
   adopter project's selected in-project spec root (default: specs/) for the
   selected profile. This is a bounded
-  missing-file addition or repair, not a profile transition, and it keeps
-  existing regular files unless overwrite is explicit. It validates the
+  missing-file addition or repair, not a profile transition. It skips
+  existing regular files by default and refuses selected existing files when
+  --force is explicit. It validates the
   manifest schema/profile graph/path inventory and the full selected source and
   destination plan before changing spec files.
 status: active
@@ -49,7 +50,7 @@ authority:
     - "unsafe or unwritable requested report paths"
     - "apply requests outside native macOS/Linux/Windows with CPython 3.11-3.13"
     - "runtime copy failures"
-    - "post-install temporary cleanup failures"
+    - "retained partial targets and pending copy-state markers after failed copies"
     - "late report persistence failures"
 allowed_resources:
   - "repo-local spec template files"
@@ -65,16 +66,16 @@ prohibited_resources:
   - "runtime governance"
   - "target-project mutation outside the configured target spec root and configured or explicit report sink"
 constraints:
-  - "Must skip existing project files unless --force is explicit."
-  - "Must treat --force as permission to replace only an in-project regular file; it never relaxes path or file-type checks."
+  - "Must skip existing project files by default and refuse any selected existing target when --force is explicit, before copying any spec file."
+  - "Must never replace an existing spec target; --force does not relax path or file-type checks."
   - "Must validate the manifest schema/profile graph/path inventory and the complete selected source inventory, destination inventory, and path topology before copying any spec file."
   - "Must fail closed with blocking evidence and no spec-file mutation for any preflight refusal."
-  - "Must install each copied leaf from a same-directory temporary without following a destination symlink."
-  - "Must report a newly installed target as copied, preserve the temporary residue path as a blocking finding, and stop remaining copies if post-install temporary cleanup fails."
+  - "Must exclusively create each absent final leaf beneath a held parent and stream through the created file handle without following destination symlinks."
+  - "Must never delete or overwrite a final name after copy failure. Create a hidden per-target pending marker before a new copy, mark it complete only after verification, and refuse an unfinished marked target on rerun until human review. A failed new copy may leave a partial target; report its selected path, marker path, and whether that path still identifies the held file, or mark the location unresolved. Retain historical overwritten, would_overwrite, and copy_cleanup_failed report fields for compatibility."
   - "Must reject symlinked in-project report ancestors, reject non-regular or multiply-hardlinked report leaves, probe basic writability before apply, and preserve truthful stdout evidence if the later report write fails."
   - "Must fail closed outside native macOS/Linux/Windows with CPython 3.11-3.13; dry-run/report evaluation may remain available."
   - "Must support dry-run mode for safe Make and CI use."
-  - "Must emit report evidence for copied, skipped, would-copy, refused, unsafe-path, cleanup-failed, report-write-failed, and missing-source files to the configured or explicit sink and stdout; stdout-only evidence is valid when no sink is configured."
+  - "Must emit report evidence for copied, skipped, would-copy, refused, unsafe-path, report-write-failed, and missing-source files to the configured or explicit sink and stdout; retain the cleanup-failed field for historical report compatibility."
   - "Must not claim copied files are filled, approved, implemented, tested, or ready."
   - "Advisory output requires human review before durable decisions or copied templates are treated as governed specs."
 required_evidence:
@@ -107,9 +108,10 @@ known_limitations:
   - "Does not fill [ADAPT] placeholders."
   - "Does not prove requirements, architecture, API, acceptance, cost, market, integration, or execution content is applicable or complete."
   - "Does not prove profile readiness; it only restores missing template files."
-  - "Multi-file materialization is sequential and has no rollback; a runtime filesystem, post-install temporary cleanup, or report-write failure can occur after the current or earlier leaf copies were installed."
-  - "Requested report sinks receive in-project ancestor, regular single-link leaf, and basic writability preflight; explicit external paths are canonicalized operator-selected outputs, and a probe cleanup failure can leave a `.naos-spec-pack-report-probe-*` file for manual removal."
-  - "Leaf installation is enabled only on the executed local macOS/POSIX tuple. Linux POSIX mutation is refused because its behavior remains unproven, as do concurrent ancestor replacement, mount or bind-mount changes, network-filesystem semantics, Windows reparse/DACL/ADS behavior, ACL/xattr preservation, and crash consistency."
+  - "Multi-file materialization is sequential and has no rollback; a runtime filesystem or report-write failure can occur after earlier leaf copies were installed. Failed copies may retain partial targets and pending per-target markers for review; markers are recovery cues, not integrity attestations or proven crash-consistency records."
+  - "A deleted completed target can be recopied only when its status marker remains writable; restrictive permissions may refuse without creating a new target."
+  - "Requested report sinks receive in-project ancestor, regular single-link leaf, and basic writability preflight; explicit external paths are canonicalized operator-selected outputs. POSIX preflight checks access through a held parent and creates no named probe."
+  - "Apply is enabled on native macOS, Linux, and Windows with CPython 3.11-3.13; host qualification is recorded in docs/PLATFORM_ADAPTERS.md. Hostile concurrent ancestor or leaf replacement, mount or bind-mount changes, network-filesystem semantics, untested Windows reparse/DACL/ADS cases, ACL/xattr preservation, and crash consistency remain unproven."
   - "Manifest validation does not cross-check files[].required_profiles metadata against every profiles.*.required_files membership; both the materializer and contract execute from the profile required-files lists."
 not_claimed:
   - "approved specifications"

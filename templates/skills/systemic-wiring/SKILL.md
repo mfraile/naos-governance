@@ -67,7 +67,7 @@ naos systemic-impact \
   --changed-path <another-path>
 ```
 
-Keep canonical kit/development sources separate from files generated or
+Keep canonical kit development sources separate from files generated or
 installed into adopter projects. A kit-only audit, plugin source, or maintainer
 history file is not adopter output. A generated `.github/`, `naos/`, or Make
 surface is not proof that its canonical source was reviewed.

@@ -29,7 +29,7 @@ These files support review and audit/admissibility discussions. They do not prov
 
 1. [The 6 Maintenance Cadences](#the-6-maintenance-cadences)
 2. [Cadence 1 — On-Demand Deterministic Conformance](#cadence-1--on-demand-deterministic-conformance)
-3. [Cadence 2 — Behavioral Readiness Cadence](#cadence-2--behavioral-readiness-cadence)
+3. [Cadence 2 — Behavioral Evaluator Cadence](#cadence-2--behavioral-evaluator-cadence)
 4. [Cadence 3 — Quarterly Review Readiness](#cadence-3--quarterly-review-readiness)
 5. [Cadence 4 — Dependency Audit](#cadence-4--dependency-audit)
 6. [Cadence 5 — Toolchain Upgrade Audit](#cadence-5--toolchain-upgrade-audit)

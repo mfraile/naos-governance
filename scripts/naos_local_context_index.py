@@ -13,9 +13,11 @@ import re
 import sqlite3
 import stat
 import sys
+import tempfile
 import time
 import uuid
 from collections import Counter
+from contextlib import ExitStack
 from datetime import UTC, datetime
 from pathlib import Path, PureWindowsPath
 from typing import Any, Iterable
@@ -26,10 +28,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from naos_self_check_inspection import (
+from naos_self_check_inspection import (  # noqa: E402
     inspection_active, inspection_output_path, inspection_logical_path,
     inspection_candidates, inspection_read_path, inspection_validation_root,
-)  # noqa: E402
+)
 
 from naos_policy import (  # noqa: E402
     build_generated_by,
@@ -47,9 +49,10 @@ from naos_policy import (  # noqa: E402
     severity_for_profile,
     write_report,
 )
-from source_roots import inferred_adopter_implementation_files, native_adopter_root_aliases
+from source_roots import inferred_adopter_implementation_files, native_adopter_root_aliases  # noqa: E402
 from naos_audit_log import write_audit_event  # noqa: E402
 from naos_secret_patterns import sanitize_report_value, secret_content_reason  # noqa: E402
+from naos_trace_atomic_write import BinaryProducer, publish_trace, read_trace_source  # noqa: E402
 
 
 REPORT_SCHEMA = "naos.local_context_index.v1"
@@ -288,6 +291,90 @@ def temp_db_path(target_db_path: Path, session_id: str | None) -> Path:
     return target_db_path.with_name(f"{target_db_path.name}.tmp.{os.getpid()}.{safe_fragment}.{uuid.uuid4().hex[:8]}")
 
 
+def _sqlite_output_operand(path: Path) -> Path:
+    """Observe raw components before normalization; publication rechecks custody."""
+    raw = path if path.is_absolute() else Path.cwd() / path
+    cursor = Path(raw.anchor)
+    for offset, component in enumerate(raw.parts[1:], 1):
+        cursor = cursor / component
+        try:
+            info = cursor.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+            raise ValueError(f"Refusing linked SQLite output component: {cursor}")
+        if offset < len(raw.parts) - 1:
+            if not stat.S_ISDIR(info.st_mode):
+                raise ValueError(f"Refusing non-directory SQLite output parent: {cursor}")
+        elif not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError(f"Refusing non-regular or multiply-linked SQLite output: {cursor}")
+    return Path(os.path.abspath(os.fspath(raw)))
+
+
+class _SQLiteLockFD(int):
+    """An ordinary descriptor bound to its original lock bytes and identity."""
+    def __new__(cls, descriptor, payload, identity):
+        value = int.__new__(cls, descriptor)
+        value.payload = payload
+        value.identity = identity
+        return value
+
+
+def _lock_snapshot(path: Path):
+    with read_trace_source(_sqlite_output_operand(path)) as stream:
+        if stream is None:
+            raise FileNotFoundError(path)
+        return stream.read(), os.fstat(stream.fileno())
+
+
+def _remove_sqlite_lock(path: Path, expected: bytes, identity: tuple[int, int]) -> None:
+    """Conditional deletion with the existing held-parent/native-delete guarantees."""
+    path = _sqlite_output_operand(path)
+    named = path.lstat()
+    if (named.st_dev, named.st_ino) != identity:
+        raise ValueError("SQLite lock identity changed; current file preserved")
+    if os.name == "nt":
+        import naos_windows_report as native
+
+        handles = native.wh.WindowsHandles()
+        with ExitStack() as stack:
+            parent = stack.enter_context(handles.open_root(path.anchor))
+            for component in path.parts[1:-1]:
+                parent = stack.enter_context(handles.open_child(
+                    parent, component, kind="directory", pin_for_read=True))
+            with handles.open_child(parent, path.name, kind="file", for_delete=True) as target:
+                named = path.lstat()
+                if ((named.st_dev, named.st_ino) != identity
+                        or native._digest(target) != hashlib.sha256(expected).hexdigest()):
+                    raise ValueError("SQLite lock changed before removal; current file preserved")
+                handles.delete_exact(parent, path.name, target)
+        return
+    from naos_policy import _open_report_parent_fd, _report_metadata_at
+
+    parent, name = _open_report_parent_fd(path, strict_parent_topology=True, create_parents=False)
+    try:
+        before = _report_metadata_at(parent, name, path)
+        if before is None:
+            raise FileNotFoundError(path)
+        descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+        with os.fdopen(descriptor, "rb") as source:
+            held = os.fstat(source.fileno())
+            content = source.read()
+            after = os.fstat(source.fileno())
+            named = _report_metadata_at(parent, name, path)
+            if (named is None or not stat.S_ISREG(held.st_mode)
+                    or (held.st_dev, held.st_ino) != identity
+                    or (held.st_dev, held.st_ino, held.st_nlink) != (before.st_dev, before.st_ino, 1)
+                    or content != expected
+                    or (after.st_dev, after.st_ino, after.st_nlink, after.st_size, after.st_mtime_ns)
+                    != (named.st_dev, named.st_ino, 1, named.st_size, named.st_mtime_ns)
+                    or (held.st_size, held.st_mtime_ns) != (after.st_size, after.st_mtime_ns)):
+                raise ValueError("SQLite lock changed before removal; current file preserved")
+            os.unlink(name, dir_fd=parent)
+    finally:
+        os.close(parent)
+
+
 def parse_lock_timestamp(value: Any) -> datetime | None:
     if not value:
         return None
@@ -299,22 +386,32 @@ def parse_lock_timestamp(value: Any) -> datetime | None:
 
 def read_lock_metadata(lock_path: Path) -> dict[str, Any]:
     try:
-        data = json.loads(lock_path.read_text(encoding="utf-8"))
+        data = json.loads(_lock_snapshot(lock_path)[0].decode("utf-8"))
     except Exception:
         data = {}
     return data if isinstance(data, dict) else {}
 
 
 def lock_age_seconds(lock_path: Path, now_text: str) -> float | None:
-    metadata = read_lock_metadata(lock_path)
+    try:
+        raw, info = _lock_snapshot(lock_path)
+    except (OSError, ValueError):
+        return None
+    return _snapshot_lock_age(raw, info, now_text)
+
+
+def _snapshot_lock_age(raw: bytes, info, now_text: str) -> float:
+    try:
+        metadata = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, ValueError):
+        metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
     acquired_at = parse_lock_timestamp(metadata.get("acquired_at"))
     now = parse_timestamp(now_text)
     if acquired_at is not None:
         return max(0.0, (now - acquired_at).total_seconds())
-    try:
-        modified_at = datetime.fromtimestamp(lock_path.stat().st_mtime, UTC)
-    except OSError:
-        return None
+    modified_at = datetime.fromtimestamp(info.st_mtime, UTC)
     return max(0.0, (now - modified_at).total_seconds())
 
 
@@ -329,7 +426,7 @@ def acquire_sqlite_lock(
     stale_after_seconds: float = SQLITE_STALE_LOCK_SECONDS,
     retry_interval_seconds: float = 0.1,
 ) -> tuple[int | None, dict[str, Any]]:
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    _sqlite_output_operand(lock_path)
     start = time.monotonic()
     stale_detected = False
     stale_action = "not_applicable"
@@ -345,9 +442,20 @@ def acquire_sqlite_lock(
     }
     while True:
         try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            os.write(fd, json.dumps(metadata, indent=2, sort_keys=True).encode("utf-8"))
-            os.fsync(fd)
+            payload = json.dumps(metadata, indent=2, sort_keys=True).encode("utf-8")
+            publish_trace(lock_path, payload, None, strict_parent_topology=True, create_only=True)
+            fd = -1
+            try:
+                with read_trace_source(lock_path) as stream:
+                    if stream is None or stream.read() != payload:
+                        raise ValueError("SQLite lock changed during acquisition")
+                    info = os.fstat(stream.fileno())
+                    fd = os.dup(stream.fileno())
+                fd = _SQLiteLockFD(fd, payload, (info.st_dev, info.st_ino))
+            except BaseException:
+                if fd >= 0:
+                    os.close(fd)
+                raise
             waited = time.monotonic() - start
             return fd, {
                 "lock_acquired": True,
@@ -357,11 +465,15 @@ def acquire_sqlite_lock(
                 "findings": findings,
             }
         except FileExistsError:
-            age = lock_age_seconds(lock_path, generated_at)
+            try:
+                raw, info = _lock_snapshot(lock_path)
+            except FileNotFoundError:
+                continue
+            age = _snapshot_lock_age(raw, info, generated_at)
             if age is not None and age > stale_after_seconds:
                 stale_detected = True
                 try:
-                    lock_path.unlink()
+                    _remove_sqlite_lock(lock_path, raw, (info.st_dev, info.st_ino))
                     stale_action = "removed"
                     findings.append(
                         finding(
@@ -374,7 +486,7 @@ def acquire_sqlite_lock(
                         )
                     )
                     continue
-                except OSError as exc:
+                except (OSError, ValueError) as exc:
                     stale_action = "not_removed"
                     waited = time.monotonic() - start
                     findings.append(
@@ -419,20 +531,22 @@ def release_sqlite_lock(fd: int | None, lock_path: Path) -> dict[str, Any] | Non
     if fd is None:
         return None
     try:
+        if not isinstance(fd, _SQLiteLockFD):
+            raise ValueError("Unbound SQLite lock descriptor; current file preserved")
+        info = os.fstat(fd)
+        if (info.st_dev, info.st_ino) != fd.identity:
+            raise ValueError("SQLite lock descriptor identity changed; current file preserved")
         os.close(fd)
-    except OSError:
-        pass
-    try:
-        lock_path.unlink()
+        _remove_sqlite_lock(lock_path, fd.payload, fd.identity)
         return {"action": "lock_released", "path": str(lock_path), "status": "removed"}
     except FileNotFoundError:
         return {"action": "lock_released", "path": str(lock_path), "status": "already_absent"}
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         return {"action": "lock_release_failed", "path": str(lock_path), "status": "failed", "error": str(exc)}
 
 
 def verify_sqlite_tables(path: Path) -> list[str]:
-    connection = sqlite3.connect(path)
+    connection = sqlite3.connect(path.absolute().as_uri() + "?mode=ro", uri=True)
     try:
         rows = connection.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual table')").fetchall()
     finally:
@@ -1463,6 +1577,55 @@ def populate_sqlite_database(path: Path | None, report: dict[str, Any], artifact
     return fts_available, findings
 
 
+def _sqlite_file_digest(source: Path) -> str:
+    digest = hashlib.sha256()
+    with read_trace_source(source) as database:
+        if database is None:
+            raise ValueError("Owned SQLite database disappeared before validation")
+        while block := database.read(1024 * 1024):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _publish_sqlite_database(source: Path, target: Path, validated_digest: str) -> None:
+    """Stream a validated owned DB into the existing guarded publication stage."""
+    copied = {}
+
+    def produce(stage):
+        digest = hashlib.sha256()
+        size = 0
+        with read_trace_source(source) as database:
+            if database is None:
+                raise ValueError("Owned SQLite database disappeared before publication")
+            while block := database.read(1024 * 1024):
+                digest.update(block)
+                size += len(block)
+                remaining = memoryview(block)
+                while remaining:
+                    written = stage.write(remaining)
+                    if written is None or written <= 0:
+                        raise OSError("SQLite stage write made no progress")
+                    remaining = remaining[written:]
+        copied.update(size=size, digest=digest.hexdigest())
+
+    def validate(stage):
+        digest = hashlib.sha256()
+        size = 0
+        while block := stage.read(1024 * 1024):
+            if size == 0 and block[:16] != b"SQLite format 3\0":
+                raise ValueError("Owned database does not have a SQLite header")
+            size += len(block)
+            digest.update(block)
+        if (size < 100 or size != copied["size"] or digest.hexdigest() != copied["digest"]
+                or copied["digest"] != validated_digest):
+            raise ValueError("SQLite publication stage differs from the validated database")
+
+    publish_trace(target, BinaryProducer(produce, validate), None,
+                  strict_parent_topology=True, observe_current=True,
+                  require_existing_write_access=False, posix_creation_mode=0o666,
+                  preserve_existing_posix_mode=False)
+
+
 def create_sqlite_artifact(
     path: Path,
     report: dict[str, Any],
@@ -1479,12 +1642,13 @@ def create_sqlite_artifact(
     generated_by: dict[str, Any],
 ) -> tuple[dict[str, Any], bool, list[dict[str, Any]], dict[str, Any]]:
     path = _inspection_owned_output(root, naos_root, path)
+    _sqlite_output_operand(path)
     findings: list[dict[str, Any]] = []
     if path.exists() and path.is_symlink():
         raise ValueError(f"Refusing to write SQLite artifact through symlink: {path}")
-    path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = sqlite_lock_path(root, naos_root, policy, path)
-    temp_path = temp_db_path(path, session_id)
+    temp_path = None
+    workspace = ExitStack()
     coordination = sqlite_coordination_report_base(
         root=root,
         naos_root=naos_root,
@@ -1567,9 +1731,11 @@ def create_sqlite_artifact(
             }
             return artifact, False, coordination["findings"], coordination
 
-        if temp_path.exists():
-            temp_path.unlink()
-            coordination["cleanup_actions"].append({"action": "preexisting_temp_removed", "path": None, "artifact_role": "temporary_database", "status": "removed"})
+        # SQLite owns all database/journal filenames inside this fresh workspace.
+        # Persistent target and lock operands never reach sqlite3.connect.
+        private_root = Path(workspace.enter_context(
+            tempfile.TemporaryDirectory(prefix="naos-sqlite-build-"))).resolve()
+        temp_path = private_root / "index.sqlite"
 
         try:
             fts_available, populate_findings = populate_sqlite_database(temp_path, report, artifacts, chunks, links)
@@ -1608,6 +1774,7 @@ def create_sqlite_artifact(
             return artifact, False, coordination["findings"], coordination
         findings.extend(populate_findings)
         coordination["findings"].extend(populate_findings)
+        validated_digest = _sqlite_file_digest(temp_path)
         tables = verify_sqlite_tables(temp_path)
         missing_tables = [table for table in SQLITE_REQUIRED_TABLES if table not in tables]
         coordination["tables_verified"] = tables
@@ -1642,10 +1809,10 @@ def create_sqlite_artifact(
             return artifact, fts_available, coordination["findings"], coordination
 
         try:
-            os.replace(temp_path, path)
+            _publish_sqlite_database(temp_path, path, validated_digest)
             coordination["atomic_replace_used"] = True
             coordination["cleanup_actions"].append({"action": "atomic_replace", "source": None, "source_role": "temporary_database", "target": str(path), "status": "completed"})
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             coordination["status"] = "replace_failed"
             coordination["findings"].append(
                 finding(
@@ -1701,7 +1868,7 @@ def create_sqlite_artifact(
                         path=str(lock_path),
                     )
                 )
-        if temp_path.exists() and coordination.get("atomic_replace_used") is not True:
+        if temp_path is not None and temp_path.exists() and coordination.get("atomic_replace_used") is not True:
             try:
                 temp_path.unlink()
                 coordination["cleanup_actions"].append({"action": "leftover_temp_removed", "path": None, "artifact_role": "temporary_database", "status": "removed"})
@@ -1716,6 +1883,15 @@ def create_sqlite_artifact(
                         path=str(path), artifact_role="temporary_database",
                     )
                 )
+        try:
+            workspace.close()
+        except OSError as exc:
+            coordination["cleanup_actions"].append({"action": "private_workspace_cleanup", "path": None,
+                "artifact_role": "temporary_database", "status": "failed", "error": str(exc)})
+            coordination["findings"].append(finding(
+                "sqlite_write_coordination.temp_cleanup_failed", "warning", "advisory",
+                f"Private SQLite workspace cleanup failed: {exc}",
+                path=str(path), artifact_role="temporary_database"))
 
     stat = path.stat()
     target_hash = safe_digest(path)

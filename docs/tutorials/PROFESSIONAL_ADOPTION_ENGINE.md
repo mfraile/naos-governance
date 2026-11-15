@@ -43,6 +43,15 @@ naos-governance init . --tier standard --archetype custom --backend static_only 
 naos-governance init . --tier standard --archetype custom --backend static_only --activate
 ```
 
+The install-plan report gives a preview-first `activation_plan.init_command`.
+For Lite/Standard/Assured it is a template: replace `CHOOSE_ARCHETYPE` and
+`CHOOSE_REVIEW_POLICY` with reviewed choices before running it. The report lists
+these flags in `required_owner_choices` and sets `init_command_is_template`.
+`activate_after_review_command` is a separate template for explicit activation
+after preview review; the report does not authorize it. Quickstart retains its
+existing bounded defaults. This guidance does not select an adopter's AI review
+or memory policy, enable a provider, or change non-interactive refusal rules.
+
 `--no-write-preview` writes neither reports nor activation files. Adoption
 `--dry-run` writes only declared NAOS report artifacts and does not activate or
 change protected project files. `init` without `--activate` writes the generated
@@ -98,10 +107,11 @@ run, and does not activate hooks, CI, providers, memory write-back, MCP runtime,
 external connectors, or protected-file changes.
 `naos adopt --no-write-preview` evaluates the same phases without writing those
 reports or any activation files.
-Report-writing adoption requires secure directory-descriptor-relative creation
-and replacement. A host without that primitive fails closed before report-path
-creation; use `--no-write-preview` there. The portable report writer is not
-treated as equivalent strict parent-swap protection.
+Report-writing adoption uses the strict publisher supported by the selected
+host: directory-descriptor-relative publication on supported POSIX hosts or
+native handle-based publication on supported Windows. If the required strict
+publisher is unavailable, it fails closed; use `--no-write-preview` there. The
+portable fallback is not a substitute for strict topology checks.
 
 The challenge commands in this release share one generic file-path presence
 check. They enumerate local paths but do not read source or document contents.

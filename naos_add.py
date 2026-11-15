@@ -63,7 +63,7 @@ try:
         metadata_preservation_matches,
         source_metadata_contract,
     )
-    from .upgrade_contract.source_origins import SourceOrigins
+    from .upgrade_contract.source_origins import SourceOrigins, render_copied_script_text
     from .upgrade_contract.transaction import (
         TransactionPrimitiveError,
         apply_create_only_plan,
@@ -107,7 +107,7 @@ except ImportError:  # Direct checkout execution: python naos_add.py ...
         metadata_preservation_matches,
         source_metadata_contract,
     )
-    from upgrade_contract.source_origins import SourceOrigins  # type: ignore[no-redef]
+    from upgrade_contract.source_origins import SourceOrigins, render_copied_script_text  # type: ignore[no-redef]
     from upgrade_contract.transaction import (  # type: ignore[no-redef]
         TransactionPrimitiveError,
         apply_create_only_plan,
@@ -1961,6 +1961,52 @@ def _materialize_text_source(source: Path, destination: Path, content: str) -> P
     return destination
 
 
+
+def _materialize_current_copied_script(
+    project_root: Path, relative: Path, source: Path, derived: Path,
+) -> Path:
+    """Bind only exact init-derived helper bytes; downstream provenance still rules."""
+    try:
+        source_relative = source.absolute().relative_to(KIT_DIR.resolve(strict=True) / "scripts")
+    except ValueError:
+        return source
+    if (source.suffix != ".py" or len(relative.parts) < 2
+            or relative.parts[0] not in {"scripts", "naos_tools"}
+            or relative.parts[1:] != source_relative.parts):
+        return source
+    destination = project_root / relative
+    if not destination.is_file():
+        return source
+    before = _managed_source_contract(source)
+    raw = _stable_regular_bytes(source, label="Copied setup script source")
+    identity = before[0]
+    if "size" in identity:
+        size_matches = (type(identity["size"]) is int
+                        and identity["size"] == len(raw)
+                        and "size_decimal" not in identity)
+    else:
+        size_matches = (type(identity.get("size_decimal")) is str
+                        and identity["size_decimal"] == str(len(raw)))
+    if not size_matches or hashlib.sha256(raw).hexdigest() != identity.get("sha256"):
+        raise ValueError(f"Copied setup script source changed: {source}")
+    try:
+        text = raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    except UnicodeDecodeError:
+        # Init's UTF-8 renderer does not apply; retain raw add planning.
+        return source
+    rendered = render_copied_script_text(
+        source, text, kit_root=KIT_DIR, policy_path=UPGRADE_SOURCE_POLICY_PATH,
+        native_windows=os.name == "nt",
+    )
+    if rendered is None or _stable_regular_bytes(
+            destination, label="Existing copied setup script") != rendered.encode("utf-8"):
+        return source
+    result = _materialize_text_source(source, derived, rendered)
+    if _managed_source_contract(source) != before:
+        raise ValueError(f"Copied setup script source changed: {source}")
+    return result
+
+
 def _flatten_managed_tree_sources(
     source_root: Path,
     destination_root: Path,
@@ -2078,6 +2124,10 @@ def _materialize_setup_request_sources(
                     materialized_root / f"{action_index:04d}" / source.name,
                     content,
                 )
+            source = _materialize_current_copied_script(
+                project_root, relative_destination, source,
+                materialized_root / f"{action_index:04d}" / "copied-script" / source.name,
+            )
             sources.append((relative_destination, source))
         elif action_type == "copy_tree" and copy_mode == "tree":
             _validate_copy_tree_destination(relative_destination)
@@ -2849,6 +2899,10 @@ def cmd_add_setup_module(
                             materialized_root / f"{action_index:04d}" / source.name,
                             content,
                         )
+                    source = _materialize_current_copied_script(
+                        project_path, relative_destination, source,
+                        materialized_root / f"{action_index:04d}" / "copied-script" / source.name,
+                    )
                     sources.append((relative_destination, source))
                 elif action_type == "copy_tree" and copy_mode == "tree":
                     _validate_copy_tree_destination(relative_destination)

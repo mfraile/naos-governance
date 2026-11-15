@@ -9,7 +9,7 @@ import json
 import os
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -727,7 +727,7 @@ def inspect_project_host_surfaces(root: Path, naos_root: str, profile: str,
     scope = load_surface_rules(root, naos_root, policy)
     paths = [] if scope["invalid_config"] else list(scope["effective_patterns"])
     for path in string_list(rules.get("project_local_adapter_paths")):
-        paths.append(str(Path(naos_root) / path.removeprefix("naos/")) if path.startswith("naos/") else path)
+        paths.append((PurePosixPath(naos_root) / path.removeprefix("naos/")).as_posix() if path.startswith("naos/") else path)
     contract_path = checked_path(root, (Path(naos_root) / "profile_generated_surface_contract.json").as_posix())
     if contract_path.is_file():
         try:
@@ -775,7 +775,9 @@ def inspect_project_host_surfaces(root: Path, naos_root: str, profile: str,
                 content = path.read_text(encoding="utf-8", errors="replace").lower()
                 for phrase in string_list(rules.get("forbidden_claim_phrases")):
                     if phrase.lower() in content:
-                        findings.append(finding("project_adapter_claim_" + stable_finding_id(str(path)), severity,
+                        identity = json.dumps([path.relative_to(root).as_posix(), phrase.lower()], ensure_ascii=True, separators=(",", ":"))
+                        claim_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+                        findings.append(finding("project_adapter_claim_" + claim_id, severity,
                             "forbidden_claim", f"Project adapter contains forbidden claim: {phrase!r}", path=rel(path, root)))
     return list(rows.values()), findings
 

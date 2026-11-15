@@ -33,6 +33,7 @@ def execute(project: Path, command: str, *args: str) -> tuple[subprocess.Complet
 
 
 def generate(work: Path, profile: str) -> Path:
+    work = work.resolve()
     project = work / profile
     result = subprocess.run([*COMMAND, 'init', str(work / (profile + '-target')), '--new', '--tier', profile,
                              '--archetype', 'custom', '--backend', 'static_only', '--preview-dir', str(project)],
@@ -149,7 +150,7 @@ class ReportTraceContracts(unittest.TestCase):
 
     def test_trace_schema_cli_grading_and_stale_report(self):
         with tempfile.TemporaryDirectory() as temp:
-            project = Path(temp)
+            project = Path(temp).resolve()
             write_event(project, event())
             run(project, 'agent-traces')
             write_event(project, event(event_id=123, source_hashes={'synthetic.txt': {'invalid': True}}))
@@ -172,7 +173,7 @@ class ReportTraceContracts(unittest.TestCase):
 
     def test_malformed_trace_events_return_controlled_diagnostics(self):
         with tempfile.TemporaryDirectory() as temp:
-            project = Path(temp)
+            project = Path(temp).resolve()
             for field, value in [('action_type', ['write']), ('files_read', [1]), ('referenced_tasks', 1),
                                  ('source_references', 1), ('action_receipt', {'approval_status': ['approved']}),
                                  ('confidence', True), ('forbidden_payload_check', {'performed': 'yes'})]:
@@ -185,7 +186,7 @@ class ReportTraceContracts(unittest.TestCase):
 
     def test_review_obligation_and_action_approval_are_distinct(self):
         with tempfile.TemporaryDirectory() as temp:
-            project = Path(temp)
+            project = Path(temp).resolve()
             for status in ('not_reviewed', 'review_pending', 'reviewed', 'rejected'):
                 with self.subTest(status=status):
                     write_event(project, event(review_status=status))
@@ -280,7 +281,7 @@ class ReportTraceContracts(unittest.TestCase):
 
     def test_imported_pending_event_remains_reviewable(self):
         with tempfile.TemporaryDirectory() as temp:
-            project = Path(temp)
+            project = Path(temp).resolve()
             (project / 'trace.jsonl').write_text(json.dumps(event()) + '\n')
             result, imported = run(project, 'harness-trace-import', 'assured', '--source', 'trace.jsonl', '--write-events')
             self.assertEqual(result.returncode, 0)
@@ -319,7 +320,7 @@ class IncompleteScanContracts(unittest.TestCase):
             for profile in ('standard', 'assured'):
                 for case, state, selected, scanned, failed in cases:
                     with self.subTest(command=command, profile=profile, case=case), tempfile.TemporaryDirectory() as temporary:
-                        project = Path(temporary) / 'project with spaces café'
+                        project = Path(temporary).resolve() / 'project with spaces café'
                         (project / 'tests').mkdir(parents=True)
                         if case in {'valid', 'mixed'}:
                             (project / 'tests/test_valid.py').write_text('def test_valid():\n    assert 2 + 2 == 4\n', encoding='utf-8')
@@ -345,7 +346,7 @@ class IncompleteScanContracts(unittest.TestCase):
                                         text=True, capture_output=True, timeout=30)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('scan inputs: not_configured; selected 0, scanned 0, failed 0', result.stdout)
-            project = Path(temporary)
+            project = Path(temporary).resolve()
             legacy = project / 'legacy.json'
             legacy.write_text(json.dumps({'status': 'pass', 'summary': {},
                                           'mappings': [{'source': 'a.py', 'mapped': True}]}), encoding='utf-8')
@@ -368,7 +369,7 @@ class IncompleteScanContracts(unittest.TestCase):
         from naos_policy import load_policy
 
         with tempfile.TemporaryDirectory() as temporary:
-            project = Path(temporary)
+            project = Path(temporary).resolve()
             (project / 'src').mkdir()
             (project / 'tests').mkdir()
             (project / 'src/app.py').write_text('value = 1\n')
@@ -409,7 +410,7 @@ class IncompleteScanContracts(unittest.TestCase):
 
     def test_incomplete_inputs_survive_cli_dashboard_pack_and_sarif(self):
         with tempfile.TemporaryDirectory() as temporary:
-            project = Path(temporary)
+            project = Path(temporary).resolve()
             (project / 'naos').mkdir()
             (project / 'src').mkdir()
             (project / 'tests').mkdir()

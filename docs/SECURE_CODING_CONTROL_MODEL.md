@@ -440,8 +440,10 @@ session recognition or a fully clean workflow.
 SQLite coordination reports retain the stable target, action, result and status.
 They no longer publish a successful write's random operational temporary filename;
 `temp_db_path` is null and temporary cleanup/replace references identify their role.
-This changes report presentation only, not filename generation or write/lock
-coordination. Legacy reports containing operational names remain ordinary inputs.
+The database is built in a fresh temporary workspace, validated and streamed into
+a guarded same-directory publication stage. Lock metadata uses guarded create-only
+publication, and stale/release cleanup checks the original bytes and file identity.
+Legacy reports containing operational names remain ordinary inputs.
 
 
 Secret-hygiene reports label the final findings array `SH-1`, `SH-2`, and so

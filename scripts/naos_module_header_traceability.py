@@ -319,9 +319,10 @@ def evaluate_file(
     req_patterns: list[re.Pattern[str]],
     task_patterns: list[re.Pattern[str]],
     spec_patterns: list[re.Pattern[str]],
+    source_text: str | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     rel = relative_text(root, path)
-    source = path.read_text(encoding="utf-8", errors="ignore")
+    source = source_text if source_text is not None else path.read_text(encoding="utf-8", errors="ignore")
     header_text, header_area = header_text_from_source(source)
     sections = section_map(header_text)
     required_sections = as_list(rules.get("required_sections")) or ["Module", "Purpose", "Implements", "Tasks", "Specs", "Rationale"]
@@ -431,7 +432,13 @@ def build_report(
     policy: dict[str, Any],
     rules_path: Path,
     rules_source: str,
+    source_texts: dict[str, str] | None = None,
 ) -> dict[str, Any]:
+    """Evaluate canonical rules; internal hook callers can supply indexed text.
+
+    Supplied text narrows the ordinary include/exclude selection. It never
+    replaces the configured rules or publishes a partial report to disk.
+    """
     rules = load_yaml(rules_path)
     severity, severity_downgrade = rule_severity_resolution(root, naos_root, profile, policy, rules)
     policy_meta = policy.get("_meta", {})
@@ -483,15 +490,21 @@ def build_report(
         ([], []) if configuration_errors
         else collect_source_files(root, rules, policy, include_patterns)
     )
+    if source_texts is not None:
+        source_files = [path for path in source_files if relative_text(root, path) in source_texts]
+        excluded_files = [item for item in excluded_files if item["path"] in source_texts]
     # Applicability is scoped to declared source roots and configured selections.
     # An unmatched Python source remains a configuration gap, not an exemption.
-    python_present = bool(source_files or excluded_files)
+    python_present = bool(source_files or (excluded_files if source_texts is None else []))
     if not python_present:
         for source_root in resolve_source_roots(root, absolute=True):
             if not source_root.is_dir():
                 continue
+            candidates = (source_root.rglob("*.py") if source_texts is None else (
+                root / name for name in source_texts
+                if (root / name).is_relative_to(source_root)))
             if any(path.is_file() and is_excluded(path, root, rules, policy) is None
-                   for path in source_root.rglob("*.py")):
+                   for path in candidates):
                 python_present = True
                 break
     coverage = {
@@ -537,6 +550,7 @@ def build_report(
             req_patterns=req_patterns,
             task_patterns=task_patterns,
             spec_patterns=spec_patterns,
+            source_text=source_texts[relative_text(root, path)] if source_texts is not None else None,
         )
         scanned_files.append(scanned)
         findings.extend(file_findings)

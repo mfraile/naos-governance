@@ -150,8 +150,11 @@ The distribution includes offline behavioral regressions under `public_tests/`.
 Install the declared dependencies and run:
 
 ```sh
-python -B -m unittest discover -s public_tests -p 'test_*.py'
+PYTHONDONTWRITEBYTECODE=1 python -B -m unittest discover -s public_tests -p 'test_*.py'
 ```
+
+The environment setting also covers child Python processes, which otherwise
+can add bytecode files to an exported tree and invalidate its exact-tree receipt.
 
 Tests construct disposable projects, synthetic review declarations and local
 Git repositories. They do not contact model providers, authenticate reviewers,

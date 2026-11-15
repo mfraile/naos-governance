@@ -23,6 +23,10 @@ MAX_PLAN_BYTES = 16 * 1024 * 1024
 DIAGNOSTIC_PLAN_SCHEMA = "naos.upgrade.windows_diagnostic_plan.v1"
 
 
+class ActivationPreflightRefusal(ValueError):
+    """Native admission failed before an activation destination was changed."""
+
+
 def _modules():
     try:
         from .. import naos_init, naos_upgrade
@@ -472,32 +476,36 @@ def recover(project_root):
 
 def activate(project_root, sources, *, request_inputs, dry_run, greenfield,
              checks, preapply_revalidator=None, private_preview_address=None):
-    required = {'generated_profile_contract'}
-    if not greenfield:
-        required.add('overlay_compatibility')
-    if (not isinstance(checks, list) or len(checks) != len(required)
-            or any(not isinstance(check, dict) or check.get('status') != 'passed'
-                   or not isinstance(check.get('evidence_sha256'), str)
-                   or len(check['evidence_sha256']) != 64
-                   or any(c not in '0123456789abcdef' for c in check['evidence_sha256'])
-                   for check in checks)
-            or {check.get('check_id') for check in checks} != required):
-        raise ValueError('Windows initialization requires passed fixed governance checks')
-    native_sources = source_pairs(sources, private_preview_address=private_preview_address)
-    handles = WindowsHandles()
-    # Native absence is distinct from permission errors and unsafe path types.
-    canonical_target(project_root, must_exist=False, allow_existing_resume=True, handles=handles)
     try:
-        WindowsReadObserver(handles).root_identity(str(project_root))
-        exists = True
-    except WindowsHandleError as exc:
-        if exc.operation != 'NtCreateFile' or exc.ntstatus != 0xC0000034:
-            raise
-        exists = False
+        required = {'generated_profile_contract'}
+        if not greenfield:
+            required.add('overlay_compatibility')
+        if (not isinstance(checks, list) or len(checks) != len(required)
+                or any(not isinstance(check, dict) or check.get('status') != 'passed'
+                       or not isinstance(check.get('evidence_sha256'), str)
+                       or len(check['evidence_sha256']) != 64
+                       or any(c not in '0123456789abcdef' for c in check['evidence_sha256'])
+                       for check in checks)
+                or {check.get('check_id') for check in checks} != required):
+            raise ValueError('Windows initialization requires passed fixed governance checks')
+        native_sources = source_pairs(sources, private_preview_address=private_preview_address)
+        handles = WindowsHandles()
+        # This boundary only observes inputs and target absence. Root creation
+        # and every subsequent operation remain outside the preflight catch.
+        canonical_target(project_root, must_exist=False, allow_existing_resume=True, handles=handles)
+        try:
+            WindowsReadObserver(handles).root_identity(str(project_root))
+            exists = True
+        except WindowsHandleError as exc:
+            if exc.operation != 'NtCreateFile' or exc.ntstatus != 0xC0000034:
+                raise
+            exists = False
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ActivationPreflightRefusal(str(exc)) from exc
     created_root = False
     if not exists:
         if not greenfield:
-            raise ValueError('Windows managed project root must already exist')
+            raise ActivationPreflightRefusal('Windows managed project root must already exist')
         if dry_run:
             print('  PLAN_ONLY: absent greenfield target; activation will bind its native identity.')
             return [relative.as_posix() for relative, _ in sources]

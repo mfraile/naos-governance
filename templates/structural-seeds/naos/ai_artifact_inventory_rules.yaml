@@ -6,7 +6,7 @@ description: >
   and third-party tool artifacts before adoption.
 # Literal project-relative file/directory paths; globs are not supported.
 scan_limits:
-  max_files_per_path: 50
+  max_files_per_path: 128
   max_discovery_files: 5000
 artifact_patterns:
   - CLAUDE.md

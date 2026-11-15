@@ -228,7 +228,7 @@ scenarios:
       Break this down into implementable work items.
     context_files:
       - .ai/RULES.md
-      - .github/agents/AGENTS.md    # ADAPT: your agents file
+      - .github/NAOS_AGENTS.md      # Generated agent index
     expects:
       request_clarified: true
       wis_enumerated: true

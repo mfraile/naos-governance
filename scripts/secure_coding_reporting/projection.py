@@ -1,13 +1,16 @@
 """Bounded projection of P3 dimensions into existing generated artifacts."""
 from __future__ import annotations
 
-import errno
+import io
 import json
 import os
 from pathlib import Path
 from typing import Any
 
-from .model import DIMENSION_KEYS, load_object
+from naos_self_check_inspection import inspection_publish_path
+from naos_trace_atomic_write import publish_trace, read_trace_source
+
+from .model import DIMENSION_KEYS
 
 MARKER_ID = "secure-coding-multidimensional-reporting"
 BEGIN_MARKER = f"<!-- BEGIN NAOS GENERATED: {MARKER_ID} -->"
@@ -31,43 +34,40 @@ def payload(report: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def safe_write_text(path: Path, text: str) -> None:
-    """Replace an existing generated artifact without following a symlink."""
-    if path.is_symlink():
-        raise ValueError(f"Refusing to project through symlink: {path}")
-    flags = os.O_WRONLY | os.O_TRUNC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    try:
-        fd = os.open(path, flags)
-    except OSError as exc:
-        if exc.errno == errno.ELOOP:
-            raise ValueError(f"Refusing to project through symlink: {path}") from exc
-        raise
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(text)
+def safe_write_text(path: Path, text: str, *, original: bytes | None = None) -> None:
+    """Publish an existing artifact against its captured, non-linked preimage."""
+    physical = inspection_publish_path(path)
+    if original is None:
+        with read_trace_source(physical) as source:
+            if source is None:
+                raise FileNotFoundError(f"Projection target is absent: {path}")
+            original = source.read()
+    publish_trace(physical, text.replace("\n", os.linesep).encode("utf-8"), original,
+                  strict_parent_topology=True, create_parents=False)
+
+
+def _read_existing(path: Path) -> bytes | None:
+    with read_trace_source(inspection_publish_path(path)) as source:
+        return None if source is None else source.read()
+
+
+def _text(original: bytes) -> str:
+    # Match Path.read_text's UTF-8 and universal-newline behavior.
+    with io.TextIOWrapper(io.BytesIO(original), encoding="utf-8") as stream:
+        return stream.read()
 
 
 def prepare_json(path: Path, report: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
-    if not path.exists():
-        return {"path": str(path), "state": "not_configured", "updated": False}, None
-    if path.is_symlink() or not path.is_file():
-        return {"path": str(path), "state": "unsafe_target", "updated": False}, None
-    try:
-        value = load_object(path)
-    except Exception as exc:
-        return {
-            "path": str(path),
-            "state": "parse_error",
-            "updated": False,
-            "message": str(exc),
-        }, None
+    result, content, _original = _prepare(path, report, markdown=False)
+    return result, content
+
+
+def _json_text(path: Path, text: str, report: dict[str, Any]) -> str:
+    value = json.loads(text)
+    if not isinstance(value, dict):
+        raise ValueError(f"expected JSON object: {path}")
     value[PROJECTION_KEY] = payload(report)
-    return {
-        "path": str(path),
-        "state": "ready",
-        "updated": False,
-    }, json.dumps(value, indent=2, sort_keys=True) + "\n"
+    return json.dumps(value, indent=2, sort_keys=True) + "\n"
 
 
 def markdown_block(report: dict[str, Any]) -> str:
@@ -102,23 +102,15 @@ def markdown_block(report: dict[str, Any]) -> str:
 
 
 def prepare_markdown(path: Path, report: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
-    if not path.exists():
-        return {"path": str(path), "state": "not_configured", "updated": False}, None
-    if path.is_symlink() or not path.is_file():
-        return {"path": str(path), "state": "unsafe_target", "updated": False}, None
-    try:
-        text = path.read_text(encoding="utf-8")
-    except Exception as exc:
-        return {
-            "path": str(path),
-            "state": "parse_error",
-            "updated": False,
-            "message": str(exc),
-        }, None
+    result, content, _original = _prepare(path, report, markdown=True)
+    return result, content
+
+
+def _markdown_text(text: str, report: dict[str, Any]) -> str | None:
     block = markdown_block(report)
     if BEGIN_MARKER in text or END_MARKER in text:
         if text.count(BEGIN_MARKER) != 1 or text.count(END_MARKER) != 1:
-            return {"path": str(path), "state": "marker_error", "updated": False}, None
+            return None
         start = text.index(BEGIN_MARKER)
         end = text.index(END_MARKER, start) + len(END_MARKER)
         updated = text[:start] + block + text[end:]
@@ -129,7 +121,28 @@ def prepare_markdown(path: Path, report: dict[str, Any]) -> tuple[dict[str, Any]
             else ("\n" if text.endswith("\n") else "\n\n")
         )
         updated = text + separator + block + "\n"
-    return {"path": str(path), "state": "ready", "updated": False}, updated
+    return updated
+
+
+def _prepare(path: Path, report: dict[str, Any], *, markdown: bool
+             ) -> tuple[dict[str, Any], str | None, bytes | None]:
+    result = {"path": str(path), "state": "ready", "updated": False}
+    try:
+        original = _read_existing(path)
+    except ValueError as exc:
+        return {**result, "state": "unsafe_target", "message": str(exc)}, None, None
+    except OSError as exc:
+        return {**result, "state": "parse_error", "message": str(exc)}, None, None
+    if original is None:
+        return {**result, "state": "not_configured"}, None, None
+    try:
+        text = _text(original)
+        content = _markdown_text(text, report) if markdown else _json_text(path, text, report)
+    except Exception as exc:
+        return {**result, "state": "parse_error", "message": str(exc)}, None, None
+    if content is None:
+        return {**result, "state": "marker_error"}, None, None
+    return result, content, original
 
 
 def project(
@@ -141,13 +154,13 @@ def project(
 ) -> dict[str, Any]:
     """Preflight every configured target before mutating any target."""
     plans = {
-        "dashboard_summary": prepare_json(dashboard_summary, report),
-        "dashboard_markdown": prepare_markdown(dashboard_markdown, report),
-        "evidence_pack": prepare_json(evidence_pack, report),
+        "dashboard_summary": _prepare(dashboard_summary, report, markdown=False),
+        "dashboard_markdown": _prepare(dashboard_markdown, report, markdown=True),
+        "evidence_pack": _prepare(evidence_pack, report, markdown=False),
     }
     results = {key: value[0] for key, value in plans.items()}
     if any(result["state"] in ERROR_STATES for result in results.values()):
-        for key, (_, content) in plans.items():
+        for key, (_, content, _original) in plans.items():
             if content is not None:
                 results[key] = {
                     **results[key],
@@ -156,10 +169,10 @@ def project(
                 }
         return results
 
-    for key, (result, content) in plans.items():
+    for key, (result, content, original) in plans.items():
         if content is None:
             continue
         path = Path(result["path"])
-        safe_write_text(path, content)
+        safe_write_text(path, content, original=original)
         results[key] = {**result, "state": "projected", "updated": True}
     return results

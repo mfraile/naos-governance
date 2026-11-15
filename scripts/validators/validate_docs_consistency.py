@@ -19,7 +19,7 @@ from urllib.parse import unquote
 
 TRUSTED_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from validator_context import validation_scope
+from validator_context import validation_scope  # noqa: E402 -- standalone CLI bootstrap
 
 
 ROOT_PUBLIC_DOCS = [
@@ -303,7 +303,9 @@ def scaffold_counts(root: Path) -> dict[str, dict[str, int]]:
     counts: dict[str, dict[str, int]] = {}
     for tier in ["quickstart", "lite", "standard", "assured"]:
         with TemporaryDirectory() as temp_dir:
-            project = Path(temp_dir)
+            # This workspace is created and owned by the validator. Resolve its
+            # physical root before passing it to the no-follow scaffold writer.
+            project = Path(temp_dir).resolve()
             preview = project / ".naos-preview"
             generated = naos_init.scaffold_files(
                 project,

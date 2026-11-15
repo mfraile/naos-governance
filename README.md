@@ -272,16 +272,18 @@ cd "$PROJECT"
 naos adopt . --mode greenfield --profile quickstart --no-write-preview
 ```
 
-The middle command writes only the generated install preview. Its destination
+The first init command writes only the generated install preview. Its destination
 must be absent. Inside the target, only direct `TARGET/.naos-preview` is
 supported; other persistent preview paths must be outside the target. `naos
 init` never deletes or replaces a pre-existing preview
 without provenance. Use `naos init --dry-run` without `--preview-dir` for a
 target-preserving evaluation through a temporary external preview that is
-removed on exit. The final command regenerates from the current kit and
-arguments in separate external temporary staging, performs one durable
-create-only transaction, and leaves the persistent review preview unchanged.
-It does not claim digest-bound identity with that earlier preview.
+removed on exit. The separate init command with `--activate` regenerates from
+the current kit and arguments in external temporary staging, performs one
+durable create-only transaction, and leaves the persistent review preview
+unchanged. It does not claim digest-bound identity with that earlier preview.
+The final `naos adopt --no-write-preview` command evaluates adoption without
+publishing reports or activating files.
 Existing-repository activation first requires a validated-current
 repository-intelligence generation, or an executed not-applicable result. If a
 host test recursively consumes its own `scripts/` Python collection, the
@@ -533,7 +535,7 @@ the CLI also reports the total and the first 20 paths.
   naos-security-standards.mdc
 
 .githooks/
-  pre-commit            — Best-effort registry sync + checks (explicit activation required)
+  pre-commit            — Checks + registry-change reminder (explicit activation required)
 
 CLAUDE.md               — Claude Code context file
 CONTRIBUTING.md         — Contribution guide template

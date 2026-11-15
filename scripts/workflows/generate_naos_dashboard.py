@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import math
 import json
 import os
@@ -61,7 +62,7 @@ SCRIPT_DIR = Path(__file__).resolve().parents[1]
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from naos_report_composition import compose_publication, collection_count, CompositionError
+from naos_report_composition import compose_publication, collection_count, CompositionError  # noqa: E402
 
 from naos_policy import (  # noqa: E402
     SAFE_FALLBACK_POLICY,
@@ -80,7 +81,10 @@ from naos_policy import (  # noqa: E402
     status_from_counts,
     test_map_output_path,
     write_report,
+    write_text_output,
 )
+from naos_self_check_inspection import inspection_publish_path  # noqa: E402
+from naos_trace_atomic_write import publish_trace  # noqa: E402
 from naos_self_check import self_check_finding_occurrences  # noqa: E402
 from naos_pr_governance_summary import project_gate_readiness  # noqa: E402
 from naos_systemic_impact import (  # noqa: E402
@@ -850,13 +854,19 @@ def parse_decisions() -> list[dict]:
 
 PROGRESS_FIELDS = ("timestamp", "done_percent", "done", "in_progress", "total")
 LEGACY_PROGRESS_FIELDS = ("date", "total_tasks", "implemented", "verified", "done", "absorbed", "in_progress", "planned", "deferred")
+_UNREAD_HISTORY = object()
 
 
-def _read_progress_history(path: Path) -> tuple[str, list[str], list[dict[str, str]], list[float]]:
-    """Read known named columns; reject malformed/mixed history as a whole."""
-    if not path.exists():
+def _read_progress_history(path: Path, *, snapshot=_UNREAD_HISTORY) -> tuple[str, list[str], list[dict[str, str]], list[float]]:
+    """Parse one byte snapshot, or read it when called without a snapshot."""
+    if snapshot is _UNREAD_HISTORY:
+        try:
+            snapshot = path.read_bytes()
+        except FileNotFoundError:
+            snapshot = None
+    if snapshot is None:
         return "missing", list(PROGRESS_FIELDS), [], []
-    with path.open(encoding="utf-8-sig", newline="") as stream:
+    with io.StringIO(snapshot.decode("utf-8-sig"), newline="") as stream:
         records = [row for row in csv.reader(stream, strict=True)
                    if row and any(row) and not row[0].startswith("#")]
     if not records:
@@ -913,7 +923,12 @@ def append_progress_history(path: Path, *, done: int, in_progress: int, total: i
             or total <= 0 or done + in_progress > total):
         return "invalid_counts"
     try:
-        kind, fields, rows, _values = _read_progress_history(path)
+        path = inspection_publish_path(path)
+        try:
+            original = path.read_bytes()
+        except FileNotFoundError:
+            original = None
+        kind, fields, rows, _values = _read_progress_history(path, snapshot=original)
         if kind == "legacy":
             print("PROGRESS_HISTORY_MIGRATION_REQUIRED: legacy history preserved without append", file=sys.stderr)
             return "migration_required"
@@ -922,18 +937,21 @@ def append_progress_history(path: Path, *, done: int, in_progress: int, total: i
             return "already_recorded"
         row = {"timestamp": current.isoformat(), "done_percent": f"{done / total * 100:.2f}",
                "done": done, "in_progress": in_progress, "total": total}
-        needs_separator = False
-        if kind != "missing":
-            with path.open("rb") as existing:
-                existing.seek(-1, os.SEEK_END)
-                needs_separator = existing.read(1) not in {b"\n", b"\r"}
-        with path.open("x" if kind == "missing" else "a", encoding="utf-8", newline="") as stream:
+        with io.StringIO(newline="") as stream:
             writer = csv.DictWriter(stream, fieldnames=fields, lineterminator="\n")
             if kind == "missing":
                 writer.writeheader()
-            elif needs_separator:
+            elif original and not original.endswith((b"\n", b"\r")):
                 stream.write("\n")
             writer.writerow(row)
+            suffix = stream.getvalue()
+        # Ordinary absent parents retain the existing advisory refusal. The
+        # native publisher separately checks aliases and the validated preimage.
+        if not path.parent.is_dir():
+            raise FileNotFoundError("history parent directory does not exist")
+        content = (original.decode("utf-8") if original is not None else "") + suffix
+        publish_trace(path, content, original, strict_parent_topology=True,
+                      create_only=original is None)
         return "appended"
     except (OSError, UnicodeError, csv.Error, ValueError) as exc:
         print("PROGRESS_HISTORY_INVALID: history not updated: " + str(exc), file=sys.stderr)
@@ -1591,7 +1609,7 @@ def summarize_evidence_verification(artifact: dict[str, Any]) -> dict[str, Any]:
         "status": artifact.get("report_status") or artifact.get("status"),
         "summary": data.get("summary") or {},
         "tamper_evident": bool(data.get("tamper_evident")),
-        "signed": legacy_signed is True,
+        "tamper_evidence_basis": "unsigned_local_attestation_baseline",
         "signature_entries_present": signature_entries_present,
         "signature_validation_performed": False,
         "signature_validation_claim_rejected": signature_validation_claim_rejected,
@@ -1609,7 +1627,7 @@ def summarize_evidence_verification(artifact: dict[str, Any]) -> dict[str, Any]:
         "human_review_required": bool(data.get("human_review_required")),
         "limitations": data.get("limitations") or [],
         "not_claimed": data.get("not_claimed") or [],
-        "rule": "Evidence verification recomputes local artifact digests and the manifest root, then reports tamper-evidence, signature-entry presence, and best-effort Git HEAD metadata. It does not validate third-party signatures, authenticate identities, sign for NAOS, approve work, provide non-repudiation, certify controls, or prove compliance.",
+        "rule": "Evidence verification recomputes local artifact digests and the manifest root, then reports tamper-evidence relative to an unsigned, regenerable local attestation baseline, signature-entry presence, and best-effort Git HEAD metadata. It does not validate third-party signatures, authenticate identities, sign for NAOS, approve work, provide non-repudiation, certify controls, or prove compliance.",
     }
 
 
@@ -3382,7 +3400,7 @@ def build_dashboard_summary(
             "evidence_attestation_human_review_required": evidence_attestation["summary"].get("human_review_required", 0),
             "evidence_verification_status": evidence_verification.get("status"),
             "evidence_verification_tamper_evident": evidence_verification.get("tamper_evident", False),
-            "evidence_verification_signed": evidence_verification.get("signed", False),
+            "evidence_verification_tamper_evidence_basis": evidence_verification.get("tamper_evidence_basis"),
             "evidence_verification_signature_entries_present": evidence_verification.get(
                 "signature_entries_present", False
             ),
@@ -3785,7 +3803,7 @@ def render_control_plane_status_matrix(control_plane: dict[str, Any]) -> list[st
             "Evidence verification",
             evidence_verification.get("status"),
             evidence_verification.get("human_review_required"),
-            f"tamper-evident: {_table_cell(evidence_verification.get('tamper_evident'))}; signature entries: {_table_cell(evidence_verification.get('signature_entries_present'))}; envelope signature validated by NAOS: {_table_cell(evidence_verification.get('signature_validation_performed'))}; invalid validation claim rejected: {_table_cell(evidence_verification.get('signature_validation_claim_rejected'))}",
+            f"tamper-evident relative to unsigned local baseline: {_table_cell(evidence_verification.get('tamper_evident'))}; signature entries: {_table_cell(evidence_verification.get('signature_entries_present'))}; envelope signature validated by NAOS: {_table_cell(evidence_verification.get('signature_validation_performed'))}; invalid validation claim rejected: {_table_cell(evidence_verification.get('signature_validation_claim_rejected'))}",
             "naos evidence-verify --profile <profile>",
         ),
         (
@@ -3988,7 +4006,7 @@ def render_governance_context_detail_rows(control_plane: dict[str, Any]) -> list
     )
     evidence_verification = control_plane.get("evidence_verification") or {}
     lines.append(
-        f"| Evidence verification | {_table_cell(evidence_verification.get('status'))} | tamper-evident: {_table_cell(evidence_verification.get('tamper_evident'))}; signature entries: {_table_cell(evidence_verification.get('signature_entries_present'))}; envelope signature validated by NAOS: {_table_cell(evidence_verification.get('signature_validation_performed'))}; invalid validation claim rejected: {_table_cell(evidence_verification.get('signature_validation_claim_rejected'))}; checked: {_table_cell(evidence_verification.get('artifacts_checked'))}; human review: {_table_cell(evidence_verification.get('human_review_required'))} |"
+        f"| Evidence verification | {_table_cell(evidence_verification.get('status'))} | tamper-evident relative to unsigned local baseline: {_table_cell(evidence_verification.get('tamper_evident'))}; signature entries: {_table_cell(evidence_verification.get('signature_entries_present'))}; envelope signature validated by NAOS: {_table_cell(evidence_verification.get('signature_validation_performed'))}; invalid validation claim rejected: {_table_cell(evidence_verification.get('signature_validation_claim_rejected'))}; checked: {_table_cell(evidence_verification.get('artifacts_checked'))}; human review: {_table_cell(evidence_verification.get('human_review_required'))} |"
     )
     evidence_conflicts = control_plane.get("evidence_conflicts") or {}
     lines.append(
@@ -4802,9 +4820,9 @@ def render_control_plane_dashboard(control_plane: dict[str, Any] | None) -> list
                 "",
                 "### Evidence Verification",
                 "",
-                "> Evidence verification recomputes local artifact digests and the manifest root, then reports tamper-evidence, signature-entry presence, and best-effort Git HEAD metadata. It does not validate third-party signatures, authenticate identities, sign artifacts for NAOS, approve work, provide non-repudiation, certify controls, or prove compliance.",
+                "> Evidence verification recomputes local artifact digests and the manifest root, then reports tamper-evidence relative to an unsigned, regenerable local attestation baseline, signature-entry presence, and best-effort Git HEAD metadata. It does not validate third-party signatures, authenticate identities, sign artifacts for NAOS, approve work, provide non-repudiation, certify controls, or prove compliance.",
                 "",
-                f"Status: `{_table_cell(evidence_verification.get('status'))}`; tamper-evident: `{_table_cell(evidence_verification.get('tamper_evident'))}`; signature entries present: `{_table_cell(evidence_verification.get('signature_entries_present'))}`; envelope signature validated by NAOS: `{_table_cell(evidence_verification.get('signature_validation_performed'))}`; invalid validation claim rejected: `{_table_cell(evidence_verification.get('signature_validation_claim_rejected'))}`; artifacts checked: `{_table_cell(evidence_verification.get('artifacts_checked'))}`; digest result: `{_table_cell(evidence_verification.get('digest_validation'))}`; root result: `{_table_cell(evidence_verification.get('manifest_root_validation'))}`; scope: `{_table_cell(evidence_verification.get('scope_status'))}`; required coverage: `{_table_cell((evidence_verification.get('required_coverage') or {}).get('status'))}`; findings: `{_table_cell(verification_summary.get('total_findings'))}`; human review required: `{_table_cell(evidence_verification.get('human_review_required'))}`.",
+                f"Status: `{_table_cell(evidence_verification.get('status'))}`; tamper-evident relative to unsigned local baseline: `{_table_cell(evidence_verification.get('tamper_evident'))}`; signature entries present: `{_table_cell(evidence_verification.get('signature_entries_present'))}`; envelope signature validated by NAOS: `{_table_cell(evidence_verification.get('signature_validation_performed'))}`; invalid validation claim rejected: `{_table_cell(evidence_verification.get('signature_validation_claim_rejected'))}`; artifacts checked: `{_table_cell(evidence_verification.get('artifacts_checked'))}`; digest result: `{_table_cell(evidence_verification.get('digest_validation'))}`; root result: `{_table_cell(evidence_verification.get('manifest_root_validation'))}`; scope: `{_table_cell(evidence_verification.get('scope_status'))}`; required coverage: `{_table_cell((evidence_verification.get('required_coverage') or {}).get('status'))}`; findings: `{_table_cell(verification_summary.get('total_findings'))}`; human review required: `{_table_cell(evidence_verification.get('human_review_required'))}`.",
                 "",
                 f"Git HEAD metadata (not identity authentication): signature status `{_table_cell(identity.get('signature_status'))}`; signer `{_table_cell(identity.get('signer'))}`; commit `{_table_cell(identity.get('commit'))}`.",
             ]
@@ -6764,8 +6782,7 @@ def main() -> int:
 
     output_path = Path(args.output) if args.output else dashboard_output_path(root, naos_root, policy)
     if output_path:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(markdown, encoding="utf-8", newline="\n")
+        write_text_output(output_path, markdown, newline="\n")
         print(f"Wrote {output_path}", file=sys.stderr if args.json else sys.stdout)
     else:
         print(

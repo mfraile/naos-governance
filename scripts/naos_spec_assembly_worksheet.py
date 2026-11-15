@@ -29,6 +29,7 @@ from naos_policy import (  # noqa: E402
     severity_for_profile,
     status_from_counts,
     write_report,
+    write_text_output,
 )
 
 SCHEMA_ID = "naos.spec_assembly_worksheet.v1"
@@ -535,8 +536,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--write-markdown requires --output or --markdown-output when no default report path is configured")
     write_report(output, report)
     if markdown_output is not None:
-        markdown_output.parent.mkdir(parents=True, exist_ok=True)
-        markdown_output.write_text(format_markdown(report), encoding="utf-8")
+        write_text_output(markdown_output, format_markdown(report))
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=False))
     else:

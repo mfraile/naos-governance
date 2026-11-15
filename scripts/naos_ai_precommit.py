@@ -14,6 +14,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
 try:
     import yaml
 except Exception:  # pragma: no cover
@@ -108,10 +112,12 @@ def rebuild_embeddings(config_path: Path) -> int:
     code = check_config(config_path)
     if code != 0:
         return code
+    from naos_policy import write_text_output
+
     data_dir = Path("data")
-    data_dir.mkdir(exist_ok=True)
     marker = data_dir / "rules_embeddings.status.json"
-    marker.write_text(
+    write_text_output(
+        marker,
         json.dumps(
             {
                 "status": "not_built_by_v092_safe_mode",
@@ -121,7 +127,6 @@ def rebuild_embeddings(config_path: Path) -> int:
             },
             indent=2,
         ),
-        encoding="utf-8",
     )
     print(f"[OK] Wrote safe-mode embedding status: {marker}")
     return 0

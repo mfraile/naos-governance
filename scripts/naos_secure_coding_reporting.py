@@ -55,17 +55,18 @@ def bounded(
     root: Path,
     default: Path,
     label: str,
+    output: bool = False,
 ) -> Path:
     candidate = (
         default
         if value is None
-        else Path(value).expanduser().resolve(strict=False)
+        else Path(value).expanduser().absolute()
     )
     if not (within(candidate, root) or within(candidate, kit_root())):
         raise ValueError(
             f"{label} must remain within the project or installed kit: {candidate}"
         )
-    return candidate
+    return candidate if output or value is None else candidate.resolve(strict=False)
 
 
 def refresh_summary(report: dict) -> None:
@@ -209,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
                 root=root,
                 default=defaults["output"],
                 label="P3 report output",
+                output=True,
             )
         reference_path = bounded(
             args.reference_report,
@@ -275,18 +277,21 @@ def main(argv: list[str] | None = None) -> int:
                     root=root,
                     default=defaults["dashboard_summary"],
                     label="dashboard summary",
+                    output=True,
                 ),
                 dashboard_markdown=bounded(
                     args.dashboard_markdown,
                     root=root,
                     default=defaults["dashboard_markdown"],
                     label="dashboard markdown",
+                    output=True,
                 ),
                 evidence_pack=bounded(
                     args.evidence_pack,
                     root=root,
                     default=defaults["evidence_pack"],
                     label="evidence pack",
+                    output=True,
                 ),
             )
             report["projection"] = projection
@@ -332,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
             item=item,
         )
 
-    write_report(output, report)
+    write_report(output, report, strict_parent_topology=True)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

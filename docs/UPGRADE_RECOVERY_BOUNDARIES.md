@@ -1,12 +1,25 @@
 # Legacy managed transaction recovery boundaries
 
-A recorded `COMMITTED` transaction remains terminal. Recovery checks current
-manifest, receipt, directory and managed-content evidence using the existing
-native guards. A mismatch returns a `recovery_required` diagnostic and preserves
-the committed journal; it does not rewrite historical commit evidence or grant
-permission to mutate a drifted tree. Valid unfinished histories retain the
-existing rollback or forward-completion behavior. Exact private cleanup after a
-validated commit may complete without rewriting an already committed journal.
+A recorded `COMMITTED` transaction remains terminal. POSIX recovery validates
+its manifest, receipt, recoverable bases and recorded lineage. Historical
+directory identities do not reserve the adopter's tree indefinitely: an absent
+created directory or an ordinary directory recreated at the same path is
+accepted without recreating missing content. A directory replaced by a file or
+symlink remains a `recovery_required` refusal. In v2 terminal recovery, beneath a
+directory recorded by a validated committed generation, a missing leaf or a
+single-link regular file restored with its
+recorded content and mode can also be recognized without rewriting the
+committed journal or assigning the restored inode new ownership authority.
+Existing v2 changed-content and linked-leaf refusals remain in force.
+
+Unfinished transactions, including a published manifest whose journal has not
+reached `COMMITTED`, retain exact native directory and file identity checks.
+Fresh plans bind current ancestors and retain source-policy drift and
+preservation rules; recognizing history does not authorize a new mutation.
+Valid unfinished histories retain rollback or forward-completion behavior.
+Exact private cleanup after a validated commit may complete without rewriting
+an already committed journal. The separate Windows recovery behavior remains
+documented in [platform adapters](PLATFORM_ADAPTERS.md).
 
 An entry named `.preparing-*` is unsealed private preparation. Its journal may be
 present, absent or unreadable, but it does not contain complete durable ownership
@@ -67,9 +80,9 @@ permission: each writer must independently acquire and retain its own kernel
 lock. Persisted PID metadata is diagnostic only. This contract does not promise
 contention-free status reads, fairness or starvation freedom.
 
-New POSIX content-aware transactions use a distinct compact checkpoint schema and retain a canonical 0600 `plan.json` sidecar for the life of the history. Its exact bytes, SHA256 and size are bound to every journal; scope, namespace, ACL/flags and native leaf identity checks remain required. The plan is not rewritten at each checkpoint. Pending intents, completion checkpoints, durable replacement/fsync and cumulative inventories retain the same recovery semantics. Old unfinished v1/v2 transactions continue their existing writer; no historical record is relabeled or migrated.
+New POSIX create-only and content-aware transactions use distinct compact checkpoint schemas and retain a canonical 0600 `plan.json` sidecar for the life of the history. Its exact bytes, SHA256 and size are bound to every journal; scope, namespace, ACL/flags and native leaf identity checks remain required. The plan is not rewritten or re-canonicalized at each checkpoint. Create-only checkpoints check the sidecar bytes before and after durable journal replacement. Pending intents, completion checkpoints, durable replacement/fsync and cumulative inventories retain the same recovery semantics. Old unfinished v1/v2 transactions continue their existing writer; no historical record is relabeled or migrated. Growing mutation inventories and repeated sidecar byte verification still have a cost; this change does not claim linear total activation work.
 
-Only a reader recognizing `naos.upgrade.content_transaction.compact.v1` can recover these new journals. The inherited 1.1.0 minimum is a semantic lower bound and does not mean every older 1.1.0 executable understands compact records; unknown schema must refuse and preserve evidence. A process exit after sidecar creation but before the initial journal remains unsealed preparation, preserved under the existing boundary above. Missing, changed or foreign sidecars refuse recovery. Validated terminal cleanup retains the sidecar as durable history. Compact payload reduction does not qualify an operating system or establish an elapsed-time guarantee.
+Only a reader recognizing `naos.upgrade.create_only_transaction.compact.v1` or `naos.upgrade.content_transaction.compact.v1`, respectively, can recover these new journals. The inherited 1.1.0 minimum is a semantic lower bound and does not mean every older 1.1.0 executable understands compact records; unknown schema must refuse and preserve evidence. A process exit after sidecar creation but before the initial journal remains unsealed preparation, preserved under the existing boundary above. Missing, changed or foreign sidecars refuse recovery. Validated terminal cleanup retains the sidecar as durable history. Compact payload reduction does not qualify an operating system or establish an elapsed-time guarantee.
 
 
 ## Path-free legacy replay migration

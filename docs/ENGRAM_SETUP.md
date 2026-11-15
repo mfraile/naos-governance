@@ -113,6 +113,12 @@ Other existing memory fields, top-level fields, `mcp_project`, `mcp_namespace`, 
 
 On macOS and Ubuntu, a new configuration file has mode `0600`; updating an existing file preserves its permission mode. On Windows, setup uses the native writer with a held parent directory: a new configuration file is private to the current user, and an update preserves the existing owner, group, access-control list and inheritance protection. Linked or hard-linked destinations are refused rather than followed. These writes publish one file; they do not constitute a multi-file transaction or guarantee recovery from every system crash.
 
+POSIX updates also use a held parent and preserve supported owner, group and
+extended metadata. Unsupported metadata refuses before publication. A readable
+existing configuration retains the earlier parent-authorized replacement
+behavior, including its existing read-only mode; the parent must be writable.
+NAOS does not temporarily grant permissions to an existing destination.
+
 If Windows refuses a new staging file during its initial permission verification, an empty private staging file can remain. No configuration content has been written to that file, and the original configuration remains unchanged. Retain the error when investigating; the presence of an empty staging file does not indicate that setup completed.
 
 ## Pending to Configured Evidence Boundary

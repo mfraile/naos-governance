@@ -823,6 +823,12 @@ def _apply_regenerated_plan(
     )
 
 
+def _warn_checkpoint_persistence_failure(detail: object) -> None:
+    """Warn separately from JSON; the diagnostic does not change disposition."""
+    if detail and transaction.RECOVERY_CHECKPOINT_WARNING_CODE in str(detail):
+        print("WARNING: " + str(detail), file=sys.stderr)
+
+
 def _emit_apply_outcome(
     outcome: object,
     expected_digest: str,
@@ -831,6 +837,7 @@ def _emit_apply_outcome(
     detail_override: str | None = None,
 ) -> int:
     status = status_override or str(getattr(outcome, "status", "unknown"))
+    _warn_checkpoint_persistence_failure(getattr(outcome, "detail", None))
     print(
         json.dumps(
             {
@@ -1068,6 +1075,8 @@ def _recover_command(project_root: Path) -> int:
         }
         for outcome in outcomes
     ]
+    for item in payload:
+        _warn_checkpoint_persistence_failure(item["detail"])
     print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
     unresolved = {
         "recovery_required",

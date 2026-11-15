@@ -58,6 +58,16 @@ excluded file counts cover discovered leaves only. They are not repository-wide
 file totals. Unreadable, undecodable and selected symlink files remain unanalyzed
 and make selected coverage incomplete.
 
+Fresh secret-scan inventories omit raw-content `sha256` for known sensitive
+filenames: case-insensitive `.env`, `.env.*`, `*.env`, `*.key`, `*.pem`, and
+`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`. Status, byte size, findings and
+coverage stay available. A digest of a short file can confirm offline guesses
+even when its value is redacted. Ordinary input and instruction-file digests,
+and digests of report artifacts themselves, remain unchanged. This protection
+uses known filenames; secrets under other names can still have content hashes.
+Previously saved reports and their copies are not scrubbed; regenerate and
+review them before sharing.
+
 A bounded reporting-only exception recognizes a direct root `AGENTS.md`,
 `CLAUDE.md` or `GEMINI.md` symlink to another selected regular root instruction
 file that was successfully scanned. No alias content or outside target is opened;
