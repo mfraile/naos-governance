@@ -13,6 +13,8 @@ import yaml
 
 KIT = Path(os.environ.get("NAOS_TEST_KIT", Path(__file__).resolve().parents[1])).resolve()
 MIB = 1024 * 1024
+PAYLOADS = ["naos-public-export.tar.gz", "NAOS_PUBLIC_EXPORT_MANIFEST.json",
+            "naos_governance-1.1.0-py3-none-any.whl", "naos_governance-1.1.0.tar.gz"]
 
 
 class ProvenanceDeliveryGuardTests(unittest.TestCase):
@@ -50,9 +52,32 @@ class ProvenanceDeliveryGuardTests(unittest.TestCase):
         )
 
     def retained_files(self, total):
-        self.package("naos.whl", total - 3)
-        for name in ["naos.tar.gz", "provenance.sigstore.json", "SHA256SUMS"]:
+        self.package(PAYLOADS[0], total - 5)
+        for name in PAYLOADS[1:] + ["provenance.sigstore.json", "SHA256SUMS"]:
             self.package(name, 1)
+
+    def test_all_four_payloads_at_48_mib_get_checksums_before_signing(self):
+        self.package(PAYLOADS[0], 48 * MIB - 3)
+        for name in PAYLOADS[1:]:
+            self.package(name, 1)
+        result = self.run_fragment("Prepare canonical archive and release checksums")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        sums = (self.dist / "SHA256SUMS").read_text().splitlines()
+        self.assertEqual({line.split("  ", 1)[1] for line in sums}, set(PAYLOADS))
+        names = [step["name"] for step in self.steps]
+        self.assertLess(names.index("Prepare canonical archive and release checksums"),
+                        names.index("Attest the built artifacts"))
+        self.assertLess(names.index("Attest the built artifacts"),
+                        names.index("Collect and recheck the same artifact bytes"))
+
+    def test_four_payload_limit_cannot_reuse_the_two_package_allowance(self):
+        self.package(PAYLOADS[0], 48 * MIB - 2)
+        for name in PAYLOADS[1:]:
+            self.package(name, 1)
+        result = self.run_fragment("Prepare canonical archive and release checksums")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("exceed the 48 MiB", result.stderr)
+        self.assertFalse((self.dist / "SHA256SUMS").exists())
 
     def test_built_packages_at_48_mib_produce_both_checksums(self):
         self.package("naos.whl", 48 * MIB - 1)
@@ -90,16 +115,16 @@ class ProvenanceDeliveryGuardTests(unittest.TestCase):
         result = self.run_fragment("Collect and recheck the same artifact bytes")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("exceeds the 50 MiB", result.stderr)
-        self.assertEqual(len(list(self.dist.iterdir())), 4)
+        self.assertEqual(len(list(self.dist.iterdir())), 6)
 
     def test_nonregular_retained_entry_is_refused(self):
-        self.package("naos.whl", 1)
-        self.package("naos.tar.gz", 1)
+        for name in PAYLOADS:
+            self.package(name, 1)
         self.package("SHA256SUMS", 1)
         (self.dist / "provenance.sigstore.json").mkdir()
         result = self.run_fragment("Collect and recheck the same artifact bytes")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Expected two packages, checksums and the attestation bundle", result.stderr)
+        self.assertIn("Expected four payloads, checksums and the attestation bundle", result.stderr)
 
     def test_new_version_update_prs_are_paused_for_both_ecosystems(self):
         published = KIT / ".github/dependabot.yml"

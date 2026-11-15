@@ -119,6 +119,7 @@ naos_governance = [
     "configs/secure_coding_control_register.sample.yaml",
     "configs/secure_coding_control_render_manifest.yaml",
     "INSTALLATION_MANUAL.md",
+    "docs/BUILD_INTEGRITY.md",
     "SECURITY.md",
     "docs/FRONTMATTER_CONFORMANCE.md",
     "NAOS_CATALOG.md",

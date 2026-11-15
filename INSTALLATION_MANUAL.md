@@ -1,8 +1,8 @@
 # NAOS Portable Governance Kit — Installation Manual
 
 **Version**: 1.1.0
-**Status**: Remediated source candidate; not a new published release
-**Last Updated**: 2026-10-18
+**Status**: Remediated 1.1.0 distribution; verify the release build identity
+**Last Updated**: 2026-11-15
 
 ---
 
@@ -15,15 +15,14 @@ complex enterprise software, including highly regulated projects. Select a
 profile and configure evidence for the development workflow and review needs
 of the project; installation does not establish regulatory compliance.
 
-**Select the matching runtime before following this manual.** The commands and
-boundaries below describe the remediated source candidate. The existing public
-v1.1.0 release predates these changes, despite sharing the `1.1.0` package version.
-Installing that release does not provide the newer provenance inspection,
-receiving/rebind, legacy migration, applicability or CI-readiness procedures.
-For this candidate, use an artifact whose reviewed build receipt identifies the
-source and SHA-256; the version string alone cannot identify it. See
-[Artifact acquisition](#artifact-acquisition). Publication of source changes
-does not replace an existing release asset or qualify a new artifact.
+**Select the matching runtime before following this manual.** These procedures
+describe the remediated 1.1.0 distribution. The release notes identify a refreshed
+build by its exact public source commit and verified artifact hashes; version
+`1.1.0` alone cannot distinguish it from the September build. Obtain the
+refreshed downloads only after that identity and their build provenance verify.
+Historical September downloads are retained under explicit historical names and
+do not provide the newer procedures. See [Artifact acquisition](#artifact-acquisition).
+Source publication alone does not replace a release asset or qualify a build.
 
 Explicitly activating a reviewed NAOS install set copies the selected profile's governance files into the project. Package installation and preview generation do not activate that install set. Activation does not cause every capability to become mature immediately. Capability maturity depends on project readiness, configuration, validator outputs, evidence freshness, gatekeeper status, and human review. See [docs/CONTROL_PLANE.md](docs/CONTROL_PLANE.md) for the capability/policy/evidence model, [docs/AUDIT_PLAYBOOK.md](docs/AUDIT_PLAYBOOK.md) for deterministic audit checks, and [docs/ASSURED_PROFILE_ACTIVATION.md](docs/ASSURED_PROFILE_ACTIVATION.md) before relying on the `assured` profile.
 
@@ -234,31 +233,55 @@ Choose the artifact for the intended workflow:
 
 | Intended use | Artifact requirement |
 | --- | --- |
-| Follow the remediated procedures in this manual | A compatible candidate wheel or sdist with a reviewed source/build receipt and SHA-256; use the local candidate route below. |
-| Reproduce the older published v1.1.0 baseline | The historical archive identified below; it cannot run the candidate-only procedures. |
+| Follow the remediated procedures in this manual | The refreshed full-kit archive, wheel or sdist with the approved source commit, verified build provenance and SHA-256; use the refreshed release route below. |
+| Reproduce the September v1.1.0 baseline | The historical archive identified below; it does not provide the remediated procedures. |
 
-The older public v1.1.0 archive has this verified acquisition identity:
-
-- Public source commit: `2711cafbef34f7f2c07e1764862d926541efc4e7`.
-- Artifact: `naos-public-export.tar.gz` on the
-  [v1.1.0 release](https://github.com/mfraile/naos-governance/releases/tag/v1.1.0).
-- SHA-256: `cb57448d777560e880b9a9cf7ebbbad38117bf8bc91be63f83c5a0999ec169f8`.
+For the refreshed release, obtain `SHA256SUMS`, `provenance.sigstore.json` and the
+selected artifact from the [v1.1.0 release](https://github.com/mfraile/naos-governance/releases/tag/v1.1.0).
+Check its source commit against the approved refresh notes, then verify both the
+checksum file and selected artifact with the repository, workflow, source commit
+and `refs/heads/main` constraints described in [Build dependency integrity](docs/BUILD_INTEGRITY.md).
+Use the reviewed digest from that verified checksum file in this command
+(template: replace the angle-bracket value before running):
 
 ```text
-python -m pip install --no-cache-dir "https://github.com/mfraile/naos-governance/releases/download/v1.1.0/naos-public-export.tar.gz#sha256=cb57448d777560e880b9a9cf7ebbbad38117bf8bc91be63f83c5a0999ec169f8"
+python -m pip install --no-cache-dir "https://github.com/mfraile/naos-governance/releases/download/v1.1.0/naos-public-export.tar.gz#sha256=<reviewed-64-hex-digest>"
 python -m pip check
 python -m naos_governance.cli doctor
 ```
 
-This installs the published release, **not unreleased remediation commits**.
+The workflow attests builds from `main`; moving the release tag afterward does
+not change that signed source ref. The full kit contains its export receipt,
+whose selected files, sizes, hashes and modes must agree with the approved
+public source. GitHub's automatic source ZIP/tar downloads are separate tag
+snapshots with different container checksums. Neither the version string nor
+a checksum alone proves build origin, review approval or platform support.
+
+For historical reproduction only, the September archive has this identity:
+
+- Public source commit: `2711cafbef34f7f2c07e1764862d926541efc4e7`.
+- Artifact: `historical-20260916-naos-public-export.tar.gz` on the
+  [v1.1.0 release](https://github.com/mfraile/naos-governance/releases/tag/v1.1.0).
+- SHA-256: `cb57448d777560e880b9a9cf7ebbbad38117bf8bc91be63f83c5a0999ec169f8`.
+
+```text
+python -m pip install --no-cache-dir "https://github.com/mfraile/naos-governance/releases/download/v1.1.0/historical-20260916-naos-public-export.tar.gz#sha256=cb57448d777560e880b9a9cf7ebbbad38117bf8bc91be63f83c5a0999ec169f8"
+python -m pip check
+python -m naos_governance.cli doctor
+```
+
+This historical command installs the September baseline, **not the refreshed remediation build**.
+The historical receipt and checksum files retain their original bytes; to use
+that old checksum file, download all three historical files into a separate
+directory and restore their original filenames before checking it.
 The checksum binds bytes even if a release asset is replaced; a mismatch must
 fail, not cause the expected checksum to be refreshed automatically. The release
 page and checksum establish provenance only to the extent that you trust their
 publisher; a checksum is not independent review or a signature.
 
-For a locally supplied candidate, retain its source commit, artifact filename
+For a locally supplied build, retain its source commit, artifact filename
 and reviewed checksum from the build receipt. Obtain that artifact and receipt
-from the maintainer before continuing; there is no new release download implied
+from the maintainer before continuing; a local path alone implies no release qualification
 by this manual. Install its absolute file URI
 with the same `#sha256=<reviewed-64-hex-digest>` suffix. Obtain a correctly escaped
 URI (including spaces and Unicode) with:
@@ -293,10 +316,10 @@ and `NAOS_ARTIFACT_SHA256` to its reviewed digest. They select the artifact;
 they are not secrets or an authorization boundary against repository writers.
 Missing or invalid selectors stop acquisition before governance commands.
 The updated workflow also requires an artifact containing the installed
-`naos_ci_readiness` runner. The existing public v1.1.0 archive predates that
-runner; use a separately reviewed compatible candidate when available, and
-do not enable this updated workflow against that older archive. A successful
-installation alone does not prove workflow compatibility.
+`naos_ci_readiness` runner. The refreshed, verified 1.1.0 build contains it; the
+historical September archive does not. Do not enable this updated workflow
+against the historical archive. A successful installation alone does not prove
+workflow compatibility, and these selectors do not authorize a hosted run.
 Quickstart generates no default CI. Running hosted CI and uploading its evidence
 remain adopter choices with their own cost and data-handling review.
 
