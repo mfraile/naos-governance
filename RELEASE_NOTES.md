@@ -12,7 +12,10 @@ integrity, and approved profile footprint allowances are described
 in [contract and migration guidance](docs/CONTRACT_REVALIDATION.md). Reviewed
 Ruff cleanup also makes expected file, parser and subprocess errors explicit
 while allowing unexpected programming errors to surface. The package version
-is 1.1.0.
+is 1.1.0. The refreshed build is identified by its exact commit and artifact
+hashes in the release notes on GitHub; the September files remain available
+under explicit historical names. The same version string does not imply the
+same bytes.
 
 ## Changes Since the 1.0.0 Candidate
 
@@ -24,9 +27,9 @@ when explicitly run with `--registry-mode online --allow-network`.
 NAOS also added `naos api-symbol-reality` and `make -f Makefile.naos
 naos-api-symbol-reality` for deterministic review of explicitly declared
 Python API symbols by source inspection without importing target modules.
-The kit also pins `requirements.txt` to `PyYAML==6.0.1` and
-`jsonschema==4.19.2` for reproducible local validation while leaving
-`pyproject.toml` package metadata ranges broader.
+The kit uses hash-locked dependency files for CI, runtime and build preparation
+while leaving declared runtime package metadata ranges broader; see
+[Build dependency integrity](docs/BUILD_INTEGRITY.md).
 
 This change description does not, by itself, establish package approval,
 security assurance, API behavior proof, vulnerability-scan results,
@@ -153,7 +156,8 @@ decisions through deterministic artifacts and explicit human-review boundaries.
 
 ## Deferred Work
 
-- Optional wheel/sdist publication decision.
+- Package-registry publication remains separate; attached wheel/sdist downloads
+  do not imply a registry upload.
 - Live MCP/Engram introspection.
 - Durable memory write-back.
 - Runtime recall trace and audit-event capture.
@@ -166,7 +170,18 @@ decisions through deterministic artifacts and explicit human-review boundaries.
 ## Publication Package Decision
 
 This release uses the sanitized archive as the primary public package:
-`dist/naos-public-export.tar.gz`. Wheel and sdist artifacts are optional/manual
-inspection artifacts unless a later publication decision explicitly includes
-them. SHA-256 checksums are integrity metadata only; they are not signatures,
-not attestations, not approval, and not release authorization.
+`naos-public-export.tar.gz`, accompanied by the same
+`NAOS_PUBLIC_EXPORT_MANIFEST.json` receipt included inside it. The refreshed
+release also attaches a wheel and source distribution for optional installation,
+`SHA256SUMS` covering those four payloads, and `provenance.sigstore.json`.
+The separate manual GitHub build workflow attests the four payloads and checksum
+file; it does not turn NAOS runtime evidence into a signing authority.
+
+Verify actual downloaded bytes against the approved source commit, workflow
+and source ref as described in [Build dependency integrity](docs/BUILD_INTEGRITY.md).
+Preserved September files are historical and are not covered by the new build
+attestation. Moving `v1.1.0` to the verified refresh commit also aligns GitHub's
+automatic source snapshots; their container checksums differ from the canonical
+archive. No package-registry upload is included. SHA-256 is integrity metadata;
+provenance establishes build origin, not code safety, human approval, regulatory
+compliance or release authority.

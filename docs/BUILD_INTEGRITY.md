@@ -42,19 +42,28 @@ separate limit. Configuration alone does not prove hosted update execution.
 The public repository's manual release-provenance workflow
 at .github/workflows/release-provenance.yml runs only from main or a version-matching tag.
 The operator must confirm the exact event commit; checkout and package version
-are checked before the hash-locked wheel and source-archive build. The job is configured to
-attest those built bytes and retains them with checksums and the verification
-bundle. It has a 20-minute limit and no permission to publish a release or
-package. Pushes and pull requests do not trigger it. The initial
-publication guard caps the two built packages at 48 MiB and the complete retained
-artifact at 50 MiB; retention stays seven days. These bounds do not establish
-free storage eligibility. Confirm included storage or an effective zero-spend
-stop before dispatch; if it cannot be confirmed, do not run the upload.
+are checked before the hash-locked wheel and source-distribution build. A
+POSIX build-workspace helper at `scripts/release/pack.py` checks the committed
+public Git tree against its export receipt, then creates the canonical full-kit
+archive and copies the same receipt. This helper is release tooling, not an
+adopter command; it is not copied into generated projects.
+
+Four payloads are prepared: `naos-public-export.tar.gz`,
+`NAOS_PUBLIC_EXPORT_MANIFEST.json`, the versioned wheel and sdist. Their combined
+size is capped at 48 MiB. `SHA256SUMS` covers exactly those four files and is
+created before attestation; all five files are signed subjects. The bundle is
+added afterward, so neither it nor an archive containing it signs itself.
+The retained artifact contains exactly six ordinary files, at most 50 MiB,
+with seven-day retention. The job has a 20-minute limit, keeps read-only source
+access and cannot publish a release or package. Pushes and pull requests do not
+trigger it. Confirm included storage or an effective zero-spend stop before
+dispatch; byte limits alone do not establish free storage eligibility.
 
 Every hosted attempt still requires separate execution approval. A candidate
 from main is not a release; release approval must identify the source commit and
-the exact artifact bytes to publish. Existing version 1.1.0 assets are not
-retroactively attested. Keep downloaded release bytes identical to the attested
+the exact artifact bytes to publish. Historical September version 1.1.0 assets are not
+retroactively attested. The refreshed release must identify its own exact
+source commit and actual attested download hashes. Keep downloaded release bytes identical to the attested
 build and verify each actual download against the independently approved
 repository, workflow, source commit and source ref, for example:
 
@@ -64,7 +73,12 @@ repository, workflow, source commit and source ref, for example:
       --deny-self-hosted-runners
 
 Replace the uppercase placeholders with the approved artifact, full commit and
-ref before running the verification. Verification of a genuine hosted output is
+ref before running the verification. Verify `SHA256SUMS` as well as every
+selected payload; use `--bundle provenance.sigstore.json` when deliberately
+verifying a downloaded bundle offline. Online lookup also checks the current
+repository identity. For a build dispatched on main, APPROVED_REF stays
+`refs/heads/main` even after the release tag is moved to that commit. The bundle
+itself is verified through its signatures, not a self-referential checksum. Verification of a genuine hosted output is
 a release acceptance gate; a local checksum, source-only test or workflow
 declaration does not satisfy it. Provenance establishes build origin, not code
 safety or human approval. No tag, release or CI execution follows from this

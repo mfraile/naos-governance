@@ -11,6 +11,9 @@ name: Release build provenance (manual)
 permissions:
   contents: read
 
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
 jobs:
   provenance:
     if: >-
@@ -109,6 +112,32 @@ jobs:
           with target.open("x", encoding="utf-8") as output:
               output.write("\n".join(lines) + "\n")
           PY
+      - name: Prepare canonical archive and release checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum --check "$RUNNER_TEMP/naos-release-SHA256SUMS")
+          python -I -B scripts/release/pack.py --kit "$GITHUB_WORKSPACE" --output "$GITHUB_WORKSPACE/dist"
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          import stat
+
+          expected = {
+              "naos-public-export.tar.gz", "NAOS_PUBLIC_EXPORT_MANIFEST.json",
+              "naos_governance-1.1.0-py3-none-any.whl", "naos_governance-1.1.0.tar.gz",
+          }
+          files = sorted(Path("dist").iterdir())
+          if {path.name for path in files} != expected or not all(
+                  stat.S_ISREG(path.lstat().st_mode) for path in files):
+              raise SystemExit("Expected exactly four ordinary release payloads")
+          if sum(path.stat().st_size for path in files) > 48 * 1024 * 1024:
+              raise SystemExit("Release payloads exceed the 48 MiB preparation limit")
+          lines = [hashlib.sha256(path.read_bytes()).hexdigest() + "  " + path.name
+                   for path in files]
+          with Path("dist/SHA256SUMS").open("x", encoding="utf-8") as output:
+              output.write("\n".join(lines) + "\n")
+          PY
       - name: Attest the built artifacts
         id: attest
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -121,14 +150,19 @@ jobs:
         run: |
           set -euo pipefail
           cp -- "$BUNDLE_PATH" dist/provenance.sigstore.json
-          cp -- "$RUNNER_TEMP/naos-release-SHA256SUMS" dist/SHA256SUMS
           python - <<'PY_GUARD'
           from pathlib import Path
           import stat
 
           files = sorted(Path("dist").iterdir())
-          if len(files) != 4 or not all(stat.S_ISREG(path.lstat().st_mode) for path in files):
-              raise SystemExit("Expected two packages, checksums and the attestation bundle")
+          expected = {
+              "naos-public-export.tar.gz", "NAOS_PUBLIC_EXPORT_MANIFEST.json",
+              "naos_governance-1.1.0-py3-none-any.whl", "naos_governance-1.1.0.tar.gz",
+              "SHA256SUMS", "provenance.sigstore.json",
+          }
+          if {path.name for path in files} != expected or not all(
+                  stat.S_ISREG(path.lstat().st_mode) for path in files):
+              raise SystemExit("Expected four payloads, checksums and the attestation bundle")
           if sum(path.stat().st_size for path in files) > 50 * 1024 * 1024:
               raise SystemExit("Retained artifact exceeds the 50 MiB storage limit")
           PY_GUARD
