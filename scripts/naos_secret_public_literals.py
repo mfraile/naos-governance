@@ -18,7 +18,7 @@ from typing import Any
 CATALOG_SCHEMA = "naos.secret_public_literals.v1"
 COPIED_RUNTIME_MARKER = b"# AUTO-" + b"GENERATED: Copied by naos init from the NAOS kit."
 CATALOG_FILENAME = "naos_secret_public_literals.json"
-CATALOG_SHA256 = "ab18b51b48687722bdf198c5631245c6ea718a7b8ba53bd3a9e40d11106da066"
+CATALOG_SHA256 = "14623129d36202684ed5c524fc7478c04af94b24c6302e261d40836ecb79c6db"
 MAX_CATALOG_BYTES = 1024 * 1024
 MAX_ENTRIES = 16_384
 MAX_GROUPS = 2048

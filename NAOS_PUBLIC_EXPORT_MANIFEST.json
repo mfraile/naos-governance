@@ -690,7 +690,7 @@
       "bytes": 145937,
       "mode": "0644",
       "path": "configs/source_modes.json",
-      "sha256": "fe6587c60f099a0666d0f8cfd460a05bc297739097e6bc38e22f061e0120041e"
+      "sha256": "6d88a87cffe5cacaa9a75cd7268f3305790388ac25ee9c56621c00ee00549ed5"
     },
     {
       "bytes": 5756,
@@ -3963,16 +3963,16 @@
       "sha256": "adcaffa73b7fa48e0c7fea87dcce6b7022513774f66e14d3999394ce06132c97"
     },
     {
-      "bytes": 517377,
+      "bytes": 517403,
       "mode": "0644",
       "path": "scripts/naos_secret_public_literals.json",
-      "sha256": "ab18b51b48687722bdf198c5631245c6ea718a7b8ba53bd3a9e40d11106da066"
+      "sha256": "14623129d36202684ed5c524fc7478c04af94b24c6302e261d40836ecb79c6db"
     },
     {
       "bytes": 115368,
       "mode": "0644",
       "path": "scripts/naos_secret_public_literals.py",
-      "sha256": "fd5426d3a7fe665e079d3efdf7eed76eba72579268063f75931c93fa54a1ea75"
+      "sha256": "4b3ed1e8abecb87654d3844bcae4a64196e1ca9f99d1e5209eac23b2ac29f176"
     },
     {
       "bytes": 21126,
@@ -6671,8 +6671,8 @@
     "The candidate does not authorize a tag, hosted repository action, package upload, or visibility change."
   ],
   "schema": "naos.public_export_receipt.v1",
-  "source_bytes": 22222985,
+  "source_bytes": 22223011,
   "source_file_count": 1110,
   "source_manifest": "configs/naos_public_export_manifest.yaml",
-  "tree_sha256": "9c7ff95d1f3cbe230f0ccb076e0f01c334cf14ca31780bbdab66c345c2519b3c"
+  "tree_sha256": "e8230d787ac6fbea5997571af6d8afdbba096c66faf9d2e57adf264536ebb34f"
 }
